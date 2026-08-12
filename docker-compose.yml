@@ -1,0 +1,66 @@
+version: "3.9"
+services:
+  gateway:
+    build: ./gateway/traefik
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - dss-net
+
+  graphql-bff:
+    build: ./gateway/graphql-bff
+    depends_on:
+      - auth-service
+      - olap-service
+      - prediction-service
+      - etl-service
+    networks:
+      - dss-net
+
+  auth-service:
+    build: ./auth-service
+    networks:
+      - dss-net
+
+  olap-service:
+    build: ./olap-service
+    networks:
+      - dss-net
+
+  prediction-service:
+    build: ./prediction-service
+    networks:
+      - dss-net
+
+  etl-service:
+    build: ./etl-service
+    networks:
+      - dss-net
+
+  postgres-dw:
+    build: ./data-layer/postgres-dw
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=secret
+    networks:
+      - dss-net
+
+  neo4j:
+    build: ./data-layer/neo4j
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    networks:
+      - dss-net
+
+  frontend:
+    build: ./frontend/nextjs-spa
+    ports:
+      - "3000:3000"
+    networks:
+      - dss-net
+
+networks:
+  dss-net:
+    driver: bridge
