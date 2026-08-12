@@ -1,3 +1,19 @@
 spring:
   application:
     name: auth-service
+  profiles:
+    active: ${SPRING_PROFILE_ACTIVE:dev}
+  banner:
+    location: static/custom-banner.txt
+
+server:
+  port: ${SERVER_PORT:8080}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when_authorized
