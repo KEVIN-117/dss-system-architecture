@@ -17,7 +17,9 @@ Este servicio actúa como un **Resource Server** y coordinador de lógica de neg
 
 ## 📂 Arquitectura (Ports and Adapters / Hexagonal)
 
-El proyecto promueve un alto desacoplamiento y testeabilidad organizando sus paquetes bajo el patrón estricto de **Arquitectura Hexagonal (Ports and Adapters)**:
+El proyecto promueve un alto desacoplamiento y testeabilidad organizando sus paquetes bajo el patrón estricto de **Arquitectura Hexagonal (Ports and Adapters)**. 
+
+Para una explicación sumamente detallada sobre responsabilidades de cada capa, visibilidad de clases, encapsulamiento de adaptadores con MapStruct y validación automatizada con ArchUnit, consulta la **[Guía Completa de Arquitectura](ARCHITECTURE_GUIDE.md)**.
 
 ```text
 uatf.dss.authservice
