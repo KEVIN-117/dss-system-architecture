@@ -72,12 +72,15 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: kerbero
       KC_BOOTSTRAP_ADMIN_PASSWORD: jFeCD7
+      KEYCLOAK_WEBHOOK_URL: http://auth-service:8080/api/v1/auth/sync
+      KEYCLOAK_WEBHOOK_SECRET: dss-webhook-secret-xyz123
 
     ports:
       - "8080:8080"
 
     volumes:
       - ./infra/keycloak/realm:/opt/keycloak/data/import
+      - ./infra/keycloak/providers:/opt/keycloak/providers
 
     networks:
       - dss-net

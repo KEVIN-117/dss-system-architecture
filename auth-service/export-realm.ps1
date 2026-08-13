@@ -26,7 +26,7 @@ param (
     [string]$AdminUser = "kerbero",
     [string]$AdminPassword = "jFeCD7",
     [string]$RealmName = "uatf-dss-realm",
-    [string]$OutputPath = "$PSScriptRoot/../infra/keycloak/realm/uatf-realm-realm.json"
+    [string]$OutputPath = "$PSScriptRoot/../infra/keycloak/realm/uatf-dss-realm-realm.json"
 )
 
 $ErrorActionPreference = "Stop"
