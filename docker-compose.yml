@@ -61,6 +61,27 @@ services:
     networks:
       - dss-net
 
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.7.1
+    container_name: uatf-keycloak
+
+    command:
+      - start-dev
+      - --import-realm
+
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: kerbero
+      KC_BOOTSTRAP_ADMIN_PASSWORD: jFeCD7
+
+    ports:
+      - "8080:8080"
+
+    volumes:
+      - ./infra/keycloak/realm:/opt/keycloak/data/import
+
+    networks:
+      - dss-net
+
 networks:
   dss-net:
     driver: bridge
