@@ -61,6 +61,8 @@ CREATE TABLE user_roles (
     CONSTRAINT fk_user_roles_on_role FOREIGN KEY (role_id) REFERENCES roles (id) ON DELETE CASCADE
 );
 
+CREATE INDEX idx_user_roles_role_id ON user_roles (role_id);
+
 -- 6. Contexto Académico (para segregación por RNF4.1)
 CREATE TABLE user_academic_contexts (
     id         UUID NOT NULL DEFAULT gen_random_uuid(),
@@ -73,11 +75,13 @@ CREATE TABLE user_academic_contexts (
     CONSTRAINT chk_career_requires_faculty CHECK (career_id IS NULL OR faculty_id IS NOT NULL)
 );
 
+CREATE INDEX idx_user_academic_contexts_user_id ON user_academic_contexts (user_id);
+
 -- 7. Tablas de Auditoría (Hibernate Envers)
 CREATE SEQUENCE IF NOT EXISTS revinfo_seq START WITH 1 INCREMENT BY 50;
 
 CREATE TABLE revinfo (
-    rev      BIGINT NOT NULL,
+    rev      BIGINT NOT NULL DEFAULT nextval('revinfo_seq'),
     revtstmp BIGINT,
     CONSTRAINT pk_revinfo PRIMARY KEY (rev)
 );
@@ -87,3 +91,5 @@ CREATE TABLE revchanges (
     entityname VARCHAR(255),
     CONSTRAINT fk_revchanges_on_default_tracking_modified_entities_changelog FOREIGN KEY (rev) REFERENCES revinfo (rev)
 );
+
+CREATE INDEX idx_revchanges_rev ON revchanges (rev);
