@@ -1,5 +1,7 @@
 package uatf.dss.authservice.adapter.in.web;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -7,9 +9,13 @@ import org.springframework.web.bind.annotation.*;
 import uatf.dss.authservice.application.port.in.SyncUserCommand;
 import uatf.dss.authservice.application.port.in.SyncUserUseCase;
 
+import java.util.Objects;
+
 @RestController
 @RequestMapping("/auth")
 public class UserSyncController {
+
+    private static final Logger log = LoggerFactory.getLogger(UserSyncController.class);
 
     private final SyncUserUseCase useCase;
     private final String expectedSecret;
@@ -24,15 +30,21 @@ public class UserSyncController {
 
     @PostMapping("/sync")
     public ResponseEntity<Void> sync(
-            @RequestHeader(value = "Authorization", required = false) String authorizationHeader,
+            @RequestHeader(value = "X-Webhook-Secret", required = false) String providedSecret,
             @RequestBody UserSyncRequest request
     ) {
-        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+        log.info("Incoming sync request. X-Webhook-Secret: {}, expectedSecret length: {}",
+                providedSecret != null ? "PRESENT" : "NULL",
+                expectedSecret != null ? expectedSecret.length() : 0);
+
+        if (providedSecret == null || providedSecret.trim().isEmpty()) {
+            log.warn("Unauthorized sync request: missing X-Webhook-Secret header");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
-        String providedSecret = authorizationHeader.substring(7).trim();
-        if (!expectedSecret.equals(providedSecret)) {
+        if (!Objects.equals(expectedSecret, providedSecret.trim())) {
+            log.warn("Unauthorized sync request: secret mismatch. Provided secret: '{}', Expected secret: '{}'",
+                    providedSecret, expectedSecret);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 

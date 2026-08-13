@@ -92,14 +92,14 @@ public class WebhookEventListenerProvider implements EventListenerProvider {
                     escapeJson(userRep.getEmail()),
                     escapeJson(userRep.getFirstName()),
                     escapeJson(userRep.getLastName()),
-                    userRep.isEnabled() != null ? userRep.isEnabled() : true
+                    userRep.isEnabled() == null || userRep.isEnabled()
             );
 
             // Enviar la petición HTTP POST de forma asíncrona para no bloquear el hilo de Keycloak
             HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(webhookUrl))
                     .header("Content-Type", "application/json")
-                    .header("Authorization", "Bearer " + webhookSecret)
+                    .header("X-Webhook-Secret", webhookSecret)
                     .POST(HttpRequest.BodyPublishers.ofString(jsonPayload))
                     .timeout(Duration.ofSeconds(10))
                     .build();

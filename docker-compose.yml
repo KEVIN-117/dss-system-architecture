@@ -72,7 +72,7 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: kerbero
       KC_BOOTSTRAP_ADMIN_PASSWORD: jFeCD7
-      KEYCLOAK_WEBHOOK_URL: http://auth-service:8080/api/v1/auth/sync
+      KEYCLOAK_WEBHOOK_URL: http://host.docker.internal:8000/api/v1/auth/sync
       KEYCLOAK_WEBHOOK_SECRET: dss-webhook-secret-xyz123
 
     ports:
@@ -82,6 +82,20 @@ services:
       - ./infra/keycloak/realm:/opt/keycloak/data/import
       - ./infra/keycloak/providers:/opt/keycloak/providers
 
+    networks:
+      - dss-net
+  auth-service-db:
+    image: postgres:15-alpine
+    container_name: auth-service-db
+    ports:
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=admin
+      - POSTGRES_PASSWORD=secret
+      - POSTGRES_DB=auth-service
+    restart: always
+    volumes:
+      - ./infra/auth-service-db:/var/lib/postgresql/data
     networks:
       - dss-net
 

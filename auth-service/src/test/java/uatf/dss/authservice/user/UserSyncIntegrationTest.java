@@ -59,7 +59,7 @@ public class UserSyncIntegrationTest {
                 )
         );
 
-        ResponseEntity<Void> response = controller.sync("Bearer " + VALID_SECRET, requestPayload);
+        ResponseEntity<Void> response = controller.sync(VALID_SECRET, requestPayload);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
 
@@ -107,7 +107,7 @@ public class UserSyncIntegrationTest {
                 )
         );
 
-        ResponseEntity<Void> response = controller.sync("Bearer " + VALID_SECRET, updatePayload);
+        ResponseEntity<Void> response = controller.sync(VALID_SECRET, updatePayload);
         assertEquals(HttpStatus.OK, response.getStatusCode());
 
         Optional<User> savedUserOpt = userRepository.findByKeycloakId(keycloakId);

@@ -46,7 +46,7 @@ try {
         username   = $AdminUser
         password   = $AdminPassword
     }
-    
+
     $tokenResponse = Invoke-RestMethod -Uri $tokenUrl -Method Post -Body $tokenBody
     $accessToken = $tokenResponse.access_token
     Write-Host "✔ Token obtenido exitosamente." -ForegroundColor Green
@@ -59,7 +59,7 @@ try {
     }
 
     $exportedJson = Invoke-RestMethod -Uri $exportUrl -Method Post -Headers $headers
-    
+
     # 3. Guardar el archivo JSON
     # Asegurar que el directorio de salida existe
     $directory = Split-Path -Path $OutputPath

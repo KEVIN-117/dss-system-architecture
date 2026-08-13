@@ -24,7 +24,7 @@ public class WebhookEventListenerProviderFactory implements EventListenerProvide
 
         // Valores por defecto para desarrollo local si no están configurados
         if (this.webhookUrl == null || this.webhookUrl.trim().isEmpty()) {
-            this.webhookUrl = "http://auth-service:8080/api/v1/auth/sync";
+            this.webhookUrl = "http://127.0.0.1:8000/api/v1/auth/sync";
         }
         if (this.webhookSecret == null || this.webhookSecret.trim().isEmpty()) {
             this.webhookSecret = "dss-webhook-secret-xyz123";

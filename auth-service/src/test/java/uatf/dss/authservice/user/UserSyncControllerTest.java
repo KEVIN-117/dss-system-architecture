@@ -49,7 +49,7 @@ public class UserSyncControllerTest {
 
     @Test
     void shouldReturnOkWhenTokenIsValid() {
-        ResponseEntity<Void> response = controller.sync("Bearer " + VALID_SECRET, validRequest);
+        ResponseEntity<Void> response = controller.sync(VALID_SECRET, validRequest);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         verify(syncUserUseCase, times(1)).sync(any(SyncUserCommand.class));
@@ -57,7 +57,7 @@ public class UserSyncControllerTest {
 
     @Test
     void shouldReturnUnauthorizedWhenTokenIsInvalid() {
-        ResponseEntity<Void> response = controller.sync("Bearer wrong-secret", validRequest);
+        ResponseEntity<Void> response = controller.sync("wrong-secret", validRequest);
 
         assertEquals(HttpStatus.UNAUTHORIZED, response.getStatusCode());
         verify(syncUserUseCase, never()).sync(any());
@@ -81,7 +81,7 @@ public class UserSyncControllerTest {
                 null
         );
 
-        ResponseEntity<Void> response = controller.sync("Bearer " + VALID_SECRET, badRequest);
+        ResponseEntity<Void> response = controller.sync(VALID_SECRET, badRequest);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         verify(syncUserUseCase, never()).sync(any());
@@ -104,7 +104,7 @@ public class UserSyncControllerTest {
                 )
         );
 
-        ResponseEntity<Void> response = controller.sync("Bearer " + VALID_SECRET, badRequest);
+        ResponseEntity<Void> response = controller.sync(VALID_SECRET, badRequest);
 
         assertEquals(HttpStatus.BAD_REQUEST, response.getStatusCode());
         verify(syncUserUseCase, never()).sync(any());
