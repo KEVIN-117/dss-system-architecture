@@ -17,3 +17,7 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+
+app:
+  security:
+    webhook-secret: ${KEYCLOAK_WEBHOOK_SECRET:dss-webhook-secret-xyz123}
