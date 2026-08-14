@@ -24,7 +24,7 @@
 param (
     [string]$KeycloakUrl = "http://localhost:8080",
     [string]$AdminUser = "kerbero",
-    [string]$AdminPassword = "jFeCD7",
+    [SecureString]$AdminPassword,
     [string]$RealmName = "uatf-dss-realm",
     [string]$OutputPath = "$PSScriptRoot/../infra/keycloak/realm/uatf-dss-realm-realm.json"
 )
@@ -75,7 +75,8 @@ try {
     Write-Host "Archivo guardado en: $OutputPath" -ForegroundColor Green
     Write-Host "=======================================================" -ForegroundColor Cyan
 
-} catch {
+}
+catch {
     Write-Error "Ocurrió un error durante la exportación de Keycloak: $_"
     exit 1
 }

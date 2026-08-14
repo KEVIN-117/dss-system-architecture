@@ -41,8 +41,8 @@ services:
   postgres-dw:
     build: ./data-layer/postgres-dw
     environment:
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=secret
+      - POSTGRES_USER=${POSTGRES_DW_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_DW_PASSWORD}
     networks:
       - dss-net
 
@@ -70,10 +70,10 @@ services:
       - --import-realm
 
     environment:
-      KC_BOOTSTRAP_ADMIN_USERNAME: kerbero
-      KC_BOOTSTRAP_ADMIN_PASSWORD: jFeCD7
-      KEYCLOAK_WEBHOOK_URL: http://host.docker.internal:8000/api/v1/auth/sync
-      KEYCLOAK_WEBHOOK_SECRET: dss-webhook-secret-xyz123
+      KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
+      KEYCLOAK_WEBHOOK_URL: ${KEYCLOAK_WEBHOOK_URL}
+      KEYCLOAK_WEBHOOK_SECRET: ${KEYCLOAK_WEBHOOK_SECRET}
 
     ports:
       - "8080:8080"
@@ -90,9 +90,9 @@ services:
     ports:
       - "5433:5432"
     environment:
-      - POSTGRES_USER=admin
-      - POSTGRES_PASSWORD=secret
-      - POSTGRES_DB=auth-service
+      - POSTGRES_USER=${AUTH_DB_USER}
+      - POSTGRES_PASSWORD=${AUTH_DB_PASSWORD}
+      - POSTGRES_DB=${AUTH_DB_NAME}
     restart: always
     volumes:
       - ./infra/auth-service-db:/var/lib/postgresql/data

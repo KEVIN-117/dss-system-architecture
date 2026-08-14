@@ -15,7 +15,6 @@ import java.util.Objects;
 @RequestMapping("/auth")
 public class UserSyncController {
 
-    private static final Logger log = LoggerFactory.getLogger(UserSyncController.class);
 
     private final SyncUserUseCase useCase;
     private final String expectedSecret;
@@ -33,18 +32,12 @@ public class UserSyncController {
             @RequestHeader(value = "X-Webhook-Secret", required = false) String providedSecret,
             @RequestBody UserSyncRequest request
     ) {
-        log.info("Incoming sync request. X-Webhook-Secret: {}, expectedSecret length: {}",
-                providedSecret != null ? "PRESENT" : "NULL",
-                expectedSecret != null ? expectedSecret.length() : 0);
 
         if (providedSecret == null || providedSecret.trim().isEmpty()) {
-            log.warn("Unauthorized sync request: missing X-Webhook-Secret header");
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 
         if (!Objects.equals(expectedSecret, providedSecret.trim())) {
-            log.warn("Unauthorized sync request: secret mismatch. Provided secret: '{}', Expected secret: '{}'",
-                    providedSecret, expectedSecret);
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
 

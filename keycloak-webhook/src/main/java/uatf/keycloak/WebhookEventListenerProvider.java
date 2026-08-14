@@ -17,7 +17,7 @@ import java.util.UUID;
 import java.util.logging.Logger;
 
 public class WebhookEventListenerProvider implements EventListenerProvider {
-    private static final Logger logger = Logger.getLogger(WebhookEventListenerProvider.class.toGenericString());
+    private static final Logger logger = Logger.getLogger(WebhookEventListenerProvider.class.getName());
 
     private final KeycloakSession session;
     private final String webhookUrl;

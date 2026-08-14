@@ -59,6 +59,9 @@ public class SyncUserServiceTest {
         assertEquals(keycloakId, result.keycloakId());
         assertEquals("krodriguez", result.username());
         assertEquals("krodriguez@uatf.edu.bo", result.email());
+        assertEquals("Kevin", result.firstName());
+        assertEquals("Rodriguez", result.lastName());
+        assertTrue(result.isActive());
 
         verify(userRepository).findByKeycloakId(keycloakId);
         
@@ -68,6 +71,9 @@ public class SyncUserServiceTest {
         assertNull(capturedUser.id());
         assertEquals(keycloakId, capturedUser.keycloakId());
         assertEquals("krodriguez", capturedUser.username());
+        assertEquals("Kevin", capturedUser.firstName());
+        assertEquals("Rodriguez", capturedUser.lastName());
+        assertTrue(capturedUser.isActive());
     }
 
     @Test
