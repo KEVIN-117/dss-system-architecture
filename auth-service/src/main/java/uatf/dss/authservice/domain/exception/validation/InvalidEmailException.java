@@ -1,6 +1,6 @@
-package uatf.dss.authservice.domain.exception;
+package uatf.dss.authservice.domain.exception.validation;
 
-public class InvalidEmailException extends RuntimeException{
+public class InvalidEmailException extends ValidationException {
     public InvalidEmailException(){
         super("The email address provided is invalid.");
     }

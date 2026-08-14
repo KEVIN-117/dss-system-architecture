@@ -18,11 +18,11 @@ public class SyncUserService implements SyncUserUseCase {
     public User sync(SyncUserCommand command) {
         return userRepository.findByKeycloakId(command.keycloakId())
                 .map(existingUser -> {
-                    User updatedUser = new User(
+                    User updatedUser = User.create(
                             existingUser.id(),
                             existingUser.keycloakId(),
                             command.username(),
-                            new Email(command.email()),
+                            command.email(),
                             command.firstName(),
                             command.lastName(),
                             command.isActive()
@@ -30,11 +30,11 @@ public class SyncUserService implements SyncUserUseCase {
                     return userRepository.save(updatedUser);
                 })
                 .orElseGet(() -> {
-                    User newUser = new User(
+                    User newUser = User.create(
                             null,
                             command.keycloakId(),
                             command.username(),
-                            new Email(command.email()),
+                            command.email(),
                             command.firstName(),
                             command.lastName(),
                             command.isActive()

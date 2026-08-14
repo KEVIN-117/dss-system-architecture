@@ -1,6 +1,6 @@
 package uatf.dss.authservice.domain.model;
 
-import uatf.dss.authservice.domain.exception.InvalidRoleAssignmentException;
+import uatf.dss.authservice.domain.exception.validation.InvalidRoleAssignmentException;
 
 public record Role(
         Integer id,

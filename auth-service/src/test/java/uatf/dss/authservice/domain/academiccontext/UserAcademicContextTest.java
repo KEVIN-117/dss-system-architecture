@@ -2,7 +2,8 @@ package uatf.dss.authservice.domain.academiccontext;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
-import uatf.dss.authservice.domain.exception.FacultyRequiredException;
+import uatf.dss.authservice.domain.exception.validation.FacultyRequiredException;
+import uatf.dss.authservice.domain.exception.validation.InvalidAcademicContextException;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 
 import java.util.UUID;
@@ -64,6 +65,34 @@ class UserAcademicContextTest {
 
         assertThrows(FacultyRequiredException.class, () ->
                 new UserAcademicContext(id, userId, null, 202)
+        );
+    }
+
+    @Test
+    @DisplayName("Should throw InvalidAcademicContextException when facultyId is negative or zero")
+    void shouldThrowInvalidAcademicContextExceptionWhenFacultyIdNonPositive() {
+        UUID id = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        assertThrows(InvalidAcademicContextException.class, () ->
+                new UserAcademicContext(id, userId, 0, null)
+        );
+        assertThrows(InvalidAcademicContextException.class, () ->
+                new UserAcademicContext(id, userId, -5, null)
+        );
+    }
+
+    @Test
+    @DisplayName("Should throw InvalidAcademicContextException when careerId is negative or zero")
+    void shouldThrowInvalidAcademicContextExceptionWhenCareerIdNonPositive() {
+        UUID id = UUID.randomUUID();
+        UUID userId = UUID.randomUUID();
+
+        assertThrows(InvalidAcademicContextException.class, () ->
+                new UserAcademicContext(id, userId, 10, 0)
+        );
+        assertThrows(InvalidAcademicContextException.class, () ->
+                new UserAcademicContext(id, userId, 10, -3)
         );
     }
 }

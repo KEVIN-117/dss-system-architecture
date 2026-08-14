@@ -2,7 +2,7 @@ package uatf.dss.authservice.adapter.out.persistence.user;
 
 import org.springframework.stereotype.Repository;
 import uatf.dss.authservice.application.port.out.UserRepository;
-import uatf.dss.authservice.domain.exception.UserNotFoundException;
+import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
 import uatf.dss.authservice.domain.model.User;
 import java.util.Optional;
 import java.util.UUID;

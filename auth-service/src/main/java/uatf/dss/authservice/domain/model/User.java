@@ -1,6 +1,6 @@
 package uatf.dss.authservice.domain.model;
 
-import uatf.dss.authservice.domain.exception.InvalidUsernameException;
+import uatf.dss.authservice.domain.exception.validation.InvalidUsernameException;
 
 import java.util.UUID;
 
@@ -17,6 +17,14 @@ public record User(
         if (username == null || username.isBlank()) {
             throw new InvalidUsernameException("The username provided is invalid or not allowed.");
         }
-        return new User(id, keycloakId, username, new Email(email), firstName, lastName, isActive);
+        return new User(
+                id,
+                keycloakId,
+                username.trim(),
+                new Email(email),
+                firstName != null ? firstName.trim() : null,
+                lastName != null ? lastName.trim() : null,
+                isActive
+        );
     }
 }

@@ -5,8 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
-import uatf.dss.authservice.domain.exception.InvalidEmailException;
-import uatf.dss.authservice.domain.exception.InvalidUsernameException;
+import uatf.dss.authservice.domain.exception.validation.InvalidEmailException;
+import uatf.dss.authservice.domain.exception.validation.InvalidUsernameException;
 import uatf.dss.authservice.domain.model.Email;
 import uatf.dss.authservice.domain.model.User;
 

@@ -1,6 +1,6 @@
-package uatf.dss.authservice.domain.exception;
+package uatf.dss.authservice.domain.exception.validation;
 
-public class InvalidUsernameException extends RuntimeException{
+public class InvalidUsernameException extends ValidationException {
     public InvalidUsernameException(){
         super("The username provided is invalid or not allowed.");
     }
