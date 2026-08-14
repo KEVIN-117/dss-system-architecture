@@ -2,6 +2,7 @@ package uatf.dss.authservice.adapter.out.persistence.user;
 
 import org.springframework.stereotype.Repository;
 import uatf.dss.authservice.application.port.out.UserRepository;
+import uatf.dss.authservice.domain.exception.UserNotFoundException;
 import uatf.dss.authservice.domain.model.User;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,5 +29,25 @@ class UserRepositoryAdapter implements UserRepository {
         UserEntity entity = mapper.toEntity(user);
         UserEntity savedEntity = springDataRepository.save(entity);
         return mapper.toDomain(savedEntity);
+    }
+
+    @Override
+    public Optional<User> findById(UUID id) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<User> findByEmail(String email) {
+        return Optional.empty();
+    }
+
+    @Override
+    public Optional<User> delete(UUID id) throws UserNotFoundException {
+        return Optional.empty();
+    }
+
+    @Override
+    public boolean existsByEmail(String email) {
+        return true;
     }
 }

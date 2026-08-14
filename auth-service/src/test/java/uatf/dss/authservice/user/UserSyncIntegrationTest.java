@@ -70,7 +70,7 @@ public class UserSyncIntegrationTest {
         assertNotNull(savedUser.id());
         assertEquals(keycloakId, savedUser.keycloakId());
         assertEquals("krodriguez.integ", savedUser.username());
-        assertEquals("krodriguez.integ@uatf.edu.bo", savedUser.email());
+        assertEquals("krodriguez.integ@uatf.edu.bo", savedUser.email().email());
         assertEquals("Kevin Integ", savedUser.firstName());
         assertEquals("Rodriguez Integ", savedUser.lastName());
         assertTrue(savedUser.isActive());
@@ -80,7 +80,7 @@ public class UserSyncIntegrationTest {
     public void shouldUpdateExistingUserInPostgresOnSubsequentSync() {
         UUID keycloakId = UUID.randomUUID();
         
-        User initialUser = new User(
+        User initialUser = User.create(
                 null,
                 keycloakId,
                 "krodriguez.integ",
@@ -116,7 +116,7 @@ public class UserSyncIntegrationTest {
         User savedUser = savedUserOpt.get();
         assertEquals(savedInitial.id(), savedUser.id());
         assertEquals("krodriguez.integ.updated", savedUser.username());
-        assertEquals("krodriguez.integ.upd@uatf.edu.bo", savedUser.email());
+        assertEquals("krodriguez.integ.upd@uatf.edu.bo", savedUser.email().email());
         assertEquals("Kevin Integ Upd", savedUser.firstName());
         assertEquals("Rodriguez Integ Upd", savedUser.lastName());
         assertFalse(savedUser.isActive());
