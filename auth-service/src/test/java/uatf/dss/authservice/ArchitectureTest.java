@@ -1,9 +1,12 @@
 package uatf.dss.authservice;
 
 import com.tngtech.archunit.core.domain.JavaClasses;
+import com.tngtech.archunit.core.domain.JavaModifier;
 import com.tngtech.archunit.core.importer.ClassFileImporter;
 import com.tngtech.archunit.lang.ArchRule;
 import org.junit.jupiter.api.Test;
+
+import uatf.dss.authservice.domain.exception.DomainException;
 
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
@@ -89,6 +92,28 @@ public class ArchitectureTest {
                 .that().resideInAPackage("..adapter.in.web..")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage("..application.port.out..");
+
+        rule.check(importArchitectureClasses());
+    }
+
+    // 8. Todas las entidades de `domain.model` deben ser records o inmutables (campos `final`, sin setters).
+    @Test
+    void entitiesShouldRecordsOrImmutable(){
+        ArchRule rule = classes()
+                .that().resideInAPackage("..domain.model..")
+                .should().beRecords()
+                        .orShould().haveModifier(JavaModifier.FINAL)
+                        .andShould(new NoSetterCondition());
+        rule.check(importArchitectureClasses());
+    }
+
+    // 9. Todas las clases dentro de `domain.exception` deben terminar con el sufijo `Exception` y extender de `DomainException`.
+    @Test
+    void allExceptionsEndingInException(){
+        ArchRule rule = classes()
+                .that().resideInAPackage("..domain.exception..")
+                .should().beAssignableTo(DomainException.class)
+                .andShould().haveSimpleNameEndingWith("Exception");
 
         rule.check(importArchitectureClasses());
     }

@@ -10,6 +10,7 @@ import uatf.dss.authservice.application.port.in.SyncUserCommand;
 import uatf.dss.authservice.application.port.out.UserRepository;
 import uatf.dss.authservice.application.service.SyncUserService;
 import uatf.dss.authservice.domain.model.User;
+import uatf.dss.authservice.domain.model.Email;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -45,7 +46,7 @@ public class SyncUserServiceTest {
                 UUID.randomUUID(),
                 keycloakId,
                 command.username(),
-                command.email(),
+                new Email(command.email()),
                 command.firstName(),
                 command.lastName(),
                 command.isActive()
@@ -58,7 +59,7 @@ public class SyncUserServiceTest {
         assertEquals(savedUser.id(), result.id());
         assertEquals(keycloakId, result.keycloakId());
         assertEquals("krodriguez", result.username());
-        assertEquals("krodriguez@uatf.edu.bo", result.email());
+        assertEquals("krodriguez@uatf.edu.bo", result.email().email());
         assertEquals("Kevin", result.firstName());
         assertEquals("Rodriguez", result.lastName());
         assertTrue(result.isActive());
@@ -89,7 +90,7 @@ public class SyncUserServiceTest {
                 false
         );
 
-        User existingUser = new User(
+        User existingUser = User.create(
                 localId,
                 keycloakId,
                 "krodriguez",
@@ -105,7 +106,7 @@ public class SyncUserServiceTest {
                 localId,
                 keycloakId,
                 command.username(),
-                command.email(),
+                new Email(command.email()),
                 command.firstName(),
                 command.lastName(),
                 command.isActive()
@@ -118,7 +119,7 @@ public class SyncUserServiceTest {
         assertEquals(localId, result.id());
         assertEquals(keycloakId, result.keycloakId());
         assertEquals("krodriguez.updated", result.username());
-        assertEquals("krodriguez.upd@uatf.edu.bo", result.email());
+        assertEquals("krodriguez.upd@uatf.edu.bo", result.email().email());
         assertFalse(result.isActive());
 
         verify(userRepository).findByKeycloakId(keycloakId);
@@ -129,6 +130,6 @@ public class SyncUserServiceTest {
         assertEquals(localId, capturedUser.id());
         assertEquals(keycloakId, capturedUser.keycloakId());
         assertEquals("krodriguez.updated", capturedUser.username());
-        assertEquals("krodriguez.upd@uatf.edu.bo", capturedUser.email());
+        assertEquals("krodriguez.upd@uatf.edu.bo", capturedUser.email().email());
     }
 }

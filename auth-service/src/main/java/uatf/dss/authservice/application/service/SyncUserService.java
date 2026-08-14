@@ -4,8 +4,7 @@ import uatf.dss.authservice.application.port.in.SyncUserCommand;
 import uatf.dss.authservice.application.port.in.SyncUserUseCase;
 import uatf.dss.authservice.application.port.out.UserRepository;
 import uatf.dss.authservice.domain.model.User;
-
-import java.util.UUID;
+import uatf.dss.authservice.domain.model.Email;
 
 public class SyncUserService implements SyncUserUseCase {
 
@@ -19,7 +18,7 @@ public class SyncUserService implements SyncUserUseCase {
     public User sync(SyncUserCommand command) {
         return userRepository.findByKeycloakId(command.keycloakId())
                 .map(existingUser -> {
-                    User updatedUser = new User(
+                    User updatedUser = User.create(
                             existingUser.id(),
                             existingUser.keycloakId(),
                             command.username(),
@@ -31,7 +30,7 @@ public class SyncUserService implements SyncUserUseCase {
                     return userRepository.save(updatedUser);
                 })
                 .orElseGet(() -> {
-                    User newUser = new User(
+                    User newUser = User.create(
                             null,
                             command.keycloakId(),
                             command.username(),
