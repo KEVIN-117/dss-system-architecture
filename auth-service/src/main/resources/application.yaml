@@ -8,6 +8,8 @@ spring:
 
 server:
   port: ${SERVER_PORT:8080}
+  servlet:
+    context-path: /api/${API_VERSION:v1}
 
 management:
   endpoints:
@@ -17,3 +19,7 @@ management:
   endpoint:
     health:
       show-details: when_authorized
+
+app:
+  security:
+    webhook-secret: ${KEYCLOAK_WEBHOOK_SECRET:dss-webhook-secret-xyz123}

@@ -16,11 +16,15 @@ spring:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_ISSUER_URI}
+          jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
+app:
+  security:
+    webhook-secret: ${KEYCLOAK_WEBHOOK_SECRET:dss-webhook-secret-xyz123}
 
 logging:
   level:
-    root: debug
-    org.springframework.web: debug
-    org.hibernate.sql: debug
+    root: info
+    org.springframework.web: info
+    org.hibernate.sql: info
     org.hibernate.type.descriptor.sql: trace
 debug: true
