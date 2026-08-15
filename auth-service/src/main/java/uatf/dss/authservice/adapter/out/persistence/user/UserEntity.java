@@ -2,7 +2,10 @@ package uatf.dss.authservice.adapter.out.persistence.user;
 
 import jakarta.persistence.*;
 import lombok.*;
-import java.util.UUID;
+import uatf.dss.authservice.adapter.out.persistence.role.RoleEntity;
+import uatf.dss.authservice.adapter.out.persistence.useracademiccontext.UserAcademicContextEntity;
+
+import java.util.*;
 
 @Entity
 @Table(name = "users")
@@ -34,4 +37,15 @@ public class UserEntity {
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
+
+    @ManyToMany
+    @JoinTable(
+            name = "user_roles",
+            joinColumns = @JoinColumn(name = "user_id"),
+            inverseJoinColumns = @JoinColumn(name = "role_id")
+    )
+    private Set<RoleEntity> roles = new HashSet<>();
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<UserAcademicContextEntity> academicContexts = new ArrayList<>();
 }

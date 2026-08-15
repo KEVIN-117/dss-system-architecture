@@ -1,6 +1,5 @@
 package uatf.dss.authservice.application.port.out;
 
-import uatf.dss.authservice.domain.model.User;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 
 import java.util.Optional;
