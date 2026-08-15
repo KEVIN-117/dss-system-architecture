@@ -6,7 +6,7 @@ import uatf.dss.authservice.domain.model.User;
 import uatf.dss.authservice.domain.model.Email;
 
 @Mapper(componentModel = "spring")
-interface UserPersistenceMapper {
+public interface UserPersistenceMapper {
     @Mapping(source = "isActive", target = "active")
     UserEntity toEntity(User domain);
 

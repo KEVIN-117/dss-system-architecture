@@ -8,7 +8,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-class UserRepositoryAdapter implements UserRepository {
+public class UserRepositoryAdapter implements UserRepository {
 
     private final SpringDataUserRepository springDataRepository;
     private final UserPersistenceMapper mapper;
@@ -33,21 +33,23 @@ class UserRepositoryAdapter implements UserRepository {
 
     @Override
     public Optional<User> findById(UUID id) {
-        return Optional.empty();
+        return springDataRepository.findById(id).map(mapper::toDomain);
     }
 
     @Override
     public Optional<User> findByEmail(String email) {
-        return Optional.empty();
+        return springDataRepository.findByEmail(email).map(mapper::toDomain);
     }
 
     @Override
-    public Optional<User> delete(UUID id) throws UserNotFoundException {
-        return Optional.empty();
+    public void delete(UUID id) {
+        UserEntity entity = springDataRepository.findById(id).orElseThrow(UserNotFoundException::new);
+        entity.setActive(false);
+        springDataRepository.save(entity);
     }
 
     @Override
     public boolean existsByEmail(String email) {
-        return true;
+        return springDataRepository.existsByEmail(email);
     }
 }
