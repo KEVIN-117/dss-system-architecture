@@ -4,6 +4,7 @@ import org.springframework.stereotype.Repository;
 import uatf.dss.authservice.application.port.out.AcademicContextRepository;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,6 +21,11 @@ public class UserAcademicContextAdapter implements AcademicContextRepository {
     @Override
     public Optional<UserAcademicContext> findByUserId(UUID userId) {
         return academicContextRepository.findByUserId(userId).map(mapper::toDomain);
+    }
+
+    @Override
+    public List<UserAcademicContext> findAllByUserId(UUID userId) {
+        return academicContextRepository.findAllByUserId(userId).stream().map(mapper::toDomain).toList();
     }
 
     @Override
