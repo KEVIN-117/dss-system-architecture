@@ -27,10 +27,10 @@ public class DemoEndpoint {
         return ResponseEntity.ok("Welcome Rector...!");
     }
 
-    @GetMapping("/decant")
+    @GetMapping("/decano")
     @PreAuthorize("hasRole('DECANO')")
-    public ResponseEntity<String> helloDecant(){
-        return ResponseEntity.ok("Welcome Decant...!");
+    public ResponseEntity<String> helloDecano(){
+        return ResponseEntity.ok("Welcome Decano...!");
     }
 
     @GetMapping("/director")

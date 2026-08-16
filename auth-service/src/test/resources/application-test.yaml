@@ -24,6 +24,6 @@ jwt:
   auth:
     converter:
       resource-id: uatf-auth-service
-      principle-attribute: preferred_username
+      principal-attribute: preferred_username
 
 KEYCLOAK_JWK_SET_URI: http://localhost:8081/realms/auth-test/protocol/openid-connect/certs

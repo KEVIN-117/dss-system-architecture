@@ -21,8 +21,8 @@ import java.util.stream.Stream;
 public class JwtConverter implements Converter<Jwt, AbstractAuthenticationToken> {
     private final JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
-    @Value("${jwt.auth.converter.principle-attribute}")
-    private String principleAttribute;
+    @Value("${jwt.auth.converter.principal-attribute}")
+    private String principalAttribute;
     @Value("${jwt.auth.converter.resource-id}")
     private String resourceId;
 
@@ -34,8 +34,8 @@ public class JwtConverter implements Converter<Jwt, AbstractAuthenticationToken>
     }
 
     private String getPrincipleClaimName(Jwt jwt) {
-        if (principleAttribute != null && jwt.hasClaim(principleAttribute)) {
-            return jwt.getClaimAsString(principleAttribute);
+        if (principalAttribute != null && jwt.hasClaim(principalAttribute)) {
+            return jwt.getClaimAsString(principalAttribute);
         }
         return jwt.hasClaim("preferred_username")
                 ? jwt.getClaimAsString("preferred_username")
@@ -43,23 +43,21 @@ public class JwtConverter implements Converter<Jwt, AbstractAuthenticationToken>
     }
 
     private Collection<? extends GrantedAuthority> extractResourceRoles(Jwt jwt) {
-        Map<String, Object> resourceAccess;
-        Map<String, Object> resource;
-        Collection<String> resourceRoles;
-        if (jwt.getClaim("resource_access") == null) {
+        Object resourceAccessClaim = jwt.getClaim("resource_access");
+        if (!(resourceAccessClaim instanceof Map<?, ?> resourceAccess)) {
             return Set.of();
         }
-        resourceAccess = jwt.getClaim("resource_access");
-
-        if (resourceAccess != null && resourceAccess.get(resourceId) == null) {
+        Object resourceObj = resourceAccess.get(resourceId);
+        if (!(resourceObj instanceof Map<?, ?> resource)) {
             return Set.of();
         }
-        resource = (Map<String, Object>) resourceAccess.get(resourceId);
-
-        resourceRoles = (Collection<String>) resource.get("roles");
-
-        return resourceRoles
-                .stream()
+        Object rolesObj = resource.get("roles");
+        if (!(rolesObj instanceof Collection<?> roles)) {
+            return Set.of();
+        }
+        return roles.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
                 .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
                 .collect(Collectors.toSet());
     }
