@@ -1,7 +1,6 @@
 package uatf.dss.authservice;
 
 import org.springframework.boot.SpringApplication;
-import uatf.dss.authservice.AuthServiceApplication;
 
 public class TestAuthServiceApplication {
 

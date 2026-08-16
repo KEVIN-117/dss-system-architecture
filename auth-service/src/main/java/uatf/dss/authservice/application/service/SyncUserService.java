@@ -4,7 +4,6 @@ import uatf.dss.authservice.application.port.in.SyncUserCommand;
 import uatf.dss.authservice.application.port.in.SyncUserUseCase;
 import uatf.dss.authservice.application.port.out.UserRepository;
 import uatf.dss.authservice.domain.model.User;
-import uatf.dss.authservice.domain.model.Email;
 
 public class SyncUserService implements SyncUserUseCase {
 
