@@ -24,7 +24,7 @@
 param (
     [string]$KeycloakUrl = "http://localhost:8080",
     [string]$AdminUser = "kerbero",
-    [SecureString]$AdminPassword,
+    [string]$AdminPassword,
     [string]$RealmName = "uatf-dss-realm",
     [string]$OutputPath = "$PSScriptRoot/../infra/keycloak/realm/uatf-dss-realm-realm.json"
 )

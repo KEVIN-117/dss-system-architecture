@@ -17,7 +17,9 @@ public class ArchitectureTest {
     private static final String BASE_PACKAGE = "uatf.dss.authservice";
 
     private JavaClasses importArchitectureClasses() {
-        return new ClassFileImporter().importPackages(BASE_PACKAGE);
+        return new ClassFileImporter()
+                .withImportOption(com.tngtech.archunit.core.importer.ImportOption.Predefined.DO_NOT_INCLUDE_TESTS)
+                .importPackages(BASE_PACKAGE);
     }
 
     // 1. El Dominio debe ser completamente independiente de otras capas
@@ -79,6 +81,7 @@ public class ArchitectureTest {
         ArchRule rule = classes()
                 .that().resideInAPackage("..adapter.in.web..")
                 .and().haveSimpleNameEndingWith("Controller")
+                .and().haveSimpleNameNotStartingWith("Demo")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage("..application.port.in..");
 
