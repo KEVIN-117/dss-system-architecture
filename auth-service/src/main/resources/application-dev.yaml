@@ -21,6 +21,12 @@ app:
   security:
     webhook-secret: ${KEYCLOAK_WEBHOOK_SECRET:dss-webhook-secret-xyz123}
 
+jwt:
+  auth:
+    converter:
+      resource-id: ${KEYCLOAK_RESOURCE_ID}
+      principal-attribute: ${KEYCLOAK_PRINCIPAL_ATTRIBUTE}
+
 logging:
   level:
     root: info

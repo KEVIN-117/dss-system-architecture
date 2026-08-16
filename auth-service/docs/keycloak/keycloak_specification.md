@@ -48,44 +48,64 @@ Keycloak se ejecuta en el contenedor `uatf-keycloak` dentro de la red compartida
 
 ---
 
-## 3. Especificación Detallada de Roles Globales (Realm Roles)
-Los roles del sistema son globales (Realm Roles) y determinan la jerarquía de acceso y la granularidad académica de los datos en el DSS (Decision Support System) de la UATF.
+## 3. Especificación Detallada de Jerarquía de Roles (RBAC y Composite Roles)
+La arquitectura de seguridad del DSS delega la jerarquía de roles (Role Hierarchy) completamente al Identity Provider (Keycloak) utilizando **Composite Roles**, manteniendo al Resource Server (Spring Boot) agnóstico de la jerarquía.
 
-| Nombre del Rol | Identificador Único (Nombre) | Descripción Microscópica | Alcance Académico y Restricción (RNF4.1) |
-| :--- | :--- | :--- | :--- |
-| **Super Administrador** | `SUPERADMIN` | Rol de administración técnica global del sistema. Permite la gestión de usuarios, roles, clientes y la visualización de auditorías del sistema. | Global. Sin restricciones académicas. |
-| **Rector** | `RECTOR` | Máxima autoridad ejecutiva de la universidad UATF. Permite el acceso consolidado a métricas, reportes y dashboards a nivel institucional total. | Global. Sin restricciones. `faculty_id` y `career_id` deben ser `NULL` en el contexto local. |
-| **Decano** | `DECANO` | Máxima autoridad de una Facultad. Permite el acceso consolidado de todas las carreras y programas que pertenezcan única y exclusivamente a su Facultad asignada. | Restringido por Facultad. `faculty_id` es obligatorio y `career_id` debe ser `NULL`. |
-| **Director de Carrera** | `DIRECTOR` | Autoridad ejecutiva de una carrera o programa académico. Permite el acceso consolidado a nivel de la carrera bajo su administración. | Restringido por Carrera. Tanto `faculty_id` como `career_id` son obligatorios. |
+### Estrategia de Roles Compuestos
+Se definen **Client Roles** en el cliente `uatf-auth-service` y se mapean a **Realm Roles** compuestos. Cuando un usuario inicia sesión, Keycloak expande estos roles compuestos inyectando todos los permisos heredados en el `access_token` dentro del claim `resource_access.uatf-auth-service.roles`.
 
-### Definición JSON de Roles para Exportación (`uatf-realm-realm.json`)
-Los roles se declaran en el nodo principal del JSON de importación del Realm de la siguiente manera:
+### Segregación de Funciones (Separation of Duties)
+En cumplimiento con el Principio de Mínimo Privilegio (PoLP):
+* El rol técnico `SUPERADMIN` **no hereda roles de negocio académicos**. Un administrador IT no debe tener acceso automático a los dashboards académicos.
+* La jerarquía aplica estrictamente a las autoridades académicas (`RECTOR` > `DECANO` > `DIRECTOR`).
+
+| Realm Role (Global) | Hereda los Client Roles (`uatf-auth-service`) | Alcance Académico y Restricción (RNF4.1) |
+| :--- | :--- | :--- |
+| 👑 **`SUPERADMIN`** | `SUPERADMIN` | **Técnico Global**. Sin acceso a dashboards académicos. Gestión de usuarios y sistema. |
+| 🎓 **`RECTOR`** | `RECTOR`, `DECANO`, `DIRECTOR` | **Negocio Global**. `faculty_id` y `career_id` deben ser `NULL` en el contexto local. |
+| 🏛️ **`DECANO`** | `DECANO`, `DIRECTOR` | **Negocio Facultad**. `faculty_id` es obligatorio y `career_id` debe ser `NULL`. |
+| 📚 **`DIRECTOR`** | `DIRECTOR` | **Negocio Carrera**. Tanto `faculty_id` como `career_id` son obligatorios. |
+
+### Definición JSON de Roles Compuestos (`uatf-dss-realm-realm.json`)
+Los Realm roles se configuran con `composite: true` referenciando a los Client Roles:
 ```json
 {
   "roles": {
     "realm": [
       {
         "name": "SUPERADMIN",
-        "description": "Rol tecnico global para administracion, configuracion de clientes y auditoria del sistema DSS-UATF.",
-        "composite": false,
+        "description": "Rol de administración técnica global del sistema. Permite la gestión de usuarios y clientes.",
+        "composite": true,
+        "composites": {
+          "client": { "uatf-auth-service": ["SUPERADMIN"] }
+        },
         "clientRole": false
       },
       {
         "name": "RECTOR",
-        "description": "Maxima autoridad universitaria de la UATF. Acceso global ilimitado a reportes y analiticas.",
-        "composite": false,
+        "description": "Máxima autoridad ejecutiva de la UATF.",
+        "composite": true,
+        "composites": {
+          "client": { "uatf-auth-service": ["RECTOR", "DECANO", "DIRECTOR"] }
+        },
         "clientRole": false
       },
       {
         "name": "DECANO",
-        "description": "Autoridad de Facultad. Acceso restringido a reportes e informacion consolidada de su respectiva facultad.",
-        "composite": false,
+        "description": "Máxima autoridad de una Facultad.",
+        "composite": true,
+        "composites": {
+          "client": { "uatf-auth-service": ["DECANO", "DIRECTOR"] }
+        },
         "clientRole": false
       },
       {
         "name": "DIRECTOR",
-        "description": "Autoridad de Carrera. Acceso restringido exclusivamente a las metricas y analiticas de la carrera bajo su direccion.",
-        "composite": false,
+        "description": "Autoridad ejecutiva de una carrera o programa académico.",
+        "composite": true,
+        "composites": {
+          "client": { "uatf-auth-service": ["DIRECTOR"] }
+        },
         "clientRole": false
       }
     ]

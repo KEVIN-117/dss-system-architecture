@@ -52,7 +52,15 @@
         "id": "16beb383-bef8-4bd4-9ae8-881d39b81715",
         "name": "DECANO",
         "description": "Máxima autoridad de una Facultad. Permite el acceso consolidado de todas las carreras y programas que pertenezcan única y exclusivamente a su Facultad asignada.",
-        "composite": false,
+        "composite": true,
+        "composites": {
+          "client": {
+            "uatf-auth-service": [
+              "DECANO",
+              "DIRECTOR"
+            ]
+          }
+        },
         "clientRole": false,
         "containerId": "cd407a16-2814-4920-91a9-b471fcde96b6",
         "attributes": {}
@@ -61,7 +69,16 @@
         "id": "f77eda84-8be3-447d-a1ca-18a1b92f427f",
         "name": "RECTOR",
         "description": "Máxima autoridad ejecutiva de la universidad UATF. Permite el acceso consolidado a métricas, reportes y dashboards a nivel institucional total.",
-        "composite": false,
+        "composite": true,
+        "composites": {
+          "client": {
+            "uatf-auth-service": [
+              "DECANO",
+              "DIRECTOR",
+              "RECTOR"
+            ]
+          }
+        },
         "clientRole": false,
         "containerId": "cd407a16-2814-4920-91a9-b471fcde96b6",
         "attributes": {}
@@ -100,7 +117,14 @@
         "id": "acb40703-b457-41fc-bfc0-e73b8aa5492b",
         "name": "SUPERADMIN",
         "description": "Rol de administración técnica global del sistema. Permite la gestión de usuarios, roles, clientes y la visualización de auditorías del sistema.",
-        "composite": false,
+        "composite": true,
+        "composites": {
+          "client": {
+            "uatf-auth-service": [
+              "SUPERADMIN"
+            ]
+          }
+        },
         "clientRole": false,
         "containerId": "cd407a16-2814-4920-91a9-b471fcde96b6",
         "attributes": {}
@@ -109,7 +133,14 @@
         "id": "5069b1d5-9192-4b12-98b1-2360e77aae61",
         "name": "DIRECTOR",
         "description": "Autoridad ejecutiva de una carrera o programa académico. Permite el acceso consolidado a nivel de la carrera bajo su administración.",
-        "composite": false,
+        "composite": true,
+        "composites": {
+          "client": {
+            "uatf-auth-service": [
+              "DIRECTOR"
+            ]
+          }
+        },
         "clientRole": false,
         "containerId": "cd407a16-2814-4920-91a9-b471fcde96b6",
         "attributes": {}
@@ -374,7 +405,44 @@
           "attributes": {}
         }
       ],
-      "uatf-auth-service": [],
+      "uatf-auth-service": [
+        {
+          "id": "3c6f8513-6fd0-4f60-a95f-2166dd80c39c",
+          "name": "DECANO",
+          "description": "Máxima autoridad de una Facultad. Permite el acceso consolidado de todas las carreras y programas que pertenezcan única y exclusivamente a su Facultad asignada.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
+          "attributes": {}
+        },
+        {
+          "id": "f9699c59-5198-481c-81b7-bbcf4735e549",
+          "name": "SUPERADMIN",
+          "description": "Rol de administración técnica global del sistema. Permite la gestión de usuarios, roles, clientes y la visualización de auditorías del sistema.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
+          "attributes": {}
+        },
+        {
+          "id": "d49acacb-994c-421d-8cdb-b193ed1a8ada",
+          "name": "DIRECTOR",
+          "description": "Autoridad ejecutiva de una carrera o programa académico. Permite el acceso consolidado a nivel de la carrera bajo su administración.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
+          "attributes": {}
+        },
+        {
+          "id": "a16d5353-a3fa-43e5-96f6-db3e588dfccf",
+          "name": "RECTOR",
+          "description": "Máxima autoridad ejecutiva de la universidad UATF. Permite el acceso consolidado a métricas, reportes y dashboards a nivel institucional total.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
+          "attributes": {}
+        }
+      ],
       "uatf-dss-spa": [],
       "security-admin-console": [],
       "admin-cli": [],
@@ -884,28 +952,45 @@
     {
       "id": "753edb77-9a49-4c40-98b4-8857e733ffb0",
       "clientId": "uatf-auth-service",
+      "name": "",
+      "description": "",
+      "rootUrl": "http://localhost:8000",
+      "adminUrl": "",
+      "baseUrl": "http://localhost:8000",
       "surrogateAuthRequired": false,
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
       "secret": "**********",
-      "redirectUris": [],
-      "webOrigins": [],
+      "redirectUris": [
+        "http://localhost:8000/*"
+      ],
+      "webOrigins": [
+        "*"
+      ],
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
-      "standardFlowEnabled": false,
+      "standardFlowEnabled": true,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
+      "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,
       "publicClient": false,
       "frontchannelLogout": false,
       "protocol": "openid-connect",
       "attributes": {
         "realm_client": "false",
+        "logout.confirmation.enabled": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "client.secret.creation.time": "1786855472",
         "backchannel.logout.session.required": "true",
-        "post.logout.redirect.uris": "+",
-        "backchannel.logout.revoke.offline.tokens": "false"
+        "standard.token.exchange.enabled": "false",
+        "oauth2.jwt.authorization.grant.enabled": "false",
+        "post.logout.redirect.uris": "http://localhost:8000",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "display.on.consent.screen": "false",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "dpop.bound.access.tokens": "false"
       },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": true,
@@ -1768,14 +1853,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "oidc-sha256-pairwise-sub-mapper",
-            "oidc-address-mapper",
-            "saml-role-list-mapper",
-            "saml-user-property-mapper",
-            "oidc-full-name-mapper",
-            "oidc-usermodel-property-mapper",
             "saml-user-attribute-mapper",
-            "oidc-usermodel-attribute-mapper"
+            "oidc-usermodel-attribute-mapper",
+            "oidc-full-name-mapper",
+            "saml-user-property-mapper",
+            "saml-role-list-mapper",
+            "oidc-usermodel-property-mapper",
+            "oidc-sha256-pairwise-sub-mapper",
+            "oidc-address-mapper"
           ]
         }
       },
@@ -1787,14 +1872,14 @@
         "subComponents": {},
         "config": {
           "allowed-protocol-mapper-types": [
-            "oidc-usermodel-property-mapper",
-            "oidc-usermodel-attribute-mapper",
-            "oidc-address-mapper",
-            "oidc-full-name-mapper",
-            "saml-user-property-mapper",
+            "saml-user-attribute-mapper",
             "saml-role-list-mapper",
-            "oidc-sha256-pairwise-sub-mapper",
-            "saml-user-attribute-mapper"
+            "oidc-usermodel-property-mapper",
+            "saml-user-property-mapper",
+            "oidc-address-mapper",
+            "oidc-usermodel-attribute-mapper",
+            "oidc-full-name-mapper",
+            "oidc-sha256-pairwise-sub-mapper"
           ]
         }
       },
