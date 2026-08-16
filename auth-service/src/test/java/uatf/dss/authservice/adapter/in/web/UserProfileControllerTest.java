@@ -6,6 +6,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import uatf.dss.authservice.application.port.in.AuthUserProfile;
 import uatf.dss.authservice.application.port.in.GetAuthUserProfileCommand;
 import uatf.dss.authservice.application.port.in.GetAuthUserProfileUseCase;
+import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
 
 import java.util.Collections;
 import java.util.UUID;
@@ -28,6 +29,22 @@ class UserProfileControllerTest extends BaseWebMvcTest {
     void whenUnauthenticated_thenStatus401() throws Exception {
         mockMvc.perform(get("/auth/me"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void whenUserNotSynced_thenReturn404ProblemDetail() throws Exception {
+        // Arrange
+        UUID keycloakId = UUID.randomUUID();
+        UserNotFoundException exception = new UserNotFoundException();
+
+        when(authUserProfileUseCase.execute(any(GetAuthUserProfileCommand.class)))
+                .thenThrow(exception);
+
+        // Act & Assert
+        mockMvc.perform(get("/auth/me").with(jwt().jwt(jwt -> jwt.subject(keycloakId.toString()))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.title").value("USER_NOT_SYNCED"))
+                .andExpect(jsonPath("$.detail").value("El perfil del usuario aún no se ha sincronizado desde Keycloak."));
     }
 
     @Test
