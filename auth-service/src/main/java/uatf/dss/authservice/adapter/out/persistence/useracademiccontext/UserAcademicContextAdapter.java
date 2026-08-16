@@ -25,7 +25,7 @@ public class UserAcademicContextAdapter implements AcademicContextRepository {
 
     @Override
     public List<UserAcademicContext> findAllByUserId(UUID userId) {
-        return academicContextRepository.findAllByUserId(userId);
+        return academicContextRepository.findAllByUserId(userId).stream().map(mapper::toDomain).toList();
     }
 
     @Override

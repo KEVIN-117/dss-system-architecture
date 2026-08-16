@@ -12,5 +12,5 @@ public interface SpringDataUserAcademicContextRepository extends JpaRepository<U
 
     Optional<UserAcademicContextEntity> findByUserId(UUID userId);
 
-    List<UserAcademicContext> findAllByUserId(UUID userId);
+    List<UserAcademicContextEntity> findAllByUserId(UUID userId);
 }
