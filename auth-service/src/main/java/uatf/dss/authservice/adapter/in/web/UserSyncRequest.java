@@ -1,20 +1,23 @@
 package uatf.dss.authservice.adapter.in.web;
 
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import java.util.UUID;
 
 public record UserSyncRequest(
-    String eventId,
-    String realmId,
-    String eventType,
+    @NotBlank String eventId,
+    @NotBlank String realmId,
+    @NotBlank String eventType,
     long timestamp,
-    UserDto user
+    @NotNull @Valid UserDto user
 ) {
     public record UserDto(
-        UUID keycloakId,
-        String username,
-        String email,
-        String firstName,
-        String lastName,
+        @NotNull UUID keycloakId,
+        @NotBlank String username,
+        @NotBlank String email,
+        @NotBlank String firstName,
+        @NotBlank String lastName,
         boolean isActive
     ) {}
 }

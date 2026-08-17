@@ -1,5 +1,6 @@
 package uatf.dss.authservice.application.service;
 
+import jakarta.transaction.Transactional;
 import uatf.dss.authservice.application.port.in.SyncUserCommand;
 import uatf.dss.authservice.application.port.in.SyncUserUseCase;
 import uatf.dss.authservice.application.port.out.UserRepository;
@@ -14,6 +15,7 @@ public class SyncUserService implements SyncUserUseCase {
     }
 
     @Override
+    @Transactional
     public User sync(SyncUserCommand command) {
         return userRepository.findByKeycloakId(command.keycloakId())
                 .map(existingUser -> {
