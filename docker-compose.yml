@@ -1,40 +1,21 @@
 version: "3.9"
+
 services:
-  gateway:
-    build: ./gateway/traefik
+  # ==========================================
+  # INFRAESTRUCTURA (Bases de Datos y Servicios de Terceros)
+  # ==========================================
+  auth-service-db:
+    image: postgres:15-alpine
+    container_name: auth-service-db
     ports:
-      - "80:80"
-      - "443:443"
-    networks:
-      - dss-net
-
-  graphql-bff:
-    build: ./gateway/graphql-bff
-    depends_on:
-      - auth-service
-      - olap-service
-      - prediction-service
-      - etl-service
-    networks:
-      - dss-net
-
-  auth-service:
-    build: ./auth-service
-    networks:
-      - dss-net
-
-  olap-service:
-    build: ./olap-service
-    networks:
-      - dss-net
-
-  prediction-service:
-    build: ./prediction-service
-    networks:
-      - dss-net
-
-  etl-service:
-    build: ./etl-service
+      - "5433:5432"
+    environment:
+      - POSTGRES_USER=${AUTH_DB_USER}
+      - POSTGRES_PASSWORD=${AUTH_DB_PASSWORD}
+      - POSTGRES_DB=${AUTH_DB_NAME}
+    restart: always
+    volumes:
+      - ./infra/auth-service-db:/var/lib/postgresql/data
     networks:
       - dss-net
 
@@ -54,48 +35,89 @@ services:
     networks:
       - dss-net
 
-  frontend:
-    build: ./frontend/nextjs-spa
-    ports:
-      - "3000:3000"
-    networks:
-      - dss-net
-
   keycloak:
     image: quay.io/keycloak/keycloak:26.7.1
     container_name: uatf-keycloak
-
     command:
       - start-dev
       - --import-realm
-
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
       KEYCLOAK_WEBHOOK_URL: ${KEYCLOAK_WEBHOOK_URL}
       KEYCLOAK_WEBHOOK_SECRET: ${KEYCLOAK_WEBHOOK_SECRET}
-
     ports:
       - "8080:8080"
-
     volumes:
       - ./infra/keycloak/realm:/opt/keycloak/data/import
       - ./infra/keycloak/providers:/opt/keycloak/providers
-
     networks:
       - dss-net
-  auth-service-db:
-    image: postgres:15-alpine
-    container_name: auth-service-db
-    ports:
-      - "5433:5432"
+
+  # ==========================================
+  # MICROSERVICIOS PROPIOS
+  # ==========================================
+  auth-service:
+    build: ./auth-service
+    depends_on:
+      - auth-service-db
+    restart: on-failure
     environment:
-      - POSTGRES_USER=${AUTH_DB_USER}
-      - POSTGRES_PASSWORD=${AUTH_DB_PASSWORD}
-      - POSTGRES_DB=${AUTH_DB_NAME}
-    restart: always
-    volumes:
-      - ./infra/auth-service-db:/var/lib/postgresql/data
+      - SPRING_PROFILE_ACTIVE=${AUTH_SPRING_PROFILE_ACTIVE}
+      - SERVER_PORT=${AUTH_SERVER_PORT}
+      - DB_URI=${AUTH_DB_URI}
+      - DB_USERNAME=${AUTH_DB_USER}
+      - DB_PASSWORD=${AUTH_DB_PASSWORD}
+      - KEYCLOAK_ISSUER_URI=${AUTH_KEYCLOAK_ISSUER_URI}
+      - KEYCLOAK_JWK_SET_URI=${AUTH_KEYCLOAK_JWK_SET_URI}
+      - KEYCLOAK_WEBHOOK_SECRET=${KEYCLOAK_WEBHOOK_SECRET}
+      - KEYCLOAK_RESOURCE_ID=${AUTH_KEYCLOAK_RESOURCE_ID}
+      - KEYCLOAK_PRINCIPAL_ATTRIBUTE=${AUTH_KEYCLOAK_PRINCIPAL_ATTRIBUTE}
+    ports:
+      - "8000:${AUTH_SERVER_PORT}"
+    networks:
+      - dss-net
+
+  olap-service:
+    build: ./olap-service
+    networks:
+      - dss-net
+
+  prediction-service:
+    build: ./prediction-service
+    networks:
+      - dss-net
+
+  etl-service:
+    build: ./etl-service
+    networks:
+      - dss-net
+
+  # ==========================================
+  # GATEWAY, BFF Y FRONTEND
+  # ==========================================
+  graphql-bff:
+    build: ./gateway/graphql-bff
+    depends_on:
+      - auth-service
+      - olap-service
+      - prediction-service
+      - etl-service
+    networks:
+      - dss-net
+
+  gateway:
+    build: ./gateway/traefik
+    ports:
+      - "80:80"
+      - "443:443"
+    networks:
+      - dss-net
+
+  frontend:
+    build: ./frontend/nextjs-spa
+    ports:
+      - "3000:3000"
     networks:
       - dss-net
 
