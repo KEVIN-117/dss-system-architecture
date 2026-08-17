@@ -137,7 +137,12 @@ public class UserSyncControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                     {
+                      "eventId": "123e4567-e89b-12d3-a456-426614174000",
+                      "realmId": "uatf-realm",
+                      "eventType": "SYNC_USER",
+                      "timestamp": 1723891200000,
                       "user": {
+                        "keycloakId": null,
                         "username": "johndoe",
                         "email": "john.doe@example.com",
                         "firstName": "John",
