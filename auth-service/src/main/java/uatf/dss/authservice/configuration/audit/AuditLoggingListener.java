@@ -13,6 +13,8 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.net.URI;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static net.logstash.logback.argument.StructuredArguments.kv;
@@ -21,6 +23,7 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
 public class AuditLoggingListener {
 
     private static final Logger AUDIT_LOGGER = LoggerFactory.getLogger("AUDIT_LOGGER");
+    private static final Set<String> AUDITED_ENDPOINTS = Set.of("/auth/me");
 
     @EventListener
     public void onAuthenticationSuccess(AuthenticationSuccessEvent event) {
@@ -56,7 +59,15 @@ public class AuditLoggingListener {
     }
 
     private boolean isAuditEndpoint(String uri) {
-        return uri != null && uri.contains("/auth/me");
+        if (uri == null) {
+            return false;
+        }
+        try {
+            String path = URI.create(uri).getPath();
+            return AUDITED_ENDPOINTS.contains(path);
+        } catch (IllegalArgumentException ex) {
+            return AUDITED_ENDPOINTS.contains(uri);
+        }
     }
 
     private HttpServletRequest getCurrentHttpRequest() {

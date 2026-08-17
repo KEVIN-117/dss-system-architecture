@@ -50,8 +50,8 @@ public class SyncUserService implements SyncUserUseCase {
 
         AUDIT_LOGGER.info("Sincronización de Perfil de Usuario",
                 kv("event_type", "USER_SYNCED"),
-                kv("keycloak_id", command.keycloakId()),
-                kv("username", command.username()));
+                kv("keycloak_id", savedUser.keycloakId()),
+                kv("username", savedUser.username()));
 
         return savedUser;
     }
