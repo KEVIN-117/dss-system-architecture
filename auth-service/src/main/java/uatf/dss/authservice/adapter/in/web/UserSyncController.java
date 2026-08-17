@@ -11,6 +11,8 @@ import uatf.dss.authservice.application.port.in.SyncUserUseCase;
 
 import java.util.Objects;
 
+import jakarta.validation.Valid;
+
 @RestController
 @RequestMapping("/auth")
 public class UserSyncController {
@@ -23,11 +25,7 @@ public class UserSyncController {
     }
 
     @PostMapping("/sync")
-    public ResponseEntity<Void> sync(@RequestBody UserSyncRequest request) {
-
-        if (request.user() == null || request.user().keycloakId() == null) {
-            return ResponseEntity.badRequest().build();
-        }
+    public ResponseEntity<Void> sync(@Valid @RequestBody UserSyncRequest request) {
 
         SyncUserCommand command = new SyncUserCommand(
                 request.user().keycloakId(),
