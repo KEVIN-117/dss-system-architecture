@@ -20,6 +20,12 @@ management:
     health:
       show-details: when_authorized
 
+jwt:
+  auth:
+    converter:
+      resource-id: ${KEYCLOAK_RESOURCE_ID:uatf-auth-service}
+      principal-attribute: ${KEYCLOAK_PRINCIPAL_ATTRIBUTE:preferred_username}
+
 app:
   security:
     webhook-secret: ${KEYCLOAK_WEBHOOK_SECRET:dss-webhook-secret-xyz123}
