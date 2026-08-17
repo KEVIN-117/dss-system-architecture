@@ -11,6 +11,7 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.client.RestTemplate;
 
 
@@ -20,9 +21,11 @@ import org.springframework.web.client.RestTemplate;
 public class SecurityConfig {
 
     private final JwtConverter converter;
+    private final WebhookSecretFilter webhookSecretFilter;
 
-    public SecurityConfig(JwtConverter converter){
+    public SecurityConfig(JwtConverter converter, WebhookSecretFilter webhookSecretFilter){
         this.converter = converter;
+        this.webhookSecretFilter = webhookSecretFilter;
     }
 
     @Bean
@@ -34,6 +37,7 @@ public class SecurityConfig {
                 .requestMatchers("/auth/sync", "/demo/public").permitAll()
                 .anyRequest().authenticated()
             )
+                .addFilterBefore(webhookSecretFilter, UsernamePasswordAuthenticationFilter.class)
             .oauth2ResourceServer(oauth2 -> oauth2.jwt(jwt -> jwt.jwtAuthenticationConverter(converter)));
 
         return http.build();

@@ -17,29 +17,13 @@ public class UserSyncController {
 
 
     private final SyncUserUseCase useCase;
-    private final String expectedSecret;
 
-    public UserSyncController(
-            SyncUserUseCase useCase,
-            @Value("${app.security.webhook-secret:dss-webhook-secret-xyz123}") String expectedSecret
-    ) {
+    public UserSyncController(SyncUserUseCase useCase) {
         this.useCase = useCase;
-        this.expectedSecret = expectedSecret;
     }
 
     @PostMapping("/sync")
-    public ResponseEntity<Void> sync(
-            @RequestHeader(value = "X-Webhook-Secret", required = false) String providedSecret,
-            @RequestBody UserSyncRequest request
-    ) {
-
-        if (providedSecret == null || providedSecret.trim().isEmpty()) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
-
-        if (!Objects.equals(expectedSecret, providedSecret.trim())) {
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
-        }
+    public ResponseEntity<Void> sync(@RequestBody UserSyncRequest request) {
 
         if (request.user() == null || request.user().keycloakId() == null) {
             return ResponseEntity.badRequest().build();
