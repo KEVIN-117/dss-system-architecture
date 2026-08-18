@@ -1,2 +1,6 @@
 /infra/auth-service-db/*
+/infra/rabbitmq/data
+/infra/hop/*
 .env
+
+/etl-service

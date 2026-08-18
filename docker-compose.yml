@@ -53,7 +53,48 @@ services:
       - ./infra/keycloak/providers:/opt/keycloak/providers
     networks:
       - dss-net
+  rabbitmq:
+    image: rabbitmq:4.3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "5672:5672" # AMQP
+      - "15672:15672" # Web UI
+    volumes:
+      - ./infra/rabbitmq/data:/var/lib/rabbitmq
+    networks:
+      - dss-net
+  apache-hop:
+    image: apache/hop:latest
+    container_name: apache-hop
+    ports:
+      - 8080:8080
+      - 8181:8181
+      - 8180:8180
+    environment:
+      # Project
+      HOP_PROJECT_NAME: university-data-platform
+      HOP_PROJECT_FOLDER: /files/project
+      # Environment
+      HOP_ENVIRONMENT_NAME: production
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/config/production.json
+      # Execution
+      HOP_FILE_PATH: ${PROJECT_HOME}/workflows/main.hwf
+      HOP_RUN_CONFIG: local
+      HOP_RUN_PARAMETERS: "PARAM_ENV=production"
+      # Logging
+      HOP_LOG_LEVEL: Basic
+      # JVM
+      HOP_OPTIONS: "-Xms512m -Xmx2g"
+      # JDBC
+      HOP_SHARED_JDBC_FOLDERS: /files/jdbc
 
+    volumes:
+      - ./infra/hop:/files
+    networks:
+      - dss-net
   # ==========================================
   # MICROSERVICIOS PROPIOS
   # ==========================================
