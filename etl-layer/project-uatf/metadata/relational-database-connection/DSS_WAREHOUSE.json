@@ -1,0 +1,37 @@
+{
+  "server" : "${DB_DW_HOST}",
+  "database" : "${DB_DW_NAME}",
+  "password" : "${DB_DW_PASS}",
+  "variables" : [
+    {
+      "name" : "DSS_DW_HOSTNAME",
+      "value" : "${DB_DW_HOST}",
+      "description" : "Hostname for database connection DSS DW"
+    },
+    {
+      "name" : "DSS_DW_PORT",
+      "value" : "5432",
+      "description" : "Port for database connection DSS DW"
+    },
+    {
+      "name" : "DSS_DW_DATABASE",
+      "value" : "${DB_DW_NAME}",
+      "description" : "Database name for database connection DSS DW"
+    },
+    {
+      "name" : "DSS_DW_USERNAME",
+      "value" : "${DB_DW_USER}",
+      "description" : "Username for database connection DSS DW"
+    },
+    {
+      "name" : "DSS_DW_PASSWORD",
+      "value" : "${DB_DW_PASS}",
+      "description" : "Password for database connection DSS DW"
+    }
+  ],
+  "access" : "Native",
+  "port" : "${DB_DW_PORT}",
+  "name" : "DSS_WAREHOUSE",
+  "type" : "POSTGRESQL",
+  "username" : "${DB_DW_USER}"
+}

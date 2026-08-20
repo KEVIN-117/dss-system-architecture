@@ -20,10 +20,19 @@ services:
       - dss-net
 
   postgres-dw:
-    build: ./data-layer/postgres-dw
+    #build: ./data-layer/postgres-dw
+    image: postgres:15-alpine
+    container_name: postgres-dw
+    ports:
+      - "5434:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_DW_USER}
       - POSTGRES_PASSWORD=${POSTGRES_DW_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DW_NAME}
+    restart: always
+    volumes:
+      - ./infra/postgres-dw:/var/lib/postgresql/data
+      - ./infra/dw-schema/create_schemas.sql:/docker-entrypoint-initdb.d/01_create_schemas.sql
     networks:
       - dss-net
 
@@ -66,33 +75,37 @@ services:
       - ./infra/rabbitmq/data:/var/lib/rabbitmq
     networks:
       - dss-net
-  apache-hop:
-    image: apache/hop:latest
-    container_name: apache-hop
+  hop-web:
+    image: apache/hop-web:latest
+    container_name: dss-hop-web
     ports:
-      - 8080:8080
-      - 8181:8181
-      - 8180:8180
-    environment:
-      # Project
-      HOP_PROJECT_NAME: university-data-platform
-      HOP_PROJECT_FOLDER: /files/project
-      # Environment
-      HOP_ENVIRONMENT_NAME: production
-      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/config/production.json
-      # Execution
-      HOP_FILE_PATH: ${PROJECT_HOME}/workflows/main.hwf
-      HOP_RUN_CONFIG: local
-      HOP_RUN_PARAMETERS: "PARAM_ENV=production"
-      # Logging
-      HOP_LOG_LEVEL: Basic
-      # JVM
-      HOP_OPTIONS: "-Xms512m -Xmx2g"
-      # JDBC
-      HOP_SHARED_JDBC_FOLDERS: /files/jdbc
-
+      - "8081:8080"
     volumes:
-      - ./infra/hop:/files
+      - ./etl-layer/project-uatf:/files/project
+      - ./etl-layer/config:/files/config
+      - ./etl-layer/jdbc:/files/jdbc
+    environment:
+      # Definición de Proyecto
+      HOP_PROJECT_NAME: dss-uatf
+      HOP_PROJECT_FOLDER: /files/project
+
+      # Definición de Entorno
+      HOP_ENVIRONMENT_NAME: dev
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/config/environments/dev-env.json
+
+      # Compartir librería de Drivers
+      HOP_SHARED_JDBC_FOLDERS: /files/jdbc
+      # Conexiones directas (SIN HOST.DOCKER.INTERNAL)
+      DB_TX_HOST: localhost
+      DB_TX_PORT: 5432
+      DB_TX_NAME: jachasun
+      DB_TX_USER: postgres
+      DB_TX_PASS: 1234567890
+      DB_DW_HOST: postgres-dw
+      DB_DW_PORT: 5434
+      DB_DW_NAME: dss_dw
+      DB_DW_USER: admin
+      DB_DW_PASS: secret
     networks:
       - dss-net
   # ==========================================
@@ -165,3 +178,6 @@ services:
 networks:
   dss-net:
     driver: bridge
+
+volumes:
+  postgres_data:
