@@ -1,2 +1,155 @@
-/infra/auth-service-db/*
+# ==========================================
+# DSS System Architecture - .gitignore
+# ==========================================
+
+# ------------------------------------------
+# 1. Variables de Entorno y Credenciales
+# ------------------------------------------
 .env
+.env.*
+**/.env
+**/.env.*
+*.env
+# Preservar plantillas de ejemplo
+!.env.example
+!**/.env.example
+!.env.template
+!**/.env.template
+
+# Certificados, llaves privadas y tokens
+*.pem
+*.key
+*.keystore
+*.p12
+*.pfx
+id_rsa*
+id_ed25519*
+secrets/
+*.secret
+.erlang.cookie
+
+# ------------------------------------------
+# 2. Infraestructura, Volúmenes y Bases de Datos
+# ------------------------------------------
+/infra/postgres-dw/*
+!/infra/postgres-dw/.gitkeep
+/infra/auth-service-db/*
+!/infra/auth-service-db/.gitkeep
+/infra/rabbitmq/data/*
+!/infra/rabbitmq/data/.gitkeep
+/infra/hop/*
+!/infra/hop/.gitkeep
+/data-layer/neo4j/data/*
+!/data-layer/neo4j/data/.gitkeep
+/data-layer/neo4j/logs/*
+!/data-layer/neo4j/logs/.gitkeep
+/data-layer/neo4j/import/*
+!/data-layer/neo4j/import/.gitkeep
+infra/**/data/*
+docker-compose.override.yml
+
+# ------------------------------------------
+# 3. Apache Hop & ETL Drivers / Runtime
+# ------------------------------------------
+**/jdbc/*.jar
+**/audit/
+**/.hop/
+**/hop-audit/
+*.hpl.cache
+*.hwf.cache
+
+# ------------------------------------------
+# 4. Java & Maven (auth-service, keycloak-webhook)
+# ------------------------------------------
+target/
+**/target/
+*.class
+*.war
+*.ear
+*.nar
+.mvn/timing.properties
+.gradle/
+**/build/
+
+# Excepción: proveedores jar requeridos por Keycloak
+!/infra/keycloak/providers/*.jar
+
+# ------------------------------------------
+# 5. Python & Machine Learning (prediction-service)
+# ------------------------------------------
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+**/venv/
+**/.venv/
+env/
+.pytest_cache/
+**/.pytest_cache/
+.mypy_cache/
+**/.mypy_cache/
+.ruff_cache/
+**/.ruff_cache/
+.ipynb_checkpoints/
+*.pkl
+*.joblib
+
+# ------------------------------------------
+# 6. Node.js & Frontend (Next.js)
+# ------------------------------------------
+node_modules/
+**/node_modules/
+.next/
+**/.next/
+out/
+**/out/
+dist/
+**/dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+.turbo/
+
+# ------------------------------------------
+# 7. IDEs, Editores y Herramientas del Desarrollador
+# ------------------------------------------
+.idea/
+**/.idea/
+*.iml
+**/*.iml
+*.ipr
+*.iws
+.vscode/
+**/.vscode/
+*.swp
+*.swo
+*~
+.fleet/
+
+# ------------------------------------------
+# 8. Archivos del Sistema Operativo
+# ------------------------------------------
+.DS_Store
+**/.DS_Store
+Thumbs.db
+**/Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# ------------------------------------------
+# 9. Logs y Archivos Temporales
+# ------------------------------------------
+*.log
+logs/
+**/logs/
+*.tmp
+*.temp
+*.pid
+
+# ------------------------------------------
+# 10. Servicios Legacy / Temporales
+# ------------------------------------------
+/etl-service
+/dss-etl-hop
