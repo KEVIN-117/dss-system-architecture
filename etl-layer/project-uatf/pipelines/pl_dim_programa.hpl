@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pipeline>
+  <info>
+    <capture_transform_performance>N</capture_transform_performance>
+    <pipeline_type>Normal</pipeline_type>
+    <name>pl_dim_programa</name>
+    <description>Pipeline ETL para poblar la dimension de programas y facultades</description>
+  </info>
+  <transform>
+    <type>TableInput</type>
+    <name>EXT - Programas y Facultades</name>
+    <description>Extrae las carreras y facultades de la BD transaccional Jachasun.</description>
+    <sql>SELECT
+        TRIM(p.id_programa) AS id_programa,
+        TRIM(p.programa) AS carrera,
+        TRIM(f.facultad) AS facultad,
+        TRIM(f.facu_abre) AS facultad_abrev,
+        'Desconocido' AS area_conocimiento
+FROM academico.alm_programas p
+INNER JOIN academico.alm_programas_facultades f
+    ON p.id_facultad = f.id_facultad
+WHERE p.activo = 'SI'</sql>
+    <connection>OLTP db</connection>
+    <GUI>
+      <xloc>96</xloc>
+      <yloc>96</yloc>
+    </GUI>
+  </transform>
+  <transform>
+    <type>IfNull</type>
+    <name>TRF - Manejo de Nulos</name>
+    <description>Reemplaza campos nulos con valores por defecto (ND) para no romper consultas OLAP.</description>
+    <fields>
+      <field>
+        <name>facultad_abrev</name>
+        <value>ND</value>
+      </field>
+      <field>
+        <name>area_conocimiento</name>
+        <value>Desconocido</value>
+      </field>
+    </fields>
+    <selectFields>Y</selectFields>
+    <GUI>
+      <xloc>288</xloc>
+      <yloc>96</yloc>
+    </GUI>
+  </transform>
+  <transform>
+    <type>StringOperations</type>
+    <name>TRF - Estandarizar Textos</name>
+    <description>Aplica TRIM y convierte a mayúsculas para asegurar Data Quality.</description>
+    <fields>
+      <field>
+        <in_stream_name>carrera</in_stream_name>
+        <trim_type>both</trim_type>
+        <lower_upper>upper</lower_upper>
+      </field>
+      <field>
+        <in_stream_name>facultad</in_stream_name>
+        <trim_type>both</trim_type>
+        <lower_upper>upper</lower_upper>
+      </field>
+      <field>
+        <in_stream_name>facultad_abrev</in_stream_name>
+        <trim_type>both</trim_type>
+        <lower_upper>upper</lower_upper>
+      </field>
+    </fields>
+    <GUI>
+      <xloc>480</xloc>
+      <yloc>96</yloc>
+    </GUI>
+  </transform>
+  <transform>
+    <type>InsertUpdate</type>
+    <name>LOD - dim_programa</name>
+    <description>Upsert en el Data Warehouse basándose en la Natural Key (id_programa).</description>
+    <connection>DSS DW</connection>
+    <commit>100</commit>
+    <lookup>
+      <schema>public</schema>
+      <table>dim_programa</table>
+      <key>
+        <name>id_programa</name>
+        <field>id_programa</field>
+        <condition>=</condition>
+      </key>
+      <value>
+        <name>id_programa</name>
+        <rename>id_programa</rename>
+        <update>N</update>
+      </value>
+      <value>
+        <name>carrera</name>
+        <rename>carrera</rename>
+        <update>Y</update>
+      </value>
+      <value>
+        <name>facultad</name>
+        <rename>facultad</rename>
+        <update>Y</update>
+      </value>
+      <value>
+        <name>facultad_abrev</name>
+        <rename>facultad_abrev</rename>
+        <update>Y</update>
+      </value>
+      <value>
+        <name>area_conocimiento</name>
+        <rename>area_conocimiento</rename>
+        <update>Y</update>
+      </value>
+    </lookup>
+    <GUI>
+      <xloc>672</xloc>
+      <yloc>96</yloc>
+    </GUI>
+  </transform>
+  <order>
+    <hop>
+      <from>EXT - Programas y Facultades</from>
+      <to>TRF - Manejo de Nulos</to>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>TRF - Manejo de Nulos</from>
+      <to>TRF - Estandarizar Textos</to>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>TRF - Estandarizar Textos</from>
+      <to>LOD - dim_programa</to>
+      <enabled>Y</enabled>
+    </hop>
+  </order>
+</pipeline>

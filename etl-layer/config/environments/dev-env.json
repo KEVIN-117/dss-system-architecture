@@ -1,0 +1,54 @@
+{
+  "variables": [
+    {
+      "name": "DB_TX_HOST",
+      "value": "localhost",
+      "description": "Host base de datos transaccional (Origen)"
+    },
+    {
+      "name": "DB_TX_PORT",
+      "value": "5432",
+      "description": "Puerto transaccional"
+    },
+    {
+      "name": "DB_TX_NAME",
+      "value": "jachasun",
+      "description": "Nombre base de datos transaccional"
+    },
+    {
+      "name": "DB_TX_USER",
+      "value": "postgres",
+      "description": "Usuario transaccional"
+    },
+    {
+      "name": "DB_TX_PASS",
+      "value": "1234567890",
+      "description": "Password transaccional"
+    },
+    {
+      "name": "DB_DW_HOST",
+      "value": "postgres-dw",
+      "description": "Host base de datos analítica (Destino)"
+    },
+    {
+      "name": "DB_DW_PORT",
+      "value": "5434",
+      "description": "Puerto analítico"
+    },
+    {
+      "name": "DB_DW_NAME",
+      "value": "dss_dw",
+      "description": "Nombre base de datos analítica"
+    },
+    {
+      "name": "DB_DW_USER",
+      "value": "admin",
+      "description": "Usuario analítico"
+    },
+    {
+      "name": "DB_DW_PASS",
+      "value": "secret",
+      "description": "Password analítico"
+    }
+  ]
+}
