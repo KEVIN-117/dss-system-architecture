@@ -2,20 +2,129 @@
 <pipeline>
   <info>
     <capture_transform_performance>N</capture_transform_performance>
-    <transform_performance_capturing_delay>1000</transform_performance_capturing_delay>
-    <transform_performance_capturing_size_limit>100</transform_performance_capturing_size_limit>
     <pipeline_type>Normal</pipeline_type>
-    <pipeline_status>-1</pipeline_status>
-    <parameters/>
-    <name>New pipeline</name>
-    <name_sync_with_filename>Y</name_sync_with_filename>
-    <created_user>-</created_user>
-    <modified_user>-</modified_user>
-    <created_date>2026/08/20 00:05:41.151</created_date>
-    <modified_date>2026/08/20 00:05:41.151</modified_date>
+    <name>pl_dim_estudiante</name>
+    <description>Pipeline ETL para poblar la dimension de estudiantes y sus datos demograficos</description>
   </info>
-  <order/>
-  <notepads/>
-  <attributes/>
-  <transform_error_handling/>
+  <transform>
+    <type>TableInput</type>
+    <name>EXT - Estudiantes</name>
+    <description>Extrae datos demograficos y academicos cruzando alumnos, colegios y uatf_datos</description>
+    <sql>SELECT
+    TRIM(a.id_alumno::VARCHAR) AS id_alumno,
+    CASE
+        WHEN UPPER(TRIM(ud.id_sexo::VARCHAR)) = 'M' THEN 'MASCULINO'
+        WHEN UPPER(TRIM(ud.id_sexo::VARCHAR)) = 'F' THEN 'FEMENINO'
+        ELSE 'NO DEFINIDO'
+    END AS genero,
+    COALESCE(TRIM(ud.estado_civil::VARCHAR), 'NO DEFINIDO') AS estado_civil,
+    COALESCE(TRIM(ud.nacionalidad::VARCHAR), 'NO DEFINIDO') AS nacionalidad,
+    COALESCE(TRIM(pc.colegio::VARCHAR), 'NO DEFINIDO') AS colegio_origen,
+    COALESCE(TRIM(pc.tipo::VARCHAR), 'NO DEFINIDO') AS tipo_colegio,
+    COALESCE(TRIM(ll.localidad::VARCHAR), 'NO DEFINIDO') AS localidad,
+    COALESCE(TRIM(ap.sede::VARCHAR), 'Sede Central') AS sede_universitaria,
+    COALESCE(TRIM(a.nivel_acad::VARCHAR), 'NO DEFINIDO') AS nivel_academico,
+    CASE
+        WHEN UPPER(TRIM(a.tipo_alumno::VARCHAR)) = 'A' THEN 'ACTIVO'
+        WHEN UPPER(TRIM(a.tipo_alumno::VARCHAR)) = 'P' THEN 'PASIVO'
+        ELSE COALESCE(TRIM(a.tipo_alumno::VARCHAR), 'NO DEFINIDO')
+    END AS tipo_alumno
+FROM academico.alumnos a
+    LEFT JOIN public.uatf_datos ud
+        ON a.id_ra = ud.id_ra
+    LEFT JOIN public.prs_colegios pc
+        ON ud.id_colegio = pc.id_colegio
+    LEFT JOIN public.lugar_localidad ll
+        ON pc.cod_loc = ll.cod_loc
+    LEFT JOIN academico.alm_programas ap
+        ON a.id_programa = ap.id_programa;</sql>
+    <connection>OLTP db</connection>
+    <GUI>
+      <xloc>96</xloc>
+      <yloc>96</yloc>
+    </GUI>
+  </transform>
+  <transform>
+    <type>IfNull</type>
+    <name>TRF - Manejo de Nulos</name>
+    <description>Asegura que no pasen nulos al Data Warehouse (ya manejado parcialmente en SQL)</description>
+    <fields>
+      <field>
+        <name>estado_civil</name>
+        <value>NO DEFINIDO</value>
+      </field>
+    </fields>
+    <selectFields>Y</selectFields>
+    <GUI>
+      <xloc>288</xloc>
+      <yloc>96</yloc>
+    </GUI>
+  </transform>
+  <transform>
+    <type>StringOperations</type>
+    <name>TRF - Estandarizar Textos</name>
+    <description>Aplica TRIM y convierte a mayusculas todas las cadenas de texto (Data Quality)</description>
+    <fields>
+      <field><in_stream_name>genero</in_stream_name><trim_type>both</trim_type><lower_upper>upper</lower_upper></field>
+      <field><in_stream_name>estado_civil</in_stream_name><trim_type>both</trim_type><lower_upper>upper</lower_upper></field>
+      <field><in_stream_name>nacionalidad</in_stream_name><trim_type>both</trim_type><lower_upper>upper</lower_upper></field>
+      <field><in_stream_name>colegio_origen</in_stream_name><trim_type>both</trim_type><lower_upper>upper</lower_upper></field>
+      <field><in_stream_name>tipo_colegio</in_stream_name><trim_type>both</trim_type><lower_upper>upper</lower_upper></field>
+      <field><in_stream_name>localidad</in_stream_name><trim_type>both</trim_type><lower_upper>upper</lower_upper></field>
+      <field><in_stream_name>sede_universitaria</in_stream_name><trim_type>both</trim_type><lower_upper>upper</lower_upper></field>
+      <field><in_stream_name>nivel_academico</in_stream_name><trim_type>both</trim_type><lower_upper>upper</lower_upper></field>
+      <field><in_stream_name>tipo_alumno</in_stream_name><trim_type>both</trim_type><lower_upper>upper</lower_upper></field>
+    </fields>
+    <GUI>
+      <xloc>480</xloc>
+      <yloc>96</yloc>
+    </GUI>
+  </transform>
+  <transform>
+    <type>InsertUpdate</type>
+    <name>LOD - dim_estudiante</name>
+    <description>Upsert en el DW (SCD Tipo 1). Se actualizan todos los campos si cambian en el origen.</description>
+    <connection>DSS DW</connection>
+    <commit>1000</commit>
+    <lookup>
+      <schema>public</schema>
+      <table>dim_estudiante</table>
+      <key>
+        <name>id_alumno</name>
+        <field>id_alumno</field>
+        <condition>=</condition>
+      </key>
+      <value><name>id_alumno</name><rename>id_alumno</rename><update>N</update></value>
+      <value><name>genero</name><rename>genero</rename><update>Y</update></value>
+      <value><name>estado_civil</name><rename>estado_civil</rename><update>Y</update></value>
+      <value><name>nacionalidad</name><rename>nacionalidad</rename><update>Y</update></value>
+      <value><name>colegio_origen</name><rename>colegio_origen</rename><update>Y</update></value>
+      <value><name>tipo_colegio</name><rename>tipo_colegio</rename><update>Y</update></value>
+      <value><name>localidad</name><rename>localidad</rename><update>Y</update></value>
+      <value><name>sede_universitaria</name><rename>sede_universitaria</rename><update>Y</update></value>
+      <value><name>nivel_academico</name><rename>nivel_academico</rename><update>Y</update></value>
+      <value><name>tipo_alumno</name><rename>tipo_alumno</rename><update>Y</update></value>
+    </lookup>
+    <GUI>
+      <xloc>672</xloc>
+      <yloc>96</yloc>
+    </GUI>
+  </transform>
+  <order>
+    <hop>
+      <from>EXT - Estudiantes</from>
+      <to>TRF - Manejo de Nulos</to>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>TRF - Manejo de Nulos</from>
+      <to>TRF - Estandarizar Textos</to>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>TRF - Estandarizar Textos</from>
+      <to>LOD - dim_estudiante</to>
+      <enabled>Y</enabled>
+    </hop>
+  </order>
 </pipeline>

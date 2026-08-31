@@ -22,13 +22,48 @@
       <description/>
       <type>SPECIAL</type>
       <attributes/>
-      <xloc>50</xloc>
-      <yloc>50</yloc>
+      <xloc>48</xloc>
+      <yloc>48</yloc>
+      <parallel>N</parallel>
+      <attributes_hac/>
+    </action>
+    <action>
+      <filename>${PROJECT_HOME}/pipelines/pl_dim_periodo_academico.hpl</filename>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <create_parent_folder>N</create_parent_folder>
+      <set_logfile>N</set_logfile>
+      <set_append_logfile>N</set_append_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <wait_until_finished>Y</wait_until_finished>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <run_configuration>local</run_configuration>
+      <name>pl_dim_periodo_academico.hpl</name>
+      <type>PIPELINE</type>
+      <attributes/>
+      <xloc>208</xloc>
+      <yloc>48</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
     </action>
   </actions>
-  <hops/>
+  <hops>
+    <hop>
+      <from>Start</from>
+      <to>pl_dim_periodo_academico.hpl</to>
+      <evaluation>Y</evaluation>
+      <unconditional>Y</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+  </hops>
   <notepads/>
   <attributes/>
 </workflow>
