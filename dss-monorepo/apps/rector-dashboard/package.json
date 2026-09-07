@@ -1,0 +1,17 @@
+{
+  "name": "@dss-monorepo/rector-dashboard",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "sourceRoot": "apps/rector-dashboard/src",
+    "tags": [
+      "type:app",
+      "scope:rector"
+    ]
+  },
+  "dependencies": {
+    "next": "~16.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}
