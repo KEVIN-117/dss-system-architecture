@@ -1,0 +1,13 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/admin-portal-e2e"
+    },
+    {
+      "path": "./apps/admin-portal"
+    }
+  ]
+}

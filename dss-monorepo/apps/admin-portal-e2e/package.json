@@ -1,0 +1,14 @@
+{
+  "name": "@dss-monorepo/admin-portal-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "implicitDependencies": [
+      "@dss-monorepo/admin-portal"
+    ],
+    "tags": [
+      "type:e2e",
+      "scope:admin"
+    ]
+  }
+}

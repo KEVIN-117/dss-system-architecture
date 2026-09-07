@@ -1,0 +1,9 @@
+{
+    "name": "@dss-monorepo/admin-portal",
+    "projectType": "application",
+    "sourceRoot": "apps/admin-portal/src",
+    "tags": [
+        "type:app",
+        "scope:admin"
+    ]
+}
