@@ -5,6 +5,10 @@
   "nx": {
     "implicitDependencies": [
       "@dss-monorepo/bff"
+    ],
+    "tags": [
+      "type:e2e",
+      "scope:shared"
     ]
   }
 }

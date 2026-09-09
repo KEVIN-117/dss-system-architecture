@@ -5,6 +5,10 @@
   "nx": {
     "implicitDependencies": [
       "@dss-monorepo/decano-dashboard"
+    ],
+    "tags": [
+      "type:e2e",
+      "scope:decano"
     ]
   }
 }

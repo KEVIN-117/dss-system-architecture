@@ -5,6 +5,10 @@
   "nx": {
     "implicitDependencies": [
       "@dss-monorepo/director-dashboard"
+    ],
+    "tags": [
+      "type:e2e",
+      "scope:rector"
     ]
   }
 }
