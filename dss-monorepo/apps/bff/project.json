@@ -1,0 +1,9 @@
+{
+    "name": "@dss-monorepo/bff",
+    "projectType": "application",
+    "sourceRoot": "apps/bff/src",
+    "tags": [
+        "type:bff",
+        "scope:shared"
+    ]
+}

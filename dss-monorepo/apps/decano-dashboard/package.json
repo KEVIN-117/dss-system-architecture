@@ -2,13 +2,6 @@
   "name": "@dss-monorepo/decano-dashboard",
   "version": "0.0.1",
   "private": true,
-  "nx": {
-    "sourceRoot": "apps/decano-dashboard/src",
-    "tags": [
-      "type:app",
-      "scope:decano"
-    ]
-  },
   "dependencies": {
     "next": "~16.1.6",
     "react": "^19.0.0",

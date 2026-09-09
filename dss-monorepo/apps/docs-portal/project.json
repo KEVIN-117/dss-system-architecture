@@ -1,0 +1,9 @@
+{
+    "name": "@dss-monorepo/docs-portal",
+    "projectType": "application",
+    "sourceRoot": "apps/docs-portal/src",
+    "tags": [
+        "type:app",
+        "scope:shared"
+    ]
+}

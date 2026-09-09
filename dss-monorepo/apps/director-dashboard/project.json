@@ -1,0 +1,9 @@
+{
+    "name": "@dss-monorepo/director-dashboard",
+    "projectType": "application",
+    "sourceRoot": "apps/director-dashboard/src",
+    "tags": [
+        "type:app",
+        "scope:director"
+    ]
+}

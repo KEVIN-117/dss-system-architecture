@@ -1,0 +1,10 @@
+{
+  "name": "@dss-monorepo/auth",
+  "sourceRoot": "libs/auth/src",
+  "projectType": "library",
+  "tags": [
+    "type:util",
+    "scope:shared"
+  ],
+  "targets": {}
+}
