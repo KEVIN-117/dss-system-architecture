@@ -95,12 +95,6 @@ services:
 
       # Compartir librería de Drivers
       HOP_SHARED_JDBC_FOLDERS: /files/jdbc
-      # Conexiones directas (SIN HOST.DOCKER.INTERNAL)
-      DB_TX_HOST: localhost
-      DB_TX_PORT: 5432
-      DB_TX_NAME: jachasun
-      DB_TX_USER: postgres
-      DB_TX_PASS: 1234567890
       DB_DW_HOST: postgres-dw
       DB_DW_PORT: 5434
       DB_DW_NAME: dss_dw
