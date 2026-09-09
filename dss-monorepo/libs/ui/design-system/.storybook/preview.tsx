@@ -38,9 +38,9 @@ const preview: Preview = {
             const theme = context.globals.theme || 'admin';
             const colorMode = context.globals.colorMode || 'dark';
             const isDark = colorMode === 'dark';
-            
+
             return (
-                <div data-theme={theme} className={`p-6 bg-background text-foreground min-h-screen ${isDark ? 'dark' : ''}`}>
+                <div data-theme={theme} className={`p-6 bg-background text-foreground ${isDark ? 'dark' : ''}`}>
                     <Story />
                 </div>
             )
