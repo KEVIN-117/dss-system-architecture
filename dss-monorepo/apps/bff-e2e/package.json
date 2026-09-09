@@ -1,0 +1,14 @@
+{
+  "name": "@dss-monorepo/bff-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "implicitDependencies": [
+      "@dss-monorepo/bff"
+    ],
+    "tags": [
+      "type:e2e",
+      "scope:shared"
+    ]
+  }
+}

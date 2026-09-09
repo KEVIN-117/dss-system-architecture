@@ -1,0 +1,9 @@
+{
+    "name": "@dss-monorepo/decano-dashboard",
+    "projectType": "application",
+    "sourceRoot": "apps/decano-dashboard/src",
+    "tags": [
+        "type:app",
+        "scope:decano"
+    ]
+}

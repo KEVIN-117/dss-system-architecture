@@ -1,0 +1,52 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compileOnSave": false,
+  "files": [],
+  "references": [
+    {
+      "path": "./apps/admin-portal-e2e"
+    },
+    {
+      "path": "./apps/admin-portal"
+    },
+    {
+      "path": "./apps/rector-dashboard-e2e"
+    },
+    {
+      "path": "./apps/rector-dashboard"
+    },
+    {
+      "path": "./apps/decano-dashboard-e2e"
+    },
+    {
+      "path": "./apps/decano-dashboard"
+    },
+    {
+      "path": "./apps/director-dashboard-e2e"
+    },
+    {
+      "path": "./apps/director-dashboard"
+    },
+    {
+      "path": "./apps/docs-portal"
+    },
+    {
+      "path": "./apps/bff-e2e"
+    },
+    {
+      "path": "./apps/bff"
+    },
+    {
+      "path": "./libs/ui"
+    },
+    {
+      "path": "./libs/auth"
+    },
+    {
+      "path": "./libs/rbac"
+    },
+    {
+      "path": "./libs/connectors"
+    }
+  ]
+}

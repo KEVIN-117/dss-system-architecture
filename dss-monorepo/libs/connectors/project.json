@@ -1,0 +1,10 @@
+{
+  "name": "@dss-monorepo/connectors",
+  "sourceRoot": "libs/connectors/src",
+  "projectType": "library",
+  "tags": [
+    "type:connector",
+    "scope:infrastructure"
+  ],
+  "targets": {}
+}

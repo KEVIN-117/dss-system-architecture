@@ -1,0 +1,14 @@
+{
+  "name": "@dss-monorepo/director-dashboard-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "implicitDependencies": [
+      "@dss-monorepo/director-dashboard"
+    ],
+    "tags": [
+      "type:e2e",
+      "scope:rector"
+    ]
+  }
+}
