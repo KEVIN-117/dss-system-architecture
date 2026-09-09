@@ -23,7 +23,7 @@
     COALESCE(TRIM(pc.tipo::VARCHAR), 'NO DEFINIDO') AS tipo_colegio,
     COALESCE(TRIM(ll.localidad::VARCHAR), 'NO DEFINIDO') AS localidad,
     COALESCE(TRIM(ap.sede::VARCHAR), 'Sede Central') AS sede_universitaria,
-    COALESCE(TRIM(a.nivel_acad::VARCHAR), 'NO DEFINIDO') AS nivel_academico,
+    COALESCE(TRIM(ap.nivel::VARCHAR), 'NO DEFINIDO') AS nivel_academico,
     CASE
         WHEN UPPER(TRIM(a.tipo_alumno::VARCHAR)) = 'A' THEN 'ACTIVO'
         WHEN UPPER(TRIM(a.tipo_alumno::VARCHAR)) = 'P' THEN 'PASIVO'

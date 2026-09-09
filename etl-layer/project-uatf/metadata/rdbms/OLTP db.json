@@ -9,8 +9,8 @@
       "sshTunnelEnabled": false,
       "accessType": 0,
       "sshTunnelUsername": "",
-      "hostname": "host.docker.internal",
-      "password": "${DB_TX_PASS}",
+      "hostname": "10.10.166.103",
+      "password": "Encrypted 2be98afc86af281968f2a8f228ec0f990",
       "pluginName": "PostgreSQL",
       "port": "5432",
       "sshTunnelHost": "",
@@ -28,7 +28,7 @@
       "sshTunnelPassphrase": "Encrypted ",
       "sshTunnelPassword": "Encrypted ",
       "sshTunnelPrivateKeyFile": "",
-      "username": "${DB_TX_USER}"
+      "username": "usr_dsa2"
     }
   },
   "name": "OLTP db"
