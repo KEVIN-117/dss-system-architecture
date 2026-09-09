@@ -1,9 +1,0 @@
-{
-    "name": "@dss-monorepo/ui",
-    "projectType": "library",
-    "sourceRoot": "libs/ui/src",
-    "tags": [
-        "type:ui",
-        "scope:shared"
-    ]
-}
