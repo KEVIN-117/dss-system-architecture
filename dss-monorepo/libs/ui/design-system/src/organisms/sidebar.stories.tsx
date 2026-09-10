@@ -14,6 +14,7 @@ import {
   SidebarHeader,
 } from './sidebar';
 import { Home, Settings, Search, User } from 'lucide-react';
+import { TooltipProvider } from '../atoms/tooltip';
 
 const meta: Meta<typeof Sidebar> = {
   title: 'Organisms/Sidebar',
@@ -114,35 +115,37 @@ export const Default: Story = {
 export const CollapsibleIcon: Story = {
   render: () => (
     <Sidebar collapsible="icon">
-      <SidebarHeader>
-        <div className="flex h-10 w-full items-center justify-center font-black text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]">
-          NX
-        </div>
-      </SidebarHeader>
-      <SidebarContent>
-        <SidebarGroup>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Dashboard" asChild>
-                  <a href="#">
-                    <Home />
-                    <span>Dashboard</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-              <SidebarMenuItem>
-                <SidebarMenuButton tooltip="Settings" asChild>
-                  <a href="#">
-                    <Settings />
-                    <span>Settings</span>
-                  </a>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-      </SidebarContent>
+      <TooltipProvider>
+        <SidebarHeader>
+          <div className="flex h-10 w-full items-center justify-center font-black text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]">
+            NX
+          </div>
+        </SidebarHeader>
+        <SidebarContent>
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Dashboard" asChild>
+                    <a href="#">
+                      <Home />
+                      <span>Dashboard</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+                <SidebarMenuItem>
+                  <SidebarMenuButton tooltip="Settings" asChild>
+                    <a href="#">
+                      <Settings />
+                      <span>Settings</span>
+                    </a>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        </SidebarContent>
+      </TooltipProvider>
     </Sidebar>
   ),
 };

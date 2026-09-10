@@ -1,5 +1,12 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { Avatar, AvatarImage, AvatarFallback, AvatarGroup, AvatarGroupCount, AvatarBadge } from './avatar';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import {
+  Avatar,
+  AvatarImage,
+  AvatarFallback,
+  AvatarGroup,
+  AvatarGroupCount,
+  AvatarBadge,
+} from './avatar';
 
 const meta: Meta<typeof Avatar> = {
   title: 'Atoms/Avatar',
@@ -27,7 +34,7 @@ export const Default: Story = {
         <AvatarBadge />
       </Avatar>
     </div>
-  )
+  ),
 };
 
 export const Group: Story = {
@@ -43,5 +50,5 @@ export const Group: Story = {
       </Avatar>
       <AvatarGroupCount>+3</AvatarGroupCount>
     </AvatarGroup>
-  )
+  ),
 };

@@ -51,76 +51,80 @@ export const Default: Story = {
   ),
 };
 
+function WithButtonsRender() {
+  const [copied, setCopied] = React.useState(false);
+
+  const handleCopy = () => {
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div className="w-96">
+      <InputGroup>
+        <InputGroupAddon align="inline-start">
+          <GlobeIcon className="size-4 text-muted-foreground" />
+          <span className="text-xs text-muted-foreground">https://</span>
+        </InputGroupAddon>
+        <InputGroupInput defaultValue="dss.uatf.edu.bo/analytics/dashboard" />
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            size="icon-xs"
+            variant="ghost"
+            title="Copy URL"
+            onClick={handleCopy}
+          >
+            {copied ? (
+              <CheckIcon className="size-3.5 text-emerald-500" />
+            ) : (
+              <CopyIcon className="size-3.5" />
+            )}
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+    </div>
+  );
+}
+
 export const WithButtons: Story = {
-  render: () => {
-    const [copied, setCopied] = React.useState(false);
-
-    const handleCopy = () => {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    };
-
-    return (
-      <div className="w-96">
-        <InputGroup>
-          <InputGroupAddon align="inline-start">
-            <GlobeIcon className="size-4 text-muted-foreground" />
-            <span className="text-xs text-muted-foreground">https://</span>
-          </InputGroupAddon>
-          <InputGroupInput defaultValue="dss.uatf.edu.bo/analytics/dashboard" />
-          <InputGroupAddon align="inline-end">
-            <InputGroupButton
-              size="icon-xs"
-              variant="ghost"
-              title="Copy URL"
-              onClick={handleCopy}
-            >
-              {copied ? (
-                <CheckIcon className="size-3.5 text-emerald-500" />
-              ) : (
-                <CopyIcon className="size-3.5" />
-              )}
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
-      </div>
-    );
-  },
+  render: () => <WithButtonsRender />,
 };
 
-export const PasswordToggle: Story = {
-  render: () => {
-    const [showPassword, setShowPassword] = React.useState(false);
+function PasswordToggleRender() {
+  const [showPassword, setShowPassword] = React.useState(false);
 
-    return (
-      <div className="w-80">
-        <InputGroup>
-          <InputGroupAddon align="inline-start">
-            <LockIcon className="size-4 text-muted-foreground" />
-          </InputGroupAddon>
-          <InputGroupInput
-            type={showPassword ? 'text' : 'password'}
-            placeholder="Enter secure master key..."
-            defaultValue="SecretMatrixToken123"
-          />
-          <InputGroupAddon align="inline-end">
-            <InputGroupButton
-              size="icon-xs"
-              variant="ghost"
-              onClick={() => setShowPassword(!showPassword)}
-              title={showPassword ? 'Hide password' : 'Show password'}
-            >
-              {showPassword ? (
-                <EyeOffIcon className="size-3.5 text-muted-foreground" />
-              ) : (
-                <EyeIcon className="size-3.5 text-muted-foreground" />
-              )}
-            </InputGroupButton>
-          </InputGroupAddon>
-        </InputGroup>
-      </div>
-    );
-  },
+  return (
+    <div className="w-80">
+      <InputGroup>
+        <InputGroupAddon align="inline-start">
+          <LockIcon className="size-4 text-muted-foreground" />
+        </InputGroupAddon>
+        <InputGroupInput
+          type={showPassword ? 'text' : 'password'}
+          placeholder="Enter secure master key..."
+          defaultValue="SecretMatrixToken123"
+        />
+        <InputGroupAddon align="inline-end">
+          <InputGroupButton
+            size="icon-xs"
+            variant="ghost"
+            onClick={() => setShowPassword(!showPassword)}
+            title={showPassword ? 'Hide password' : 'Show password'}
+          >
+            {showPassword ? (
+              <EyeOffIcon className="size-3.5 text-muted-foreground" />
+            ) : (
+              <EyeIcon className="size-3.5 text-muted-foreground" />
+            )}
+          </InputGroupButton>
+        </InputGroupAddon>
+      </InputGroup>
+    </div>
+  );
+}
+
+export const PasswordToggle: Story = {
+  render: () => <PasswordToggleRender />,
 };
 
 export const WithTextarea: Story = {
@@ -130,7 +134,9 @@ export const WithTextarea: Story = {
         <InputGroupTextarea placeholder="Escribe observaciones académicas o notas del estudiante..." />
         <InputGroupAddon align="block-end" className="border-t justify-between">
           <InputGroupText>
-            <span className="text-[11px] text-muted-foreground">0 / 250 caracteres</span>
+            <span className="text-[11px] text-muted-foreground">
+              0 / 250 caracteres
+            </span>
           </InputGroupText>
           <InputGroupButton size="xs" variant="default">
             <span>Enviar</span>
@@ -146,17 +152,21 @@ export const Variations: Story = {
   render: () => (
     <div className="flex flex-col gap-4 w-80">
       <div>
-        <span className="text-xs text-muted-foreground mb-1 block">Disabled State</span>
-        <InputGroup disabled>
+        <span className="text-xs text-muted-foreground mb-1 block">
+          Disabled State
+        </span>
+        <InputGroup aria-disabled>
           <InputGroupAddon align="inline-start">
             <SearchIcon className="size-4" />
           </InputGroupAddon>
-          <InputGroupInput placeholder="Read only input..." disabled />
+          <InputGroupInput placeholder="Read only input..." aria-disabled />
         </InputGroup>
       </div>
 
       <div>
-        <span className="text-xs text-muted-foreground mb-1 block">Invalid / Error State</span>
+        <span className="text-xs text-muted-foreground mb-1 block">
+          Invalid / Error State
+        </span>
         <InputGroup aria-invalid="true">
           <InputGroupAddon align="inline-start">
             <AlertCircleIcon className="size-4 text-destructive" />

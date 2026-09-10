@@ -1,5 +1,13 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { Card, CardHeader, CardFooter, CardTitle, CardDescription, CardContent, CardAction } from './card';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import {
+  Card,
+  CardHeader,
+  CardFooter,
+  CardTitle,
+  CardDescription,
+  CardContent,
+  CardAction,
+} from './card';
 import { Button } from '../atoms/button';
 
 const meta: Meta<typeof Card> = {
@@ -18,7 +26,9 @@ export const Default: Story = {
         <CardTitle>System Status</CardTitle>
         <CardDescription>Real-time server diagnostics.</CardDescription>
         <CardAction>
-          <Button size="icon-sm" variant="ghost">?</Button>
+          <Button size="icon-sm" variant="ghost">
+            ?
+          </Button>
         </CardAction>
       </CardHeader>
       <CardContent>
@@ -37,5 +47,5 @@ export const Default: Story = {
         <Button className="w-full">Initialize</Button>
       </CardFooter>
     </Card>
-  )
+  ),
 };

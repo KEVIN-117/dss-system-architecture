@@ -1,5 +1,13 @@
-import type { Meta, StoryObj } from '@storybook/react';
-import { Dialog, DialogTrigger, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from './dialog';
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import {
+  Dialog,
+  DialogTrigger,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from './dialog';
 import { Button } from '../atoms/button';
 import { Input } from '../atoms/input';
 
@@ -28,7 +36,12 @@ export const Default: Story = {
         <div className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <span className="text-right text-sm">Passkey</span>
-            <Input id="passkey" type="password" className="col-span-3" defaultValue="" />
+            <Input
+              id="passkey"
+              type="password"
+              className="col-span-3"
+              defaultValue=""
+            />
           </div>
         </div>
         <DialogFooter>
@@ -36,5 +49,5 @@ export const Default: Story = {
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  ),
 };
