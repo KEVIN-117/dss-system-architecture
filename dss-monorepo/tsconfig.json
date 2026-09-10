@@ -37,9 +37,6 @@
       "path": "./apps/bff"
     },
     {
-      "path": "./libs/ui"
-    },
-    {
       "path": "./libs/auth"
     },
     {
@@ -47,6 +44,9 @@
     },
     {
       "path": "./libs/connectors"
+    },
+    {
+      "path": "./libs/ui/design-system"
     }
   ]
 }

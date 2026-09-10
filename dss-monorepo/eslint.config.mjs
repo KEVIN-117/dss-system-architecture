@@ -93,7 +93,10 @@ export default [
             },
             {
               sourceTag: 'scope:infrastructure',
-              onlyDependOnLibsWithTags: ['scope:infrastructure', 'scope:shared'],
+              onlyDependOnLibsWithTags: [
+                'scope:infrastructure',
+                'scope:shared',
+              ],
             },
           ],
         },

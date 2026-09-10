@@ -17,7 +17,10 @@
       }
     ],
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "@dss-monorepo/design-system": [
+        "../../libs/ui/design-system/src/index.ts"
+      ]
     },
     "types": [
       "vitest/globals",
@@ -62,5 +65,10 @@
     "eslint.config.js",
     "eslint.config.cjs",
     "eslint.config.mjs"
+  ],
+  "references": [
+    {
+      "path": "../../libs/ui/design-system"
+    }
   ]
 }
