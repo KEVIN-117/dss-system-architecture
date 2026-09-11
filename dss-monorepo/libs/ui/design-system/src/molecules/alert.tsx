@@ -1,24 +1,25 @@
-import * as React from "react"
-import { cva, type VariantProps } from "class-variance-authority"
-import { cn } from "cn"
+import * as React from 'react';
+import { cva, type VariantProps } from 'class-variance-authority';
+import { cn } from 'cn';
 
 const alertVariants = cva(
-  "relative w-full rounded-lg border px-4 py-4 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground [&>svg~*]:pl-7 overflow-hidden",
+  'relative w-full rounded-lg border px-4 py-4 text-sm [&>svg+div]:translate-y-[-3px] [&>svg]:absolute [&>svg]:left-4 [&>svg]:top-4 [&>svg]:text-foreground [&>svg~*]:pl-7 overflow-hidden',
   {
     variants: {
       variant: {
-        default: "bg-background/50 backdrop-blur-sm text-foreground border-primary/20",
+        default:
+          'bg-background/50 backdrop-blur-sm text-foreground border-primary/20',
         destructive:
-          "border-destructive/50 text-destructive bg-destructive/10 backdrop-blur-sm dark:border-destructive [&>svg]:text-destructive shadow-[0_0_15px_theme(colors.destructive.DEFAULT/15%)] border-l-4 border-l-destructive",
-        system: 
-          "border-primary/40 text-primary bg-primary/5 backdrop-blur-sm [&>svg]:text-primary shadow-[0_0_15px_theme(colors.primary.DEFAULT/15%)] border-l-4 border-l-primary font-mono",
+          'border-destructive/50 text-destructive bg-destructive/10 backdrop-blur-sm dark:border-destructive [&>svg]:text-destructive shadow-[0_0_15px_theme(colors.destructive.DEFAULT/15%)] border-l-4 border-l-destructive',
+        system:
+          'border-primary/40 text-primary bg-primary/5 backdrop-blur-sm [&>svg]:text-primary shadow-[0_0_15px_theme(colors.primary.DEFAULT/15%)] border-l-4 border-l-primary font-mono',
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: 'default',
     },
-  }
-)
+  },
+);
 
 const Alert = React.forwardRef<
   HTMLDivElement,
@@ -30,8 +31,8 @@ const Alert = React.forwardRef<
     className={cn(alertVariants({ variant }), className)}
     {...props}
   />
-))
-Alert.displayName = "Alert"
+));
+Alert.displayName = 'Alert';
 
 const AlertTitle = React.forwardRef<
   HTMLParagraphElement,
@@ -39,11 +40,14 @@ const AlertTitle = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <h5
     ref={ref}
-    className={cn("mb-1 font-heading font-medium leading-none tracking-tight", className)}
+    className={cn(
+      'mb-1 font-heading font-medium leading-none tracking-tight',
+      className,
+    )}
     {...props}
   />
-))
-AlertTitle.displayName = "AlertTitle"
+));
+AlertTitle.displayName = 'AlertTitle';
 
 const AlertDescription = React.forwardRef<
   HTMLParagraphElement,
@@ -51,10 +55,10 @@ const AlertDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn("text-sm [&_p]:leading-relaxed opacity-90", className)}
+    className={cn('text-sm [&_p]:leading-relaxed opacity-90', className)}
     {...props}
   />
-))
-AlertDescription.displayName = "AlertDescription"
+));
+AlertDescription.displayName = 'AlertDescription';
 
-export { Alert, AlertTitle, AlertDescription, alertVariants }
+export { Alert, AlertTitle, AlertDescription, alertVariants };

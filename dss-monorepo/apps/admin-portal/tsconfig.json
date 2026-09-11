@@ -6,11 +6,7 @@
     "emitDeclarationOnly": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true,
@@ -21,9 +17,7 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ],
+      "@/*": ["./src/*"],
       "@dss-monorepo/design-system": [
         "../../libs/ui/design-system/src/index.ts"
       ]
@@ -73,6 +67,9 @@
     "eslint.config.mjs"
   ],
   "references": [
+    {
+      "path": "../../libs/charts"
+    },
     {
       "path": "../../libs/ui/design-system"
     }

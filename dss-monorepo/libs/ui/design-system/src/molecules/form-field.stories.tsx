@@ -20,7 +20,8 @@ const meta: Meta<typeof FormField> = {
     },
     error: {
       control: 'text',
-      description: 'Error message that displays above the input with pulse animation.',
+      description:
+        'Error message that displays above the input with pulse animation.',
     },
     required: {
       control: 'boolean',
@@ -55,7 +56,11 @@ export const Required: Story = {
         required
         description="Token criptográfico emitido para la ingesta del Load Manager."
       >
-        <Input id="ingest-token" type="password" placeholder="••••••••••••••••" />
+        <Input
+          id="ingest-token"
+          type="password"
+          placeholder="••••••••••••••••"
+        />
       </FormField>
     </div>
   ),
@@ -100,7 +105,9 @@ export const CyberpunkTerminal: Story = {
       <div className="flex items-center justify-between border-b border-primary/20 pb-3">
         <div className="flex items-center gap-2 text-xs text-primary">
           <Terminal className="size-4 animate-pulse" />
-          <span className="font-bold tracking-widest">// MAINFRAME ROOT AUTH</span>
+          <span className="font-bold tracking-widest">
+            // MAINFRAME ROOT AUTH
+          </span>
         </div>
         <span className="text-[10px] text-muted-foreground border border-primary/20 px-2 py-0.5 rounded">
           CLEARANCE: S-RANK

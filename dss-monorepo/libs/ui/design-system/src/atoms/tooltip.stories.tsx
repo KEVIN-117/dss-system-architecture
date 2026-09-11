@@ -1,5 +1,10 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from './tooltip';
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from './tooltip';
 import { Button } from './button';
 import { TerminalIcon } from 'lucide-react';
 
@@ -33,7 +38,9 @@ export const Positions: Story = {
       <div className="flex gap-4 items-center justify-center p-12">
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" size="sm">Arriba</Button>
+            <Button variant="outline" size="sm">
+              Arriba
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="top">
             <p>Tooltip en la parte superior</p>
@@ -42,7 +49,9 @@ export const Positions: Story = {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" size="sm">Derecha</Button>
+            <Button variant="outline" size="sm">
+              Derecha
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="right">
             <p>Tooltip a la derecha</p>
@@ -51,7 +60,9 @@ export const Positions: Story = {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" size="sm">Abajo</Button>
+            <Button variant="outline" size="sm">
+              Abajo
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="bottom">
             <p>Tooltip en la parte inferior</p>
@@ -60,7 +71,9 @@ export const Positions: Story = {
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="outline" size="sm">Izquierda</Button>
+            <Button variant="outline" size="sm">
+              Izquierda
+            </Button>
           </TooltipTrigger>
           <TooltipContent side="left">
             <p>Tooltip a la izquierda</p>
@@ -88,9 +101,15 @@ export const Cyberpunk: Story = {
             className="font-mono text-xs bg-black/90 border border-primary/50 text-foreground shadow-[0_0_15px_rgba(0,255,200,0.2)]"
           >
             <div className="flex flex-col gap-1">
-              <span className="text-primary font-bold">{'// SECURE_TUNNEL_DETAILS'}</span>
-              <span className="text-[11px] text-muted-foreground">LATENCY: 14ms | TLS 1.3 AES-256</span>
-              <span className="text-[10px] text-emerald-400">STATUS: 0 PACKET LOSS</span>
+              <span className="text-primary font-bold">
+                {'// SECURE_TUNNEL_DETAILS'}
+              </span>
+              <span className="text-[11px] text-muted-foreground">
+                LATENCY: 14ms | TLS 1.3 AES-256
+              </span>
+              <span className="text-[10px] text-emerald-400">
+                STATUS: 0 PACKET LOSS
+              </span>
             </div>
           </TooltipContent>
         </Tooltip>

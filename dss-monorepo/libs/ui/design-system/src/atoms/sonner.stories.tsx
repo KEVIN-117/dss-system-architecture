@@ -58,7 +58,8 @@ export const Variations: Story = {
           className="text-emerald-500 border-emerald-500/30 hover:bg-emerald-500/10"
           onClick={() =>
             toast.success('Operación completada', {
-              description: 'El modelo predictivo CRISP-DM ha finalizado el entrenamiento.',
+              description:
+                'El modelo predictivo CRISP-DM ha finalizado el entrenamiento.',
             })
           }
         >
@@ -71,7 +72,8 @@ export const Variations: Story = {
           className="text-blue-500 border-blue-500/30 hover:bg-blue-500/10"
           onClick={() =>
             toast.info('Actualización disponible', {
-              description: 'Nuevos datos de matrículas detectados en el Load Manager.',
+              description:
+                'Nuevos datos de matrículas detectados en el Load Manager.',
             })
           }
         >
@@ -84,7 +86,8 @@ export const Variations: Story = {
           className="text-amber-500 border-amber-500/30 hover:bg-amber-500/10"
           onClick={() =>
             toast.warning('Advertencia de carga', {
-              description: 'El pool de conexiones PostgreSQL está al 85% de capacidad.',
+              description:
+                'El pool de conexiones PostgreSQL está al 85% de capacidad.',
             })
           }
         >
@@ -108,7 +111,7 @@ export const Variations: Story = {
           variant="secondary"
           onClick={() => {
             const promise = new Promise((resolve) =>
-              setTimeout(() => resolve({ name: 'Matrículas 2026' }), 2000)
+              setTimeout(() => resolve({ name: 'Matrículas 2026' }), 2000),
             );
 
             toast.promise(promise, {
@@ -134,7 +137,8 @@ export const Cyberpunk: Story = {
         // TELEMETRY UPLINK PROTOCOL
       </div>
       <p className="text-muted-foreground text-xs max-w-sm">
-        Dispara alertas HUD simuladas directamente a la consola del operador de mainframe.
+        Dispara alertas HUD simuladas directamente a la consola del operador de
+        mainframe.
       </p>
 
       <div className="flex flex-wrap gap-3 justify-center pt-2">
@@ -143,7 +147,8 @@ export const Cyberpunk: Story = {
           className="border-primary/50 text-cyan-400 hover:text-cyan-300 hover:bg-primary/20 font-mono text-xs shadow-[0_0_12px_rgba(59,130,246,0.25)]"
           onClick={() =>
             toast.success('NEURAL_CORE: CONNECTED', {
-              description: 'Quantum node 0x9F authenticated. 10Gbps stream active.',
+              description:
+                'Quantum node 0x9F authenticated. 10Gbps stream active.',
             })
           }
         >

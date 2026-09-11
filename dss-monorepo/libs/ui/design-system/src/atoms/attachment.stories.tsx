@@ -60,7 +60,10 @@ export const Default: Story = {
         <AttachmentAction title="Download">
           <DownloadIcon className="size-3.5" />
         </AttachmentAction>
-        <AttachmentAction title="Delete" className="text-destructive hover:text-destructive">
+        <AttachmentAction
+          title="Delete"
+          className="text-destructive hover:text-destructive"
+        >
           <Trash2Icon className="size-3.5" />
         </AttachmentAction>
       </AttachmentActions>
@@ -112,7 +115,9 @@ export const Variations: Story = {
             </AttachmentMedia>
             <AttachmentContent>
               <AttachmentTitle>dw_star_schema_dump.sql</AttachmentTitle>
-              <AttachmentDescription>Transforming data...</AttachmentDescription>
+              <AttachmentDescription>
+                Transforming data...
+              </AttachmentDescription>
             </AttachmentContent>
           </Attachment>
 
@@ -122,7 +127,9 @@ export const Variations: Story = {
             </AttachmentMedia>
             <AttachmentContent>
               <AttachmentTitle>corrupted_matriculas.parquet</AttachmentTitle>
-              <AttachmentDescription>CRC32 Checksum failure</AttachmentDescription>
+              <AttachmentDescription>
+                CRC32 Checksum failure
+              </AttachmentDescription>
             </AttachmentContent>
             <AttachmentActions>
               <AttachmentAction title="Retry">

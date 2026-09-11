@@ -1,9 +1,6 @@
 {
-    "name": "@dss-monorepo/rector-dashboard",
-    "projectType": "application",
-    "sourceRoot": "apps/rector-dashboard/src",
-    "tags": [
-        "type:app",
-        "scope:rector"
-    ]
+  "name": "@dss-monorepo/rector-dashboard",
+  "projectType": "application",
+  "sourceRoot": "apps/rector-dashboard/src",
+  "tags": ["type:app", "scope:rector"]
 }

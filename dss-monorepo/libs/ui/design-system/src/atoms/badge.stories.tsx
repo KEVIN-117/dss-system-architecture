@@ -9,7 +9,14 @@ const meta: Meta<typeof Badge> = {
   argTypes: {
     variant: {
       control: 'select',
-      options: ['default', 'secondary', 'destructive', 'outline', 'ghost', 'link'],
+      options: [
+        'default',
+        'secondary',
+        'destructive',
+        'outline',
+        'ghost',
+        'link',
+      ],
       description: 'The visual style variant of the badge.',
     },
     asChild: {
@@ -72,17 +79,29 @@ export const Cyberpunk: Story = {
         System Telemetry Flags
       </div>
       <div className="flex flex-wrap gap-3 items-center">
-        <Badge variant="default" className="shadow-[0_0_8px_rgba(34,197,94,0.4)]">
+        <Badge
+          variant="default"
+          className="shadow-[0_0_8px_rgba(34,197,94,0.4)]"
+        >
           <span className="size-1.5 rounded-full bg-emerald-400 animate-ping inline-block mr-1" />
           SYS:ONLINE
         </Badge>
-        <Badge variant="outline" className="border-primary/50 text-primary shadow-[0_0_8px_rgba(59,130,246,0.3)]">
+        <Badge
+          variant="outline"
+          className="border-primary/50 text-primary shadow-[0_0_8px_rgba(59,130,246,0.3)]"
+        >
           CORE:v2.4
         </Badge>
-        <Badge variant="destructive" className="shadow-[0_0_8px_rgba(239,68,68,0.4)]">
+        <Badge
+          variant="destructive"
+          className="shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+        >
           BREACH:NULL
         </Badge>
-        <Badge variant="secondary" className="border border-muted-foreground/30">
+        <Badge
+          variant="secondary"
+          className="border border-muted-foreground/30"
+        >
           NODE:POT-01
         </Badge>
       </div>
