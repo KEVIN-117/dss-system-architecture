@@ -1,5 +1,6 @@
 import type { Preview } from '@storybook/react-vite';
-// import '../../ui/design-system/src/styles/globals.css';
+import '../src/styles/tokens.css';
+import '../src/styles/tailwind.css';
 import React from 'react';
 
 const preview: Preview = {
@@ -41,18 +42,24 @@ const preview: Preview = {
       const isDark = colorMode === 'dark';
 
       React.useEffect(() => {
+        const root = document.documentElement;
         if (isDark) {
-          document.documentElement.classList.add('dark');
+          root.classList.add('dark');
+          root.setAttribute('data-theme', 'dark');
         } else {
-          document.documentElement.classList.remove('dark');
+          root.classList.remove('dark');
+          root.removeAttribute('data-theme');
         }
-        document.documentElement.setAttribute('data-theme', theme);
       }, [isDark, theme]);
 
       return (
         <div
-          className={`p-6 bg-background text-foreground min-h-screen ${isDark ? 'dark' : ''}`}
-          data-theme={theme}
+          style={{
+            padding: '1.5rem',
+            minHeight: '100vh',
+            backgroundColor: 'hsl(var(--bg))',
+            color: 'hsl(var(--fg))',
+          }}
         >
           <Story />
         </div>

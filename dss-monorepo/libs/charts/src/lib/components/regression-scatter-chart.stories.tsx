@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { RegressionScatterChart } from './regression-scatter-chart';
 import { RegressionChartData } from '../core/builders';
 

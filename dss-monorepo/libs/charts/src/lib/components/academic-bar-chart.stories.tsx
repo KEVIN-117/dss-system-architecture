@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { AcademicBarChart } from './academic-bar-chart';
 
 const meta: Meta<typeof AcademicBarChart> = {

@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { TrendLineChart } from './trend-line-chart';
 
 const meta: Meta<typeof TrendLineChart> = {

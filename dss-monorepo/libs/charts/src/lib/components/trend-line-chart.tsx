@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useMemo } from 'react';
 import * as echarts from 'echarts';
-import { ChartThemeTokens, DEFAULT_DARK_THEME } from '../core/theme';
+import { ChartThemeTokens, resolveChartTheme } from '../core/theme';
 import { buildLineOption, ChartDataPoint } from '../core/builders';
 
 export interface TrendLineChartProps {
@@ -12,25 +12,32 @@ export interface TrendLineChartProps {
   themeTokens?: ChartThemeTokens;
 }
 
-export const TrendLineChart: React.FC<TrendLineChartProps> = ({ 
-  data, 
-  title, 
-  loading, 
-  onChartClick, 
+export const TrendLineChart: React.FC<TrendLineChartProps> = ({
+  data,
+  title,
+  loading,
+  onChartClick,
   className,
-  themeTokens = DEFAULT_DARK_THEME
+  themeTokens,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
 
+  const resolvedTheme = useMemo(
+    () => themeTokens ?? resolveChartTheme(),
+    [themeTokens],
+  );
+
   const option = useMemo(() => {
-    return buildLineOption(data, title, themeTokens);
-  }, [data, title, themeTokens]);
+    return buildLineOption(data, title, resolvedTheme);
+  }, [data, title, resolvedTheme]);
 
   useEffect(() => {
     if (!chartRef.current) return;
     if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current, undefined, { renderer: 'canvas' });
+      chartInstance.current = echarts.init(chartRef.current, undefined, {
+        renderer: 'canvas',
+      });
       if (onChartClick) {
         chartInstance.current.on('click', (params) => {
           onChartClick(params);
@@ -54,16 +61,16 @@ export const TrendLineChart: React.FC<TrendLineChartProps> = ({
     if (loading) {
       chartInstance.current.showLoading('default', {
         text: 'LOADING...',
-        color: themeTokens.chartColors[0],
-        textColor: themeTokens.chartColors[0],
-        maskColor: themeTokens.alpha(themeTokens.background, 0.8),
+        color: resolvedTheme.chartColors[0],
+        textColor: resolvedTheme.chartColors[0],
+        maskColor: resolvedTheme.alpha(resolvedTheme.background, 0.8),
         zlevel: 0,
-        fontFamily: 'monospace'
+        fontFamily: 'monospace',
       });
     } else {
       chartInstance.current.hideLoading();
     }
-  }, [loading, themeTokens]);
+  }, [loading, resolvedTheme]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -77,9 +84,9 @@ export const TrendLineChart: React.FC<TrendLineChartProps> = ({
   }, []);
 
   return (
-    <div 
-      ref={chartRef} 
-      className={className || "w-full h-full"} 
+    <div
+      ref={chartRef}
+      className={className || 'w-full h-full'}
       style={{ width: '100%', minHeight: '300px', height: '100%' }}
     />
   );

@@ -152,6 +152,10 @@
       "dependencies": {
         "echarts": "^6.1.0",
       },
+      "devDependencies": {
+        "@tailwindcss/vite": "^4.3.3",
+        "tailwindcss": "^4.3.3",
+      },
     },
     "libs/connectors": {
       "name": "@dss-monorepo/connectors",

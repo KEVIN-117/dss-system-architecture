@@ -9,7 +9,7 @@ import {
   TitleComponent,
 } from 'echarts/components';
 import { LabelLayout } from 'echarts/features';
-import { ChartThemeTokens, DEFAULT_DARK_THEME } from '../core/theme';
+import { ChartThemeTokens, resolveChartTheme } from '../core/theme';
 import { buildBarOption, ChartDataPoint } from '../core/builders';
 
 echarts.use([
@@ -37,14 +37,19 @@ export const AcademicBarChart: React.FC<AcademicBarChartProps> = ({
   loading,
   onChartClick,
   className,
-  themeTokens = DEFAULT_DARK_THEME,
+  themeTokens,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
 
+  const resolvedTheme = useMemo(
+    () => themeTokens ?? resolveChartTheme(),
+    [themeTokens],
+  );
+
   const option = useMemo(() => {
-    return buildBarOption(data, title, themeTokens);
-  }, [data, title, themeTokens]);
+    return buildBarOption(data, title, resolvedTheme);
+  }, [data, title, resolvedTheme]);
 
   useEffect(() => {
     if (!chartRef.current) return;
@@ -75,16 +80,16 @@ export const AcademicBarChart: React.FC<AcademicBarChartProps> = ({
     if (loading) {
       chartInstance.current.showLoading('default', {
         text: 'LOADING...',
-        color: themeTokens.chartColors[0],
-        textColor: themeTokens.chartColors[0],
-        maskColor: themeTokens.alpha(themeTokens.background, 0.8),
+        color: resolvedTheme.chartColors[0],
+        textColor: resolvedTheme.chartColors[0],
+        maskColor: resolvedTheme.alpha(resolvedTheme.background, 0.8),
         zlevel: 0,
         fontFamily: 'monospace',
       });
     } else {
       chartInstance.current.hideLoading();
     }
-  }, [loading, themeTokens]);
+  }, [loading, resolvedTheme]);
 
   useEffect(() => {
     if (!chartRef.current) return;
