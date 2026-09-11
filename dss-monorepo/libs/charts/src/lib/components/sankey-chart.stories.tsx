@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { AcademicSankeyChart } from './sankey-chart';
 
 const meta: Meta<typeof AcademicSankeyChart> = {
@@ -18,13 +18,13 @@ export const Default: Story = {
         { name: 'Ingreso S1' },
         { name: 'Promovido S2' },
         { name: 'Repitente' },
-        { name: 'Deserción' }
+        { name: 'Deserción' },
       ],
       links: [
         { source: 'Ingreso S1', target: 'Promovido S2', value: 700 },
         { source: 'Ingreso S1', target: 'Repitente', value: 200 },
-        { source: 'Ingreso S1', target: 'Deserción', value: 100 }
-      ]
-    }
+        { source: 'Ingreso S1', target: 'Deserción', value: 100 },
+      ],
+    },
   },
 };

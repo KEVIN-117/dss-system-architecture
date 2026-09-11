@@ -42,13 +42,21 @@ export const AcademicSunburstChart: React.FC<SunburstChartProps> = ({
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
-  const resolvedTheme = useMemo(() => themeTokens ?? resolveChartTheme(), [themeTokens]);
-  const option = useMemo(() => buildSunburstOption(data, title, resolvedTheme), [data, title, resolvedTheme]);
+  const resolvedTheme = useMemo(
+    () => themeTokens ?? resolveChartTheme(),
+    [themeTokens],
+  );
+  const option = useMemo(
+    () => buildSunburstOption(data, title, resolvedTheme),
+    [data, title, resolvedTheme],
+  );
 
   useEffect(() => {
     if (!chartRef.current) return;
     if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current, undefined, { renderer: 'canvas' });
+      chartInstance.current = echarts.init(chartRef.current, undefined, {
+        renderer: 'canvas',
+      });
       if (onChartClick) {
         chartInstance.current.on('click', onChartClick);
       }
@@ -90,5 +98,11 @@ export const AcademicSunburstChart: React.FC<SunburstChartProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  return <div ref={chartRef} className={className || 'w-full h-full'} style={{ width: '100%', minHeight: '300px', height: '100%' }} />;
+  return (
+    <div
+      ref={chartRef}
+      className={className || 'w-full h-full'}
+      style={{ width: '100%', minHeight: '300px', height: '100%' }}
+    />
+  );
 };

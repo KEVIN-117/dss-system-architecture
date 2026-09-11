@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { AcademicRadarChart } from './radar-chart';
 
 const meta: Meta<typeof AcademicRadarChart> = {
@@ -24,7 +24,7 @@ export const Default: Story = {
       series: [
         { name: 'Estudiante', value: [85, 90, 78, 65, 80] },
         { name: 'Esperado', value: [70, 70, 70, 70, 70] },
-      ]
+      ],
     },
   },
 };

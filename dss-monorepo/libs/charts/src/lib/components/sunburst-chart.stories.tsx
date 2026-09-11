@@ -1,4 +1,4 @@
-import type { Meta, StoryObj } from '@storybook/react';
+import type { Meta, StoryObj } from '@storybook/react-vite';
 import { AcademicSunburstChart } from './sunburst-chart';
 
 const meta: Meta<typeof AcademicSunburstChart> = {
@@ -17,17 +17,29 @@ export const Default: Story = {
       {
         name: 'Ingeniería',
         children: [
-          { name: 'Sistemas', children: [{ name: 'Cohorte 2024', value: 180 }, { name: 'Cohorte 2025', value: 210 }] },
-          { name: 'Civil', children: [{ name: 'Cohorte 2024', value: 140 }, { name: 'Cohorte 2025', value: 160 }] }
-        ]
+          {
+            name: 'Sistemas',
+            children: [
+              { name: 'Cohorte 2024', value: 180 },
+              { name: 'Cohorte 2025', value: 210 },
+            ],
+          },
+          {
+            name: 'Civil',
+            children: [
+              { name: 'Cohorte 2024', value: 140 },
+              { name: 'Cohorte 2025', value: 160 },
+            ],
+          },
+        ],
       },
       {
         name: 'Ciencias',
         children: [
           { name: 'Física', value: 80 },
-          { name: 'Matemáticas', value: 90 }
-        ]
-      }
-    ]
+          { name: 'Matemáticas', value: 90 },
+        ],
+      },
+    ],
   },
 };

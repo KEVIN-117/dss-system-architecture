@@ -616,12 +616,14 @@ export function buildRadarOption(
   return {
     backgroundColor: 'transparent',
     color: theme.chartColors,
-    title: title ? {
-      text: title,
-      left: 'center',
-      top: 0,
-      textStyle: { color: theme.foreground },
-    } : undefined,
+    title: title
+      ? {
+          text: title,
+          left: 'center',
+          top: 0,
+          textStyle: { color: theme.foreground },
+        }
+      : undefined,
     tooltip: {
       trigger: 'item',
       backgroundColor: theme.alpha(theme.background, 0.8),
@@ -634,18 +636,22 @@ export function buildRadarOption(
     radar: {
       indicator: data.indicators,
       splitArea: { show: false },
-      splitLine: { lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) } },
-      axisLine: { lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) } },
+      splitLine: {
+        lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
+      },
+      axisLine: {
+        lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
+      },
       axisName: { color: theme.mutedForeground },
     },
     series: [
       {
         type: 'radar',
-        data: data.series.map(s => ({
+        data: data.series.map((s) => ({
           name: s.name,
           value: s.value,
           areaStyle: { opacity: 0.2 },
-          lineStyle: { width: 2 }
+          lineStyle: { width: 2 },
         })),
       },
     ],
@@ -667,31 +673,43 @@ export function buildHeatmapOption(
 ): EChartsOption {
   return {
     backgroundColor: 'transparent',
-    title: title ? {
-      text: title,
-      left: 'center',
-      top: 0,
-      textStyle: { color: theme.foreground },
-    } : undefined,
+    title: title
+      ? {
+          text: title,
+          left: 'center',
+          top: 0,
+          textStyle: { color: theme.foreground },
+        }
+      : undefined,
     tooltip: {
       position: 'top',
       backgroundColor: theme.alpha(theme.background, 0.8),
       textStyle: { color: theme.foreground },
     },
-    grid: { left: '5%', right: '5%', bottom: '10%', top: title ? 60 : 20, containLabel: true },
+    grid: {
+      left: '5%',
+      right: '5%',
+      bottom: '10%',
+      top: title ? 60 : 20,
+      containLabel: true,
+    },
     xAxis: {
       type: 'category',
       data: data.xAxisLabels,
       splitArea: { show: true, areaStyle: { color: ['transparent'] } },
       axisLabel: { color: theme.mutedForeground },
-      axisLine: { lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) } },
+      axisLine: {
+        lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
+      },
     },
     yAxis: {
       type: 'category',
       data: data.yAxisLabels,
       splitArea: { show: true, areaStyle: { color: ['transparent'] } },
       axisLabel: { color: theme.mutedForeground },
-      axisLine: { lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) } },
+      axisLine: {
+        lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
+      },
     },
     visualMap: {
       min: data.min ?? 0,
@@ -702,8 +720,12 @@ export function buildHeatmapOption(
       bottom: '0%',
       textStyle: { color: theme.foreground },
       inRange: {
-        color: [theme.riskColors.none, theme.riskColors.medium, theme.riskColors.high]
-      }
+        color: [
+          theme.riskColors.none,
+          theme.riskColors.medium,
+          theme.riskColors.high,
+        ],
+      },
     },
     series: [
       {
@@ -712,14 +734,14 @@ export function buildHeatmapOption(
         data: data.data,
         label: {
           show: true,
-          color: theme.foreground
+          color: theme.foreground,
         },
         itemStyle: {
           borderColor: theme.background,
-          borderWidth: 2
-        }
-      }
-    ]
+          borderWidth: 2,
+        },
+      },
+    ],
   };
 }
 
@@ -737,12 +759,14 @@ export function buildSunburstOption(
   return {
     backgroundColor: 'transparent',
     color: theme.chartColors,
-    title: title ? {
-      text: title,
-      left: 'center',
-      top: 0,
-      textStyle: { color: theme.foreground },
-    } : undefined,
+    title: title
+      ? {
+          text: title,
+          left: 'center',
+          top: 0,
+          textStyle: { color: theme.foreground },
+        }
+      : undefined,
     tooltip: {
       trigger: 'item',
       backgroundColor: theme.alpha(theme.background, 0.8),
@@ -755,13 +779,13 @@ export function buildSunburstOption(
       itemStyle: {
         borderRadius: 4,
         borderWidth: 2,
-        borderColor: theme.background
+        borderColor: theme.background,
       },
       label: {
         rotate: 'radial',
-        color: theme.foreground
-      }
-    }
+        color: theme.foreground,
+      },
+    },
   };
 }
 
@@ -786,12 +810,14 @@ export function buildSankeyOption(
   return {
     backgroundColor: 'transparent',
     color: theme.chartColors,
-    title: title ? {
-      text: title,
-      left: 'center',
-      top: 0,
-      textStyle: { color: theme.foreground },
-    } : undefined,
+    title: title
+      ? {
+          text: title,
+          left: 'center',
+          top: 0,
+          textStyle: { color: theme.foreground },
+        }
+      : undefined,
     tooltip: {
       trigger: 'item',
       triggerOn: 'mousemove',
@@ -804,22 +830,22 @@ export function buildSankeyOption(
         data: data.nodes,
         links: data.links,
         emphasis: {
-          focus: 'adjacency'
+          focus: 'adjacency',
         },
         lineStyle: {
           color: 'gradient',
           curveness: 0.5,
-          opacity: 0.4
+          opacity: 0.4,
         },
         itemStyle: {
           borderColor: theme.background,
-          borderWidth: 1
+          borderWidth: 1,
         },
         label: {
           color: theme.foreground,
-          fontSize: 12
-        }
-      }
-    ]
+          fontSize: 12,
+        },
+      },
+    ],
   };
 }

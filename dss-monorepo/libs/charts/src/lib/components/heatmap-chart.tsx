@@ -7,7 +7,7 @@ import {
   TooltipComponent,
   LegendComponent,
   TitleComponent,
-  VisualMapComponent
+  VisualMapComponent,
 } from 'echarts/components';
 import { LabelLayout } from 'echarts/features';
 import { ChartThemeTokens, resolveChartTheme } from '../core/theme';
@@ -44,13 +44,21 @@ export const AcademicHeatmapChart: React.FC<HeatmapChartProps> = ({
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
-  const resolvedTheme = useMemo(() => themeTokens ?? resolveChartTheme(), [themeTokens]);
-  const option = useMemo(() => buildHeatmapOption(data, title, resolvedTheme), [data, title, resolvedTheme]);
+  const resolvedTheme = useMemo(
+    () => themeTokens ?? resolveChartTheme(),
+    [themeTokens],
+  );
+  const option = useMemo(
+    () => buildHeatmapOption(data, title, resolvedTheme),
+    [data, title, resolvedTheme],
+  );
 
   useEffect(() => {
     if (!chartRef.current) return;
     if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current, undefined, { renderer: 'canvas' });
+      chartInstance.current = echarts.init(chartRef.current, undefined, {
+        renderer: 'canvas',
+      });
       if (onChartClick) {
         chartInstance.current.on('click', onChartClick);
       }
@@ -92,5 +100,11 @@ export const AcademicHeatmapChart: React.FC<HeatmapChartProps> = ({
     return () => resizeObserver.disconnect();
   }, []);
 
-  return <div ref={chartRef} className={className || 'w-full h-full'} style={{ width: '100%', minHeight: '300px', height: '100%' }} />;
+  return (
+    <div
+      ref={chartRef}
+      className={className || 'w-full h-full'}
+      style={{ width: '100%', minHeight: '300px', height: '100%' }}
+    />
+  );
 };

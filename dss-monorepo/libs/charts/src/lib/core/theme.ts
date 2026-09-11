@@ -179,13 +179,16 @@ export function resolveChartTheme(
 
   return {
     chartColors,
-    foreground: get('--fg', fallback.foreground),
-    mutedForeground: get('--fg-subtle', fallback.mutedForeground),
-    background: get('--bg', fallback.background),
+    foreground: get('--foreground', get('--fg', fallback.foreground)),
+    mutedForeground: get(
+      '--muted-foreground',
+      get('--fg-subtle', fallback.mutedForeground),
+    ),
+    background: get('--background', get('--bg', fallback.background)),
     gridLine: get('--border', fallback.gridLine),
-    destructive: get('--danger', fallback.destructive),
+    destructive: get('--destructive', get('--danger', fallback.destructive)),
     riskColors: {
-      high: get('--danger', fallback.riskColors.high),
+      high: get('--destructive', get('--danger', fallback.riskColors.high)),
       medium: get('--warning', fallback.riskColors.medium),
       none: get('--success', fallback.riskColors.none),
     },
