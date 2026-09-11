@@ -5,7 +5,7 @@ import { DEFAULT_DARK_THEME } from './theme';
 describe('Pure ECharts Builders', () => {
   const sampleData: ChartDataPoint[] = [
     { label: 'Matemáticas', value: 85 },
-    { label: 'Riesgo', value: 15 },
+    { label: 'Riesgo Alto', value: 15 },
   ];
 
   it('buildBarOption should return a valid ECharts option with primary color', () => {
@@ -34,8 +34,8 @@ describe('Pure ECharts Builders', () => {
         expect(data[0].name).toBe('Matemáticas');
         expect(data[0].itemStyle.color).not.toBe(DEFAULT_DARK_THEME.destructive);
         
-        expect(data[1].name).toBe('Riesgo');
-        expect(data[1].itemStyle.color).toBe(DEFAULT_DARK_THEME.destructive);
+        expect(data[1].name).toBe('Riesgo Alto');
+        expect(data[1].itemStyle.color).toBe(DEFAULT_DARK_THEME.riskColors.high);
     }
   });
 

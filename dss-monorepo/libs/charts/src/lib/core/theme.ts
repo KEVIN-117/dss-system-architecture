@@ -60,6 +60,11 @@ export const DEFAULT_LIGHT_THEME: ChartThemeTokens = {
   mutedForeground: '#475569',
   gridLine: '#e2e8f0',
   alpha: hexWithAlpha,
+  riskColors: {
+    high: '#d55e00',   // vermillion (Okabe-Ito) — distinguible incluso en deuteranopía/protanopía
+    medium: '#e69f00',  // naranja
+    none: '#009e73',    // verde azulado
+  },
 };
 
 /**
@@ -67,11 +72,29 @@ export const DEFAULT_LIGHT_THEME: ChartThemeTokens = {
  * while maintaining the vibrant categorical palette from saiku-ui.
  */
 export const DEFAULT_DARK_THEME: ChartThemeTokens = {
-  chartColors: CHART_FALLBACK_COLORS, // Same vibrant colors work well on dark
+  chartColors: CHART_FALLBACK_COLORS,
   destructive: '#ff003c',
   background: '#09090b',
   foreground: '#fafafa',
   mutedForeground: '#a1a1aa',
   gridLine: '#27272a',
   alpha: hexWithAlpha,
+  riskColors: {
+    high: '#ff003c',    // rojo neón, mismo destructive para consistencia con el resto de la UI
+    medium: '#ffb800',  // ámbar neón
+    none: '#00ff9d',    // verde neón
+  },
 };
+
+
+export interface ChartThemeTokens {
+  chartColors: string[];
+  destructive: string;
+  background: string;
+  foreground: string;
+  mutedForeground: string;
+  gridLine: string;
+  alpha: (hex: string, opacity: number) => string;
+  /** Colores semánticos fijos para niveles de riesgo — no dependen del orden de los datos */
+  riskColors: { high: string; medium: string; none: string };
+}

@@ -12,13 +12,13 @@ export interface RiskDonutChartProps {
   themeTokens?: ChartThemeTokens;
 }
 
-export const RiskDonutChart: React.FC<RiskDonutChartProps> = ({ 
-  data, 
-  title, 
-  loading, 
-  onChartClick, 
+export const RiskDonutChart: React.FC<RiskDonutChartProps> = ({
+  data,
+  title,
+  loading,
+  onChartClick,
   className,
-  themeTokens = DEFAULT_DARK_THEME
+  themeTokens = DEFAULT_DARK_THEME,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
@@ -30,7 +30,9 @@ export const RiskDonutChart: React.FC<RiskDonutChartProps> = ({
   useEffect(() => {
     if (!chartRef.current) return;
     if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current, undefined, { renderer: 'canvas' });
+      chartInstance.current = echarts.init(chartRef.current, 'dark', {
+        renderer: 'canvas',
+      });
       if (onChartClick) {
         chartInstance.current.on('click', (params) => {
           onChartClick(params);
@@ -58,7 +60,7 @@ export const RiskDonutChart: React.FC<RiskDonutChartProps> = ({
         textColor: themeTokens.chartColors[0],
         maskColor: themeTokens.alpha(themeTokens.background, 0.8),
         zlevel: 0,
-        fontFamily: 'monospace'
+        fontFamily: 'monospace',
       });
     } else {
       chartInstance.current.hideLoading();
@@ -77,10 +79,10 @@ export const RiskDonutChart: React.FC<RiskDonutChartProps> = ({
   }, []);
 
   return (
-    <div 
-      ref={chartRef} 
-      className={className || "w-full h-full"} 
-      style={{ width: '100%', minHeight: '300px', height: '100%' }}
+    <div
+      ref={chartRef}
+      className={className || 'w-full h-full'}
+      style={{ width: '100%', minHeight: '700px', height: '100%' }}
     />
   );
 };

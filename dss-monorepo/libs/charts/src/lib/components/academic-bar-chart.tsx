@@ -1,8 +1,27 @@
 import React, { useEffect, useRef, useMemo } from 'react';
-import * as echarts from 'echarts';
+import * as echarts from 'echarts/core';
+import { SVGRenderer, CanvasRenderer } from 'echarts/renderers';
+import { BarChart, PieChart } from 'echarts/charts';
+import {
+  GridComponent,
+  TooltipComponent,
+  LegendComponent,
+  TitleComponent,
+} from 'echarts/components';
+import { LabelLayout } from 'echarts/features';
 import { ChartThemeTokens, DEFAULT_DARK_THEME } from '../core/theme';
 import { buildBarOption, ChartDataPoint } from '../core/builders';
 
+echarts.use([
+  SVGRenderer,
+  CanvasRenderer,
+  BarChart,
+  GridComponent,
+  TooltipComponent,
+  LegendComponent,
+  TitleComponent,
+  LabelLayout,
+]);
 export interface AcademicBarChartProps {
   data: ChartDataPoint[];
   title?: string;
@@ -12,13 +31,13 @@ export interface AcademicBarChartProps {
   themeTokens?: ChartThemeTokens;
 }
 
-export const AcademicBarChart: React.FC<AcademicBarChartProps> = ({ 
-  data, 
-  title, 
-  loading, 
-  onChartClick, 
+export const AcademicBarChart: React.FC<AcademicBarChartProps> = ({
+  data,
+  title,
+  loading,
+  onChartClick,
   className,
-  themeTokens = DEFAULT_DARK_THEME
+  themeTokens = DEFAULT_DARK_THEME,
 }) => {
   const chartRef = useRef<HTMLDivElement>(null);
   const chartInstance = useRef<echarts.ECharts | null>(null);
@@ -30,7 +49,9 @@ export const AcademicBarChart: React.FC<AcademicBarChartProps> = ({
   useEffect(() => {
     if (!chartRef.current) return;
     if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current, undefined, { renderer: 'canvas' });
+      chartInstance.current = echarts.init(chartRef.current, undefined, {
+        renderer: 'canvas',
+      });
       if (onChartClick) {
         chartInstance.current.on('click', (params) => {
           onChartClick(params);
@@ -58,7 +79,7 @@ export const AcademicBarChart: React.FC<AcademicBarChartProps> = ({
         textColor: themeTokens.chartColors[0],
         maskColor: themeTokens.alpha(themeTokens.background, 0.8),
         zlevel: 0,
-        fontFamily: 'monospace'
+        fontFamily: 'monospace',
       });
     } else {
       chartInstance.current.hideLoading();
@@ -77,9 +98,9 @@ export const AcademicBarChart: React.FC<AcademicBarChartProps> = ({
   }, []);
 
   return (
-    <div 
-      ref={chartRef} 
-      className={className || "w-full h-full"} 
+    <div
+      ref={chartRef}
+      className={className || 'w-full h-full'}
       style={{ width: '100%', minHeight: '300px', height: '100%' }}
     />
   );
