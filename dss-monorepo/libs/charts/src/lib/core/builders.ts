@@ -378,3 +378,170 @@ export function buildStackedAreaOption(
     })
   };
 }
+
+export interface ScatterDataPoint {
+  x: number;
+  y: number;
+  name?: string;
+  size?: number;
+}
+
+export interface ClusteringChartData {
+  clusters: Array<{
+    name: string;
+    data: ScatterDataPoint[];
+  }>;
+}
+
+export interface RegressionChartData {
+  points: ScatterDataPoint[];
+  line: ScatterDataPoint[];
+}
+
+export function buildScatterOption(
+  data: ScatterDataPoint[],
+  title?: string,
+  theme: ChartThemeTokens = DEFAULT_DARK_THEME
+): EChartsOption {
+  const primary = theme.chartColors[0];
+  return {
+    backgroundColor: 'transparent',
+    color: theme.chartColors,
+    title: title ? { text: title, left: 'center', top: 0, textStyle: { color: theme.foreground } } : undefined,
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: theme.alpha(theme.background, 0.8),
+      borderColor: theme.alpha(primary, 0.3),
+      textStyle: { color: theme.foreground }
+    },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { 
+      type: 'value', 
+      scale: true,
+      axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
+      axisLabel: { color: theme.mutedForeground },
+      splitLine: { show: false }
+    },
+    yAxis: { 
+      type: 'value', 
+      scale: true,
+      axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
+      axisLabel: { color: theme.mutedForeground },
+      splitLine: { lineStyle: { color: theme.gridLine, type: 'dashed' } }
+    },
+    series: [
+      {
+        type: 'scatter',
+        symbolSize: (data: any) => data[2] || 10,
+        data: data.map(d => [d.x, d.y, d.size || 10, d.name]),
+        itemStyle: {
+          color: theme.alpha(primary, 0.7),
+          borderColor: primary,
+          borderWidth: 1
+        },
+        emphasis: {
+          itemStyle: { shadowBlur: 10, shadowColor: primary }
+        }
+      }
+    ]
+  };
+}
+
+export function buildClusteringScatterOption(
+  data: ClusteringChartData,
+  title?: string,
+  theme: ChartThemeTokens = DEFAULT_DARK_THEME
+): EChartsOption {
+  return {
+    backgroundColor: 'transparent',
+    color: theme.chartColors,
+    title: title ? { text: title, left: 'center', top: 0, textStyle: { color: theme.foreground } } : undefined,
+    tooltip: {
+      trigger: 'item',
+      backgroundColor: theme.alpha(theme.background, 0.8),
+      textStyle: { color: theme.foreground }
+    },
+    legend: { top: 30, textStyle: { color: theme.foreground } },
+    grid: { left: '3%', right: '4%', bottom: '3%', top: title ? 70 : 50, containLabel: true },
+    xAxis: { 
+      type: 'value', 
+      scale: true,
+      axisLine: { lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) } },
+      axisLabel: { color: theme.mutedForeground },
+      splitLine: { show: false }
+    },
+    yAxis: { 
+      type: 'value', 
+      scale: true,
+      axisLine: { lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) } },
+      axisLabel: { color: theme.mutedForeground },
+      splitLine: { lineStyle: { color: theme.gridLine, type: 'dashed' } }
+    },
+    series: data.clusters.map((cluster, index) => {
+      const color = theme.chartColors[index % theme.chartColors.length];
+      return {
+        name: cluster.name,
+        type: 'scatter',
+        symbolSize: 12,
+        data: cluster.data.map(d => [d.x, d.y, d.name]),
+        itemStyle: {
+          color: theme.alpha(color, 0.6),
+          borderColor: color,
+          borderWidth: 1
+        },
+        emphasis: { itemStyle: { shadowBlur: 10, shadowColor: color } }
+      };
+    })
+  };
+}
+
+export function buildRegressionScatterOption(
+  data: RegressionChartData,
+  title?: string,
+  theme: ChartThemeTokens = DEFAULT_DARK_THEME
+): EChartsOption {
+  const primary = theme.chartColors[0];
+  const secondary = theme.chartColors[1] || theme.destructive;
+  return {
+    backgroundColor: 'transparent',
+    title: title ? { text: title, left: 'center', top: 0, textStyle: { color: theme.foreground } } : undefined,
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: { type: 'cross' },
+      backgroundColor: theme.alpha(theme.background, 0.8),
+      textStyle: { color: theme.foreground }
+    },
+    grid: { left: '3%', right: '4%', bottom: '3%', containLabel: true },
+    xAxis: { 
+      type: 'value', 
+      scale: true,
+      axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
+      axisLabel: { color: theme.mutedForeground },
+      splitLine: { show: false }
+    },
+    yAxis: { 
+      type: 'value', 
+      scale: true,
+      axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
+      axisLabel: { color: theme.mutedForeground },
+      splitLine: { lineStyle: { color: theme.gridLine, type: 'dashed' } }
+    },
+    series: [
+      {
+        name: 'Datos',
+        type: 'scatter',
+        symbolSize: 8,
+        data: data.points.map(d => [d.x, d.y]),
+        itemStyle: { color: theme.alpha(primary, 0.5) }
+      },
+      {
+        name: 'Regresión',
+        type: 'line',
+        showSymbol: false,
+        smooth: true,
+        data: data.line.map(d => [d.x, d.y]),
+        lineStyle: { color: secondary, width: 3, type: 'solid' }
+      }
+    ]
+  };
+}

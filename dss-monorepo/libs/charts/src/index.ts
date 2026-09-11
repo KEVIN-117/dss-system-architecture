@@ -4,3 +4,6 @@ export * from './lib/components/trend-line-chart';
 export * from './lib/core/theme';
 export * from './lib/core/builders';
 export * from './lib/components/stacked-area-chart';
+export * from './lib/components/scatter-chart';
+export * from './lib/components/clustering-scatter-chart';
+export * from './lib/components/regression-scatter-chart';

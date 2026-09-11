@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { buildBarOption, buildDonutOption, buildLineOption, ChartDataPoint } from './builders';
+import { buildBarOption, buildDonutOption, buildLineOption, buildScatterOption, buildClusteringScatterOption, buildRegressionScatterOption, ChartDataPoint } from './builders';
 import { DEFAULT_DARK_THEME } from './theme';
 
 describe('Pure ECharts Builders', () => {
@@ -49,5 +49,23 @@ describe('Pure ECharts Builders', () => {
         const areaColor = (option.series[0] as any).areaStyle.color;
         expect(areaColor.type).toBe('linear');
     }
+  });
+
+  it('buildScatterOption should return a scatter series', () => {
+    const option = buildScatterOption([{x:1, y:2}], 'Scatter', DEFAULT_DARK_THEME);
+    expect((option.series as any[])[0].type).toBe('scatter');
+  });
+
+  it('buildClusteringScatterOption should map clusters to series', () => {
+    const option = buildClusteringScatterOption({ clusters: [{ name: 'A', data: [{x:1, y:2}] }] }, 'Clustering', DEFAULT_DARK_THEME);
+    expect((option.series as any[])[0].name).toBe('A');
+    expect((option.series as any[])[0].type).toBe('scatter');
+  });
+
+  it('buildRegressionScatterOption should return a scatter and a line series', () => {
+    const option = buildRegressionScatterOption({ points: [{x:1, y:2}], line: [{x:1, y:2}, {x:2, y:4}] }, 'Regresión', DEFAULT_DARK_THEME);
+    expect((option.series as any[]).length).toBe(2);
+    expect((option.series as any[])[0].type).toBe('scatter');
+    expect((option.series as any[])[1].type).toBe('line');
   });
 });
