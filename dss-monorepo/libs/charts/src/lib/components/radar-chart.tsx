@@ -102,7 +102,7 @@ export const AcademicRadarChart: React.FC<RadarChartProps> = ({
     <div
       ref={chartRef}
       className={className || 'w-full h-full'}
-      style={{ width: '100%', minHeight: '300px', height: '100%' }}
+      style={{ width: '100%', minHeight: '800px', height: '100%' }}
     />
   );
 };

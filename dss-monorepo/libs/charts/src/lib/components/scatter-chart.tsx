@@ -87,7 +87,7 @@ export const ScatterChart: React.FC<ScatterChartProps> = ({
     <div
       ref={chartRef}
       className={className || 'w-full h-full'}
-      style={{ width: '100%', minHeight: '300px', height: '100%' }}
+      style={{ width: '100%', minHeight: '700px', height: '100%' }}
     />
   );
 };

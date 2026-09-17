@@ -87,7 +87,7 @@ export const StackedAreaChart: React.FC<StackedAreaChartProps> = ({
     <div
       ref={chartRef}
       className={className || 'w-full h-full'}
-      style={{ width: '100%', minHeight: '300px', height: '100%' }}
+      style={{ width: '100%', minHeight: '500px', height: '100%' }}
     />
   );
 };

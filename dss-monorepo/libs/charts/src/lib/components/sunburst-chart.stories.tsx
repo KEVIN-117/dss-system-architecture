@@ -22,6 +22,14 @@ export const Default: Story = {
             children: [
               { name: 'Cohorte 2024', value: 180 },
               { name: 'Cohorte 2025', value: 210 },
+              {
+                name: 'Especialidades',
+                children: [
+                  { name: 'IA', value: 60 },
+                  { name: 'Redes', value: 50 },
+                  { name: 'Seguridad', value: 70 },
+                ],
+              },
             ],
           },
           {
@@ -29,6 +37,14 @@ export const Default: Story = {
             children: [
               { name: 'Cohorte 2024', value: 140 },
               { name: 'Cohorte 2025', value: 160 },
+              {
+                name: 'Áreas',
+                children: [
+                  { name: 'Estructuras', value: 80 },
+                  { name: 'Hidráulica', value: 60 },
+                  { name: 'Transportes', value: 40 },
+                ],
+              },
             ],
           },
         ],
@@ -36,8 +52,39 @@ export const Default: Story = {
       {
         name: 'Ciencias',
         children: [
-          { name: 'Física', value: 80 },
-          { name: 'Matemáticas', value: 90 },
+          {
+            name: 'Física',
+            children: [
+              { name: 'Teórica', value: 40 },
+              { name: 'Experimental', value: 40 },
+            ],
+          },
+          {
+            name: 'Matemáticas',
+            children: [
+              { name: 'Pura', value: 50 },
+              { name: 'Aplicada', value: 40 },
+            ],
+          },
+        ],
+      },
+      {
+        name: 'Humanidades',
+        children: [
+          {
+            name: 'Historia',
+            children: [
+              { name: 'Antigua', value: 30 },
+              { name: 'Moderna', value: 25 },
+            ],
+          },
+          {
+            name: 'Filosofía',
+            children: [
+              { name: 'Ética', value: 20 },
+              { name: 'Metafísica', value: 15 },
+            ],
+          },
         ],
       },
     ],

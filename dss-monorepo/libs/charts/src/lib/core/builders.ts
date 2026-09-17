@@ -422,7 +422,7 @@ export function buildScatterOption(
   title?: string,
   theme: ChartThemeTokens = DEFAULT_DARK_THEME,
 ): EChartsOption {
-  const primary = theme.chartColors[0];
+  const primary = theme.chartColors[4];
   return {
     backgroundColor: 'transparent',
     color: theme.chartColors,
@@ -775,14 +775,14 @@ export function buildSunburstOption(
     series: {
       type: 'sunburst',
       data: data,
-      radius: [0, '90%'],
+      radius: [0, '100%'],
       itemStyle: {
         borderRadius: 4,
-        borderWidth: 2,
+        borderWidth: 3,
         borderColor: theme.background,
       },
       label: {
-        rotate: 'radial',
+        rotate: 'tangential',
         color: theme.foreground,
       },
     },

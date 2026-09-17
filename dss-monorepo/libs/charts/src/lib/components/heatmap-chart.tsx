@@ -104,7 +104,7 @@ export const AcademicHeatmapChart: React.FC<HeatmapChartProps> = ({
     <div
       ref={chartRef}
       className={className || 'w-full h-full'}
-      style={{ width: '100%', minHeight: '300px', height: '100%' }}
+      style={{ width: '100%', minHeight: '600px', height: '100%' }}
     />
   );
 };
