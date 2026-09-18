@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ==========================================
   # INFRAESTRUCTURA (Bases de Datos y Servicios de Terceros)
@@ -32,7 +30,31 @@ services:
     restart: always
     volumes:
       - ./infra/postgres-dw:/var/lib/postgresql/data
-      - ./infra/dw-schema/create_schemas.sql:/docker-entrypoint-initdb.d/01_create_schemas.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    networks:
+      - dss-net
+
+  dw-migrator:
+    image: postgres:15-alpine
+    depends_on:
+      postgres-dw:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres-dw
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DW_NAME}
+      PGUSER: ${POSTGRES_DW_USER}
+      PGPASSWORD: ${POSTGRES_DW_PASSWORD}
+    volumes:
+      - ./infra/dw-schema/migrations:/migrations:ro
+      - ./infra/dw-schema/scripts:/scripts:ro
+    entrypoint: ["/bin/sh", "/scripts/apply-migrations.sh"]
+    restart: "no"
     networks:
       - dss-net
 
@@ -78,6 +100,9 @@ services:
   hop-web:
     image: apache/hop-web:latest
     container_name: dss-hop-web
+    depends_on:
+      dw-migrator:
+        condition: service_completed_successfully
     ports:
       - "8081:8080"
     volumes:

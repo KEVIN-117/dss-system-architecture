@@ -29,11 +29,17 @@ services:
       PGPASSWORD: dw_test
     volumes:
       - ./migrations:/migrations:ro
+      - ./scripts:/scripts:ro
       - ./tests:/tests:ro
     command:
       - /bin/sh
       - -ec
       - |
         psql -v ON_ERROR_STOP=1 -f /migrations/0001_create_academic_closure_calendar.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/dw_002_upgrade_fixture.sql
+        sh /scripts/apply-migrations.sh
+        psql -v ON_ERROR_STOP=1 -f /tests/dw_003_upgrade_assertion.sql
+        sh /scripts/apply-migrations.sh
         psql -v ON_ERROR_STOP=1 -f /tests/academic_closure_calendar_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/analytical_layers_and_roles_test.sql
     restart: "no"
