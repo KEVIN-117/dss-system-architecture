@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pipeline>
+  <info>
+    <capture_transform_performance>N</capture_transform_performance>
+    <pipeline_type>Normal</pipeline_type>
+    <name>pl_dim_periodo_academico</name>
+    <description>Pipeline ETL para poblar la dimension de periodo (tiempo academico)</description>
+  </info>
+  <transform>
+    <type>TableInput</type>
+    <name>EXT - Periodo Academico</name>
+    <description>Extrae las combinaciones unicas de gestion y periodo desde las notas transaccionales</description>
+    <sql>SELECT DISTINCT
+    id_gestion::INTEGER AS gestion,
+    id_periodo::INTEGER AS periodo,
+    -- Generacion automatica del tipo de periodo basandose en la logica academica estandar
+    CASE 
+        WHEN id_periodo = 1 THEN 'SEMESTRE I'
+        WHEN id_periodo = 2 THEN 'SEMESTRE II'
+        WHEN id_periodo = 3 THEN 'CURSO DE INVIERNO'
+        WHEN id_periodo = 4 THEN 'CURSO DE VERANO'
+        ELSE 'PERIODO REGULAR'
+    END AS tipo_periodo,
+    -- Etiqueta descriptiva para los dashboards
+    CONCAT('Gestion ', id_gestion::VARCHAR, ' - Periodo ', id_periodo::VARCHAR) AS descripcion
+FROM academico.notas_planilla
+WHERE id_gestion IS NOT NULL 
+  AND id_periodo IS NOT NULL;</sql>
+    <connection>OLTP db</connection>
+    <GUI>
+      <xloc>128</xloc>
+      <yloc>96</yloc>
+    </GUI>
+  </transform>
+  <transform>
+    <type>InsertUpdate</type>
+    <name>LOD - dim_periodo_academico</name>
+    <description>Upsert en el DW (SCD Tipo 1)</description>
+    <connection>DSS DW</connection>
+    <commit>1000</commit>
+    <lookup>
+      <schema>public</schema>
+      <table>dim_periodo_academico</table>
+      <!-- La llave logica unica es compuesta: gestion + periodo -->
+      <key>
+        <name>gestion</name>
+        <field>gestion</field>
+        <condition>=</condition>
+      </key>
+      <key>
+        <name>periodo</name>
+        <field>periodo</field>
+        <condition>=</condition>
+      </key>
+      <value><name>gestion</name><rename>gestion</rename><update>N</update></value>
+      <value><name>periodo</name><rename>periodo</rename><update>N</update></value>
+      <value><name>tipo_periodo</name><rename>tipo_periodo</rename><update>Y</update></value>
+      <value><name>descripcion</name><rename>descripcion</rename><update>Y</update></value>
+    </lookup>
+    <GUI>
+      <xloc>448</xloc>
+      <yloc>96</yloc>
+    </GUI>
+  </transform>
+  <order>
+    <hop>
+      <from>EXT - Periodo Academico</from>
+      <to>LOD - dim_periodo_academico</to>
+      <enabled>Y</enabled>
+    </hop>
+  </order>
+</pipeline>

@@ -1,0 +1,59 @@
+{
+  "variables" : [
+    {
+      "name" : "OLTP_DB_HOSTNAME",
+      "value" : "Encrypted 2be98aff95a89c3d4e548f82690c3ff89",
+      "description" : "Hostname for database connection OLTP db"
+    },
+    {
+      "name" : "OLTP_DB_PORT",
+      "value" : "Encrypted 2be98afc86aa7f2e4cb79ce108bc6fc88",
+      "description" : "Port for database connection OLTP db"
+    },
+    {
+      "name" : "OLTP_DB_DATABASE",
+      "value" : "Encrypted 2be98afc86aa7f2e4a118ad78df81bad4",
+      "description" : "Database name for database connection OLTP db"
+    },
+    {
+      "name" : "OLTP_DB_USERNAME",
+      "value" : "Encrypted 2be98afc86aa7f2e4be0abc4fda81ae88",
+      "description" : "Username for database connection OLTP db"
+    },
+    {
+      "name" : "OLTP_DB_PASSWORD",
+      "value" : "Encrypted 2be98afc86af281968f2a8f228ec0f990",
+      "description" : "Password for database connection OLTP db"
+    },
+    {
+      "name" : "DSS_DW_HOSTNAME",
+      "value" : "${DB_DW_HOST}",
+      "description" : "Hostname for database connection DSS DW"
+    },
+    {
+      "name" : "DSS_DW_PORT",
+      "value" : "5432",
+      "description" : "Port for database connection DSS DW"
+    },
+    {
+      "name" : "DSS_DW_DATABASE",
+      "value" : "${DB_DW_NAME}",
+      "description" : "Database name for database connection DSS DW"
+    },
+    {
+      "name" : "DSS_DW_USERNAME",
+      "value" : "${DB_DW_USER}",
+      "description" : "Username for database connection DSS DW"
+    },
+    {
+      "name" : "DSS_DW_PASSWORD",
+      "value" : "${DB_DW_PASS}",
+      "description" : "Password for database connection DSS DW"
+    }
+  ],
+  "parentProjectName" : "samples",
+  "metadataBaseFolder" : "${PROJECT_HOME}/metadata",
+  "unitTestsBasePath" : "${PROJECT_HOME}",
+  "enforcingExecutionInHome" : true,
+  "dataSetsCsvFolder" : "${PROJECT_HOME}/datasets"
+}
