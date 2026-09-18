@@ -1,0 +1,37 @@
+{
+  "server" : "${DB_TX_HOST}",
+  "database" : "${DB_TX_NAME}",
+  "password" : "${DB_TX_PASS}",
+  "variables" : [
+    {
+      "name" : "OLTP_DB_HOSTNAME",
+      "value" : "host.docker.internal",
+      "description" : "Hostname for database connection OLTP db"
+    },
+    {
+      "name" : "OLTP_DB_PORT",
+      "value" : "5432",
+      "description" : "Port for database connection OLTP db"
+    },
+    {
+      "name" : "OLTP_DB_DATABASE",
+      "value" : "jachasun",
+      "description" : "Database name for database connection OLTP db"
+    },
+    {
+      "name" : "OLTP_DB_USERNAME",
+      "value" : "${DB_TX_USER}",
+      "description" : "Username for database connection OLTP db"
+    },
+    {
+      "name" : "OLTP_DB_PASSWORD",
+      "value" : "${DB_TX_PASS}",
+      "description" : "Password for database connection OLTP db"
+    }
+  ],
+  "access" : "Native",
+  "port" : "${DB_TX_PORT}",
+  "name" : "DSS_TRANSACTIONAL",
+  "type" : "POSTGRESQL",
+  "username" : "${DB_TX_USER}"
+}
