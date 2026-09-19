@@ -1,6 +1,6 @@
 # DW-003 — Fundamentos de la plataforma analítica
 
-DW-003 establece las capas y controles de acceso de la base analítica. No crea dimensiones, hechos, tablas RAW ni ejecuciones ETL; esas responsabilidades permanecen en DW-004 y las issues de modelado posteriores.
+DW-003 establece las capas y controles de acceso de la base analítica. No crea dimensiones, hechos ni tablas RAW; el control de ejecuciones se incorpora posteriormente en DW-004 y el modelado permanece en issues posteriores.
 
 ## Capas
 
@@ -15,7 +15,7 @@ flowchart LR
     CTRL -. gobierna .-> DWH
 ```
 
-`staging` conserva la observación de las fuentes sin transformación analítica. `etl_work` contiene resultados temporales de transformación. `dw` es la única capa para el modelo dimensional publicado. `ml_workspace` no publica datos al DW. `etl_control` conserva metadatos operativos y no reemplaza el registro de ejecuciones de DW-004.
+`staging` conserva la observación de las fuentes sin transformación analítica. `etl_work` contiene resultados temporales de transformación. `dw` es la única capa para el modelo dimensional publicado. `ml_workspace` no publica datos al DW. `etl_control` conserva metadatos operativos; DW-004 incorpora allí el registro auditable de ejecuciones.
 
 ## Roles de grupo
 

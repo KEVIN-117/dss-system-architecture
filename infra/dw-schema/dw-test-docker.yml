@@ -36,10 +36,15 @@ services:
       - -ec
       - |
         psql -v ON_ERROR_STOP=1 -f /migrations/0001_create_academic_closure_calendar.sql
-        psql -v ON_ERROR_STOP=1 -f /tests/dw_002_upgrade_fixture.sql
-        sh /scripts/apply-migrations.sh
-        psql -v ON_ERROR_STOP=1 -f /tests/dw_003_upgrade_assertion.sql
-        sh /scripts/apply-migrations.sh
         psql -v ON_ERROR_STOP=1 -f /tests/academic_closure_calendar_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/dw_002_upgrade_fixture.sql
+        psql -v ON_ERROR_STOP=1 -f /migrations/0002_create_analytical_layers_and_roles.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/dw_004_upgrade_fixture.sql
+        tr -d '\r' < /scripts/apply-migrations.sh | /bin/sh
+        psql -v ON_ERROR_STOP=1 -f /tests/dw_003_upgrade_assertion.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/dw_004_upgrade_assertion.sql
+        tr -d '\r' < /scripts/apply-migrations.sh | /bin/sh
         psql -v ON_ERROR_STOP=1 -f /tests/analytical_layers_and_roles_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/execution_control_test.sql
+        sh /tests/execution_lock_concurrency_test.sh
     restart: "no"
