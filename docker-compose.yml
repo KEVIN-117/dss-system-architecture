@@ -53,7 +53,7 @@ services:
     volumes:
       - ./infra/dw-schema/migrations:/migrations:ro
       - ./infra/dw-schema/scripts:/scripts:ro
-    entrypoint: ["/bin/sh", "/scripts/apply-migrations.sh"]
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /scripts/apply-migrations.sh | /bin/sh"]
     restart: "no"
     networks:
       - dss-net
