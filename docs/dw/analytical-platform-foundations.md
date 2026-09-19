@@ -1,6 +1,6 @@
 # DW-003 — Fundamentos de la plataforma analítica
 
-DW-003 establece las capas y controles de acceso de la base analítica. No crea dimensiones, hechos ni tablas RAW; el control de ejecuciones se incorpora posteriormente en DW-004 y el modelado permanece en issues posteriores.
+DW-003 establece las capas y controles de acceso de la base analítica. No crea dimensiones, hechos ni tablas RAW; DW-004 incorpora el control de ejecuciones, DW-005 documenta el modelo dimensional lógico y las issues posteriores materializarán sus objetos.
 
 ## Capas
 
