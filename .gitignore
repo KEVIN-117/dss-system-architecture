@@ -97,7 +97,7 @@ env/
 *.joblib
 
 # ------------------------------------------
-# 6. Node.js & Frontend (Next.js)
+# 6. Node.js, Frontend & Monorepo (Next.js, Nx, Vite)
 # ------------------------------------------
 node_modules/
 **/node_modules/
@@ -107,14 +107,53 @@ out/
 **/out/
 dist/
 **/dist/
+build/
+**/build/
+.nx/cache/
+**/.nx/cache/
+.nx/workspace-data/
+**/.nx/workspace-data/
+.nx/migrate-runs/
+**/.nx/migrate-runs/
+.nx/polygraph/
+**/.nx/polygraph/
+.turbo/
+**/.turbo/
+.parcel-cache/
+**/.parcel-cache/
+storybook-static/
+**/storybook-static/
+vite.config.*.timestamp*
+vitest.config.*.timestamp*
+*.tsbuildinfo
+**/*.tsbuildinfo
+.eslintcache
+**/.eslintcache
+.stylelintcache
+**/.stylelintcache
+
+# Testing & Coverage
+coverage/
+**/coverage/
+.nyc_output/
+**/.nyc_output/
+test-output/
+**/test-output/
+test-results/
+**/test-results/
+playwright-report/
+**/playwright-report/
+blob-report/
+**/blob-report/
+
+# Package managers logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
-.turbo/
 
 # ------------------------------------------
-# 7. IDEs, Editores y Herramientas del Desarrollador
+# 7. IDEs, Editores y Asistentes de Código
 # ------------------------------------------
 .idea/
 **/.idea/
@@ -124,30 +163,87 @@ yarn-error.log*
 *.iws
 .vscode/
 **/.vscode/
-*.swp
-*.swo
-*~
 .fleet/
+**/.fleet/
+.history/
+**/.history/
+*.sublime-workspace
+*.sublime-project
+
+# Herramientas de IA y asistentes
+.claude/worktrees/
+**/.claude/worktrees/
+.claude/settings.local.json
+**/.claude/settings.local.json
+.gemini/
+**/.gemini/
+.cursor/
+**/.cursor/
 
 # ------------------------------------------
 # 8. Archivos del Sistema Operativo
 # ------------------------------------------
 .DS_Store
 **/.DS_Store
+.DS_Store?
+._*
 Thumbs.db
 **/Thumbs.db
 ehthumbs.db
 desktop.ini
+$RECYCLE.BIN/
+*.lnk
 
 # ------------------------------------------
-# 9. Logs y Archivos Temporales
+# 9. Logs, Respaldos y Archivos Temporales
 # ------------------------------------------
+# Logs
 *.log
+**/*.log
+*.log.*
 logs/
 **/logs/
+
+# Temporales y caches generales
 *.tmp
+**/*.tmp
 *.temp
+**/*.temp
+tmp/
+**/tmp/
+temp/
+**/temp/
+.cache/
+**/.cache/
+*.cache
+
+# Respaldos y archivos de edición temporal
+*.bak
+**/*.bak
+*.backup
+**/*.backup
+*.old
+**/*.old
+*.orig
+**/*.orig
+*.rej
+*~
+**/*~
+*.swp
+**/*.swp
+*.swo
+**/*.swo
+
+# Bloqueos y archivos temporales de Office / Editores
+~$*
+.~lock.*#
 *.pid
+*.pid.lock
+*.seed
+*.dmp
+*.stackdump
+core
+core.*
 
 # ------------------------------------------
 # 10. Servicios Legacy / Temporales

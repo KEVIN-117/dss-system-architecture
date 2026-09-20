@@ -1,5 +1,3 @@
-version: "3.9"
-
 services:
   # ==========================================
   # INFRAESTRUCTURA (Bases de Datos y Servicios de Terceros)
@@ -20,10 +18,43 @@ services:
       - dss-net
 
   postgres-dw:
-    build: ./data-layer/postgres-dw
+    #build: ./data-layer/postgres-dw
+    image: postgres:15-alpine
+    container_name: postgres-dw
+    ports:
+      - "5434:5432"
     environment:
       - POSTGRES_USER=${POSTGRES_DW_USER}
       - POSTGRES_PASSWORD=${POSTGRES_DW_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DW_NAME}
+    restart: always
+    volumes:
+      - ./infra/postgres-dw:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+      start_period: 5s
+    networks:
+      - dss-net
+
+  dw-migrator:
+    image: postgres:15-alpine
+    depends_on:
+      postgres-dw:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres-dw
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DW_NAME}
+      PGUSER: ${POSTGRES_DW_USER}
+      PGPASSWORD: ${POSTGRES_DW_PASSWORD}
+    volumes:
+      - ./infra/dw-schema/migrations:/migrations:ro
+      - ./infra/dw-schema/scripts:/scripts:ro
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /scripts/apply-migrations.sh | /bin/sh"]
+    restart: "no"
     networks:
       - dss-net
 
@@ -53,7 +84,49 @@ services:
       - ./infra/keycloak/providers:/opt/keycloak/providers
     networks:
       - dss-net
+  rabbitmq:
+    image: rabbitmq:4.3-management
+    container_name: rabbitmq
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
+    ports:
+      - "5672:5672" # AMQP
+      - "15672:15672" # Web UI
+    volumes:
+      - ./infra/rabbitmq/data:/var/lib/rabbitmq
+    networks:
+      - dss-net
+  hop-web:
+    image: apache/hop-web:latest
+    container_name: dss-hop-web
+    depends_on:
+      dw-migrator:
+        condition: service_completed_successfully
+    ports:
+      - "8081:8080"
+    volumes:
+      - ./etl-layer/project-uatf:/files/project
+      - ./etl-layer/config:/files/config
+      - ./etl-layer/jdbc:/files/jdbc
+    environment:
+      # Definición de Proyecto
+      HOP_PROJECT_NAME: dss-uatf
+      HOP_PROJECT_FOLDER: /files/project
 
+      # Definición de Entorno
+      HOP_ENVIRONMENT_NAME: dev
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/config/environments/dev-env.json
+
+      # Compartir librería de Drivers
+      HOP_SHARED_JDBC_FOLDERS: /files/jdbc
+      DB_DW_HOST: postgres-dw
+      DB_DW_PORT: 5434
+      DB_DW_NAME: dss_dw
+      DB_DW_USER: admin
+      DB_DW_PASS: secret
+    networks:
+      - dss-net
   # ==========================================
   # MICROSERVICIOS PROPIOS
   # ==========================================
@@ -124,3 +197,6 @@ services:
 networks:
   dss-net:
     driver: bridge
+
+volumes:
+  postgres_data:
