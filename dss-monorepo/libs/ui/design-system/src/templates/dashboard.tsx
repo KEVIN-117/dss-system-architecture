@@ -13,6 +13,7 @@ import {
 } from '../organisms/sidebar';
 import { Header, HeaderProps } from '../organisms/header';
 import { Typography } from '../atoms/typography';
+import Link from 'next/link';
 
 export interface NavigationItem {
   title: string;
@@ -59,18 +60,18 @@ export function DashboardTemplate({
             <SidebarGroup className="mt-4">
               <SidebarMenu>
                 {navItems.map((item) => (
-                  <SidebarMenuItem key={item.href}>
+                  <SidebarMenuItem key={item.href + item.title}>
                     <SidebarMenuButton
                       asChild
                       className="hover:bg-primary/10 hover:text-primary transition-colors data-[active=true]:bg-primary/20 data-[active=true]:text-primary data-[active=true]:border-r-2 data-[active=true]:border-primary"
                     >
-                      <a
+                      <Link
                         href={item.href}
                         className="flex items-center gap-3 px-4 py-3 font-mono text-sm"
                       >
                         {item.icon}
                         <span>{item.title}</span>
-                      </a>
+                      </Link>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}

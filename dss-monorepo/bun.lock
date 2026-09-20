@@ -72,6 +72,8 @@
       "name": "@dss-monorepo/admin-portal",
       "version": "0.0.1",
       "dependencies": {
+        "@dss-monorepo/charts": "workspace:*",
+        "@dss-monorepo/design-system": "workspace:*",
         "next": "~16.1.6",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -98,6 +100,8 @@
       "name": "@dss-monorepo/decano-dashboard",
       "version": "0.0.1",
       "dependencies": {
+        "@dss-monorepo/charts": "workspace:*",
+        "@dss-monorepo/design-system": "workspace:*",
         "next": "~16.1.6",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -111,6 +115,8 @@
       "name": "@dss-monorepo/director-dashboard",
       "version": "0.0.1",
       "dependencies": {
+        "@dss-monorepo/charts": "workspace:*",
+        "@dss-monorepo/design-system": "workspace:*",
         "next": "~16.1.6",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -124,6 +130,7 @@
       "name": "@dss-monorepo/docs-portal",
       "version": "0.0.1",
       "dependencies": {
+        "@dss-monorepo/design-system": "workspace:*",
         "next": "~16.1.6",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -133,6 +140,8 @@
       "name": "@dss-monorepo/rector-dashboard",
       "version": "0.0.1",
       "dependencies": {
+        "@dss-monorepo/charts": "workspace:*",
+        "@dss-monorepo/design-system": "workspace:*",
         "next": "~16.1.6",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",

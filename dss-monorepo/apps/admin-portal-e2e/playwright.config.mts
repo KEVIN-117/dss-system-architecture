@@ -1,9 +1,15 @@
 import { defineConfig, devices } from '@playwright/test';
 import { nxE2EPreset } from '@nx/playwright/preset';
 import { workspaceRoot } from '@nx/devkit';
+import { loadE2EEnv, resolveBaseURL } from '../../tools/load-e2e-env.mjs';
 
 // For CI, you may want to set BASE_URL to the deployed application.
-const baseURL = process.env['BASE_URL'] || 'http://localhost:3000';
+const env = loadE2EEnv(import.meta.dirname, 'admin-portal');
+const configuredPort = Number(env['ADMIN_PORTAL_PORT_E2E']);
+const port = Number.isInteger(configuredPort) && configuredPort > 0 ? configuredPort : 3001;
+process.env['ADMIN_PORTAL_PORT'] ??= String(port);
+process.env.PORT = String(port);
+const baseURL = resolveBaseURL(env['ADMIN_PORTAL_BASE_URL'], port);
 
 /**
  * Read environment variables from file.
@@ -32,8 +38,8 @@ export default defineConfig({
   /* Run your local dev server before starting the tests */
   webServer: {
     command: 'bun nx run @dss-monorepo/admin-portal:dev',
-    url: 'http://localhost:3000',
-    reuseExistingServer: true,
+    url: baseURL,
+    reuseExistingServer: !process.env.CI,
     cwd: workspaceRoot,
   },
   projects: [

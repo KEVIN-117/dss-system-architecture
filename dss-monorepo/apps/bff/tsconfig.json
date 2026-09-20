@@ -63,9 +63,5 @@
     "eslint.config.cjs",
     "eslint.config.mjs"
   ],
-  "references": [
-    {
-      "path": "../../libs/ui/design-system"
-    }
-  ]
+  "references": []
 }

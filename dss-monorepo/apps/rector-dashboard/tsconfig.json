@@ -66,6 +66,9 @@
   "references": [
     {
       "path": "../../libs/ui/design-system"
+    },
+    {
+      "path": "../../libs/charts"
     }
   ]
 }
