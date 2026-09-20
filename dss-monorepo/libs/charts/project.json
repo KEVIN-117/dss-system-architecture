@@ -1,0 +1,28 @@
+{
+  "name": "charts",
+  "projectType": "library",
+  "sourceRoot": "libs/charts/src",
+  "tags": [
+    "type:ui",
+    "scope:shared"
+  ],
+  "targets": {
+    "e2e": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "bun x playwright test --config libs/charts/playwright.config.ts"
+      }
+    },
+    "build": {
+      "dependsOn": [],
+      "syncGenerators": []
+    },
+    "typecheck": {
+      "dependsOn": [],
+      "syncGenerators": []
+    },
+    "test": {
+      "dependsOn": []
+    }
+  }
+}

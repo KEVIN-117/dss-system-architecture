@@ -16,12 +16,6 @@
         "name": "next"
       }
     ],
-    "paths": {
-      "@/*": ["./src/*"],
-      "@dss-monorepo/design-system": [
-        "../../libs/ui/design-system/src/index.ts"
-      ]
-    },
     "types": [
       "vitest/globals",
       "vitest/importMeta",
@@ -69,6 +63,9 @@
   "references": [
     {
       "path": "../../libs/ui/design-system"
+    },
+    {
+      "path": "../../libs/charts"
     }
   ]
 }

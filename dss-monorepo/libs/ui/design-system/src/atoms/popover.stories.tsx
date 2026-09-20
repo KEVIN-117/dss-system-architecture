@@ -40,12 +40,14 @@ export const Default: Story = {
           <PopoverHeader>
             <PopoverTitle>Metodología HEFESTO v2</PopoverTitle>
             <PopoverDescription>
-              Construcción del Data Warehouse institucional UATF con arquitectura en estrella.
+              Construcción del Data Warehouse institucional UATF con
+              arquitectura en estrella.
             </PopoverDescription>
           </PopoverHeader>
           <div className="text-xs text-muted-foreground pt-1 space-y-1.5">
             <p>
-              • Ingesta de fuentes transaccionales vía Pentaho PDI y Load Manager en Go.
+              • Ingesta de fuentes transaccionales vía Pentaho PDI y Load
+              Manager en Go.
             </p>
             <p>
               • Almacenamiento dimensional en PostgreSQL y relaciones en Neo4j.
@@ -71,7 +73,8 @@ export const WithForm: Story = {
           <PopoverHeader>
             <PopoverTitle>Configurar Parámetros</PopoverTitle>
             <PopoverDescription>
-              Ajusta los umbrales para el modelo de riesgo de deserción estudiantil.
+              Ajusta los umbrales para el modelo de riesgo de deserción
+              estudiantil.
             </PopoverDescription>
           </PopoverHeader>
           <div className="grid gap-3 py-2">
@@ -118,7 +121,9 @@ export const Variations: Story = {
         </PopoverTrigger>
         <PopoverContent align="start" className="w-64">
           <PopoverTitle>Align Start</PopoverTitle>
-          <PopoverDescription>Alineado al inicio del activador.</PopoverDescription>
+          <PopoverDescription>
+            Alineado al inicio del activador.
+          </PopoverDescription>
         </PopoverContent>
       </Popover>
 
@@ -130,7 +135,9 @@ export const Variations: Story = {
         </PopoverTrigger>
         <PopoverContent align="center" className="w-64">
           <PopoverTitle>Align Center</PopoverTitle>
-          <PopoverDescription>Alineado al centro del activador.</PopoverDescription>
+          <PopoverDescription>
+            Alineado al centro del activador.
+          </PopoverDescription>
         </PopoverContent>
       </Popover>
 
@@ -142,7 +149,9 @@ export const Variations: Story = {
         </PopoverTrigger>
         <PopoverContent align="end" className="w-64">
           <PopoverTitle>Align End</PopoverTitle>
-          <PopoverDescription>Alineado al extremo final del activador.</PopoverDescription>
+          <PopoverDescription>
+            Alineado al extremo final del activador.
+          </PopoverDescription>
         </PopoverContent>
       </Popover>
     </div>
@@ -169,7 +178,9 @@ export const Cyberpunk: Story = {
                 <ActivityIcon className="size-3.5 text-emerald-400 animate-pulse" />
                 NEURAL_CLUSTER_01
               </PopoverTitle>
-              <span className="text-[10px] text-emerald-400 font-bold">ONLINE</span>
+              <span className="text-[10px] text-emerald-400 font-bold">
+                ONLINE
+              </span>
             </div>
             <PopoverDescription className="text-primary/70 text-[11px] font-mono">
               Real-time memory allocation & inference telemetry.

@@ -28,8 +28,12 @@ export const Default: Story = {
   render: (args: React.ComponentProps<typeof Separator>) => (
     <div className="w-[320px] space-y-4">
       <div>
-        <h4 className="text-sm font-semibold leading-none">DSS System Architecture</h4>
-        <p className="text-xs text-muted-foreground mt-1">Academic decision support & analytics platform.</p>
+        <h4 className="text-sm font-semibold leading-none">
+          DSS System Architecture
+        </h4>
+        <p className="text-xs text-muted-foreground mt-1">
+          Academic decision support & analytics platform.
+        </p>
       </div>
       <Separator {...args} />
       <div className="flex h-5 items-center space-x-4 text-xs text-muted-foreground">
@@ -46,11 +50,17 @@ export const Default: Story = {
 export const Vertical: Story = {
   render: () => (
     <div className="flex h-6 items-center space-x-4 text-sm font-medium">
-      <a href="#overview" className="hover:text-primary transition-colors">Overview</a>
+      <a href="#overview" className="hover:text-primary transition-colors">
+        Overview
+      </a>
       <Separator orientation="vertical" />
-      <a href="#metrics" className="hover:text-primary transition-colors">Metrics</a>
+      <a href="#metrics" className="hover:text-primary transition-colors">
+        Metrics
+      </a>
       <Separator orientation="vertical" />
-      <a href="#settings" className="hover:text-primary transition-colors">Settings</a>
+      <a href="#settings" className="hover:text-primary transition-colors">
+        Settings
+      </a>
     </div>
   ),
 };

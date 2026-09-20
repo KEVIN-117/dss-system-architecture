@@ -1,6 +1,14 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Toggle } from './toggle';
-import { BoldIcon, ItalicIcon, UnderlineIcon, BookmarkIcon, ShieldAlertIcon, TerminalIcon, CpuIcon } from 'lucide-react';
+import {
+  BoldIcon,
+  ItalicIcon,
+  UnderlineIcon,
+  BookmarkIcon,
+  ShieldAlertIcon,
+  TerminalIcon,
+  CpuIcon,
+} from 'lucide-react';
 
 const meta: Meta<typeof Toggle> = {
   title: 'Atoms/Toggle',
@@ -36,7 +44,11 @@ export const Default: Story = {
 
 export const WithText: Story = {
   render: () => (
-    <Toggle aria-label="Toggle notifications" variant="outline" className="gap-2">
+    <Toggle
+      aria-label="Toggle notifications"
+      variant="outline"
+      className="gap-2"
+    >
       <BookmarkIcon className="size-4" />
       <span>Bookmark</span>
     </Toggle>
@@ -119,7 +131,9 @@ export const Cyberpunk: Story = {
   render: () => (
     <div className="w-[360px] p-5 rounded-lg border border-primary/30 bg-black/70 shadow-[0_0_15px_rgba(0,255,200,0.1)] font-mono text-xs">
       <div className="flex items-center justify-between pb-3 mb-4 border-b border-primary/20">
-        <span className="font-bold text-primary tracking-widest">{'// TACTICAL_CONTROLS'}</span>
+        <span className="font-bold text-primary tracking-widest">
+          {'// TACTICAL_CONTROLS'}
+        </span>
         <span className="text-[10px] text-primary">ARMED</span>
       </div>
 

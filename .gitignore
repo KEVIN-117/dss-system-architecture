@@ -13,6 +13,7 @@
 # Preservar plantillas de ejemplo
 !.env.example
 !**/.env.example
+!**/.env.*.example
 !.env.template
 !**/.env.template
 

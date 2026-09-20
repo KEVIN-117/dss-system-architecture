@@ -66,7 +66,9 @@ export const Variations: Story = {
           aria-invalid="true"
           defaultValue="Error en formato de entrada: faltan campos obligatorios."
         />
-        <span className="text-xs text-destructive">El contenido supera el límite permitido.</span>
+        <span className="text-xs text-destructive">
+          El contenido supera el límite permitido.
+        </span>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -84,8 +86,12 @@ export const Cyberpunk: Story = {
   render: () => (
     <div className="w-[440px] p-5 rounded-lg border border-primary/30 bg-black/70 shadow-[0_0_20px_rgba(0,255,200,0.12)] font-mono text-xs">
       <div className="flex items-center justify-between pb-2 mb-3 border-b border-primary/20">
-        <span className="text-primary font-bold tracking-wider">{'// CIPHER_PAYLOAD_INJECTOR'}</span>
-        <span className="text-[10px] text-emerald-400 font-semibold animate-pulse">TERMINAL: ACTIVE</span>
+        <span className="text-primary font-bold tracking-wider">
+          {'// CIPHER_PAYLOAD_INJECTOR'}
+        </span>
+        <span className="text-[10px] text-emerald-400 font-semibold animate-pulse">
+          TERMINAL: ACTIVE
+        </span>
       </div>
 
       <div className="space-y-3">
@@ -97,7 +103,9 @@ export const Cyberpunk: Story = {
           defaultValue={`MATCH (s:Student)-[r:ENROLLED_IN]->(c:Course)\nWHERE s.risk_score > 0.75\nRETURN s.id, s.name, c.code, r.attendance_rate;`}
         />
         <div className="flex items-center justify-between pt-1">
-          <span className="text-[10px] text-muted-foreground font-mono">BUFFER: 128 BYTES</span>
+          <span className="text-[10px] text-muted-foreground font-mono">
+            BUFFER: 128 BYTES
+          </span>
           <Button size="sm" className="font-mono text-xs tracking-wider">
             EXECUTE_CYPHER
           </Button>

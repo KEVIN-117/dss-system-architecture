@@ -16,9 +16,6 @@
         "name": "next"
       }
     ],
-    "paths": {
-      "@/*": ["./src/*"]
-    },
     "types": [
       "vitest/globals",
       "vitest/importMeta",
@@ -66,6 +63,9 @@
   "references": [
     {
       "path": "../../libs/ui/design-system"
+    },
+    {
+      "path": "../../libs/charts"
     }
   ]
 }

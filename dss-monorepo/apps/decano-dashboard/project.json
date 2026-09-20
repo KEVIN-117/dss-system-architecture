@@ -1,9 +1,19 @@
 {
-    "name": "@dss-monorepo/decano-dashboard",
-    "projectType": "application",
-    "sourceRoot": "apps/decano-dashboard/src",
-    "tags": [
-        "type:app",
-        "scope:decano"
-    ]
+  "name": "@dss-monorepo/decano-dashboard",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/decano-dashboard/src",
+  "tags": ["type:app", "scope:decano"],
+  "targets": {
+    "dev": {
+      "options": {
+        "port": 3002
+      }
+    },
+    "serve": {
+      "options": {
+        "port": 3002
+      }
+    }
+  }
 }

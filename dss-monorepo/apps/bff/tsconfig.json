@@ -16,9 +16,6 @@
         "name": "next"
       }
     ],
-    "paths": {
-      "@/*": ["./src/*"]
-    },
     "types": [
       "vitest/globals",
       "vitest/importMeta",
@@ -63,9 +60,5 @@
     "eslint.config.cjs",
     "eslint.config.mjs"
   ],
-  "references": [
-    {
-      "path": "../../libs/ui/design-system"
-    }
-  ]
+  "references": []
 }

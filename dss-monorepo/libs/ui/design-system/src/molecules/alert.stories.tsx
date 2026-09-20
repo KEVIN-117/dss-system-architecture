@@ -23,7 +23,8 @@ export const Default: Story = {
     <Alert className="max-w-xl">
       <AlertTitle>Notificación del Sistema</AlertTitle>
       <AlertDescription>
-        El pipeline de sincronización del Data Warehouse se ha completado exitosamente.
+        El pipeline de sincronización del Data Warehouse se ha completado
+        exitosamente.
       </AlertDescription>
     </Alert>
   ),
@@ -42,14 +43,16 @@ export const Variants: Story = {
       <Alert variant="system">
         <AlertTitle>System Telemetry</AlertTitle>
         <AlertDescription>
-          Nodo Load Manager operando a capacidad nominal con 12 workers concurrentes.
+          Nodo Load Manager operando a capacidad nominal con 12 workers
+          concurrentes.
         </AlertDescription>
       </Alert>
 
       <Alert variant="destructive">
         <AlertTitle>Critical Warning</AlertTitle>
         <AlertDescription>
-          Fallo de conexión en réplica de base de datos secundaria. Iniciando failover automático.
+          Fallo de conexión en réplica de base de datos secundaria. Iniciando
+          failover automático.
         </AlertDescription>
       </Alert>
     </div>
@@ -63,7 +66,8 @@ export const WithIcons: Story = {
         <Info className="size-4" />
         <AlertTitle>Actualización de Esquema</AlertTitle>
         <AlertDescription>
-          Se han aplicado nuevas migraciones dimensionales para el semestre 2026-I.
+          Se han aplicado nuevas migraciones dimensionales para el semestre
+          2026-I.
         </AlertDescription>
       </Alert>
 
@@ -71,7 +75,8 @@ export const WithIcons: Story = {
         <Terminal className="size-4" />
         <AlertTitle>Terminal Protocol</AlertTitle>
         <AlertDescription>
-          Túnel seguro gRPC establecido entre Query Manager y microservicios analíticos.
+          Túnel seguro gRPC establecido entre Query Manager y microservicios
+          analíticos.
         </AlertDescription>
       </Alert>
 
@@ -79,7 +84,8 @@ export const WithIcons: Story = {
         <AlertTriangle className="size-4" />
         <AlertTitle>Alerta de Riesgo Académico</AlertTitle>
         <AlertDescription>
-          Modelo predictivo detectó 48 estudiantes en umbral crítico de deserción.
+          Modelo predictivo detectó 48 estudiantes en umbral crítico de
+          deserción.
         </AlertDescription>
       </Alert>
     </div>
@@ -97,23 +103,31 @@ export const CyberpunkTerminal: Story = {
         <span>SECURITY_CLEARANCE: LEVEL_4</span>
       </div>
 
-      <Alert variant="system" className="border-primary/50 shadow-[0_0_20px_theme(colors.primary.DEFAULT/20%)]">
+      <Alert
+        variant="system"
+        className="border-primary/50 shadow-[0_0_20px_theme(colors.primary.DEFAULT/20%)]"
+      >
         <Cpu className="size-4 text-primary animate-pulse" />
         <AlertTitle className="tracking-widest uppercase font-mono text-xs">
           [SYS_NODE_01]: NEURAL CORE ONLINE
         </AlertTitle>
         <AlertDescription className="text-xs font-mono text-primary/80">
-          UATF Academic DSS engine running CRISP-DM v2 inference model. Accuracy: 94.8% | Latency: 12ms.
+          UATF Academic DSS engine running CRISP-DM v2 inference model.
+          Accuracy: 94.8% | Latency: 12ms.
         </AlertDescription>
       </Alert>
 
-      <Alert variant="destructive" className="border-destructive/60 shadow-[0_0_25px_theme(colors.destructive.DEFAULT/25%)]">
+      <Alert
+        variant="destructive"
+        className="border-destructive/60 shadow-[0_0_25px_theme(colors.destructive.DEFAULT/25%)]"
+      >
         <ShieldAlert className="size-4 text-destructive animate-pulse" />
         <AlertTitle className="tracking-widest uppercase font-mono text-xs">
           [SEC_BREACH_ALERT]: ANOMALY INTERCEPTED
         </AlertTitle>
         <AlertDescription className="text-xs font-mono text-destructive/90">
-          Cross-faculty unauthorized token probe intercepted on port 8443. Target node segregated.
+          Cross-faculty unauthorized token probe intercepted on port 8443.
+          Target node segregated.
         </AlertDescription>
       </Alert>
     </div>

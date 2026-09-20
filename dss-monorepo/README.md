@@ -28,16 +28,16 @@ El DSS es un sistema de apoyo a la toma de decisiones académicas de la UATF. El
 
 **Stack principal:**
 
-| Capa | Tecnología |
-|---|---|
-| Aplicaciones web | Next.js 16, React 19 |
-| Lenguaje | TypeScript 6 |
-| Gestor de paquetes | Bun workspaces |
-| Herramienta de build | Nx 23 |
-| Estilos | Tailwind CSS + shadcn/ui |
-| Testing unitario | Vitest |
-| Testing E2E | Playwright |
-| Linting | ESLint (flat config) |
+| Capa                 | Tecnología               |
+| -------------------- | ------------------------ |
+| Aplicaciones web     | Next.js 16, React 19     |
+| Lenguaje             | TypeScript 6             |
+| Gestor de paquetes   | Bun workspaces           |
+| Herramienta de build | Nx 23                    |
+| Estilos              | Tailwind CSS + shadcn/ui |
+| Testing unitario     | Vitest                   |
+| Testing E2E          | Playwright               |
+| Linting              | ESLint (flat config)     |
 
 ---
 
@@ -194,30 +194,30 @@ Nx utiliza **tags** para clasificar proyectos. El monorepo implementa **dos dime
 
 Define el rol arquitectónico de cada proyecto dentro del sistema.
 
-| Tag | Rol | Ejemplos de proyectos |
-|---|---|---|
-| `type:app` | Aplicación desplegable (Next.js, entrypoint) | `admin-portal`, `rector-dashboard` |
-| `type:feature` | Feature completa con UI + lógica + datos | `feature-dropout-risk`, `feature-performance` |
-| `type:data-access` | Acceso a APIs, hooks de datos, React Query | `data-access-academic`, `data-access-students` |
-| `type:domain` | Interfaces, tipos, enums del dominio | `domain-academic`, `domain-students` |
-| `type:ui` | Componentes visuales puros, Design System | `ui-primitives`, `ui-components`, `charts` |
-| `type:util` | Helpers, constantes, formatters, validators | `util-formatters`, `util-validators` |
-| `type:bff` | Backend-For-Frontend (API routes de Next.js) | `bff` |
-| `type:connector` | Clientes de servicios externos | `connector-mondrian`, `connector-hop` |
-| `type:e2e` | Tests de extremo a extremo | `admin-portal-e2e`, `rector-dashboard-e2e` |
+| Tag                | Rol                                          | Ejemplos de proyectos                          |
+| ------------------ | -------------------------------------------- | ---------------------------------------------- |
+| `type:app`         | Aplicación desplegable (Next.js, entrypoint) | `admin-portal`, `rector-dashboard`             |
+| `type:feature`     | Feature completa con UI + lógica + datos     | `feature-dropout-risk`, `feature-performance`  |
+| `type:data-access` | Acceso a APIs, hooks de datos, React Query   | `data-access-academic`, `data-access-students` |
+| `type:domain`      | Interfaces, tipos, enums del dominio         | `domain-academic`, `domain-students`           |
+| `type:ui`          | Componentes visuales puros, Design System    | `ui-primitives`, `ui-components`, `charts`     |
+| `type:util`        | Helpers, constantes, formatters, validators  | `util-formatters`, `util-validators`           |
+| `type:bff`         | Backend-For-Frontend (API routes de Next.js) | `bff`                                          |
+| `type:connector`   | Clientes de servicios externos               | `connector-mondrian`, `connector-hop`          |
+| `type:e2e`         | Tests de extremo a extremo                   | `admin-portal-e2e`, `rector-dashboard-e2e`     |
 
 ### 4.2 Dimensión `scope` — Ámbito funcional
 
 Define el contexto de negocio al que pertenece el proyecto.
 
-| Tag | Ámbito | Descripción |
-|---|---|---|
-| `scope:admin` | Administración del sistema | Portal de configuración, usuarios, conectores |
-| `scope:rector` | Rectorado | KPIs institucionales, reportes ejecutivos |
-| `scope:decano` | Decanatura | Métricas por facultad, rendimiento académico |
-| `scope:director` | Dirección de carrera | Análisis por carrera, deserción, admisiones |
-| `scope:shared` | Compartido entre todos | UI, domain, utils reutilizables por cualquier scope |
-| `scope:infrastructure` | Infraestructura técnica | Auth, RBAC, connectors, BFF |
+| Tag                    | Ámbito                     | Descripción                                         |
+| ---------------------- | -------------------------- | --------------------------------------------------- |
+| `scope:admin`          | Administración del sistema | Portal de configuración, usuarios, conectores       |
+| `scope:rector`         | Rectorado                  | KPIs institucionales, reportes ejecutivos           |
+| `scope:decano`         | Decanatura                 | Métricas por facultad, rendimiento académico        |
+| `scope:director`       | Dirección de carrera       | Análisis por carrera, deserción, admisiones         |
+| `scope:shared`         | Compartido entre todos     | UI, domain, utils reutilizables por cualquier scope |
+| `scope:infrastructure` | Infraestructura técnica    | Auth, RBAC, connectors, BFF                         |
 
 ### 4.3 Cómo etiquetar un proyecto
 
@@ -229,10 +229,7 @@ Cada proyecto debe llevar exactamente **un tag de tipo** y **un tag de scope**. 
   "name": "@dss-monorepo/admin-portal",
   "projectType": "application",
   "sourceRoot": "apps/admin-portal/src",
-  "tags": [
-    "type:app",
-    "scope:admin"
-  ]
+  "tags": ["type:app", "scope:admin"]
 }
 ```
 
@@ -242,10 +239,7 @@ Cada proyecto debe llevar exactamente **un tag de tipo** y **un tag de scope**. 
   "name": "@dss-monorepo/ui-components",
   "projectType": "library",
   "sourceRoot": "libs/ui/components/src",
-  "tags": [
-    "type:ui",
-    "scope:shared"
-  ]
+  "tags": ["type:ui", "scope:shared"]
 }
 ```
 
@@ -255,34 +249,31 @@ Cada proyecto debe llevar exactamente **un tag de tipo** y **un tag de scope**. 
   "name": "@dss-monorepo/connector-mondrian",
   "projectType": "library",
   "sourceRoot": "libs/connectors/mondrian/src",
-  "tags": [
-    "type:connector",
-    "scope:infrastructure"
-  ]
+  "tags": ["type:connector", "scope:infrastructure"]
 }
 ```
 
 ### 4.4 Tabla de tags por proyecto
 
-| Proyecto | `type` | `scope` | Estado |
-|---|---|---|---|
-| `admin-portal` | `type:app` | `scope:admin` | ✅ Activo |
-| `admin-portal-e2e` | `type:e2e` | `scope:admin` | ✅ Activo |
-| `rector-dashboard` | `type:app` | `scope:rector` | 🔜 Futuro |
-| `decano-dashboard` | `type:app` | `scope:decano` | 🔜 Futuro |
-| `director-dashboard` | `type:app` | `scope:director` | 🔜 Futuro |
-| `bff` | `type:bff` | `scope:infrastructure` | 🔜 Futuro |
-| `ui-primitives` | `type:ui` | `scope:shared` | 🔜 Futuro |
-| `ui-components` | `type:ui` | `scope:shared` | 🔜 Futuro |
-| `charts` | `type:ui` | `scope:shared` | 🔜 Futuro |
-| `domain-academic` | `type:domain` | `scope:shared` | 🔜 Futuro |
-| `data-access-academic` | `type:data-access` | `scope:shared` | 🔜 Futuro |
-| `feature-dropout-risk` | `type:feature` | `scope:shared` | 🔜 Futuro |
-| `auth` | `type:util` | `scope:infrastructure` | 🔜 Futuro |
-| `rbac` | `type:util` | `scope:infrastructure` | 🔜 Futuro |
-| `connector-mondrian` | `type:connector` | `scope:infrastructure` | 🔜 Futuro |
-| `connector-hop` | `type:connector` | `scope:infrastructure` | 🔜 Futuro |
-| `connector-prediction` | `type:connector` | `scope:infrastructure` | 🔜 Futuro |
+| Proyecto               | `type`             | `scope`                | Estado    |
+| ---------------------- | ------------------ | ---------------------- | --------- |
+| `admin-portal`         | `type:app`         | `scope:admin`          | ✅ Activo |
+| `admin-portal-e2e`     | `type:e2e`         | `scope:admin`          | ✅ Activo |
+| `rector-dashboard`     | `type:app`         | `scope:rector`         | 🔜 Futuro |
+| `decano-dashboard`     | `type:app`         | `scope:decano`         | 🔜 Futuro |
+| `director-dashboard`   | `type:app`         | `scope:director`       | 🔜 Futuro |
+| `bff`                  | `type:bff`         | `scope:infrastructure` | 🔜 Futuro |
+| `ui-primitives`        | `type:ui`          | `scope:shared`         | 🔜 Futuro |
+| `ui-components`        | `type:ui`          | `scope:shared`         | 🔜 Futuro |
+| `charts`               | `type:ui`          | `scope:shared`         | 🔜 Futuro |
+| `domain-academic`      | `type:domain`      | `scope:shared`         | 🔜 Futuro |
+| `data-access-academic` | `type:data-access` | `scope:shared`         | 🔜 Futuro |
+| `feature-dropout-risk` | `type:feature`     | `scope:shared`         | 🔜 Futuro |
+| `auth`                 | `type:util`        | `scope:infrastructure` | 🔜 Futuro |
+| `rbac`                 | `type:util`        | `scope:infrastructure` | 🔜 Futuro |
+| `connector-mondrian`   | `type:connector`   | `scope:infrastructure` | 🔜 Futuro |
+| `connector-hop`        | `type:connector`   | `scope:infrastructure` | 🔜 Futuro |
+| `connector-prediction` | `type:connector`   | `scope:infrastructure` | 🔜 Futuro |
 
 ---
 
@@ -292,28 +283,28 @@ Las reglas están implementadas en [`eslint.config.mjs`](./eslint.config.mjs) me
 
 ### 5.1 Reglas de la dimensión `type`
 
-| Desde (`sourceTag`) | Puede importar (`onlyDependOnLibsWithTags`) |
-|---|---|
-| `type:app` | `type:feature`, `type:ui`, `type:data-access`, `type:domain`, `type:util` |
-| `type:feature` | `type:ui`, `type:data-access`, `type:domain`, `type:util` |
-| `type:data-access` | `type:domain`, `type:util` |
-| `type:domain` | `type:util` |
-| `type:ui` | `type:ui`, `type:util` |
-| `type:util` | `type:util` |
-| `type:bff` | `type:connector`, `type:util` |
-| `type:connector` | `type:util` |
-| `type:e2e` | `type:util` |
+| Desde (`sourceTag`) | Puede importar (`onlyDependOnLibsWithTags`)                               |
+| ------------------- | ------------------------------------------------------------------------- |
+| `type:app`          | `type:feature`, `type:ui`, `type:data-access`, `type:domain`, `type:util` |
+| `type:feature`      | `type:ui`, `type:data-access`, `type:domain`, `type:util`                 |
+| `type:data-access`  | `type:domain`, `type:util`                                                |
+| `type:domain`       | `type:util`                                                               |
+| `type:ui`           | `type:ui`, `type:util`                                                    |
+| `type:util`         | `type:util`                                                               |
+| `type:bff`          | `type:connector`, `type:util`                                             |
+| `type:connector`    | `type:util`                                                               |
+| `type:e2e`          | `type:util`                                                               |
 
 ### 5.2 Reglas de la dimensión `scope`
 
-| Desde (`sourceTag`) | Puede importar (`onlyDependOnLibsWithTags`) |
-|---|---|
-| `scope:admin` | `scope:shared`, `scope:admin` |
-| `scope:rector` | `scope:shared`, `scope:rector` |
-| `scope:decano` | `scope:shared`, `scope:decano` |
-| `scope:director` | `scope:shared`, `scope:director` |
-| `scope:shared` | `scope:shared` |
-| `scope:infrastructure` | `scope:shared`, `scope:infrastructure` |
+| Desde (`sourceTag`)    | Puede importar (`onlyDependOnLibsWithTags`) |
+| ---------------------- | ------------------------------------------- |
+| `scope:admin`          | `scope:shared`, `scope:admin`               |
+| `scope:rector`         | `scope:shared`, `scope:rector`              |
+| `scope:decano`         | `scope:shared`, `scope:decano`              |
+| `scope:director`       | `scope:shared`, `scope:director`            |
+| `scope:shared`         | `scope:shared`                              |
+| `scope:infrastructure` | `scope:shared`, `scope:infrastructure`      |
 
 > Las reglas de `type` y `scope` se evalúan **independientemente** sobre cada importación. Una importación es válida solo si pasa **ambas** dimensiones.
 
@@ -423,10 +414,10 @@ Todos los proyectos usan el scope `@dss-monorepo` en su `package.json`:
 
 ### Responsabilidad de cada archivo de configuración
 
-| Archivo | Responsabilidad |
-|---|---|
+| Archivo        | Responsabilidad                                                              |
+| -------------- | ---------------------------------------------------------------------------- |
 | `project.json` | Metadata de Nx: nombre canónico, tipo, tags, targets, `implicitDependencies` |
-| `package.json` | Nombre del paquete npm, versión, dependencias |
+| `package.json` | Nombre del paquete npm, versión, dependencias                                |
 
 > Los tags, targets y `implicitDependencies` **siempre van en `project.json`**, nunca en la sección `"nx"` de `package.json`.
 
@@ -441,10 +432,7 @@ Todos los proyectos usan el scope `@dss-monorepo` en su `package.json`:
   "name": "@dss-monorepo/<nombre>",
   "projectType": "application",
   "sourceRoot": "apps/<nombre>/src",
-  "tags": [
-    "type:app",
-    "scope:<scope>"
-  ]
+  "tags": ["type:app", "scope:<scope>"]
 }
 ```
 
@@ -455,10 +443,7 @@ Todos los proyectos usan el scope `@dss-monorepo` en su `package.json`:
   "name": "@dss-monorepo/<nombre>",
   "projectType": "library",
   "sourceRoot": "libs/<ruta>/src",
-  "tags": [
-    "type:<tipo>",
-    "scope:<scope>"
-  ]
+  "tags": ["type:<tipo>", "scope:<scope>"]
 }
 ```
 
@@ -470,10 +455,7 @@ Todos los proyectos usan el scope `@dss-monorepo` en su `package.json`:
   "projectType": "application",
   "sourceRoot": "apps/<nombre>-e2e/src",
   "implicitDependencies": ["@dss-monorepo/<nombre>"],
-  "tags": [
-    "type:e2e",
-    "scope:<scope>"
-  ]
+  "tags": ["type:e2e", "scope:<scope>"]
 }
 ```
 
@@ -604,8 +586,6 @@ Nx Cloud comparte la caché entre desarrolladores y jobs de CI, eliminando traba
 - [shadcn/ui](https://ui.shadcn.com)
 - [Tailwind CSS](https://tailwindcss.com)
 - [Bun Workspaces](https://bun.sh/docs/install/workspaces)
-
-
 
 ---
 
@@ -948,11 +928,11 @@ Aquí podríamos definir:
 
 ```typescript
 export interface StudentPerformance {
-    studentId: string;
-    finalGrade: number;
-    failed: boolean;
-    repeated: boolean;
-    dropoutRisk: number;
+  studentId: string;
+  finalGrade: number;
+  failed: boolean;
+  repeated: boolean;
+  dropoutRisk: number;
 }
 ```
 
@@ -960,9 +940,9 @@ o:
 
 ```typescript
 export interface AcademicRisk {
-    studentId: string;
-    probability: number;
-    level: "LOW" | "MEDIUM" | "HIGH";
+  studentId: string;
+  probability: number;
+  level: 'LOW' | 'MEDIUM' | 'HIGH';
 }
 ```
 
@@ -1005,10 +985,10 @@ libs/data-access/
 Por ejemplo:
 
 ```typescript
-getAcademicPerformance()
-getDropoutRisk()
-getAdmissionStatistics()
-getFacultyKPIs()
+getAcademicPerformance();
+getDropoutRisk();
+getAdmissionStatistics();
+getFacultyKPIs();
 ```
 
 Pero estas librerías **no deberían conocer directamente la interfaz visual**.
@@ -1498,8 +1478,8 @@ Pero con una regla importante:
 Esto:
 
 ```typescript
-if (user.role === "RECTOR") {
-    showDashboard();
+if (user.role === 'RECTOR') {
+  showDashboard();
 }
 ```
 
@@ -1767,25 +1747,25 @@ Nx puede hacer que la estructura correcta sea la opción fácil.
 Por ejemplo, no permitir:
 
 ```typescript
-import { Button } from "../../../libs/ui/src/components/button";
+import { Button } from '../../../libs/ui/src/components/button';
 ```
 
 ni:
 
 ```typescript
-import { something } from "@dss/ui/src/internal/...";
+import { something } from '@dss/ui/src/internal/...';
 ```
 
 Utilizaríamos APIs públicas:
 
 ```typescript
-import { Button } from "@dss/ui";
+import { Button } from '@dss/ui';
 ```
 
 o:
 
 ```typescript
-import { DropoutRiskCard } from "@dss/feature-dropout-risk";
+import { DropoutRiskCard } from '@dss/feature-dropout-risk';
 ```
 
 Esto es muy importante para preservar encapsulamiento.
@@ -1803,9 +1783,9 @@ libs/ui/
 expone:
 
 ```typescript
-export * from "./components/button";
-export * from "./components/data-table";
-export * from "./components/kpi-card";
+export * from './components/button';
+export * from './components/data-table';
+export * from './components/kpi-card';
 ```
 
 pero no expone:

@@ -11,8 +11,8 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" data-theme="admin">
-      <body className='dark'>{children}</body>
+    <html lang="en" data-theme="admin" className="dark">
+      <body>{children}</body>
     </html>
   );
 }

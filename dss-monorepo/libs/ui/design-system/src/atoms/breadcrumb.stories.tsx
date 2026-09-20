@@ -90,11 +90,16 @@ export const CustomSeparator: Story = {
 export const Cyberpunk: Story = {
   render: () => (
     <div className="p-6 bg-black rounded-lg border border-primary/30 font-mono">
-      <div className="text-xs text-primary/70 mb-3 tracking-widest">{'// PATH ROUTING PROTOCOL'}</div>
+      <div className="text-xs text-primary/70 mb-3 tracking-widest">
+        {'// PATH ROUTING PROTOCOL'}
+      </div>
       <Breadcrumb>
         <BreadcrumbList className="text-xs uppercase tracking-wider text-muted-foreground">
           <BreadcrumbItem>
-            <BreadcrumbLink href="#" className="text-primary hover:text-cyan-400 transition-colors">
+            <BreadcrumbLink
+              href="#"
+              className="text-primary hover:text-cyan-400 transition-colors"
+            >
               ROOT
             </BreadcrumbLink>
           </BreadcrumbItem>
@@ -102,7 +107,10 @@ export const Cyberpunk: Story = {
             <span className="text-xs font-bold text-primary/40">{'//'}</span>
           </BreadcrumbSeparator>
           <BreadcrumbItem>
-            <BreadcrumbLink href="#" className="hover:text-primary transition-colors">
+            <BreadcrumbLink
+              href="#"
+              className="hover:text-primary transition-colors"
+            >
               CORE_DSS
             </BreadcrumbLink>
           </BreadcrumbItem>

@@ -1,9 +1,19 @@
 {
-    "name": "@dss-monorepo/admin-portal",
-    "projectType": "application",
-    "sourceRoot": "apps/admin-portal/src",
-    "tags": [
-        "type:app",
-        "scope:admin"
-    ]
+  "name": "@dss-monorepo/admin-portal",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/admin-portal/src",
+  "tags": ["type:app", "scope:admin"],
+  "targets": {
+    "dev": {
+      "options": {
+        "port": 3001
+      }
+    },
+    "serve": {
+      "options": {
+        "port": 3001
+      }
+    }
+  }
 }

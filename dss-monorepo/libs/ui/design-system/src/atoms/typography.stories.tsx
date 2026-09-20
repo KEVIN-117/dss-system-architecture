@@ -42,10 +42,18 @@ export const CyberpunkNeon: Story = {
 export const Colors: Story = {
   render: () => (
     <div className="flex flex-col gap-4">
-      <Typography variant="large" color="primary">Primary Accent</Typography>
-      <Typography variant="large" color="secondary">Secondary Accent</Typography>
-      <Typography variant="large" color="destructive">Destructive Error</Typography>
-      <Typography variant="large" color="muted">Muted Subtext</Typography>
+      <Typography variant="large" color="primary">
+        Primary Accent
+      </Typography>
+      <Typography variant="large" color="secondary">
+        Secondary Accent
+      </Typography>
+      <Typography variant="large" color="destructive">
+        Destructive Error
+      </Typography>
+      <Typography variant="large" color="muted">
+        Muted Subtext
+      </Typography>
     </div>
   ),
 };
@@ -54,7 +62,8 @@ export const Elements: Story = {
   render: () => (
     <div className="flex flex-col gap-4 w-[500px]">
       <Typography variant="blockquote">
-        "I've seen things you people wouldn't believe. Attack ships on fire off the shoulder of Orion."
+        "I've seen things you people wouldn't believe. Attack ships on fire off
+        the shoulder of Orion."
       </Typography>
       <Typography variant="inlineCode">sudo rm -rf /</Typography>
       <Typography variant="list">
