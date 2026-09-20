@@ -1,93 +1,18 @@
-import React, { useEffect, useRef, useMemo } from 'react';
-import * as echarts from 'echarts';
-import { ChartThemeTokens, resolveChartTheme } from '../core/theme';
-import { buildStackedAreaOption, MultiSeriesChartData } from '../core/builders';
+'use client';
 
-export interface StackedAreaChartProps {
+import { useCallback } from 'react';
+import { BaseChart } from './base-chart';
+import { buildStackedAreaOption } from '../core/builders';
+import type { MultiSeriesChartData } from '../core/builders';
+import type { ChartOptionFactory, CommonChartProps } from '../core/types';
+
+export interface StackedAreaChartProps extends CommonChartProps {
   data: MultiSeriesChartData;
-  title?: string;
-  loading?: boolean;
-  onChartClick?: (params: any) => void;
-  className?: string;
-  themeTokens?: ChartThemeTokens;
 }
 
-export const StackedAreaChart: React.FC<StackedAreaChartProps> = ({
-  data,
-  title,
-  loading,
-  onChartClick,
-  className,
-  themeTokens,
-}) => {
-  const chartRef = useRef<HTMLDivElement>(null);
-  const chartInstance = useRef<echarts.ECharts | null>(null);
-
-  const resolvedTheme = useMemo(
-    () => themeTokens ?? resolveChartTheme(),
-    [themeTokens],
-  );
-
-  const option = useMemo(() => {
-    return buildStackedAreaOption(data, title, resolvedTheme);
-  }, [data, title, resolvedTheme]);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-    if (!chartInstance.current) {
-      chartInstance.current = echarts.init(chartRef.current, undefined, {
-        renderer: 'canvas',
-      });
-      if (onChartClick) {
-        chartInstance.current.on('click', (params) => {
-          onChartClick(params);
-        });
-      }
-    }
-    chartInstance.current.setOption(option, true);
-  }, [option, onChartClick]);
-
-  useEffect(() => {
-    return () => {
-      if (chartInstance.current) {
-        chartInstance.current.dispose();
-        chartInstance.current = null;
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!chartInstance.current) return;
-    if (loading) {
-      chartInstance.current.showLoading('default', {
-        text: 'LOADING...',
-        color: resolvedTheme.chartColors[0],
-        textColor: resolvedTheme.chartColors[0],
-        maskColor: resolvedTheme.alpha(resolvedTheme.background, 0.8),
-        zlevel: 0,
-        fontFamily: 'monospace',
-      });
-    } else {
-      chartInstance.current.hideLoading();
-    }
-  }, [loading, resolvedTheme]);
-
-  useEffect(() => {
-    if (!chartRef.current) return;
-    const resizeObserver = new ResizeObserver(() => {
-      if (chartInstance.current) {
-        chartInstance.current.resize();
-      }
-    });
-    resizeObserver.observe(chartRef.current);
-    return () => resizeObserver.disconnect();
-  }, []);
-
-  return (
-    <div
-      ref={chartRef}
-      className={className || 'w-full h-full'}
-      style={{ width: '100%', minHeight: '500px', height: '100%' }}
-    />
-  );
-};
+export function StackedAreaChart({ data, title, ...props }: StackedAreaChartProps) {
+  const option = useCallback<ChartOptionFactory>((theme) =>
+    buildStackedAreaOption(data, title, theme), [data, title]);
+  return <BaseChart {...props} title={title} option={option}
+    empty={data.categories.length === 0 || data.series.every((series) => series.data.length === 0)} />;
+}

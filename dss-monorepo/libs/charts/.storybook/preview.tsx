@@ -1,71 +1,43 @@
 import type { Preview } from '@storybook/react-vite';
-import '../src/styles/tokens.css';
-import '../src/styles/tailwind.css';
-import React from 'react';
+import '@dss-monorepo/design-system/styles/globals.css';
 
 const preview: Preview = {
   tags: ['autodocs'],
+  initialGlobals: { theme: 'admin', colorMode: 'light' },
   globalTypes: {
     theme: {
-      description: 'Paleta funcional del DSS',
-      defaultValue: 'admin',
+      description: 'Ámbito del DSS',
       toolbar: {
-        title: 'Theme',
-        icon: 'paintbrush',
-        items: [
-          { value: 'admin', title: 'Admin' },
-          { value: 'rector', title: 'Rector' },
-          { value: 'decano', title: 'Decano' },
-          { value: 'director', title: 'Director' },
-        ],
+        title: 'Ámbito',
+        items: ['admin', 'rector', 'decano', 'director'],
         dynamicTitle: true,
       },
     },
     colorMode: {
-      description: 'Modo Claro / Oscuro',
-      defaultValue: 'dark',
+      description: 'Modo de color',
       toolbar: {
-        title: 'Mode',
-        icon: 'circlehollow',
-        items: [
-          { value: 'light', icon: 'sun', title: 'Light' },
-          { value: 'dark', icon: 'moon', title: 'Dark' },
-        ],
+        title: 'Modo',
+        items: ['light', 'dark'],
         dynamicTitle: true,
       },
     },
   },
   decorators: [
-    (Story, context) => {
-      const theme = context.globals.theme || 'admin';
-      const colorMode = context.globals.colorMode || 'dark';
-      const isDark = colorMode === 'dark';
-
-      React.useEffect(() => {
-        const root = document.documentElement;
-        if (isDark) {
-          root.classList.add('dark');
-          root.setAttribute('data-theme', 'dark');
-        } else {
-          root.classList.remove('dark');
-          root.removeAttribute('data-theme');
-        }
-      }, [isDark, theme]);
-
-      return (
-        <div
-          style={{
-            padding: '1.5rem',
-            minHeight: '100vh',
-            backgroundColor: 'hsl(var(--bg))',
-            color: 'hsl(var(--fg))',
-          }}
-        >
-          <Story />
-        </div>
-      );
-    },
+    (Story, { globals }) => (
+      <div
+        data-theme={globals.theme}
+        className={globals.colorMode === 'dark' ? 'dark' : ''}
+        style={{
+          padding: 24,
+          minHeight: '100vh',
+          background: 'var(--background)',
+          color: 'var(--foreground)',
+          fontFamily: 'var(--font-sans)',
+        }}
+      >
+        <Story />
+      </div>
+    ),
   ],
 };
-
 export default preview;

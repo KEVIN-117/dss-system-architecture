@@ -1,8 +1,10 @@
+import { colorWithAlpha, normalizeChartColor } from './colors';
+
 /**
  * Chart Theme Tokens — centralized color system for @dss-monorepo/charts.
  *
  * Architecture:
- *   tokens.css (CSS variables, source of truth)
+ *   DSS Design System CSS variables (source of truth)
  *       ↓  getComputedStyle()
  *   resolveChartTheme() → ChartThemeTokens (resolved hex/rgb)
  *       ↓
@@ -12,8 +14,7 @@
  * passed to a builder must be a resolved string (hex, rgb, hsl).
  * resolveChartTheme() bridges that gap at runtime. The static
  * DEFAULT_*_THEME constants serve as fallbacks for SSR / Vitest /
- * Storybook initial render — their values are copied verbatim from
- * tokens.css so the two never drift.
+ * Storybook initial render — legacy fallbacks are retained for API compatibility.
  */
 
 // ---------------------------------------------------------------------------
@@ -21,6 +22,8 @@
 // ---------------------------------------------------------------------------
 
 export interface ChartThemeTokens {
+  /** DSS role accent; optional for compatibility with existing token objects. */
+  primary?: string;
   /** Categorical series palette (--chart-1..8 resolved) */
   chartColors: string[];
   /** Primary text color (--text-primary / --fg) */
@@ -47,18 +50,12 @@ export interface ChartThemeTokens {
  * Appends an alpha channel to a hex color.
  * Handles 3-char (#abc), 6-char (#aabbcc) and pass-through for non-hex.
  */
-export function hexWithAlpha(hex: string, opacity: number): string {
-  const clean = hex.replace('#', '');
-  // Expand 3-char hex → 6-char
-  const full =
-    clean.length === 3
-      ? clean[0] + clean[0] + clean[1] + clean[1] + clean[2] + clean[2]
-      : clean;
-  const alphaHex = Math.round(opacity * 255)
-    .toString(16)
-    .padStart(2, '0');
-  return `#${full}${alphaHex}`;
-}
+/** @deprecated Historical name; now handles normalized RGB/HSL/OKLCH too. */
+export const hexWithAlpha = colorWithAlpha;
+
+export type ChartThemeOverrides = Partial<Omit<ChartThemeTokens, 'riskColors'>> & {
+  riskColors?: Partial<ChartThemeTokens['riskColors']>;
+};
 
 // ---------------------------------------------------------------------------
 // Static fallbacks — values copied from tokens.css
@@ -152,47 +149,51 @@ export const DEFAULT_DARK_THEME: ChartThemeTokens = {
  */
 export function resolveChartTheme(
   fallback: ChartThemeTokens = DEFAULT_DARK_THEME,
+  element?: HTMLElement,
+  overrides?: ChartThemeOverrides,
 ): ChartThemeTokens {
-  if (typeof document === 'undefined') return fallback;
-
-  const cs = getComputedStyle(document.documentElement);
+  const target = element ?? (typeof document === 'undefined' ? undefined : document.documentElement);
+  const cs = target ? getComputedStyle(target) : undefined;
   const get = (name: string, fb: string): string => {
-    const raw = cs.getPropertyValue(name).trim();
+    let raw = cs?.getPropertyValue(name).trim();
     if (!raw) return fb;
-    // tokens.css chart colors are plain hex → pass through
-    if (
-      raw.startsWith('#') ||
-      raw.startsWith('rgb') ||
-      raw.startsWith('hsl') ||
-      raw.startsWith('oklch')
-    ) {
-      return raw;
-    }
-    // HSL triple (e.g. "220 15% 99%") → wrap
-    if (/^-?[\d.]+\s+[\d.]+%\s+[\d.]+%/.test(raw)) return `hsl(${raw})`;
-    return raw;
+    if (/^-?[\d.]+\s+[\d.]+%\s+[\d.]+%/.test(raw)) raw = 'hsl(' + raw + ')';
+    return normalizeChartColor(raw, fb);
   };
-
-  const chartColors = fallback.chartColors.map((fb, i) =>
-    get(`--chart-${i + 1}`, fb),
-  );
-
-  return {
+  const chartColors = fallback.chartColors.map((color, i) => get('--chart-' + (i + 1), color));
+  const cssTheme: ChartThemeTokens = {
+    primary: get('--primary', fallback.primary ?? chartColors[0]),
     chartColors,
     foreground: get('--foreground', get('--fg', fallback.foreground)),
-    mutedForeground: get(
-      '--muted-foreground',
-      get('--fg-subtle', fallback.mutedForeground),
-    ),
+    mutedForeground: get('--muted-foreground', get('--fg-subtle', fallback.mutedForeground)),
     background: get('--background', get('--bg', fallback.background)),
     gridLine: get('--border', fallback.gridLine),
     destructive: get('--destructive', get('--danger', fallback.destructive)),
     riskColors: {
       high: get('--destructive', get('--danger', fallback.riskColors.high)),
-      medium: get('--warning', fallback.riskColors.medium),
-      none: get('--success', fallback.riskColors.none),
+      medium: get('--warning', get('--chart-4', fallback.riskColors.medium)),
+      none: get('--success', get('--chart-2', fallback.riskColors.none)),
     },
-    alpha: hexWithAlpha,
+    alpha: colorWithAlpha,
+  };
+  const merged = { ...cssTheme, ...overrides,
+    chartColors: overrides?.chartColors?.length ? overrides.chartColors : cssTheme.chartColors,
+    riskColors: { ...cssTheme.riskColors, ...overrides?.riskColors },
+  };
+  return {
+    ...merged,
+    primary: normalizeChartColor(merged.primary ?? chartColors[0], cssTheme.primary),
+    chartColors: merged.chartColors.map((color, i) => normalizeChartColor(color, chartColors[i % chartColors.length])),
+    foreground: normalizeChartColor(merged.foreground, cssTheme.foreground),
+    mutedForeground: normalizeChartColor(merged.mutedForeground, cssTheme.mutedForeground),
+    background: normalizeChartColor(merged.background, cssTheme.background),
+    gridLine: normalizeChartColor(merged.gridLine, cssTheme.gridLine),
+    destructive: normalizeChartColor(merged.destructive, cssTheme.destructive),
+    riskColors: {
+      high: normalizeChartColor(merged.riskColors.high, cssTheme.riskColors.high),
+      medium: normalizeChartColor(merged.riskColors.medium, cssTheme.riskColors.medium),
+      none: normalizeChartColor(merged.riskColors.none, cssTheme.riskColors.none),
+    },
   };
 }
 

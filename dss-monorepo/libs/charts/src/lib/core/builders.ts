@@ -4,6 +4,7 @@ import { ChartThemeTokens, DEFAULT_DARK_THEME } from './theme';
 export interface ChartDataPoint {
   label: string;
   value: number;
+  tone?: 'default' | 'success' | 'warning' | 'destructive';
 }
 
 /**
@@ -14,7 +15,7 @@ export function buildBarOption(
   title?: string,
   theme: ChartThemeTokens = DEFAULT_DARK_THEME,
 ): EChartsOption {
-  const primary = theme.chartColors[0];
+  const primary = theme.primary ?? theme.chartColors[0];
 
   return {
     backgroundColor: 'transparent',
@@ -45,12 +46,12 @@ export function buildBarOption(
       data: data.map((d) => d.label),
       axisTick: { alignWithLabel: true },
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
     },
     yAxis: {
       type: 'value',
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       splitLine: {
         lineStyle: {
           color: theme.gridLine,
@@ -79,32 +80,14 @@ export function buildBarOption(
   };
 }
 
-/**
- * Builds the ECharts option for a Risk Donut Chart.
- */
-/**
- * Clasifica una etiqueta de riesgo en un nivel semántico fijo.
- * Usa coincidencia por palabra completa, no `includes` suelto,
- * para no confundir "Riesgo Alto" con "Sin Riesgo".
- */
-function getRiskLevel(label: string): 'high' | 'medium' | 'none' {
-  const words = label.toLowerCase().split(/\s+/);
-  if (
-    words.includes('alto') ||
-    words.includes('peligro') ||
-    words.includes('high')
-  )
-    return 'high';
-  if (words.includes('medio') || words.includes('medium')) return 'medium';
-  return 'none'; // "Sin Riesgo", "Bajo", "None", etc.
-}
-
 export function buildDonutOption(
   data: ChartDataPoint[],
   title?: string,
   theme: ChartThemeTokens = DEFAULT_DARK_THEME,
+  width = 640,
 ): EChartsOption {
   const total = data.reduce((sum, d) => sum + d.value, 0);
+  const compact = width < 480;
 
   return {
     backgroundColor: 'transparent',
@@ -131,10 +114,13 @@ export function buildDonutOption(
       textStyle: { color: theme.foreground },
     },
 
+    title: title ? { text: title, left: 'center', textStyle: { color: theme.foreground, fontSize: 14, width: Math.max(width - 32, 0), overflow: 'truncate' } } : undefined,
     legend: {
-      orient: 'vertical',
-      left: 'left',
-      top: 'middle',
+      type: 'scroll',
+      orient: compact ? 'horizontal' : 'vertical',
+      left: compact ? 'center' : 'left',
+      top: compact ? undefined : 'middle',
+      bottom: compact ? 0 : undefined,
       icon: 'roundRect',
       itemGap: 14,
       textStyle: { color: theme.foreground, fontSize: 13 },
@@ -151,7 +137,9 @@ export function buildDonutOption(
       {
         name: 'Risk Level',
         type: 'pie',
-        radius: ['40%', '70%'],
+        radius: compact ? ['35%', '58%'] : ['35%', '60%'],
+        center: compact ? ['50%', '47%'] : ['65%', '50%'],
+        stillShowZeroSum: false,
         avoidLabelOverlap: true,
         padAngle: 5,
         itemStyle: {
@@ -160,29 +148,29 @@ export function buildDonutOption(
           borderWidth: 2,
         },
         label: {
-          show: true, // visible siempre, no solo en hover
+          show: !compact,
           position: 'outer',
           formatter: '{d}%',
           color: theme.foreground,
-          fontSize: 20,
+          fontSize: 13,
           fontWeight: 'bold',
         },
         labelLine: { show: true, length: 10, length2: 10 },
         emphasis: {
           scale: true,
           scaleSize: 6,
-          label: { fontSize: 40, fontWeight: 'bold', color: theme.foreground },
+          label: { fontSize: 15, fontWeight: 'bold', color: theme.foreground },
           itemStyle: {
             shadowBlur: 15,
             shadowColor: theme.alpha(theme.foreground, 0.3),
           },
         },
-        data: data.map((d) => {
-          const level = getRiskLevel(d.label);
+        data: data.map((d, index) => {
+          const color = d.tone === 'destructive' ? theme.riskColors.high : d.tone === 'warning' ? theme.riskColors.medium : d.tone === 'success' ? theme.riskColors.none : theme.chartColors[index % theme.chartColors.length];
           return {
             value: d.value,
             name: d.label,
-            itemStyle: { color: theme.riskColors[level] },
+            itemStyle: { color },
           };
         }),
       },
@@ -198,7 +186,7 @@ export function buildLineOption(
   title?: string,
   theme: ChartThemeTokens = DEFAULT_DARK_THEME,
 ): EChartsOption {
-  const primary = theme.chartColors[0];
+  const primary = theme.primary ?? theme.chartColors[0];
 
   return {
     backgroundColor: 'transparent',
@@ -228,12 +216,12 @@ export function buildLineOption(
       boundaryGap: false,
       data: data.map((d) => d.label),
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
     },
     yAxis: {
       type: 'value',
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       splitLine: {
         lineStyle: {
           color: theme.gridLine,
@@ -339,7 +327,7 @@ export function buildStackedAreaOption(
         axisLine: {
           lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
         },
-        axisLabel: { color: theme.mutedForeground },
+        axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       },
     ],
     yAxis: [
@@ -348,7 +336,7 @@ export function buildStackedAreaOption(
         axisLine: {
           lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
         },
-        axisLabel: { color: theme.mutedForeground },
+        axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
         splitLine: {
           lineStyle: {
             color: theme.gridLine,
@@ -445,20 +433,20 @@ export function buildScatterOption(
       type: 'value',
       scale: true,
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       splitLine: { show: false },
     },
     yAxis: {
       type: 'value',
       scale: true,
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       splitLine: { lineStyle: { color: theme.gridLine, type: 'dashed' } },
     },
     series: [
       {
         type: 'scatter',
-        symbolSize: (data: any) => data[2] || 10,
+        symbolSize: (data: number[]) => data[2] || 10,
         data: data.map((d) => [d.x, d.y, d.size || 10, d.name]),
         itemStyle: {
           color: theme.alpha(primary, 0.7),
@@ -508,7 +496,7 @@ export function buildClusteringScatterOption(
       axisLine: {
         lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
       },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       splitLine: { show: false },
     },
     yAxis: {
@@ -517,7 +505,7 @@ export function buildClusteringScatterOption(
       axisLine: {
         lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
       },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       splitLine: { lineStyle: { color: theme.gridLine, type: 'dashed' } },
     },
     series: data.clusters.map((cluster, index) => {
@@ -543,7 +531,7 @@ export function buildRegressionScatterOption(
   title?: string,
   theme: ChartThemeTokens = DEFAULT_DARK_THEME,
 ): EChartsOption {
-  const primary = theme.chartColors[0];
+  const primary = theme.primary ?? theme.chartColors[0];
   const secondary = theme.chartColors[1] || theme.destructive;
   return {
     backgroundColor: 'transparent',
@@ -566,14 +554,14 @@ export function buildRegressionScatterOption(
       type: 'value',
       scale: true,
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       splitLine: { show: false },
     },
     yAxis: {
       type: 'value',
       scale: true,
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       splitLine: { lineStyle: { color: theme.gridLine, type: 'dashed' } },
     },
     series: [
@@ -697,7 +685,7 @@ export function buildHeatmapOption(
       type: 'category',
       data: data.xAxisLabels,
       splitArea: { show: true, areaStyle: { color: ['transparent'] } },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       axisLine: {
         lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
       },
@@ -706,7 +694,7 @@ export function buildHeatmapOption(
       type: 'category',
       data: data.yAxisLabels,
       splitArea: { show: true, areaStyle: { color: ['transparent'] } },
-      axisLabel: { color: theme.mutedForeground },
+      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
       axisLine: {
         lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
       },

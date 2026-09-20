@@ -13,7 +13,7 @@ import { DEFAULT_DARK_THEME } from './theme';
 describe('Pure ECharts Builders', () => {
   const sampleData: ChartDataPoint[] = [
     { label: 'Matemáticas', value: 85 },
-    { label: 'Riesgo Alto', value: 15 },
+    { label: 'Riesgo Alto', value: 15, tone: 'destructive' },
   ];
 
   it('buildBarOption should return a valid ECharts option with primary color', () => {
@@ -33,13 +33,11 @@ describe('Pure ECharts Builders', () => {
       expect(option.series[0].type).toBe('bar');
       expect(option.series[0].data).toEqual([85, 15]);
       // Theme extraction test
-      expect((option.series[0] as any).itemStyle.color).toBe(
-        DEFAULT_DARK_THEME.chartColors[0],
-      );
+      expect(option.series[0]).toMatchObject({ itemStyle: { color: DEFAULT_DARK_THEME.chartColors[0] } });
     }
   });
 
-  it('buildDonutOption should assign destructive color to "Riesgo" labels', () => {
+  it('buildDonutOption uses explicit tone instead of guessing from translated labels', () => {
     const option = buildDonutOption(
       sampleData,
       'Riesgo de Deserción',
@@ -48,7 +46,7 @@ describe('Pure ECharts Builders', () => {
 
     expect(option.series).toBeDefined();
     if (Array.isArray(option.series)) {
-      const data = option.series[0].data as any[];
+      const data = option.series[0].data as Array<{name: string; itemStyle: {color: string}}>;
       expect(data[0].name).toBe('Matemáticas');
       expect(data[0].itemStyle.color).not.toBe(DEFAULT_DARK_THEME.destructive);
 
@@ -64,8 +62,7 @@ describe('Pure ECharts Builders', () => {
     if (Array.isArray(option.series)) {
       expect(option.series[0].type).toBe('line');
       expect(option.series[0].data).toEqual([85, 15]);
-      const areaColor = (option.series[0] as any).areaStyle.color;
-      expect(areaColor.type).toBe('linear');
+      expect(option.series[0]).toMatchObject({ areaStyle: { color: { type: 'linear' } } });
     }
   });
 
@@ -75,7 +72,7 @@ describe('Pure ECharts Builders', () => {
       'Scatter',
       DEFAULT_DARK_THEME,
     );
-    expect((option.series as any[])[0].type).toBe('scatter');
+    expect((option.series as Array<{type: string; name?: string}>)[0].type).toBe('scatter');
   });
 
   it('buildClusteringScatterOption should map clusters to series', () => {
@@ -84,8 +81,8 @@ describe('Pure ECharts Builders', () => {
       'Clustering',
       DEFAULT_DARK_THEME,
     );
-    expect((option.series as any[])[0].name).toBe('A');
-    expect((option.series as any[])[0].type).toBe('scatter');
+    expect((option.series as Array<{type: string; name?: string}>)[0].name).toBe('A');
+    expect((option.series as Array<{type: string; name?: string}>)[0].type).toBe('scatter');
   });
 
   it('buildRegressionScatterOption should return a scatter and a line series', () => {
@@ -100,8 +97,31 @@ describe('Pure ECharts Builders', () => {
       'Regresión',
       DEFAULT_DARK_THEME,
     );
-    expect((option.series as any[]).length).toBe(2);
-    expect((option.series as any[])[0].type).toBe('scatter');
-    expect((option.series as any[])[1].type).toBe('line');
+    expect((option.series as Array<{type: string; name?: string}>).length).toBe(2);
+    expect((option.series as Array<{type: string; name?: string}>)[0].type).toBe('scatter');
+    expect((option.series as Array<{type: string; name?: string}>)[1].type).toBe('line');
+  });
+});
+
+
+describe('Donut semantics and proportions', () => {
+  it('preserves input order and raw values instead of guessing percentages', () => {
+    const option = buildDonutOption([{label:'B',value:3},{label:'A',value:1}]);
+    expect(option.series).toMatchObject([{ data: [{ name:'B', value:3 },{ name:'A',value:1 }] }]);
+    expect(option.aria?.label?.description).toContain('B: 3 (75%)');
+    expect(option.aria?.label?.description).toContain('A: 1 (25%)');
+  });
+  it('does not derive risk from display text', () => {
+    const option = buildDonutOption([{label:'Riesgo Alto',value:4},{label:'High risk',value:2}]);
+    expect(option.series).toMatchObject([{ data: [
+      {itemStyle:{color:DEFAULT_DARK_THEME.chartColors[0]}},
+      {itemStyle:{color:DEFAULT_DARK_THEME.chartColors[1]}},
+    ] }]);
+  });
+  it('does not fabricate shares for a zero sum and adapts the legend to narrow charts', () => {
+    const option=buildDonutOption([{label:'A',value:0}], undefined, DEFAULT_DARK_THEME, 300);
+    expect(option.series).toMatchObject([{stillShowZeroSum:false}]);
+    expect(option.legend).toMatchObject({orient:'horizontal',bottom:0});
+    expect(option.aria?.label?.description).not.toContain('NaN');
   });
 });

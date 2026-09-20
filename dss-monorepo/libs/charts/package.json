@@ -12,20 +12,24 @@
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",
       "default": "./dist/index.js"
+    },
+    "./core": {
+      "@dss-monorepo/source": "./src/core.ts",
+      "types": "./dist/core.d.ts",
+      "import": "./dist/core.js",
+      "default": "./dist/core.js"
     }
-  },
-  "nx": {
-    "name": "charts",
-    "tags": [
-      "type:ui",
-      "scope:shared"
-    ]
   },
   "dependencies": {
     "echarts": "^6.1.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
-    "tailwindcss": "^4.3.3"
+    "tailwindcss": "^4.3.3",
+    "@dss-monorepo/design-system": "workspace:*"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   }
 }
