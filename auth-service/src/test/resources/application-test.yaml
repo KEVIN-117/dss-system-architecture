@@ -13,6 +13,10 @@ spring:
         jwt:
           issuer-uri: http://localhost:8081/realms/auth-test
 
+server:
+  servlet:
+    context-path: /api/v1
+
 logging:
   level:
     org.springframework.boot.autoconfigure: DEBUG
@@ -25,5 +29,12 @@ jwt:
     converter:
       resource-id: uatf-auth-service
       principal-attribute: preferred_username
+
+app:
+  security:
+    webhook-secret: test-webhook-secret
+    jwt-audience: uatf-auth-service
+    cors:
+      allowed-origins: http://localhost:3001
 
 KEYCLOAK_JWK_SET_URI: http://localhost:8081/realms/auth-test/protocol/openid-connect/certs

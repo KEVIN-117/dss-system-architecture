@@ -27,6 +27,9 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 public class UserSyncIntegrationTest {
 
+    private static final String CONTEXT_PATH = "/api/v1";
+    private static final String WEBHOOK_PATH = CONTEXT_PATH + "/auth/sync";
+
     @Autowired
     private MockMvc mockMvc;
 
@@ -36,11 +39,13 @@ public class UserSyncIntegrationTest {
     @Autowired
     private JdbcTemplate jdbcTemplate;
 
-    private static final String VALID_SECRET = "dss-webhook-secret-xyz123";
+    private static final String VALID_SECRET = "test-webhook-secret";
+    private static final int LOCAL_ROLE_ID = 99001;
 
     @BeforeEach
     void setUp() {
         jdbcTemplate.execute("TRUNCATE TABLE users CASCADE");
+        jdbcTemplate.update("DELETE FROM roles WHERE id = ?", LOCAL_ROLE_ID);
     }
 
     @Test
@@ -64,7 +69,7 @@ public class UserSyncIntegrationTest {
         }
         """.formatted(UUID.randomUUID().toString(), System.currentTimeMillis(), keycloakId.toString());
 
-        mockMvc.perform(post("/auth/sync")
+        mockMvc.perform(post(WEBHOOK_PATH).contextPath(CONTEXT_PATH).servletPath("/auth/sync")
                 .header("X-Webhook-Secret", VALID_SECRET)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(jsonPayload))
@@ -116,7 +121,7 @@ public class UserSyncIntegrationTest {
         }
         """.formatted(UUID.randomUUID().toString(), System.currentTimeMillis(), keycloakId.toString());
 
-        mockMvc.perform(post("/auth/sync")
+        mockMvc.perform(post(WEBHOOK_PATH).contextPath(CONTEXT_PATH).servletPath("/auth/sync")
                 .header("X-Webhook-Secret", VALID_SECRET)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(jsonPayload))
@@ -135,7 +140,74 @@ public class UserSyncIntegrationTest {
     }
 
     @Test
-    public void shouldRejectSyncRequestWithUnauthorizedWhenNoTokenProvided() throws Exception {
+    public void shouldUpdateProfileWithoutRemovingLocalRolesOrAcademicContexts() throws Exception {
+        UUID keycloakId = UUID.randomUUID();
+        User initialUser = User.create(
+                null,
+                keycloakId,
+                "director.sistemas",
+                "director.sistemas@uatf.edu.bo",
+                "Director",
+                "Sistemas",
+                true
+        );
+        User savedInitial = userRepository.save(initialUser);
+        UUID contextId = UUID.randomUUID();
+
+        jdbcTemplate.update("INSERT INTO roles (id, name, description) VALUES (?, ?, ?)",
+                LOCAL_ROLE_ID, "LOCAL_SYNC_TEST", "Role preserved during profile synchronization");
+        jdbcTemplate.update("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
+                savedInitial.id(), LOCAL_ROLE_ID);
+        jdbcTemplate.update("INSERT INTO user_academic_contexts (id, user_id, faculty_id, career_id) VALUES (?, ?, ?, ?)",
+                contextId, savedInitial.id(), 10, 25);
+
+        String jsonPayload = """
+        {
+            "eventId": "%s",
+            "realmId": "uatf-dss-realm",
+            "eventType": "USER_UPDATED",
+            "timestamp": %d,
+            "user": {
+                "keycloakId": "%s",
+                "username": "director.sistemas.updated",
+                "email": "director.updated@uatf.edu.bo",
+                "firstName": "Director Updated",
+                "lastName": "Sistemas Updated",
+                "isActive": false
+            }
+        }
+        """.formatted(UUID.randomUUID(), System.currentTimeMillis(), keycloakId);
+
+        mockMvc.perform(post(WEBHOOK_PATH).contextPath(CONTEXT_PATH).servletPath("/auth/sync")
+                .header("X-Webhook-Secret", VALID_SECRET)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(jsonPayload))
+                .andExpect(status().isOk());
+
+        User updatedUser = userRepository.findByKeycloakId(keycloakId).orElseThrow();
+        assertEquals(savedInitial.id(), updatedUser.id());
+        assertEquals("director.sistemas.updated", updatedUser.username());
+        assertEquals("director.updated@uatf.edu.bo", updatedUser.email().email());
+        assertEquals("Director Updated", updatedUser.firstName());
+        assertEquals("Sistemas Updated", updatedUser.lastName());
+        assertFalse(updatedUser.isActive());
+        assertEquals(1L, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_roles WHERE user_id = ? AND role_id = ?",
+                Long.class,
+                savedInitial.id(),
+                LOCAL_ROLE_ID));
+        assertEquals(1L, jdbcTemplate.queryForObject(
+                "SELECT COUNT(*) FROM user_academic_contexts " +
+                        "WHERE id = ? AND user_id = ? AND faculty_id = ? AND career_id = ?",
+                Long.class,
+                contextId,
+                savedInitial.id(),
+                10,
+                25));
+    }
+
+    @Test
+    public void shouldRejectSyncRequestWithUnauthorizedWhenNoWebhookSecretProvided() throws Exception {
         UUID keycloakId = UUID.randomUUID();
         
         String jsonPayload = """
@@ -155,7 +227,7 @@ public class UserSyncIntegrationTest {
         }
         """.formatted(UUID.randomUUID().toString(), System.currentTimeMillis(), keycloakId.toString());
 
-        mockMvc.perform(post("/auth/sync")
+        mockMvc.perform(post(WEBHOOK_PATH).contextPath(CONTEXT_PATH).servletPath("/auth/sync")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(jsonPayload))
                 .andExpect(status().isUnauthorized());

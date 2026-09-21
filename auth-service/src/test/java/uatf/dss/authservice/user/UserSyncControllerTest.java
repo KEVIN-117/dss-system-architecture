@@ -19,13 +19,18 @@ import uatf.dss.authservice.configuration.WebhookSecretFilter;
 
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(controllers = UserSyncController.class)
 @Import({SecurityConfig.class, WebhookSecretFilter.class, JwtConverter.class})
 @ActiveProfiles("test")
 public class UserSyncControllerTest {
+
+    private static final String CONTEXT_PATH = "/api/v1";
+    private static final String WEBHOOK_PATH = CONTEXT_PATH + "/auth/sync";
 
     @MockitoBean
     private SyncUserUseCase syncUserUseCase;
@@ -41,7 +46,7 @@ public class UserSyncControllerTest {
 
     @Test
     void shouldReturnOkWhenTokenIsValid() throws Exception {
-        mockMvc.perform(post("/auth/sync")
+        mockMvc.perform(post(WEBHOOK_PATH).contextPath(CONTEXT_PATH).servletPath("/auth/sync")
                         .header("X-Webhook-Secret", expectedSecret)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -66,8 +71,8 @@ public class UserSyncControllerTest {
     }
 
     @Test
-    void shouldReturnUnauthorizedWhenTokenIsInvalid() throws Exception {
-        mockMvc.perform(post("/auth/sync")
+    void shouldReturnUnauthorizedWhenWebhookSecretIsInvalid() throws Exception {
+        mockMvc.perform(post(WEBHOOK_PATH).contextPath(CONTEXT_PATH).servletPath("/auth/sync")
                         .header("X-Webhook-Secret", "wrong-secret")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -85,13 +90,15 @@ public class UserSyncControllerTest {
                         "isActive": true
                       }
                     }
-                """))
+                        """))
                 .andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(syncUserUseCase);
     }
 
     @Test
-    void shouldReturnUnauthorizedWhenHeaderIsMissing() throws Exception {
-        mockMvc.perform(post("/auth/sync")
+    void shouldReturnUnauthorizedWhenWebhookSecretIsMissing() throws Exception {
+        mockMvc.perform(post(WEBHOOK_PATH).contextPath(CONTEXT_PATH).servletPath("/auth/sync")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                         {
@@ -105,11 +112,13 @@ public class UserSyncControllerTest {
                             }
                         }
                 """)).andExpect(status().isUnauthorized());
+
+        verifyNoInteractions(syncUserUseCase);
     }
 
     @Test
     void shouldReturnBadRequestWhenUserPayloadIsNull() throws Exception {
-        mockMvc.perform(post("/auth/sync")
+        mockMvc.perform(post(WEBHOOK_PATH).contextPath(CONTEXT_PATH).servletPath("/auth/sync")
                         .header("X-Webhook-Secret", expectedSecret)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -132,7 +141,7 @@ public class UserSyncControllerTest {
 
     @Test
     void shouldReturnBadRequestWhenKeycloakIdIsNull() throws Exception {
-        mockMvc.perform(post("/auth/sync")
+        mockMvc.perform(post(WEBHOOK_PATH).contextPath(CONTEXT_PATH).servletPath("/auth/sync")
                         .header("X-Webhook-Secret", expectedSecret)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -152,5 +161,11 @@ public class UserSyncControllerTest {
                     }
                 """))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void shouldRequireAuthenticationForGetWebhookPath() throws Exception {
+        mockMvc.perform(get(WEBHOOK_PATH).contextPath(CONTEXT_PATH).servletPath("/auth/sync"))
+                .andExpect(status().isUnauthorized());
     }
 }

@@ -29,16 +29,24 @@ export default defineConfig(() => ({
     },
     lib: {
       // Could also be a dictionary or array of multiple entry points.
-      entry: 'src/index.ts',
+      entry: {
+        index: 'src/index.ts',
+        server: 'src/server.ts',
+      },
       name: '@dss-monorepo/auth',
-      fileName: 'index',
+      fileName: (format, entryName) => `${entryName}.js`,
       // Change this to the formats you want to support.
       // Don't forget to update your package.json as well.
       formats: ['es' as const],
     },
     rolldownOptions: {
       // External packages that should not be bundled into your library.
-      external: ['react', 'react-dom', 'react/jsx-runtime'],
+      external: ['react', 'react-dom', 'react/jsx-runtime', 'keycloak-js'],
+      output: {
+        // Vite removes module directives while bundling. Next.js needs this
+        // directive in the public client entry to preserve the client boundary.
+        banner: (chunk) => (chunk.name === 'index' ? "'use client';" : ''),
+      },
     },
   },
   test: {

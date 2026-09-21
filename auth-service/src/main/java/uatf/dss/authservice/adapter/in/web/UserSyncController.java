@@ -1,22 +1,15 @@
 package uatf.dss.authservice.adapter.in.web;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import uatf.dss.authservice.application.port.in.SyncUserCommand;
 import uatf.dss.authservice.application.port.in.SyncUserUseCase;
-
-import java.util.Objects;
 
 import jakarta.validation.Valid;
 
 @RestController
 @RequestMapping("/auth")
 public class UserSyncController {
-
 
     private final SyncUserUseCase useCase;
 
@@ -33,8 +26,7 @@ public class UserSyncController {
                 request.user().email(),
                 request.user().firstName(),
                 request.user().lastName(),
-                request.user().isActive()
-        );
+                request.user().isActive());
 
         useCase.sync(command);
         return ResponseEntity.ok().build();

@@ -16,6 +16,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -29,6 +30,24 @@ class UserProfileControllerTest extends BaseWebMvcTest {
     void whenUnauthenticated_thenStatus401() throws Exception {
         mockMvc.perform(get("/auth/me"))
                 .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void whenAllowedPortalPreflightsProfile_thenReturnExplicitCorsPolicy() throws Exception {
+        mockMvc.perform(options("/auth/me")
+                        .header("Origin", "http://localhost:3001")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers
+                        .header().string("Access-Control-Allow-Origin", "http://localhost:3001"));
+    }
+
+    @Test
+    void whenUnknownOriginPreflightsProfile_thenRejectRequest() throws Exception {
+        mockMvc.perform(options("/auth/me")
+                        .header("Origin", "https://untrusted.example")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isForbidden());
     }
 
     @Test

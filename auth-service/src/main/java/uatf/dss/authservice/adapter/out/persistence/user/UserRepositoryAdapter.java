@@ -1,6 +1,7 @@
 package uatf.dss.authservice.adapter.out.persistence.user;
 
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 import uatf.dss.authservice.application.port.out.UserRepository;
 import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
 import uatf.dss.authservice.domain.model.User;
@@ -25,10 +26,18 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    @Transactional
     public User save(User user) {
-        UserEntity entity = mapper.toEntity(user);
-        UserEntity savedEntity = springDataRepository.save(entity);
-        return mapper.toDomain(savedEntity);
+        if (user.id() == null) {
+            return mapper.toDomain(springDataRepository.save(mapper.toEntity(user)));
+        }
+
+        return springDataRepository.findById(user.id())
+                .map(existingEntity -> {
+                    mapper.updateEntity(user, existingEntity);
+                    return mapper.toDomain(existingEntity);
+                })
+                .orElseGet(() -> mapper.toDomain(springDataRepository.save(mapper.toEntity(user))));
     }
 
     @Override
