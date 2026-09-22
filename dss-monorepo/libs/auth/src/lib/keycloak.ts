@@ -1,6 +1,6 @@
 import Keycloak, { type KeycloakConfig, type KeycloakInitOptions } from 'keycloak-js';
 
-import type { DSSRole } from './types';
+import { isDSSRole, type DSSRole } from '@dss-monorepo/auth-models';
 
 let instance: Keycloak | null = null;
 let initialization: Promise<boolean> | null = null;
@@ -40,15 +40,7 @@ export function extractRoles(keycloak: Keycloak, clientId: string): string[] {
     return allRoles;
 }
 
-const DSS_ROLES = new Set([
-    'SUPERADMIN',
-    'RECTOR',
-    'DECANO',
-    'DIRECTOR'
-]);
-
 export function filterDSSRoles(roles: string[]): DSSRole[] {
     return roles
-        .filter(r => DSS_ROLES.has(r))
-        .map(r => r as DSSRole);
+        .filter(isDSSRole);
 }

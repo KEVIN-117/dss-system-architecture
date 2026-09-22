@@ -98,7 +98,7 @@ export const CyberpunkTerminal: Story = {
       <div className="flex items-center justify-between border-b border-primary/20 pb-2 text-xs text-primary/70">
         <span className="flex items-center gap-2">
           <span className="size-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-          // DSS KERNEL INTERRUPT LOG
+          DSS KERNEL INTERRUPT LOG
         </span>
         <span>SECURITY_CLEARANCE: LEVEL_4</span>
       </div>

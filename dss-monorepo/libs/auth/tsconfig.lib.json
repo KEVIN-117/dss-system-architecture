@@ -13,10 +13,7 @@
     "rootDir": "src",
     "jsx": "react-jsx",
     "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo",
-    "lib": [
-      "dom",
-      "es2022"
-    ]
+    "lib": ["dom", "es2022"]
   },
   "exclude": [
     "out-tsc",
@@ -45,5 +42,10 @@
     "eslint.config.cjs",
     "eslint.config.mjs"
   ],
-  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"]
+  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],
+  "references": [
+    {
+      "path": "../shared/auth-models/tsconfig.lib.json"
+    }
+  ]
 }

@@ -189,7 +189,7 @@ export const Cyberpunk: Story = {
           <TerminalIcon className="size-4" />
           <span>DECANAL_ROOT_TERMINAL</span>
         </div>
-        <span className="text-[10px] text-emerald-400">// TTY_1</span>
+        <span className="text-[10px] text-emerald-400">TTY_1</span>
       </div>
 
       <div className="space-y-1">

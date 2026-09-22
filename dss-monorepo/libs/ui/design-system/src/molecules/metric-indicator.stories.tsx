@@ -93,7 +93,7 @@ export const CyberpunkTerminalDashboard: Story = {
         <div className="flex items-center gap-2 text-xs text-primary">
           <Activity className="size-4 animate-pulse text-primary" />
           <span className="font-bold tracking-widest">
-            // UATF-DSS TELEMETRY MONITOR // LIVE CORE
+            UATF-DSS TELEMETRY MONITOR • LIVE CORE
           </span>
         </div>
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">

@@ -2,7 +2,7 @@
 
 import type { ReactNode } from 'react';
 
-import type { DSSRole } from './types';
+import type { DSSRole } from '@dss-monorepo/auth-models';
 import { useAuth } from './AuthProvider';
 
 export interface ProtectedRouteProps {

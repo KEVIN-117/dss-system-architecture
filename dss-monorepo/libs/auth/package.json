@@ -27,6 +27,7 @@
     ]
   },
   "dependencies": {
+    "@dss-monorepo/auth-models": "workspace:*",
     "keycloak-js": "^26.2.4"
   }
 }

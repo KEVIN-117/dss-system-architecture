@@ -5,6 +5,7 @@
     "": {
       "name": "@dss-monorepo/source",
       "dependencies": {
+        "jose": "^6.2.12",
         "next": "~16.1.6",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -54,6 +55,7 @@
         "eslint-plugin-react-hooks": "5.0.0",
         "jiti": "2.4.2",
         "jsdom": "^27.1.0",
+        "jsonc-eslint-parser": "^2.1.0",
         "nx": "23.2.0",
         "postcss": "^8.5.28",
         "prettier": "~3.6.2",
@@ -87,6 +89,9 @@
       "name": "@dss-monorepo/bff",
       "version": "0.0.1",
       "dependencies": {
+        "@dss-monorepo/auth-connector": "workspace:*",
+        "@dss-monorepo/auth-models": "workspace:*",
+        "@dss-monorepo/rbac": "workspace:*",
         "next": "~16.1.6",
         "react": "^19.0.0",
         "react-dom": "^19.0.0",
@@ -155,6 +160,7 @@
       "name": "@dss-monorepo/auth",
       "version": "0.0.1",
       "dependencies": {
+        "@dss-monorepo/auth-models": "workspace:*",
         "keycloak-js": "^26.2.4",
       },
     },
@@ -174,13 +180,42 @@
         "react-dom": "^19.0.0",
       },
     },
-    "libs/connectors": {
-      "name": "@dss-monorepo/connectors",
+    "libs/connectors/auth-connector": {
+      "name": "@dss-monorepo/auth-connector",
       "version": "0.0.1",
+      "dependencies": {
+        "@dss-monorepo/auth-models": "workspace:*",
+        "jose": "^6.2.12",
+      },
+    },
+    "libs/connectors/olap-connector": {
+      "name": "@dss-monorepo/olap-connector",
+      "version": "0.0.1",
+      "dependencies": {
+        "tslib": "^2.3.0",
+      },
     },
     "libs/rbac": {
       "name": "@dss-monorepo/rbac",
       "version": "0.0.1",
+      "dependencies": {
+        "@dss-monorepo/auth": "workspace:*",
+        "@dss-monorepo/auth-models": "workspace:*",
+      },
+    },
+    "libs/shared/auth-models": {
+      "name": "@dss-monorepo/auth-models",
+      "version": "0.0.1",
+      "dependencies": {
+        "tslib": "^2.3.0",
+      },
+    },
+    "libs/shared/olap-models": {
+      "name": "@dss-monorepo/olap-models",
+      "version": "0.0.1",
+      "dependencies": {
+        "tslib": "^2.3.0",
+      },
     },
     "libs/ui/design-system": {
       "name": "@dss-monorepo/design-system",
@@ -490,13 +525,15 @@
 
     "@dss-monorepo/auth": ["@dss-monorepo/auth@workspace:libs/auth"],
 
+    "@dss-monorepo/auth-connector": ["@dss-monorepo/auth-connector@workspace:libs/connectors/auth-connector"],
+
+    "@dss-monorepo/auth-models": ["@dss-monorepo/auth-models@workspace:libs/shared/auth-models"],
+
     "@dss-monorepo/bff": ["@dss-monorepo/bff@workspace:apps/bff"],
 
     "@dss-monorepo/bff-e2e": ["@dss-monorepo/bff-e2e@workspace:apps/bff-e2e"],
 
     "@dss-monorepo/charts": ["@dss-monorepo/charts@workspace:libs/charts"],
-
-    "@dss-monorepo/connectors": ["@dss-monorepo/connectors@workspace:libs/connectors"],
 
     "@dss-monorepo/decano-dashboard": ["@dss-monorepo/decano-dashboard@workspace:apps/decano-dashboard"],
 
@@ -509,6 +546,10 @@
     "@dss-monorepo/director-dashboard-e2e": ["@dss-monorepo/director-dashboard-e2e@workspace:apps/director-dashboard-e2e"],
 
     "@dss-monorepo/docs-portal": ["@dss-monorepo/docs-portal@workspace:apps/docs-portal"],
+
+    "@dss-monorepo/olap-connector": ["@dss-monorepo/olap-connector@workspace:libs/connectors/olap-connector"],
+
+    "@dss-monorepo/olap-models": ["@dss-monorepo/olap-models@workspace:libs/shared/olap-models"],
 
     "@dss-monorepo/rbac": ["@dss-monorepo/rbac@workspace:libs/rbac"],
 

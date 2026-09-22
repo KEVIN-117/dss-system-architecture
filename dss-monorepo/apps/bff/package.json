@@ -3,6 +3,9 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@dss-monorepo/auth-connector": "workspace:*",
+    "@dss-monorepo/auth-models": "workspace:*",
+    "@dss-monorepo/rbac": "workspace:*",
     "next": "~16.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

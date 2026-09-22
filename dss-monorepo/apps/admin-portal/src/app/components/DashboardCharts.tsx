@@ -11,6 +11,7 @@ import {
   RiskDonutChart,
   TrendLineChart,
 } from '@dss-monorepo/charts';
+import type { ChartClickEvent } from '@dss-monorepo/charts';
 
 const barData = [
   { label: 'Ingeniería', value: 1200 },
@@ -34,7 +35,7 @@ const trendData = [
 ];
 
 export function DashboardCharts() {
-  const handleChartClick = (params: any) => {
+  const handleChartClick = (params: ChartClickEvent) => {
     console.log('Chart clicked:', params.name, params.value);
     // Drill-down logic would go here
   };

@@ -134,7 +134,7 @@ export const Cyberpunk: Story = {
     <div className="p-8 bg-black rounded-lg border border-primary/40 font-mono space-y-4 shadow-[0_0_20px_rgba(59,130,246,0.15)] flex flex-col items-center text-center">
       <Toaster />
       <div className="text-xs text-primary tracking-widest uppercase">
-        // TELEMETRY UPLINK PROTOCOL
+        TELEMETRY UPLINK PROTOCOL
       </div>
       <p className="text-muted-foreground text-xs max-w-sm">
         Dispara alertas HUD simuladas directamente a la consola del operador de

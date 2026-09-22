@@ -105,9 +105,7 @@ export const CyberpunkTerminal: Story = {
       <div className="flex items-center justify-between border-b border-primary/20 pb-3">
         <div className="flex items-center gap-2 text-xs text-primary">
           <Terminal className="size-4 animate-pulse" />
-          <span className="font-bold tracking-widest">
-            // MAINFRAME ROOT AUTH
-          </span>
+          <span className="font-bold tracking-widest">MAINFRAME ROOT AUTH</span>
         </div>
         <span className="text-[10px] text-muted-foreground border border-primary/20 px-2 py-0.5 rounded">
           CLEARANCE: S-RANK

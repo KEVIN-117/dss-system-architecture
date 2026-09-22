@@ -12,8 +12,18 @@ import {
 } from 'react';
 
 import { AuthProfileError, fetchCurrentUser } from './auth-api';
-import { extractRoles, filterDSSRoles, getKeycloak, initializeKeycloak } from './keycloak';
-import type { AuthActions, AuthState, AuthUser, DSSRole } from './types';
+import {
+  extractRoles,
+  filterDSSRoles,
+  getKeycloak,
+  initializeKeycloak,
+} from './keycloak';
+import type {
+  AuthActions,
+  AuthState,
+  AuthUser,
+  DSSRole,
+} from '@dss-monorepo/auth-models';
 
 type AuthContextValue = AuthState & AuthActions;
 
@@ -50,7 +60,9 @@ export function AuthProvider({
   realm,
 }: AuthProviderProps) {
   const [state, setState] = useState<AuthState>(INITIAL_STATE);
-  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const refreshIntervalRef = useRef<ReturnType<typeof setInterval> | null>(
+    null,
+  );
 
   useEffect(() => {
     let active = true;
@@ -79,9 +91,14 @@ export function AuthProvider({
       clearRefreshInterval();
       refreshIntervalRef.current = setInterval(async () => {
         try {
-          const refreshed = await keycloak.updateToken(TOKEN_REFRESH_MARGIN_SECONDS);
+          const refreshed = await keycloak.updateToken(
+            TOKEN_REFRESH_MARGIN_SECONDS,
+          );
           if (active && refreshed && keycloak.token) {
-            setState((previous) => ({ ...previous, token: keycloak.token ?? null }));
+            setState((previous) => ({
+              ...previous,
+              token: keycloak.token ?? null,
+            }));
           }
         } catch {
           clearRefreshInterval();
@@ -110,14 +127,20 @@ export function AuthProvider({
         }
 
         try {
-          const profile = await fetchCurrentUser(authServiceUrl, token, abortController.signal);
+          const profile = await fetchCurrentUser(
+            authServiceUrl,
+            token,
+            abortController.signal,
+          );
           if (!active) {
             return;
           }
 
           const user: AuthUser = {
             ...profile,
-            roles: filterDSSRoles(extractRoles(keycloak, clientId)) as DSSRole[],
+            roles: filterDSSRoles(
+              extractRoles(keycloak, clientId),
+            ) as DSSRole[],
           };
 
           if (!user.isActive) {
@@ -172,7 +195,10 @@ export function AuthProvider({
     try {
       await keycloak.updateToken(TOKEN_REFRESH_MARGIN_SECONDS);
       if (keycloak.token) {
-        setState((previous) => ({ ...previous, token: keycloak.token ?? null }));
+        setState((previous) => ({
+          ...previous,
+          token: keycloak.token ?? null,
+        }));
       }
       return keycloak.token;
     } catch {
@@ -217,7 +243,10 @@ function profileErrorMessage(error: unknown): string {
   if (error instanceof AuthProfileError && error.status === 404) {
     return 'Tu perfil todavía no fue sincronizado. Contacta al administrador.';
   }
-  if (error instanceof AuthProfileError && (error.status === 401 || error.status === 403)) {
+  if (
+    error instanceof AuthProfileError &&
+    (error.status === 401 || error.status === 403)
+  ) {
     return 'No fue posible validar tu sesión.';
   }
   return 'No fue posible verificar tu perfil de usuario.';

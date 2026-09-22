@@ -5,6 +5,7 @@
   "scripts": {},
   "private": true,
   "dependencies": {
+    "jose": "^6.2.12",
     "next": "~16.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
@@ -54,6 +55,7 @@
     "eslint-plugin-react-hooks": "5.0.0",
     "jiti": "2.4.2",
     "jsdom": "^27.1.0",
+    "jsonc-eslint-parser": "^2.1.0",
     "nx": "23.2.0",
     "postcss": "^8.5.28",
     "prettier": "~3.6.2",
@@ -70,6 +72,8 @@
   "workspaces": [
     "apps/*",
     "libs/*",
-    "libs/ui/*"
+    "libs/ui/*",
+    "libs/shared/*",
+    "libs/connectors/*"
   ]
 }
