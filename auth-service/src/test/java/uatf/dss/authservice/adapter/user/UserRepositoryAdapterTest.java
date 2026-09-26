@@ -7,10 +7,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import uatf.dss.authservice.adapter.out.persistence.role.RoleEntity;
 import uatf.dss.authservice.adapter.out.persistence.user.SpringDataUserRepository;
 import uatf.dss.authservice.adapter.out.persistence.user.UserEntity;
 import uatf.dss.authservice.adapter.out.persistence.user.UserPersistenceMapper;
 import uatf.dss.authservice.adapter.out.persistence.user.UserRepositoryAdapter;
+import uatf.dss.authservice.adapter.out.persistence.useracademiccontext.UserAcademicContextEntity;
 import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
 import uatf.dss.authservice.domain.model.User;
 
@@ -71,6 +73,52 @@ class UserRepositoryAdapterTest {
         assertEquals("krodriguez@uatf.edu.bo", result.email().email());
         assertTrue(result.isActive());
         verify(springDataRepository).save(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("Should update profile without replacing local roles or academic contexts")
+    void shouldUpdateProfileWithoutReplacingLocalRelations() {
+        UUID userId = UUID.randomUUID();
+        UUID keycloakId = UUID.randomUUID();
+        UserEntity existingEntity = new UserEntity();
+        existingEntity.setId(userId);
+        existingEntity.setKeycloakId(keycloakId);
+        existingEntity.setUsername("director.sistemas");
+        existingEntity.setEmail("director.sistemas@uatf.edu.bo");
+        existingEntity.setFirstName("Director");
+        existingEntity.setLastName("Sistemas");
+        existingEntity.setActive(true);
+
+        RoleEntity localRole = new RoleEntity(7, "DIRECTOR", "Local director role", null);
+        existingEntity.getRoles().add(localRole);
+        UserAcademicContextEntity localContext = new UserAcademicContextEntity(
+                UUID.randomUUID(), 10, 25, existingEntity);
+        existingEntity.getAcademicContexts().add(localContext);
+
+        User updatedProfile = User.create(
+                userId,
+                keycloakId,
+                "director.sistemas.updated",
+                "director.updated@uatf.edu.bo",
+                "Director Updated",
+                "Sistemas Updated",
+                false);
+        when(springDataRepository.findById(userId)).thenReturn(Optional.of(existingEntity));
+
+        User result = adapter.save(updatedProfile);
+
+        assertEquals("director.sistemas.updated", result.username());
+        assertEquals("director.updated@uatf.edu.bo", result.email().email());
+        assertEquals("Director Updated", result.firstName());
+        assertEquals("Sistemas Updated", result.lastName());
+        assertFalse(result.isActive());
+        assertEquals(keycloakId, existingEntity.getKeycloakId());
+        assertEquals(1, existingEntity.getRoles().size());
+        assertSame(localRole, existingEntity.getRoles().iterator().next());
+        assertEquals(1, existingEntity.getAcademicContexts().size());
+        assertSame(localContext, existingEntity.getAcademicContexts().getFirst());
+        verify(springDataRepository).findById(userId);
+        verify(springDataRepository, never()).save(any(UserEntity.class));
     }
 
     @Test

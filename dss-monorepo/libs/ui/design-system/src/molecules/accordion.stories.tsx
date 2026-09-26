@@ -97,7 +97,7 @@ export const CyberpunkTerminal: Story = {
           <AccordionTrigger className="text-xs font-mono hover:text-primary">
             <div className="flex items-center gap-2 text-left">
               <Database className="size-3.5 text-amber-400 shrink-0" />
-              <span>// SUBSYSTEM_01: HEFESTO_DATA_WAREHOUSE</span>
+              <span>SUBSYSTEM_01: HEFESTO_DATA_WAREHOUSE</span>
             </div>
             <Badge
               variant="default"
@@ -131,7 +131,7 @@ export const CyberpunkTerminal: Story = {
           <AccordionTrigger className="text-xs font-mono hover:text-primary">
             <div className="flex items-center gap-2 text-left">
               <Cpu className="size-3.5 text-cyan-400 shrink-0" />
-              <span>// SUBSYSTEM_02: PREDICTIVE_ML_ENGINE</span>
+              <span>SUBSYSTEM_02: PREDICTIVE_ML_ENGINE</span>
             </div>
             <Badge
               variant="default"
@@ -165,7 +165,7 @@ export const CyberpunkTerminal: Story = {
           <AccordionTrigger className="text-xs font-mono hover:text-primary">
             <div className="flex items-center gap-2 text-left">
               <Network className="size-3.5 text-purple-400 shrink-0" />
-              <span>// SUBSYSTEM_03: NEO4J_KNOWLEDGE_GRAPH</span>
+              <span>SUBSYSTEM_03: NEO4J_KNOWLEDGE_GRAPH</span>
             </div>
             <Badge
               variant="default"
@@ -193,7 +193,7 @@ export const CyberpunkTerminal: Story = {
           <AccordionTrigger className="text-xs font-mono hover:text-primary">
             <div className="flex items-center gap-2 text-left">
               <Shield className="size-3.5 text-emerald-400 shrink-0" />
-              <span>// SUBSYSTEM_04: SECURITY_RBAC_GATEWAY</span>
+              <span>SUBSYSTEM_04: SECURITY_RBAC_GATEWAY</span>
             </div>
             <Badge
               variant="outline"

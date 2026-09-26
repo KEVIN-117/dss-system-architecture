@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Button } from './button';
 
 type Direction = 'asc' | 'desc';
@@ -24,7 +23,7 @@ export function SortableColumnHeader<K extends string>({
   onToggle,
   testid,
 }: SortableColumnHeaderProps<K>) {
-  const [isActive, setIsActive] = useState(activeKey === sortKey);
+  const isActive = activeKey === sortKey;
 
   const directionIcon = () => {
     if (isActive) {

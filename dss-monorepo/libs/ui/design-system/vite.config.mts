@@ -40,12 +40,36 @@ export default defineConfig(() => ({
     },
     rolldownOptions: {
       // External packages that should not be bundled into your library.
-      external: ['react', 'react-dom', 'react/jsx-runtime'],
+      // Keeping the UI dependencies external also prevents Vite/Rolldown from
+      // embedding their CommonJS React shims (which use dynamic require()).
+      external: [
+        'react',
+        'react-dom',
+        'react/jsx-runtime',
+        '@base-ui/react',
+        '@fontsource-variable/geist',
+        'class-variance-authority',
+        'cn',
+        'date-fns',
+        'lucide-react',
+        'next-themes',
+        'radix-ui',
+        'react-day-picker',
+        'shadcn',
+        'sonner',
+        'tw-animate-css',
+      ],
+      output: {
+        // Next.js consumes the package as a Client Component boundary. Vite's
+        // library output otherwise drops the source directive.
+        banner: '"use client";',
+      },
     },
   },
   test: {
     name: '@dss-monorepo/design-system',
     watch: false,
+    passWithNoTests: true,
     globals: true,
     environment: 'jsdom',
     include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],

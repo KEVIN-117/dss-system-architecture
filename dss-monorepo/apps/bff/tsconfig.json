@@ -60,5 +60,15 @@
     "eslint.config.cjs",
     "eslint.config.mjs"
   ],
-  "references": []
+  "references": [
+    {
+      "path": "../../libs/rbac"
+    },
+    {
+      "path": "../../libs/shared/auth-models"
+    },
+    {
+      "path": "../../libs/connectors/auth-connector"
+    }
+  ]
 }

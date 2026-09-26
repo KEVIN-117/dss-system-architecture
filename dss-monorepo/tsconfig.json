@@ -43,13 +43,22 @@
       "path": "./libs/rbac"
     },
     {
-      "path": "./libs/connectors"
-    },
-    {
       "path": "./libs/ui/design-system"
     },
     {
       "path": "./libs/charts"
+    },
+    {
+      "path": "./libs/shared/auth-models"
+    },
+    {
+      "path": "./libs/shared/olap-models"
+    },
+    {
+      "path": "./libs/connectors/auth-connector"
+    },
+    {
+      "path": "./libs/connectors/olap-connector"
     }
   ]
 }

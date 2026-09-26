@@ -28,4 +28,5 @@ jwt:
 
 app:
   security:
-    webhook-secret: ${KEYCLOAK_WEBHOOK_SECRET:dss-webhook-secret-xyz123}
+    webhook-secret: ${KEYCLOAK_WEBHOOK_SECRET}
+    jwt-audience: ${KEYCLOAK_AUDIENCE:${KEYCLOAK_RESOURCE_ID:uatf-auth-service}}

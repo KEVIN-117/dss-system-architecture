@@ -62,10 +62,16 @@
   ],
   "references": [
     {
-      "path": "../../libs/charts"
+      "path": "../../libs/ui/design-system"
     },
     {
-      "path": "../../libs/ui/design-system"
+      "path": "../../libs/auth"
+    },
+    {
+      "path": "../../libs/rbac"
+    },
+    {
+      "path": "../../libs/charts"
     }
   ]
 }

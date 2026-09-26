@@ -112,9 +112,7 @@ export const Cyberpunk: Story = {
             <CpuIcon className="size-4 text-cyan-400" />
             <span>NODE_TARGET_SELECTOR</span>
           </div>
-          <span className="text-[10px] text-emerald-400 font-mono">
-            // READY
-          </span>
+          <span className="text-[10px] text-emerald-400 font-mono">READY</span>
         </div>
 
         <div className="space-y-1">

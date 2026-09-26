@@ -229,7 +229,7 @@ export const Cyberpunk: Story = {
   render: () => (
     <div className="p-6 bg-black rounded-lg border border-primary/30 font-mono space-y-4">
       <div className="text-xs text-primary/70 tracking-widest flex items-center justify-between">
-        <span>// NEURAL_PAYLOAD_MANIFEST</span>
+        <span> NEURAL_PAYLOAD_MANIFEST</span>
         <span className="text-emerald-400">STATUS: SECURE</span>
       </div>
 

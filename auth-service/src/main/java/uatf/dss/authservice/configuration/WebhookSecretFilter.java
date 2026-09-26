@@ -5,7 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.security.web.util.matcher.RequestMatcher;
+import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
@@ -18,16 +18,21 @@ public class WebhookSecretFilter extends OncePerRequestFilter {
 
     private final String expectedSecret;
 
-    public WebhookSecretFilter(@Value("${app.security.webhook-secret}") String expectedSecret){
+    public WebhookSecretFilter(@Value("${app.security.webhook-secret:}") String expectedSecret) {
+        if (expectedSecret == null || expectedSecret.isBlank()) {
+            throw new IllegalStateException("KEYCLOAK_WEBHOOK_SECRET must be configured");
+        }
+
         this.expectedSecret = expectedSecret;
     }
 
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) throws ServletException, IOException {
-        if (request.getRequestURI().startsWith("/auth/sync")){
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
+            throws ServletException, IOException {
+        if (HttpMethod.POST.matches(request.getMethod()) && "/auth/sync".equals(request.getServletPath())) {
             String providedSecret = request.getHeader("X-Webhook-Secret");
 
-            if (providedSecret == null || providedSecret.trim().isEmpty()){
+            if (providedSecret == null || providedSecret.trim().isEmpty()) {
                 response.sendError(HttpServletResponse.SC_UNAUTHORIZED, "Missing webhook secret");
                 return;
             }
