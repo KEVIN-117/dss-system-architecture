@@ -1,10 +1,16 @@
 # @dss-monorepo/auth-connector
 
-Adaptador de servidor para que el futuro BFF valide tokens de Keycloak y consulte el perfil local de `auth-service`. No depende de React ni contiene navegación, sesión de navegador o jerarquías RBAC.
+Adaptador de servidor para que el BFF valide tokens de Keycloak, complete el
+intercambio Authorization Code + PKCE y consulte el perfil local de
+`auth-service`. No depende de React ni contiene navegación de navegador,
+sesión o jerarquías RBAC.
 
 ```ts
 import {
+  createAuthorizationUrl,
+  exchangeAuthorizationCode,
   fetchUserProfile,
+  verifyKeycloakIdToken,
   verifyKeycloakJwt,
 } from '@dss-monorepo/auth-connector';
 
@@ -19,6 +25,12 @@ const verified = await verifyKeycloakJwt(token, keycloak);
 
 const profile = await fetchUserProfile('https://auth.example.edu', token);
 ```
+
+Las funciones OIDC reciben `KeycloakOidcClientConfig` con `clientId`,
+`clientSecret` y `redirectUri`; solo el BFF puede construir esa configuración
+desde sus variables de entorno. `createAuthorizationUrl` genera la solicitud
+con `state`, `nonce` y PKCE S256; `exchangeAuthorizationCode` usa únicamente
+`grant_type=authorization_code` desde el servidor.
 
 `verifyKeycloakJwt` obtiene las claves del JWKS del realm y exige firma `RS256` de forma predeterminada, `iss`, `aud`, `exp` y `sub`. Solo extrae roles DSS del cliente indicado por `roleClientId`; no interpreta roles de otros clientes. `fetchUserProfile` exige una respuesta plana y válida de `auth-service`; sus roles no proceden de ese endpoint.
 

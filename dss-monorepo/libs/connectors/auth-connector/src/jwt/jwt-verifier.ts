@@ -24,6 +24,17 @@ export interface KeycloakJwtVerificationOptions {
   algorithms?: readonly JWSAlgorithm[];
 }
 
+export interface KeycloakIdTokenVerificationOptions {
+  /** Keycloak base URL, preserving an optional deployment path such as /auth. */
+  keycloakUrl: string;
+  realm: string;
+  /** The confidential BFF client that initiated the authorization request. */
+  audience: string;
+  /** Nonce generated for the matching authorization transaction. */
+  nonce: string;
+  algorithms?: readonly JWSAlgorithm[];
+}
+
 export class JwtVerificationError extends Error {
   constructor(message = 'Invalid or expired access token') {
     super(message);
@@ -67,6 +78,35 @@ export async function verifyKeycloakJwt(
       throw error;
     }
     throw new JwtVerificationError();
+  }
+}
+
+/**
+ * Checks that the ID token was issued for the same authorization transaction.
+ * Access tokens are validated separately against the resource-server audience.
+ */
+export async function verifyKeycloakIdToken(
+  token: string,
+  options: KeycloakIdTokenVerificationOptions,
+): Promise<void> {
+  const issuerUrl = realmUrl(options.keycloakUrl, options.realm);
+  const jwks = getJwks(new URL('protocol/openid-connect/certs', issuerUrl));
+
+  try {
+    const { payload } = await jwtVerify(token, jwks, {
+      issuer: issuerUrl.toString().replace(/\/$/, ''),
+      audience: options.audience,
+      algorithms: [...(options.algorithms ?? ['RS256'])],
+      requiredClaims: ['aud', 'exp', 'iss', 'sub', 'nonce'],
+    });
+    if (payload.nonce !== options.nonce) {
+      throw new JwtVerificationError('ID token nonce does not match');
+    }
+  } catch (error) {
+    if (error instanceof JwtVerificationError) {
+      throw error;
+    }
+    throw new JwtVerificationError('Invalid ID token');
   }
 }
 

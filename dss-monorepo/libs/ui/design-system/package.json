@@ -8,6 +8,7 @@
   "exports": {
     "./package.json": "./package.json",
     ".": {
+      "react-server": "./src/index.ts",
       "@dss-monorepo/source": "./src/index.ts",
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js",

@@ -9,4 +9,14 @@ export {
   hasRole,
 } from './lib/permissions';
 export type { RoleMatch } from './lib/permissions';
-export type { DSSRole } from '@dss-monorepo/auth/server';
+export {
+  DSS_PERMISSIONS,
+  ROLE_PERMISSIONS,
+  hasAllPermissions,
+  hasAnyPermissions,
+  hasPermission,
+  hasRequiredPermissions,
+  resolvePermissions,
+} from './lib/permission-map';
+export type { DSSPermission } from './lib/permission-map';
+export type { DSSRole } from '@dss-monorepo/auth-models';

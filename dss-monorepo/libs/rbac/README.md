@@ -1,57 +1,81 @@
 # @dss-monorepo/rbac
 
-Controles de presentación basados en los roles DSS que `@dss-monorepo/auth`
-obtiene de un access token validado por Keycloak. Esta librería no sustituye la
-autorización de los servicios: cada API debe validar el JWT, roles y ámbito
-académico en el servidor.
+Controles declarativos de presentación para los roles y permisos DSS. La
+librería no sustituye la autorización del BFF ni de los servicios: cada API
+debe validar el JWT, el rol y el contexto académico en el servidor.
 
-## Política de roles
+## Política
 
-| Rol | Puede mostrar contenido de |
+`RECTOR` hereda `DECANO` y `DIRECTOR`; `DECANO` hereda `DIRECTOR`.
+`SUPERADMIN` es un rol técnico aislado y no hereda permisos académicos.
+
+| Rol | Permisos efectivos |
 | --- | --- |
-| `SUPERADMIN` | `SUPERADMIN` solamente |
-| `RECTOR` | `RECTOR`, `DECANO`, `DIRECTOR` |
-| `DECANO` | `DECANO`, `DIRECTOR` |
-| `DIRECTOR` | `DIRECTOR` |
+| `DIRECTOR` | `analytics:read`, `analytics:career` |
+| `DECANO` | permisos de `DIRECTOR`, `analytics:faculty`, `pipelines:read` |
+| `RECTOR` | permisos de `DECANO`, `analytics:global`, `connectors:read` |
+| `SUPERADMIN` | `users:*`, `connectors:*`, `pipelines:*` |
 
-`SUPERADMIN` es un rol técnico. No hereda permisos académicos ni permite abrir
-dashboards de rectorado, facultad o carrera.
+El catálogo está cerrado y tipado mediante `DSSPermission`. Añadir un permiso
+requiere actualizar `ROLE_PERMISSIONS` y sus pruebas.
 
-## Uso
+## `<Can>`
 
 ```tsx
 'use client';
 
-import { RoleGate, usePermission } from '@dss-monorepo/rbac';
+import { Can } from '@dss-monorepo/rbac';
 
 export function FacultyPanel() {
-  const { hasAccess, isLoading } = usePermission(['DECANO', 'RECTOR']);
-
-  if (isLoading) return <p>Cargando permisos…</p>;
-  if (!hasAccess) return null;
-
   return (
-    <RoleGate roles={['DECANO']} fallback={<p>Sin acceso</p>}>
+    <Can role="DECANO" fallback={<p>Sin acceso</p>}>
       <FacultyDashboard />
-    </RoleGate>
+    </Can>
+  );
+}
+
+export function RunPipeline() {
+  return (
+    <Can permission="pipelines:execute" fallback={<DisabledRunButton />}>
+      <RunPipelineButton />
+    </Can>
   );
 }
 ```
 
-`RoleGate` usa coincidencia `any` por defecto. Para requerir que un usuario
-tenga todas las capacidades indicadas, usa `match="all"`:
+`role` y `roles` respetan la jerarquía; `permission` y `permissions` usan los
+permisos efectivos. `match="any"` es el valor predeterminado y `match="all"`
+requiere todos los elementos. Una lista vacía, una sesión inexistente o una
+sesión en carga fallan cerrado y muestran `fallback` o `loadingFallback`.
 
-```tsx
-<RoleGate roles={['DECANO', 'DIRECTOR']} match="all">
-  <CombinedView />
-</RoleGate>
+La negación de roles es exacta para que `not role="DIRECTOR"` oculte el
+contenido únicamente a usuarios con el rol literal `DIRECTOR`; no lo oculta a
+`DECANO`, `RECTOR` ni `SUPERADMIN`. La negación de permisos invierte el chequeo
+del catálogo. Los hijos también pueden ser una función `(allowed) => ReactNode`;
+en ese caso el resultado se entrega directamente y no se usa `fallback`.
+
+`RoleGate` sigue disponible como adaptador compatible, pero está deprecado.
+Usa `<Can>` para código nuevo. `useCan(check)` devuelve `false` durante la
+carga o sin sesión, y `useMyPermissions()` devuelve un `ReadonlySet` memoizado
+para controles imperativos o diagnósticos.
+
+## Uso en servidor
+
+```ts
+import {
+  hasRequiredPermissions,
+  type DSSPermission,
+} from '@dss-monorepo/rbac/server';
+
+const required: DSSPermission[] = ['pipelines:execute'];
+if (!hasRequiredPermissions(roles, required)) {
+  return Response.json({ error: 'Forbidden' }, { status: 403 });
+}
 ```
 
-Una lista vacía u omitida no concede acceso. Esto evita que una ruta quede
-visible por una configuración incompleta.
-
-`@dss-monorepo/rbac/server` exporta sólo funciones puras (`hasRole`,
-`hasRequiredRoles` y la política) para código que no debe cargar React.
+La entrada `@dss-monorepo/rbac/server` solo exporta funciones, tipos y mapas
+puros; no carga React. En el BFF se recomienda usar `requireRoles()` o
+`requirePermissions()` después de autenticar la cookie o el token.
 
 ## Verificación
 

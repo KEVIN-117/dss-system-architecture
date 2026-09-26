@@ -66,6 +66,9 @@
     },
     {
       "path": "../../libs/charts"
+    },
+    {
+      "path": "../../libs/auth"
     }
   ]
 }

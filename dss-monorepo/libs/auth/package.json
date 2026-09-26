@@ -14,6 +14,7 @@
       "default": "./dist/index.js"
     },
     "./server": {
+      "react-server": "./src/server.ts",
       "@dss-monorepo/source": "./src/server.ts",
       "types": "./dist/server.d.ts",
       "import": "./dist/server.js",
@@ -27,7 +28,6 @@
     ]
   },
   "dependencies": {
-    "@dss-monorepo/auth-models": "workspace:*",
-    "keycloak-js": "^26.2.4"
+    "@dss-monorepo/auth-models": "workspace:*"
   }
 }

@@ -6,6 +6,7 @@
     "@dss-monorepo/auth-connector": "workspace:*",
     "@dss-monorepo/auth-models": "workspace:*",
     "@dss-monorepo/rbac": "workspace:*",
+    "jose": "^6.2.12",
     "next": "~16.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

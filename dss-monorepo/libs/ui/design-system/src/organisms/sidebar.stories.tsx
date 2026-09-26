@@ -15,7 +15,6 @@ import {
 } from './sidebar';
 import { Home, Settings, Search, User } from 'lucide-react';
 import { TooltipProvider } from '../atoms/tooltip';
-import Link from 'next/link';
 
 const meta: Meta<typeof Sidebar> = {
   title: 'Organisms/Sidebar',
@@ -68,18 +67,18 @@ export const Default: Story = {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="#">
+                  <a href="#">
                     <Home />
                     <span>Dashboard</span>
-                  </Link>
+                  </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="#">
+                  <a href="#">
                     <Search />
                     <span>Search</span>
-                  </Link>
+                  </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -91,18 +90,18 @@ export const Default: Story = {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="#">
+                  <a href="#">
                     <User />
                     <span>Profile</span>
-                  </Link>
+                  </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild>
-                  <Link href="#">
+                  <a href="#">
                     <Settings />
                     <span>Settings</span>
-                  </Link>
+                  </a>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>
@@ -128,18 +127,18 @@ export const CollapsibleIcon: Story = {
               <SidebarMenu>
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Dashboard" asChild>
-                    <Link href="#">
+                    <a href="#">
                       <Home />
                       <span>Dashboard</span>
-                    </Link>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
                 <SidebarMenuItem>
                   <SidebarMenuButton tooltip="Settings" asChild>
-                    <Link href="#">
+                    <a href="#">
                       <Settings />
                       <span>Settings</span>
-                    </Link>
+                    </a>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               </SidebarMenu>

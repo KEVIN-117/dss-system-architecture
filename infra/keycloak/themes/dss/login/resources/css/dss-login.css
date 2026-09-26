@@ -1,0 +1,25 @@
+/* Shared visual contract with @dss-monorepo/design-system. This is plain CSS
+   because Keycloak serves it directly and does not run the portal's Tailwind build. */
+:root {
+  --dss-background: oklch(0.98 0.01 240);
+  --dss-foreground: oklch(0.15 0.02 240);
+  --dss-card: oklch(1 0 0);
+  --dss-primary: oklch(0.55 0.15 260);
+  --dss-primary-foreground: oklch(0.98 0 0);
+  --dss-muted: oklch(0.95 0.02 240);
+  --dss-muted-foreground: oklch(0.5 0.05 240);
+  --dss-destructive: oklch(0.5 0.2 20);
+  --dss-border: oklch(0.9 0.02 240);
+  --dss-ring: oklch(0.55 0.15 260);
+  --dss-radius: 0.75rem;
+}
+
+body.login-pf { background: var(--dss-background); color: var(--dss-foreground); font-family: "Geist Variable", Arial, sans-serif; }
+.login-pf-page { padding-top: 4rem; }
+.card-pf { border: 1px solid var(--dss-border); border-radius: var(--dss-radius); box-shadow: 0 12px 32px oklch(0.15 0.02 240 / 12%); }
+.login-pf-page .btn-primary { background: var(--dss-primary); border-color: var(--dss-primary); border-radius: calc(var(--dss-radius) * .8); color: var(--dss-primary-foreground); }
+.login-pf-page .btn-primary:hover, .login-pf-page .btn-primary:focus { background: color-mix(in oklch, var(--dss-primary), black 15%); }
+.login-pf-page .form-control { border-color: var(--dss-border); border-radius: calc(var(--dss-radius) * .8); }
+.login-pf-page .form-control:focus { border-color: var(--dss-ring); box-shadow: 0 0 0 3px oklch(0.55 0.15 260 / 30%); }
+.login-pf-page a { color: var(--dss-primary); }
+.alert-error { border-radius: calc(var(--dss-radius) * .8); }

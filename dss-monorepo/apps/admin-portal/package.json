@@ -4,6 +4,8 @@
   "private": true,
   "dependencies": {
     "@dss-monorepo/charts": "workspace:*",
+    "@dss-monorepo/rbac": "workspace:*",
+    "@dss-monorepo/auth": "workspace:*",
     "@dss-monorepo/design-system": "workspace:*",
     "next": "~16.1.6",
     "react": "^19.0.0",

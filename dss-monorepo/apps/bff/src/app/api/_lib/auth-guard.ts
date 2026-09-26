@@ -5,10 +5,20 @@ import {
   verifyKeycloakJwt,
 } from '@dss-monorepo/auth-connector';
 import type { AuthUser, DSSRole } from '@dss-monorepo/auth-models';
-import { hasRequiredRoles, type RoleMatch } from '@dss-monorepo/rbac/server';
+import {
+  hasRequiredPermissions,
+  hasRequiredRoles,
+  type DSSPermission,
+  type RoleMatch,
+} from '@dss-monorepo/rbac/server';
 import { NextResponse } from 'next/server';
 
-import { BffConfigurationError, getBffAuthConfig } from '../../../lib/bff-config';
+import {
+  BffConfigurationError,
+  getBffAuthConfig,
+  getBffSessionCookieName,
+} from '../../../lib/bff-config';
+import { unsealSession } from './session-cookie';
 
 export interface AuthenticatedRequest {
   user: AuthUser;
@@ -21,20 +31,25 @@ export type AuthenticationResult =
   | { authenticated: false; response: NextResponse };
 
 /**
- * Validates the bearer token through the auth connector, then retrieves the
- * local user profile through that same connector. No external request is made
- * by the BFF itself.
+ * Resolves a bearer token or encrypted BFF session, validates it through the
+ * auth connector, then retrieves the local user profile through that same
+ * connector. No external request is made by the BFF itself.
  */
-export async function authenticateRequest(request: Request): Promise<AuthenticationResult> {
-  const token = extractBearerToken(request.headers.get('authorization'));
+export async function authenticateRequest(
+  request: Request,
+): Promise<AuthenticationResult> {
+  const token = await resolveRequestToken(request);
   if (!token) {
-    return unauthorized('Authorization header required');
+    return unauthorized('Authentication required');
   }
 
   try {
     const config = getBffAuthConfig();
     const verified = await verifyKeycloakJwt(token, config.keycloak);
     const profile = await fetchUserProfile(config.authServiceUrl, token);
+    if (!profile.isActive) {
+      return unauthorized('Account is inactive');
+    }
 
     return {
       authenticated: true,
@@ -60,6 +75,33 @@ export async function authenticateRequest(request: Request): Promise<Authenticat
   }
 }
 
+async function resolveRequestToken(
+  request: Request,
+): Promise<string | null> {
+  const bearerToken = extractBearerToken(request.headers.get('authorization'));
+  if (bearerToken) {
+    return bearerToken;
+  }
+
+  const cookieName = getBffSessionCookieName();
+  const sessionCookie = request.headers
+    .get('cookie')
+    ?.split(';')
+    .map((part) => part.trim())
+    .find((part) => part.startsWith(`${cookieName}=`))
+    ?.slice(cookieName.length + 1);
+
+  if (!sessionCookie) {
+    return null;
+  }
+
+  try {
+    return unsealSession(decodeURIComponent(sessionCookie));
+  } catch {
+    return null;
+  }
+}
+
 /** Applies the shared DSS role hierarchy and fails closed without roles. */
 export function requireRoles(
   authentication: AuthenticatedRequest,
@@ -72,6 +114,22 @@ export function requireRoles(
 
   return NextResponse.json(
     { error: 'Insufficient permissions', requiredRoles },
+    { status: 403 },
+  );
+}
+
+/** Applies the shared DSS permission map and fails closed without permissions. */
+export function requirePermissions(
+  authentication: AuthenticatedRequest,
+  requiredPermissions: readonly DSSPermission[],
+  match: RoleMatch = 'any',
+): NextResponse | null {
+  if (hasRequiredPermissions(authentication.roles, requiredPermissions, match)) {
+    return null;
+  }
+
+  return NextResponse.json(
+    { error: 'Insufficient permissions', requiredPermissions },
     { status: 403 },
   );
 }

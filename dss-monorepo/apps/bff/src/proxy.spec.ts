@@ -14,6 +14,12 @@ describe('BFF proxy', () => {
     expect(response.status).toBe(401);
   });
 
+  it('allows only the OAuth start and callback routes before a session exists', () => {
+    expect(proxy(new NextRequest('http://localhost:3006/api/auth/login')).status).toBe(200);
+    expect(proxy(new NextRequest('http://localhost:3006/api/auth/callback')).status).toBe(200);
+    expect(proxy(new NextRequest('http://localhost:3006/api/auth/me')).status).toBe(401);
+  });
+
   it('allows CORS preflight only for configured dashboard origins', () => {
     vi.stubEnv('BFF_ALLOWED_ORIGINS', 'http://localhost:3001');
     const response = proxy(new NextRequest('http://localhost:3006/api/auth/me', {
@@ -23,5 +29,14 @@ describe('BFF proxy', () => {
 
     expect(response.status).toBe(204);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3001');
+    expect(response.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+  });
+
+  it('allows API calls authenticated by the BFF session cookie', () => {
+    const response = proxy(new NextRequest('http://localhost:3006/api/auth/me', {
+      headers: { Cookie: 'dss_session=encrypted-session' },
+    }));
+
+    expect(response.status).toBe(200);
   });
 });

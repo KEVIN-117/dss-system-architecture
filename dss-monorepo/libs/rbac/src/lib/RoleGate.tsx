@@ -2,10 +2,10 @@
 
 import type { ReactNode } from 'react';
 
-import { useAuth } from '@dss-monorepo/auth';
 import type { DSSRole } from '@dss-monorepo/auth-models';
 
-import { hasRequiredRoles, type RoleMatch } from './permissions';
+import { Can } from './Can';
+import type { RoleMatch } from './permissions';
 
 export interface RoleGateProps {
   /** At least one role required to render the protected content. */
@@ -17,8 +17,8 @@ export interface RoleGateProps {
 }
 
 /**
- * Client-side presentation gate. APIs must enforce the same authorization on
- * the server; hiding a React subtree is never an authorization boundary.
+ * @deprecated Use <Can role="…" /> or <Can roles={[…]} />. It remains as a
+ * compatibility adapter for existing callers.
  */
 export function RoleGate({
   roles,
@@ -27,17 +27,14 @@ export function RoleGate({
   loadingFallback = null,
   match = 'any',
 }: RoleGateProps) {
-  const { user, isAuthenticated, isLoading } = useAuth();
-
-  if (isLoading) {
-    return loadingFallback;
-  }
-  if (
-    !isAuthenticated ||
-    !user ||
-    !hasRequiredRoles(user.roles, roles, match)
-  ) {
-    return fallback;
-  }
-  return children;
+  return (
+    <Can
+      roles={roles}
+      match={match}
+      fallback={fallback}
+      loadingFallback={loadingFallback}
+    >
+      {children}
+    </Can>
+  );
 }

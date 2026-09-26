@@ -41,11 +41,14 @@ export default defineConfig(() => ({
     },
     rolldownOptions: {
       // External packages that should not be bundled into your library.
-      external: ['react', 'react-dom', 'react/jsx-runtime', 'keycloak-js'],
+      external: ['react', 'react-dom', 'react/jsx-runtime'],
       output: {
         // Vite removes module directives while bundling. Next.js needs this
         // directive in the public client entry to preserve the client boundary.
-        banner: (chunk) => (chunk.name === 'index' ? "'use client';" : ''),
+        banner: (chunk) =>
+          chunk.name === 'index' || chunk.name === 'server'
+            ? "'use client';"
+            : '',
       },
     },
   },

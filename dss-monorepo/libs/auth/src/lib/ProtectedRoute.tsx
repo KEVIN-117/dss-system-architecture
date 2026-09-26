@@ -8,8 +8,8 @@ import { useAuth } from './AuthProvider';
 export interface ProtectedRouteProps {
   children: ReactNode;
   requiredRoles?: DSSRole[];
-  loadingFallback?: React.ReactNode;
-  unauthorizedFallback?: React.ReactNode;
+  loadingFallback?: ReactNode;
+  unauthorizedFallback?: ReactNode;
 }
 
 export function ProtectedRoute({

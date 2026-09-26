@@ -58,11 +58,11 @@ dss-monorepo/
 │   │   ├── playwright.config.mts
 │   │   └── package.json
 │   │
-│   ├── rector-dashboard/          # [FUTURO] Dashboard del Rector
-│   ├── decano-dashboard/          # [FUTURO] Dashboard del Decano
-│   ├── director-dashboard/        # [FUTURO] Dashboard del Director de Carrera
+│   ├── rector-dashboard/          # Dashboard del Rector con sesión BFF y RBAC
+│   ├── decano-dashboard/          # Dashboard del Decano con sesión BFF y RBAC
+│   ├── director-dashboard/        # Dashboard del Director con sesión BFF y RBAC
 │   ├── docs-portal/               # [FUTURO] Documentación pública del DSS
-│   └── bff/                       # [FUTURO] Backend-For-Frontend (Next.js API Routes)
+│   └── bff/                       # Backend-For-Frontend (Next.js API Routes)
 │
 ├── libs/                          # Librerías internas compartidas
 │   │
@@ -102,8 +102,8 @@ dss-monorepo/
 │   │   ├── admissions/
 │   │   └── administration/
 │   │
-│   ├── auth/                      # [FUTURO] Integración con Keycloak / OIDC
-│   ├── rbac/                      # [FUTURO] Control de acceso basado en roles
+│   ├── auth/                      # Sesión BFF y protección de rutas del frontend
+│   ├── rbac/                      # Control de acceso basado en roles y permisos
 │   │
 │   └── connectors/                # [FUTURO] Clientes de servicios externos (solo para BFF)
 │       ├── mondrian/              # Cliente XMLA para Mondrian OLAP
@@ -259,18 +259,18 @@ Cada proyecto debe llevar exactamente **un tag de tipo** y **un tag de scope**. 
 | ---------------------- | ------------------ | ---------------------- | --------- |
 | `admin-portal`         | `type:app`         | `scope:admin`          | ✅ Activo |
 | `admin-portal-e2e`     | `type:e2e`         | `scope:admin`          | ✅ Activo |
-| `rector-dashboard`     | `type:app`         | `scope:rector`         | 🔜 Futuro |
-| `decano-dashboard`     | `type:app`         | `scope:decano`         | 🔜 Futuro |
-| `director-dashboard`   | `type:app`         | `scope:director`       | 🔜 Futuro |
-| `bff`                  | `type:bff`         | `scope:infrastructure` | 🔜 Futuro |
+| `rector-dashboard`     | `type:app`         | `scope:rector`         | ✅ Activo |
+| `decano-dashboard`     | `type:app`         | `scope:decano`         | ✅ Activo |
+| `director-dashboard`   | `type:app`         | `scope:director`       | ✅ Activo |
+| `bff`                  | `type:bff`         | `scope:infrastructure` | ✅ Activo |
 | `ui-primitives`        | `type:ui`          | `scope:shared`         | 🔜 Futuro |
 | `ui-components`        | `type:ui`          | `scope:shared`         | 🔜 Futuro |
 | `charts`               | `type:ui`          | `scope:shared`         | 🔜 Futuro |
 | `domain-academic`      | `type:domain`      | `scope:shared`         | 🔜 Futuro |
 | `data-access-academic` | `type:data-access` | `scope:shared`         | 🔜 Futuro |
 | `feature-dropout-risk` | `type:feature`     | `scope:shared`         | 🔜 Futuro |
-| `auth`                 | `type:util`        | `scope:infrastructure` | 🔜 Futuro |
-| `rbac`                 | `type:util`        | `scope:infrastructure` | 🔜 Futuro |
+| `auth`                 | `type:util`        | `scope:infrastructure` | ✅ Activo |
+| `rbac`                 | `type:util`        | `scope:infrastructure` | ✅ Activo |
 | `connector-mondrian`   | `type:connector`   | `scope:infrastructure` | 🔜 Futuro |
 | `connector-hop`        | `type:connector`   | `scope:infrastructure` | 🔜 Futuro |
 | `connector-prediction` | `type:connector`   | `scope:infrastructure` | 🔜 Futuro |

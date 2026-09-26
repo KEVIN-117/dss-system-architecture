@@ -3,6 +3,7 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@dss-monorepo/auth": "workspace:*",
     "@dss-monorepo/charts": "workspace:*",
     "@dss-monorepo/design-system": "workspace:*",
     "next": "~16.1.6",
