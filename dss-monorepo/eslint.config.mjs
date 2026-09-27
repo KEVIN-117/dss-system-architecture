@@ -60,7 +60,11 @@ export default [
             },
             {
               sourceTag: 'type:bff',
-              onlyDependOnLibsWithTags: ['type:connector', 'type:feature', 'type:util'],
+              onlyDependOnLibsWithTags: [
+                'type:connector',
+                'type:feature',
+                'type:util',
+              ],
             },
             {
               sourceTag: 'type:connector',

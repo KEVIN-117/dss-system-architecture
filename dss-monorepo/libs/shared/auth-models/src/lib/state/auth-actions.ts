@@ -3,11 +3,11 @@ import type { AuthUser } from '../users/auth-user.js';
 
 export interface AuthActions {
     /** Inicia el flujo de login con Keycloak */
-    login: () => void;
+    login: (returnTo?: string) => void;
     /** Cierra la sesión del usuario */
     logout: () => void;
     /** Registra un nuevo usuario */
-    register: () => void;
+    register: (returnTo?: string) => void;
     /**
     * Obtiene un access_token válido (renovado si es necesario).
     * Úsalo para headers Authorization: Bearer <token>.

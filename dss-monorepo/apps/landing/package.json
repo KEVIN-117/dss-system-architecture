@@ -1,0 +1,18 @@
+{
+  "name": "@dss-monorepo/landing",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@dss-monorepo/auth": "workspace:*",
+    "@phosphor-icons/react": "^2.1.10",
+    "@dss-monorepo/rbac": "workspace:*",
+    "clsx": "^2.1.1",
+    "gsap": "^3.15.0",
+    "motion": "^13.4.4",
+    "next": "~16.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0",
+    "tailwind-merge": "^3.7.0",
+    "@dss-monorepo/design-system": "workspace:*"
+  }
+}

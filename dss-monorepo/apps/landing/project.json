@@ -1,0 +1,20 @@
+{
+  "name": "@dss-monorepo/landing",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "apps/landing/src",
+  "projectType": "application",
+  "tags": ["type:app", "scope:public"],
+  "// targets": "to see all targets run: nx show project @dss-monorepo/landing --web",
+  "targets": {
+    "dev": {
+      "options": {
+        "port": 3000
+      }
+    },
+    "serve": {
+      "options": {
+        "port": 3000
+      }
+    }
+  }
+}
