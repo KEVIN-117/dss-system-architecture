@@ -11,7 +11,12 @@ import {
 } from 'react';
 
 import { AuthProfileError, fetchBffSession } from './auth-api';
-import type { AuthActions, AuthState, AuthUser, DSSRole } from '@dss-monorepo/auth-models';
+import type {
+  AuthActions,
+  AuthState,
+  AuthUser,
+  DSSRole,
+} from '@dss-monorepo/auth-models';
 
 type AuthContextValue = AuthState & AuthActions;
 
@@ -59,7 +64,8 @@ export function AuthProvider({ bffBaseUrl, children }: AuthProviderProps) {
       })
       .catch((error: unknown) => {
         if (!active || abortController.signal.aborted) return;
-        const unauthenticated = error instanceof AuthProfileError && error.status === 401;
+        const unauthenticated =
+          error instanceof AuthProfileError && error.status === 401;
         setState({
           ...INITIAL_STATE,
           isLoading: false,
@@ -76,7 +82,9 @@ export function AuthProvider({ bffBaseUrl, children }: AuthProviderProps) {
 
   const login = useCallback(() => {
     const returnTo = getCurrentPortalReturnTo();
-    window.location.assign(`${bffBaseUrl.replace(/\/$/, '')}/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
+    window.location.assign(
+      `${bffBaseUrl.replace(/\/$/, '')}/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
+    );
   }, [bffBaseUrl]);
 
   const logout = useCallback(() => {
@@ -90,7 +98,10 @@ export function AuthProvider({ bffBaseUrl, children }: AuthProviderProps) {
     );
   }, [bffBaseUrl]);
 
-  const getToken = useCallback(async (): Promise<string | undefined> => undefined, []);
+  const getToken = useCallback(
+    async (): Promise<string | undefined> => undefined,
+    [],
+  );
   const getUser = useCallback((): AuthUser | null => state.user, [state.user]);
   const hasRole = useCallback(
     (role: DSSRole): boolean => state.user?.roles.includes(role) ?? false,
@@ -102,7 +113,16 @@ export function AuthProvider({ bffBaseUrl, children }: AuthProviderProps) {
   );
 
   const value = useMemo<AuthContextValue>(
-    () => ({ ...state, login, logout, register, getToken, getUser, hasRole, hasPermission }),
+    () => ({
+      ...state,
+      login,
+      logout,
+      register,
+      getToken,
+      getUser,
+      hasRole,
+      hasPermission,
+    }),
     [state, login, logout, register, getToken, getUser, hasRole, hasPermission],
   );
 
@@ -126,7 +146,9 @@ function getCurrentPortalReturnTo(): string {
 
   try {
     const target = new URL(requested, current.origin);
-    return target.origin === current.origin ? target.toString() : current.toString();
+    return target.origin === current.origin
+      ? target.toString()
+      : current.toString();
   } catch {
     return current.toString();
   }

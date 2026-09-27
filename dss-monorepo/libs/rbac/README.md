@@ -59,6 +59,33 @@ Usa `<Can>` para código nuevo. `useCan(check)` devuelve `false` durante la
 carga o sin sesión, y `useMyPermissions()` devuelve un `ReadonlySet` memoizado
 para controles imperativos o diagnósticos.
 
+## API de compatibilidad y hooks
+
+`RoleGuard` conserva el contrato solicitado inicialmente por la librería. Es
+un adaptador de `<Can>` y, por tanto, comparte la misma jerarquía y el mismo
+fallo cerrado:
+
+```tsx
+import { RoleGuard, useHasPermission, useHasRole } from '@dss-monorepo/rbac';
+
+function FacultyActions() {
+  const canRunPipelines = useHasPermission('pipelines:execute');
+  const canSeeFaculty = useHasRole(['DECANO', 'RECTOR']);
+
+  return (
+    <RoleGuard rolesAllowed={['DECANO', 'RECTOR']} fallback={<p>Sin acceso</p>}>
+      {canSeeFaculty && <FacultyDashboard />}
+      <RunButton disabled={!canRunPipelines} />
+    </RoleGuard>
+  );
+}
+```
+
+`useHasRole()` aplica la jerarquía de roles y `useHasPermission()` resuelve
+los permisos efectivos. Ambos aceptan un elemento o una lista, y `match` es
+`"any"` por defecto. Durante carga, sin sesión o con una lista vacía devuelven
+`false`.
+
 ## Uso en servidor
 
 ```ts
@@ -76,6 +103,31 @@ if (!hasRequiredPermissions(roles, required)) {
 La entrada `@dss-monorepo/rbac/server` solo exporta funciones, tipos y mapas
 puros; no carga React. En el BFF se recomienda usar `requireRoles()` o
 `requirePermissions()` después de autenticar la cookie o el token.
+
+Para handlers Web o Next que ya tienen una forma confiable de resolver el
+principal, `withRbacMiddleware()` evita copiar la evaluación de políticas:
+
+```ts
+import { withRbacMiddleware } from '@dss-monorepo/rbac/server';
+
+export const GET = withRbacMiddleware(
+  {
+    permissions: ['pipelines:execute'],
+    resolvePrincipal: async (request) => {
+      const session = await authenticateRequest(request);
+      return session.authenticated ? { roles: session.value.roles } : null;
+    },
+  },
+  async () => Response.json({ accepted: true }),
+);
+```
+
+El resolvedor es responsabilidad de la aplicación: debe partir de una sesión
+o token validado. El middleware no lee variables de entorno, no descifra
+cookies, no valida JWT ni llama a sistemas externos. Devuelve `401` cuando no
+hay principal y `403` cuando la política no se cumple. Los portales no deben
+usar este mecanismo para sustituir la autorización del BFF: `<Can>` y los
+hooks solo controlan la presentación.
 
 ## Verificación
 

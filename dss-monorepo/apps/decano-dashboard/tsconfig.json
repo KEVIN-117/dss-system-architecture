@@ -62,6 +62,9 @@
   ],
   "references": [
     {
+      "path": "../../libs/rbac"
+    },
+    {
       "path": "../../libs/ui/design-system"
     },
     {

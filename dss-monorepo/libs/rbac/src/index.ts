@@ -22,6 +22,14 @@ export { Can } from './lib/Can';
 export type { CanProps } from './lib/Can';
 export { RoleGate } from './lib/RoleGate';
 export type { RoleGateProps } from './lib/RoleGate';
-export { useCan, useMyPermissions } from './lib/useCan';
+export { RoleGuard } from './lib/RoleGuard';
+export type { RoleGuardProps } from './lib/RoleGuard';
+
+export {
+  useCan,
+  useHasPermission,
+  useHasRole,
+  useMyPermissions,
+} from './lib/useCan';
 export type { CanCheck } from './lib/can-access';
 export { usePermission } from './lib/usePermission';

@@ -3,14 +3,17 @@ import {
   MetricIndicator,
   Button,
   Typography,
+  AccessDenied,
 } from '@dss-monorepo/design-system';
 import { ProtectedRoute } from '@dss-monorepo/auth';
+import { RoleGuard } from '@dss-monorepo/rbac';
 import { DashboardCharts } from './components/DashboardCharts';
 
 export default function Index() {
   return (
-    <ProtectedRoute requiredRoles={['SUPERADMIN']} unauthorizedFallback={<LoginRequired />}>
-      <DashboardTemplate
+    <ProtectedRoute unauthenticatedFallback={<LoginRequired />}>
+      <RoleGuard rolesAllowed={['SUPERADMIN']} fallback={<AccessDeniedForPortal />}>
+        <DashboardTemplate
         sidebarTitle="DSS ADMIN"
         navItems={[
           { title: 'System Overview', href: '#' },
@@ -63,7 +66,8 @@ export default function Index() {
           />
         </div>
         <DashboardCharts />
-      </DashboardTemplate>
+        </DashboardTemplate>
+      </RoleGuard>
     </ProtectedRoute>
   );
 }
@@ -75,5 +79,14 @@ function LoginRequired() {
       <p>Inicia sesión para acceder al portal de administración.</p>
       <a className="text-primary underline" href="/login">Iniciar sesión</a>
     </main>
+  );
+}
+
+function AccessDeniedForPortal() {
+  return (
+    <AccessDenied
+      portalName="de administración"
+      logoutHref={`${process.env.NEXT_PUBLIC_BFF_URL}/api/auth/logout`}
+    />
   );
 }

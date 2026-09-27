@@ -20,3 +20,14 @@ export {
 } from './lib/permission-map';
 export type { DSSPermission } from './lib/permission-map';
 export type { DSSRole } from '@dss-monorepo/auth-models';
+export {
+  isRbacAllowed,
+  withRbacMiddleware,
+} from './lib/middleware';
+export type {
+  RbacMiddlewareHandler,
+  RbacMiddlewareOptions,
+  RbacPolicy,
+  RbacPrincipal,
+  RbacPrincipalResolver,
+} from './lib/middleware';
