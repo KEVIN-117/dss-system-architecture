@@ -30,7 +30,8 @@ export function AdministrationPage() {
 }
 ```
 
-`login()` y `register()` redirigen el navegador al BFF. El BFF inicia
+`login()` y `register()` redirigen el navegador al BFF. Ambos aceptan un
+`returnTo` opcional para completar flujos como el SSO Hub de la landing. El BFF inicia
 Authorization Code + PKCE y Keycloak presenta el formulario de credenciales
 con el tema `dss`; la biblioteca no conoce ni procesa contraseña alguna.
 `logout()` redirige al logout BFF/Keycloak. `getToken()` siempre devuelve

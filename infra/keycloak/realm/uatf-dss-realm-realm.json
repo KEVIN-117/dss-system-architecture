@@ -2107,7 +2107,13 @@
       }
     ]
   },
-  "internationalizationEnabled": false,
+  "loginTheme": "dss",
+  "internationalizationEnabled": true,
+  "supportedLocales": [
+    "es",
+    "en"
+  ],
+  "defaultLocale": "es",
   "authenticationFlows": [
     {
       "id": "59ffdf79-7106-4f71-a0cb-fac87d01e9aa",

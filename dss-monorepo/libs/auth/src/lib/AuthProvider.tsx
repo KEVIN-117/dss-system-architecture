@@ -80,8 +80,8 @@ export function AuthProvider({ bffBaseUrl, children }: AuthProviderProps) {
     };
   }, [bffBaseUrl]);
 
-  const login = useCallback(() => {
-    const returnTo = getCurrentPortalReturnTo();
+  const login = useCallback((requestedReturnTo?: string) => {
+    const returnTo = resolveReturnTo(requestedReturnTo);
     window.location.assign(
       `${bffBaseUrl.replace(/\/$/, '')}/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`,
     );
@@ -91,8 +91,8 @@ export function AuthProvider({ bffBaseUrl, children }: AuthProviderProps) {
     window.location.assign(`${bffBaseUrl.replace(/\/$/, '')}/api/auth/logout`);
   }, [bffBaseUrl]);
 
-  const register = useCallback(() => {
-    const returnTo = getCurrentPortalReturnTo();
+  const register = useCallback((requestedReturnTo?: string) => {
+    const returnTo = resolveReturnTo(requestedReturnTo);
     window.location.assign(
       `${bffBaseUrl.replace(/\/$/, '')}/api/auth/login?action=register&returnTo=${encodeURIComponent(returnTo)}`,
     );
@@ -149,6 +149,20 @@ function getCurrentPortalReturnTo(): string {
     return target.origin === current.origin
       ? target.toString()
       : current.toString();
+  } catch {
+    return current.toString();
+  }
+}
+
+function resolveReturnTo(requestedReturnTo?: string): string {
+  if (!requestedReturnTo) {
+    return getCurrentPortalReturnTo();
+  }
+
+  const current = new URL(window.location.href);
+  try {
+    const target = new URL(requestedReturnTo, current.origin);
+    return target.origin === current.origin ? target.toString() : current.toString();
   } catch {
     return current.toString();
   }

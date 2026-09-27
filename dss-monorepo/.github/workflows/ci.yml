@@ -16,12 +16,17 @@ jobs:
     # These values are isolated test configuration. Production secrets are
     # never committed and must be supplied through the deployment environment.
     env:
+      LANDING_PORT: 3000
       ADMIN_PORTAL_PORT: 3001
       DECANO_DASHBOARD_PORT: 3002
       DIRECTOR_DASHBOARD_PORT: 3003
       RECTOR_DASHBOARD_PORT: 3004
       BFF_PORT: 3006
       NEXT_PUBLIC_BFF_URL: http://localhost:3006
+      NEXT_PUBLIC_ADMIN_PORTAL_URL: http://localhost:3001
+      NEXT_PUBLIC_RECTOR_DASHBOARD_URL: http://localhost:3004
+      NEXT_PUBLIC_DECANO_DASHBOARD_URL: http://localhost:3002
+      NEXT_PUBLIC_DIRECTOR_DASHBOARD_URL: http://localhost:3003
       KEYCLOAK_URL: http://localhost:8080
       KEYCLOAK_REALM: uatf-dss-realm
       KEYCLOAK_AUDIENCE: uatf-auth-service
@@ -29,10 +34,10 @@ jobs:
       KEYCLOAK_BFF_CLIENT_ID: dss-bff
       KEYCLOAK_BFF_CLIENT_SECRET: ci-client-secret-not-used-in-production
       KEYCLOAK_BFF_REDIRECT_URI: http://localhost:3006/api/auth/callback
-      KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI: http://localhost:3001/login
+      KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI: http://localhost:3000/login
       AUTH_SERVICE_URL: http://localhost:8000
-      BFF_ALLOWED_ORIGINS: http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
-      BFF_DEFAULT_POST_LOGIN_REDIRECT_URI: http://localhost:3001/
+      BFF_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
+      BFF_DEFAULT_POST_LOGIN_REDIRECT_URI: http://localhost:3000/auth/callback
       BFF_SESSION_SECRET: ci-session-secret-not-used-in-production-123456
       BFF_SESSION_TTL_SECONDS: 300
       BFF_SESSION_COOKIE: dss_session

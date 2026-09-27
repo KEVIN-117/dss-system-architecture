@@ -59,6 +59,12 @@
     },
     {
       "path": "./libs/connectors/olap-connector"
+    },
+    {
+      "path": "./apps/landing-e2e"
+    },
+    {
+      "path": "./apps/landing"
     }
   ]
 }

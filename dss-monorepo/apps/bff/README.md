@@ -43,10 +43,10 @@ KEYCLOAK_ROLE_CLIENT_ID=uatf-auth-service
 KEYCLOAK_BFF_CLIENT_ID=dss-bff
 KEYCLOAK_BFF_CLIENT_SECRET=<secreto-no-versionado>
 KEYCLOAK_BFF_REDIRECT_URI=http://localhost:3006/api/auth/callback
-KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI=http://localhost:3001/login
+KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI=http://localhost:3000/login
 AUTH_SERVICE_URL=http://localhost:8000
-BFF_ALLOWED_ORIGINS=http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
-BFF_DEFAULT_POST_LOGIN_REDIRECT_URI=http://localhost:3001/
+BFF_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
+BFF_DEFAULT_POST_LOGIN_REDIRECT_URI=http://localhost:3000/auth/callback
 BFF_SESSION_SECRET=<al-menos-32-caracteres-no-versionados>
 ```
 

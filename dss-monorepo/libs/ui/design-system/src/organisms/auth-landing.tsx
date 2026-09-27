@@ -36,7 +36,7 @@ export function AuthLanding({
 }: AuthLandingProps) {
   return (
     <main
-      className={`flex min-h-screen items-center justify-center bg-background p-6 text-foreground${className ? ` ${className}` : ''}`}
+      className={`flex items-center justify-center p-6 text-foreground${className ? ` ${className}` : ''}`}
       {...props}
     >
       <Card className="w-full max-w-md">
@@ -46,18 +46,31 @@ export function AuthLanding({
         </CardHeader>
         <CardContent>
           {error ? (
-            <p role="alert" className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+            <p
+              role="alert"
+              className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+            >
               {error}
             </p>
           ) : null}
         </CardContent>
         <CardFooter className="flex-col gap-3">
-          <Button className="w-full" size="lg" onClick={onLogin} disabled={isLoading}>
+          <Button
+            className="w-full"
+            size="lg"
+            onClick={onLogin}
+            disabled={isLoading}
+          >
             <LogIn aria-hidden="true" />
             {isLoading ? 'Verificando sesión…' : 'Iniciar sesión'}
           </Button>
           {onRegister ? (
-            <Button className="w-full" variant="outline" onClick={onRegister} disabled={isLoading}>
+            <Button
+              className="w-full"
+              variant="outline"
+              onClick={onRegister}
+              disabled={isLoading}
+            >
               <UserPlus aria-hidden="true" />
               Crear cuenta
             </Button>

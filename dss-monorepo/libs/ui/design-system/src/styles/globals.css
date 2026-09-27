@@ -23,6 +23,25 @@
   --color-chart-2: var(--chart-2);
   --color-chart-1: var(--chart-1);
   --color-ring: var(--ring);
+  --color-dss-navy-950: var(--dss-navy-950);
+  --color-dss-navy-900: var(--dss-navy-900);
+  --color-dss-navy-800: var(--dss-navy-800);
+  --color-dss-blue-700: var(--dss-blue-700);
+  --color-dss-blue-500: var(--dss-blue-500);
+  --color-dss-cyan-400: var(--dss-cyan-400);
+  --color-dss-cyan-500: var(--dss-cyan-500);
+  --color-dss-cyan-600: var(--dss-cyan-600);
+  --color-dss-gold-400: var(--dss-gold-400);
+  --color-dss-gold-600: var(--dss-gold-600);
+  --color-dss-gold-700: var(--dss-gold-700);
+  --color-dss-red-500: var(--dss-red-500);
+  --color-brand-blue: var(--dss-blue-500);
+  --color-brand-navy: var(--dss-navy-900);
+  --color-brand-navydark: var(--dss-navy-950);
+  --color-brand-cyan: var(--dss-cyan-400);
+  --color-brand-red: var(--dss-red-500);
+  --color-brand-gold: var(--dss-gold-400);
+  --color-role-accent: var(--role-accent);
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
@@ -50,154 +69,179 @@
 }
 
 /* ==========================================================================
-   1. BASE DEFAULT / CYBERPUNK (Fallback)
+   1. ACADEMIC DSS PALETTE
    ========================================================================== */
 :root {
+  /* Brand colors sampled from the DSA mark and shared by every surface. */
+  --dss-navy-950: #060b14;
+  --dss-navy-900: #0b1a38;
+  --dss-navy-800: #102b57;
+  --dss-blue-700: #1d4ed8;
+  --dss-blue-500: #2563eb;
+  --dss-cyan-400: #22d3ee;
+  --dss-cyan-500: #06b6d4;
+  --dss-cyan-600: #0e7490;
+  --dss-gold-400: #fbbf24;
+  --dss-gold-600: #d97706;
+  --dss-gold-700: #b45309;
+  --dss-red-500: #dc2626;
+  --role-accent: var(--dss-blue-700);
   --radius: 0.75rem;
-  --background: oklch(0.98 0.01 240);
-  --foreground: oklch(0.15 0.02 240);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.15 0.02 240);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.15 0.02 240);
-  --primary: oklch(0.55 0.15 260);
-  --primary-foreground: oklch(0.98 0 0);
-  --secondary: oklch(0.95 0.02 240);
-  --secondary-foreground: oklch(0.2 0.05 240);
-  --muted: oklch(0.95 0.02 240);
-  --muted-foreground: oklch(0.5 0.05 240);
-  --accent: oklch(0.95 0.02 240);
-  --accent-foreground: oklch(0.15 0.02 240);
-  --destructive: oklch(0.5 0.2 20);
-  --border: oklch(0.9 0.02 240);
-  --input: oklch(0.9 0.02 240);
-  --ring: oklch(0.55 0.15 260);
-  --chart-1: oklch(0.64 0.22 41);
-  --chart-2: oklch(0.6 0.11 184);
-  --chart-3: oklch(0.39 0.07 227);
-  --chart-4: oklch(0.82 0.18 84);
-  --chart-5: oklch(0.76 0.18 70);
-  --sidebar: oklch(0.98 0.01 240);
-  --sidebar-foreground: oklch(0.15 0.02 240);
-  --sidebar-primary: oklch(0.55 0.15 260);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-  --sidebar-accent: oklch(0.95 0.02 240);
-  --sidebar-accent-foreground: oklch(0.15 0.02 240);
-  --sidebar-border: oklch(0.9 0.02 240);
-  --sidebar-ring: oklch(0.55 0.15 260);
+  --background: #f5f9ff;
+  --foreground: #0b1a38;
+  --card: #ffffff;
+  --card-foreground: #0b1a38;
+  --popover: #ffffff;
+  --popover-foreground: #0b1a38;
+  --primary: var(--dss-blue-700);
+  --primary-foreground: #ffffff;
+  --secondary: #e8f0fb;
+  --secondary-foreground: #102b57;
+  --muted: #edf3fa;
+  --muted-foreground: #456181;
+  --accent: #dff8fd;
+  --accent-foreground: #0b1a38;
+  --destructive: var(--dss-red-500);
+  --border: #cbd9eb;
+  --input: #cbd9eb;
+  --ring: var(--dss-cyan-500);
+  --chart-1: var(--dss-blue-500);
+  --chart-2: var(--dss-cyan-500);
+  --chart-3: var(--dss-navy-800);
+  --chart-4: var(--dss-gold-400);
+  --chart-5: var(--dss-red-500);
+  --sidebar: #eef4fb;
+  --sidebar-foreground: #0b1a38;
+  --sidebar-primary: var(--dss-blue-700);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #dff8fd;
+  --sidebar-accent-foreground: #0b1a38;
+  --sidebar-border: #cbd9eb;
+  --sidebar-ring: var(--dss-cyan-500);
 }
 
 .dark {
-  --background: oklch(0.11 0.015 265); /* Deep space navy/black */
-  --foreground: oklch(0.98 0 0);
-  --card: oklch(0.15 0.02 265); /* Slightly elevated panels */
-  --card-foreground: oklch(0.98 0 0);
-  --popover: oklch(0.15 0.02 265);
-  --popover-foreground: oklch(0.98 0 0);
-  --primary: oklch(0.7 0.15 260); /* Neon Blue default */
-  --primary-foreground: oklch(0.1 0.05 260);
-  --secondary: oklch(0.2 0.03 265);
-  --secondary-foreground: oklch(0.98 0 0);
-  --muted: oklch(0.2 0.03 265);
-  --muted-foreground: oklch(0.65 0.02 265);
-  --accent: oklch(0.2 0.03 265);
-  --accent-foreground: oklch(0.98 0 0);
-  --destructive: oklch(0.65 0.25 15); /* Neon Red */
-  --border: oklch(0.25 0.03 265); /* Visible cyber-borders */
-  --input: oklch(0.25 0.03 265);
-  --ring: oklch(0.7 0.15 260);
-  --sidebar: oklch(0.13 0.02 265);
-  --sidebar-foreground: oklch(0.98 0 0);
-  --sidebar-primary: oklch(0.7 0.15 260);
-  --sidebar-primary-foreground: oklch(0.1 0.05 260);
-  --sidebar-accent: oklch(0.2 0.03 265);
-  --sidebar-accent-foreground: oklch(0.98 0 0);
-  --sidebar-border: oklch(0.25 0.03 265);
-  --sidebar-ring: oklch(0.7 0.15 260);
+  --background: var(--dss-navy-950);
+  --foreground: #f3f7ff;
+  --card: var(--dss-navy-900);
+  --card-foreground: #f3f7ff;
+  --popover: var(--dss-navy-900);
+  --popover-foreground: #f3f7ff;
+  --primary: var(--dss-blue-500);
+  --primary-foreground: #ffffff;
+  --secondary: var(--dss-navy-800);
+  --secondary-foreground: #f3f7ff;
+  --muted: #122746;
+  --muted-foreground: #b2c5df;
+  --accent: #12385e;
+  --accent-foreground: #e5fbff;
+  --destructive: #f87171;
+  --border: #24416d;
+  --input: #24416d;
+  --ring: var(--dss-cyan-400);
+  --sidebar: #08162c;
+  --sidebar-foreground: #f3f7ff;
+  --sidebar-primary: var(--dss-blue-500);
+  --sidebar-primary-foreground: #ffffff;
+  --sidebar-accent: #12385e;
+  --sidebar-accent-foreground: #e5fbff;
+  --sidebar-border: #24416d;
+  --sidebar-ring: var(--dss-cyan-400);
 }
 
 /* ==========================================================================
-   2. RECTOR DASHBOARD (Neon Magenta / Hot Pink)
+   2. ROLE ACCENTS — the same academic palette in every portal
    ========================================================================== */
+[data-theme='superadmin'],
+[data-theme='admin'] {
+  --role-accent: var(--dss-navy-900);
+  --primary: var(--dss-navy-900);
+  --primary-foreground: #ffffff;
+  --ring: var(--dss-cyan-500);
+  --sidebar-primary: var(--dss-navy-900);
+  --sidebar-primary-foreground: #ffffff;
+}
+
+.dark[data-theme='superadmin'],
+[data-theme='superadmin'].dark,
+[data-theme='superadmin'] .dark,
+.dark [data-theme='superadmin'],
+.dark[data-theme='admin'],
+[data-theme='admin'].dark,
+[data-theme='admin'] .dark,
+.dark [data-theme='admin'] {
+  --role-accent: var(--dss-blue-500);
+  --primary: var(--dss-blue-500);
+  --primary-foreground: #ffffff;
+  --ring: var(--dss-cyan-400);
+  --sidebar-primary: var(--dss-blue-500);
+  --sidebar-primary-foreground: #ffffff;
+}
+
+/* Rector — institutional electric blue. */
 [data-theme='rector'] {
-  --primary: oklch(0.55 0.25 350);
-  --primary-foreground: oklch(0.98 0 0);
-  --ring: oklch(0.55 0.25 350);
-  --sidebar-primary: oklch(0.55 0.25 350);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --role-accent: var(--dss-blue-700);
+  --primary: var(--dss-blue-700);
+  --primary-foreground: #ffffff;
+  --ring: var(--dss-cyan-500);
+  --sidebar-primary: var(--dss-blue-700);
+  --sidebar-primary-foreground: #ffffff;
 }
 
 .dark[data-theme='rector'],
 [data-theme='rector'].dark,
-[data-theme='rector'] .dark {
-  --primary: oklch(0.65 0.25 350); /* Neon Hot Pink */
-  --primary-foreground: oklch(0.15 0.05 350);
-  --ring: oklch(0.65 0.25 350);
-  --sidebar-primary: oklch(0.65 0.25 350);
-  --sidebar-primary-foreground: oklch(0.15 0.05 350);
+[data-theme='rector'] .dark,
+.dark [data-theme='rector'] {
+  --role-accent: var(--dss-blue-500);
+  --primary: var(--dss-blue-500);
+  --primary-foreground: #ffffff;
+  --ring: var(--dss-cyan-400);
+  --sidebar-primary: var(--dss-blue-500);
+  --sidebar-primary-foreground: #ffffff;
 }
 
-/* ==========================================================================
-   3. DECANO DASHBOARD (Neon Green / Matrix Emerald)
-   ========================================================================== */
+/* Decano — academic cyan. */
 [data-theme='decano'] {
-  --primary: oklch(0.55 0.2 150);
-  --primary-foreground: oklch(0.98 0 0);
-  --ring: oklch(0.55 0.2 150);
-  --sidebar-primary: oklch(0.55 0.2 150);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --role-accent: var(--dss-cyan-600);
+  --primary: var(--dss-cyan-600);
+  --primary-foreground: #ffffff;
+  --ring: var(--dss-cyan-600);
+  --sidebar-primary: var(--dss-cyan-600);
+  --sidebar-primary-foreground: #ffffff;
 }
 
 .dark[data-theme='decano'],
 [data-theme='decano'].dark,
-[data-theme='decano'] .dark {
-  --primary: oklch(0.75 0.22 150); /* Matrix Neon Green */
-  --primary-foreground: oklch(0.15 0.05 150);
-  --ring: oklch(0.75 0.22 150);
-  --sidebar-primary: oklch(0.75 0.22 150);
-  --sidebar-primary-foreground: oklch(0.15 0.05 150);
+[data-theme='decano'] .dark,
+.dark [data-theme='decano'] {
+  --role-accent: var(--dss-cyan-400);
+  --primary: var(--dss-cyan-400);
+  --primary-foreground: var(--dss-navy-950);
+  --ring: var(--dss-cyan-400);
+  --sidebar-primary: var(--dss-cyan-400);
+  --sidebar-primary-foreground: var(--dss-navy-950);
 }
 
-/* ==========================================================================
-   4. DIRECTOR DASHBOARD (Neon Purple / Cyber Violet)
-   ========================================================================== */
+/* Director — operational gold / amber. */
 [data-theme='director'] {
-  --primary: oklch(0.45 0.22 300);
-  --primary-foreground: oklch(0.98 0 0);
-  --ring: oklch(0.45 0.22 300);
-  --sidebar-primary: oklch(0.45 0.22 300);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
+  --role-accent: var(--dss-gold-700);
+  --primary: var(--dss-gold-700);
+  --primary-foreground: #ffffff;
+  --ring: var(--dss-gold-700);
+  --sidebar-primary: var(--dss-gold-700);
+  --sidebar-primary-foreground: #ffffff;
 }
 
 .dark[data-theme='director'],
 [data-theme='director'].dark,
-[data-theme='director'] .dark {
-  --primary: oklch(0.7 0.25 300); /* Glowing Cyber Violet */
-  --primary-foreground: oklch(0.15 0.05 300);
-  --ring: oklch(0.7 0.25 300);
-  --sidebar-primary: oklch(0.7 0.25 300);
-  --sidebar-primary-foreground: oklch(0.15 0.05 300);
-}
-
-/* ==========================================================================
-   5. ADMIN PORTAL (Neon Cyan / Electric Blue)
-   ========================================================================== */
-[data-theme='admin'] {
-  --primary: oklch(0.5 0.15 230);
-  --primary-foreground: oklch(0.98 0 0);
-  --ring: oklch(0.5 0.15 230);
-  --sidebar-primary: oklch(0.5 0.15 230);
-  --sidebar-primary-foreground: oklch(0.98 0 0);
-}
-
-.dark[data-theme='admin'],
-[data-theme='admin'].dark,
-[data-theme='admin'] .dark {
-  --primary: oklch(0.75 0.18 230); /* Electric Cyan */
-  --primary-foreground: oklch(0.1 0.05 230);
-  --ring: oklch(0.75 0.18 230);
-  --sidebar-primary: oklch(0.75 0.18 230);
-  --sidebar-primary-foreground: oklch(0.1 0.05 230);
+[data-theme='director'] .dark,
+.dark [data-theme='director'] {
+  --role-accent: var(--dss-gold-400);
+  --primary: var(--dss-gold-400);
+  --primary-foreground: var(--dss-navy-950);
+  --ring: var(--dss-gold-400);
+  --sidebar-primary: var(--dss-gold-400);
+  --sidebar-primary-foreground: var(--dss-navy-950);
 }
 
 @layer base {
