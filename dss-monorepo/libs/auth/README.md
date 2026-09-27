@@ -9,6 +9,7 @@ no lee variables de entorno ni guarda tokens en React, `localStorage` o
 'use client';
 
 import { AuthProvider, ProtectedRoute } from '@dss-monorepo/auth';
+import { RoleGuard } from '@dss-monorepo/rbac';
 
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
@@ -20,8 +21,10 @@ export function Providers({ children }: { children: React.ReactNode }) {
 
 export function AdministrationPage() {
   return (
-    <ProtectedRoute requiredRoles={['SUPERADMIN']}>
-      <main>Administración</main>
+    <ProtectedRoute>
+      <RoleGuard rolesAllowed={['SUPERADMIN']}>
+        <main>Administración</main>
+      </RoleGuard>
     </ProtectedRoute>
   );
 }
@@ -48,18 +51,28 @@ layout raíz:
 
 ```tsx
 import { ProtectedRoute } from '@dss-monorepo/auth';
+import { RoleGuard } from '@dss-monorepo/rbac';
+import { AccessDenied } from '@dss-monorepo/design-system';
 
 export default function DashboardPage() {
   return (
     <ProtectedRoute
-      requiredRoles={['DECANO']}
-      unauthorizedFallback={<a href="/login">Iniciar sesión</a>}
+      unauthenticatedFallback={<a href="/login">Iniciar sesión</a>}
     >
-      <Dashboard />
+      <RoleGuard rolesAllowed={['DECANO']} fallback={<AccessDenied portalName="del decano" />}>
+        <Dashboard />
+      </RoleGuard>
     </ProtectedRoute>
   );
 }
 ```
+
+`ProtectedRoute` distingue la ausencia de sesión de la autorización: usa
+`unauthenticatedFallback` solo cuando no existe una sesión válida. La política
+de roles pertenece a `@dss-monorepo/rbac`; combina el guard de sesión con
+`RoleGuard` o `<Can>` para mostrar un estado de acceso no autorizado a un
+usuario que sí inició sesión pero no tiene el rol necesario. `requiredRoles` y
+`unauthorizedFallback` se conservan temporalmente como API deprecada.
 
 `ProtectedRoute` solo controla la presentación. Las APIs siguen exigiendo la
 sesión BFF y sus reglas de autorización en el servidor.

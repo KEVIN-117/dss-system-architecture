@@ -6,8 +6,7 @@ import {
 } from '@dss-monorepo/auth-connector';
 import type { AuthUser, DSSRole } from '@dss-monorepo/auth-models';
 import {
-  hasRequiredPermissions,
-  hasRequiredRoles,
+  isRbacAllowed,
   type DSSPermission,
   type RoleMatch,
 } from '@dss-monorepo/rbac/server';
@@ -108,7 +107,7 @@ export function requireRoles(
   requiredRoles: readonly DSSRole[],
   match: RoleMatch = 'any',
 ): NextResponse | null {
-  if (hasRequiredRoles(authentication.roles, requiredRoles, match)) {
+  if (isRbacAllowed(authentication.roles, { roles: requiredRoles, match })) {
     return null;
   }
 
@@ -124,7 +123,7 @@ export function requirePermissions(
   requiredPermissions: readonly DSSPermission[],
   match: RoleMatch = 'any',
 ): NextResponse | null {
-  if (hasRequiredPermissions(authentication.roles, requiredPermissions, match)) {
+  if (isRbacAllowed(authentication.roles, { permissions: requiredPermissions, match })) {
     return null;
   }
 
