@@ -1,0 +1,13 @@
+cases:
+  - case_code: NULL_OPTIONAL_FIELDS
+    entity: student:1003
+    expected_result: PRESERVE_NULL
+    description: atributos opcionales no informados
+  - case_code: DUPLICATE_CONFLICTING
+    entity: admission:1002
+    expected_result: BLOCK
+    description: mismo grano con valores diferentes
+  - case_code: NOTE_OUT_OF_RANGE
+    entity: grade:9005
+    expected_result: BLOCK
+    description: nota superior al rango 0..100

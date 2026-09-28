@@ -1,0 +1,21 @@
+cases:
+  - case_code: IDENTITY_COMPLETE
+    entity: student:1001
+    expected_result: RESOLVE
+    description: id_ra e id_alumno presentes
+  - case_code: IDENTITY_PROVISIONAL
+    entity: student:1002
+    expected_result: REVIEW
+    description: id_ra ausente; no fusionar automaticamente
+  - case_code: SCD2_STATE_CHANGE
+    entity: student:1001
+    expected_result: NEW_VERSION
+    description: estado academico cambia entre cortes
+  - case_code: REPEATED_SNAPSHOT
+    entity: student:1001
+    expected_result: NO_DUPLICATE
+    description: mismos atributos y mismo hash
+  - case_code: LATE_CORRECTION
+    entity: student:1001
+    expected_result: REPROCESS
+    description: correccion con fecha efectiva anterior

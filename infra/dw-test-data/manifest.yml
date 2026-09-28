@@ -1,0 +1,47 @@
+dataset: dw-integration-fixture
+version: "1.0.0"
+privacy: synthetic_only
+source_system: jachasun-fixture
+target_system: dw-integration
+run_id: "88888888-8888-8888-8888-888888888888"
+snapshot:
+  gestion: 2025
+  periodo: 2
+  closed_at: "2025-12-15T18:00:00Z"
+expected_counts:
+  public.uatf_datos: 2
+  academico.alumnos: 3
+  public.postulantes: 4
+  academico.alm_programas: 2
+  academico.alm_programas_facultades: 2
+  academico.pln_materias: 3
+  academico.notas_planilla: 5
+expected_cases:
+  scd2-cases.yml: 5
+  closure-cases.yml: 2
+  quality-cases.yml: 3
+files:
+  source/alm_programas.sql:
+    sha256: 37cff404c6c4d5d7e25b7c69293943734f55ec1a5f7a956242608d2fa4fb13b2
+  source/alm_programas_facultades.sql:
+    sha256: 5994f8097179bdc92a8bcf4a034a5767d97373a55881cb0c3bb1ff0002149197
+  source/alumnos.sql:
+    sha256: 1a6d5dfea45e2a1d7b01e55275879506b61f62639521f7c8620c65d81796ee9f
+  source/lugar_localidad.sql:
+    sha256: ace4e10a1a94fa6a84a81069ad6cce0fbc88e213341dc4cb4d84662635e079a8
+  source/notas_planilla.sql:
+    sha256: 4c6493a84d5a72a8184574755f508d53e29ba1ca0a1a26e9048bbfba659bd036
+  source/pln_materias.sql:
+    sha256: e762d5583a202f09c20cee4530e693033b59605de6c5c784124b3cf3ab08a531
+  source/postulantes.sql:
+    sha256: c8091cda5cf13a37d2b12226b9dd9f83cf37822a8ab8547f8f0d6c525f43f6d1
+  source/prs_colegios.sql:
+    sha256: b7d9b8a0f208bd3cc28180bbe07e9441b1aee6e702170032f06c1f60d16ed1ea
+  source/uatf_datos.sql:
+    sha256: c6203e98fdc57387ee2a3387ac9c9a0450938fb9656ea876e49da4ea52d0aba0
+  expected/scd2-cases.yml:
+    sha256: 0efe7aec63e30d22c137cac05949a142dcde543ebee60f02f98170ebeb910a85
+  expected/closure-cases.yml:
+    sha256: 94d7ebc2ee8feaa1fe9e7df945754b77eaa61a70dbd4106fa10c3f5e5dbf5afe
+  expected/quality-cases.yml:
+    sha256: e7dffe9d18e686b9cdb8cc32de9d7c512fa8662d7871ff8fecfa9a74884de7d6

@@ -1,0 +1,65 @@
+name: dss-dw-integration-test
+
+services:
+  jachasun-fixture:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: jachasun_test
+      POSTGRES_USER: source_test
+      POSTGRES_PASSWORD: source_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ../dw-test-data/source:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U source_test -d jachasun_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 2s
+
+  postgres-dw:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: dw_integration
+      POSTGRES_USER: dw_test
+      POSTGRES_PASSWORD: dw_test
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dw_test -d dw_integration"]
+      interval: 2s
+      timeout: 3s
+      retries: 15
+      start_period: 2s
+
+  integration-test:
+    image: postgres:15-alpine
+    depends_on:
+      jachasun-fixture:
+        condition: service_healthy
+      postgres-dw:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres-dw
+      PGPORT: "5432"
+      PGDATABASE: dw_integration
+      PGUSER: dw_test
+      PGPASSWORD: dw_test
+      SOURCE_HOST: jachasun-fixture
+      SOURCE_PORT: "5432"
+      SOURCE_DB: jachasun_test
+      SOURCE_USER: dw_fixture_reader
+      SOURCE_PASSWORD: fixture_readonly
+      TARGET_HOST: postgres-dw
+      TARGET_PORT: "5432"
+      TARGET_DB: dw_integration
+      TARGET_USER: dw_test
+      TARGET_PASSWORD: dw_test
+    volumes:
+      - ../dw-test-data:/fixtures:ro
+      - ../dw-schema/migrations:/migrations:ro
+      - ../dw-schema/scripts:/scripts:ro
+      - ./tests/run_integration_tests.sh:/tests/run_integration_tests.sh:ro
+    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /scripts/apply-migrations.sh | /bin/sh && tr -d '\\r' < /tests/run_integration_tests.sh | /bin/sh"]
+    restart: "no"
