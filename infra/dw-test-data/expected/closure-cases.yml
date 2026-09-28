@@ -1,0 +1,9 @@
+cases:
+  - case_code: CLOSURE_CLOSED
+    entity: closure:2025-1
+    expected_result: ELIGIBLE
+    description: cierre efectivo autorizado para prueba
+  - case_code: CLOSURE_REOPENED
+    entity: closure:2025-2
+    expected_result: BLOCK_AUTOMATIC_LOAD
+    description: reapertura bloquea nueva carga automatica
