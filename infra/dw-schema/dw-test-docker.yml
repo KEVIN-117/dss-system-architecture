@@ -44,7 +44,9 @@ services:
         psql -v ON_ERROR_STOP=1 -f /tests/dw_003_upgrade_assertion.sql
         psql -v ON_ERROR_STOP=1 -f /tests/dw_004_upgrade_assertion.sql
         tr -d '\r' < /scripts/apply-migrations.sh | /bin/sh
+        tr -d '\r' < /tests/dimension_migration_immutability_test.sh | sh
         psql -v ON_ERROR_STOP=1 -f /tests/analytical_layers_and_roles_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/execution_control_test.sql
-        sh /tests/execution_lock_concurrency_test.sh
+        psql -v ON_ERROR_STOP=1 -f /tests/conformed_dimensions_test.sql
+        tr -d '\r' < /tests/execution_lock_concurrency_test.sh | sh
     restart: "no"
