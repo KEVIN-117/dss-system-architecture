@@ -67,7 +67,7 @@ La migración repite los `REVOKE` y `GRANT` explícitos para que la seguridad no
 
 ## Límites con las siguientes issues
 
-- DW-007 definirá vigencias, versiones y la política SCD de persona/estudiante. DW-006 no crea `valid_from`, `valid_to`, `is_current` ni lógica de historización.
+- DW-007 define vigencias, versiones y la [política SCD de persona/estudiante](scd2-person-student-policy.md). DW-006 no crea `valid_from`, `valid_to`, `is_current` ni lógica de historización.
 - DW-019 cargará dimensiones desde las capas RAW y de trabajo. DW-006 no inserta datos OLTP ni interpreta códigos de estado.
 - DW-020 a DW-022 crearán los hechos. Los campos de notas, conteos, PPA, retención, deserción y grupo permanecen fuera de estas tablas.
 - La validación de `public.postulantes`, los dominios de estado, la semántica de egreso y los joins OLTP continúan bajo la aprobación DSA/TI definida en DW-001 y DW-005.
