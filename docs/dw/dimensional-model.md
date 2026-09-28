@@ -4,7 +4,7 @@
 
 Este documento define el modelo lógico aprobable del primer Data Warehouse relacional de Jachasun: una constelación de hechos para admisión, cursado y retención/deserción. Su propósito es fijar significados, granos y agregaciones antes de crear objetos físicos.
 
-No crea DDL, tablas, dimensiones, cargas, transformaciones Apache Hop ni procesos de extracción. DW-006 implementará las dimensiones y sus miembros técnicos; DW-007 decidirá la historización SCD; y las issues de staging, transformación y publicación materializarán los hechos. Las fuentes continúan siendo de solo lectura y los contratos de DW-001 son la referencia de campos y filtros autorizados.
+No crea DDL, tablas, dimensiones, cargas, transformaciones Apache Hop ni procesos de extracción. DW-006 materializa las dimensiones y sus miembros técnicos en [conformed-dimensions.md](conformed-dimensions.md); DW-007 decidirá la historización SCD; y las issues de staging, transformación y publicación materializarán los hechos. Las fuentes continúan siendo de solo lectura y los contratos de DW-001 son la referencia de campos y filtros autorizados.
 
 ## Principios de diseño
 
