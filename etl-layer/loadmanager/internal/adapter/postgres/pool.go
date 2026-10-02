@@ -6,6 +6,7 @@ import (
 	"net"
 	"net/url"
 	"strconv"
+	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/config"
@@ -18,11 +19,11 @@ type Pool struct {
 	pool *pgxpool.Pool
 }
 
-func NewPool(ctx context.Context, name string, db config.Database, readOnly bool, maxConns int32) (*Pool, error) {
-	if name == "" || maxConns < 1 {
-		return nil, errors.New("database pool name and positive max connections are required")
+func NewPool(ctx context.Context, name string, db config.Database, readOnly bool, maxConns int32, connectTimeout time.Duration) (*Pool, error) {
+	if ctx == nil || name == "" || maxConns < 1 || connectTimeout <= 0 {
+		return nil, errors.New("database pool context, name, positive max connections and connect timeout are required")
 	}
-	cfg, err := BuildPoolConfig(db, name, readOnly, maxConns)
+	cfg, err := BuildPoolConfig(db, name, readOnly, maxConns, connectTimeout)
 	if err != nil {
 		return nil, err
 	}
@@ -35,9 +36,9 @@ func NewPool(ctx context.Context, name string, db config.Database, readOnly bool
 
 // BuildPoolConfig creates a safely escaped pgx configuration. It is exported
 // to support deterministic configuration tests without requiring a database.
-func BuildPoolConfig(db config.Database, applicationName string, readOnly bool, maxConns int32) (*pgxpool.Config, error) {
+func BuildPoolConfig(db config.Database, applicationName string, readOnly bool, maxConns int32, connectTimeout time.Duration) (*pgxpool.Config, error) {
 	if applicationName == "" || maxConns < 1 || db.Host == "" || db.Port == 0 || db.Name == "" ||
-		db.User == "" || db.Password == "" {
+		db.User == "" || db.Password == "" || connectTimeout <= 0 {
 		return nil, errors.New("database pool configuration is incomplete")
 	}
 	u := &url.URL{
@@ -53,6 +54,7 @@ func BuildPoolConfig(db config.Database, applicationName string, readOnly bool, 
 	if err != nil {
 		return nil, errors.New("invalid database pool configuration")
 	}
+	cfg.ConnConfig.ConnectTimeout = connectTimeout
 	cfg.MaxConns = maxConns
 	cfg.ConnConfig.RuntimeParams["application_name"] = applicationName
 	if readOnly {
