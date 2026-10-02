@@ -7,6 +7,12 @@ server:
   readiness_timeout: 2s
   connect_timeout: 5s
 
+extraction:
+  max_duration: 30m
+  source_statement_timeout: 30s
+  source_idle_timeout: 2m
+  target_write_timeout: 1m
+
 databases:
   source:
     host_env: DB_TX_HOST

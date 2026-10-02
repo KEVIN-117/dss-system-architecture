@@ -16,11 +16,13 @@ import (
 	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/app"
 	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/config"
 	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/observability"
+	sourcecatalog "github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/source"
 )
 
 const (
-	sourcePoolMaxConns = 4
-	targetPoolMaxConns = 4
+	sourcePoolMaxConns      = 4
+	targetPoolMaxConns      = 4
+	coordinatorPoolMaxConns = 2
 )
 
 func main() {
@@ -53,8 +55,27 @@ func run(logger *slog.Logger) error {
 		return fmt.Errorf("initialize target pool: %w", err)
 	}
 	defer target.Close()
+	coordinator, err := postgres.NewPool(startupCtx, "dw-extraction-coordinator", cfg.Target, false, coordinatorPoolMaxConns, cfg.ConnectTimeout)
+	if err != nil {
+		return fmt.Errorf("initialize coordinator pool: %w", err)
+	}
+	defer coordinator.Close()
+	queryDirectory := os.Getenv("LOADMANAGER_QUERY_DIR")
+	if queryDirectory == "" {
+		queryDirectory = "../../infra/postgres-tx/extract"
+	}
+	query, err := sourcecatalog.LoadUATFDatosQuery(queryDirectory)
+	if err != nil {
+		return fmt.Errorf("load approved source contract: %w", err)
+	}
+	if _, err := postgres.NewUATFDatosExtractor(source, target, coordinator, query, postgres.ExtractionLimits{
+		MaxDuration: cfg.Extraction.MaxDuration, SourceStatementTimeout: cfg.Extraction.SourceStatementTimeout,
+		SourceIdleTimeout: cfg.Extraction.SourceIdleTimeout, TargetWriteTimeout: cfg.Extraction.TargetWriteTimeout,
+	}); err != nil {
+		return fmt.Errorf("initialize source snapshot: %w", err)
+	}
 
-	service := app.NewService(source, target)
+	service := app.NewService(source, target, coordinator)
 	handler := httpadapter.NewHandler(func(ctx context.Context) bool {
 		return service.CheckReadiness(ctx).Ready
 	}, cfg.ReadinessTimeout)

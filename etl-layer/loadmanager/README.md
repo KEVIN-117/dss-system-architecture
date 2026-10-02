@@ -23,7 +23,7 @@ HTTP, logging (`log/slog`), contextos, JSON y pruebas utilizan la biblioteca est
 
 ## Configuración
 
-`configs/loadmanager.example.yaml` contiene timeouts y nombres de variables de entorno, no valores secretos. `config.Load` resuelve dos conexiones: OLTP (`DB_TX_*`) y PostgreSQL DW (`DB_DW_*`). Staging y `etl_control` son esquemas de la misma base DW, no bases distintas. La configuración exige un `sslmode` explícito para cada conexión y falla con el nombre de la variable faltante, nunca con su valor.
+`configs/loadmanager.example.yaml` contiene timeouts y nombres de variables de entorno, no valores secretos. `config.Load` resuelve OLTP (`DB_TX_*`) y PostgreSQL DW (`DB_DW_*`). Staging y `etl_control` son esquemas de la misma base DW. Hay un pool DW separado para los advisory locks de coordinación; el pool de escritura conserva cuatro conexiones. `extraction.max_duration`, `source_statement_timeout`, `source_idle_timeout` y `target_write_timeout` acotan la extracción, las consultas OLTP y las transacciones del destino. La configuración exige un `sslmode` explícito y nunca imprime las credenciales.
 
 La fuente de Jachasun utiliza `DB_TX_HOST`, `DB_TX_PORT`, `DB_TX_NAME`, `DB_TX_USER`, `DB_TX_PASS` y `DB_TX_SSLMODE`. El target utiliza las variables equivalentes `DB_DW_HOST`, `DB_DW_PORT`, `DB_DW_NAME`, `DB_DW_USER`, `DB_DW_PASS` y `DB_DW_SSLMODE`. El pool de origen fuerza transacciones de solo lectura y su cuenta OLTP debe limitarse a las fuentes aprobadas en DW-001. Los pools tienen un límite inicial de cuatro conexiones cada uno. `server.connect_timeout` se aplica a cada conexión física pgx; la creación del pool es perezosa y no valida la base por sí sola. La conexión real se valida al hacer `Ping` (incluido en readiness), acotado además por `server.readiness_timeout`; el servicio permanece vivo pero no-ready cuando una base no responde.
 
@@ -31,7 +31,9 @@ La fuente de Jachasun utiliza `DB_TX_HOST`, `DB_TX_PORT`, `DB_TX_NAME`, `DB_TX_U
 
 ## Primer flujo de extracción
 
-El extractor usa únicamente la consulta DW-001 `infra/postgres-tx/extract/01_uatf_datos.sql`, valida el orden de columnas y el orden estable, abre una transacción OLTP `REPEATABLE READ READ ONLY` y escribe filas a Staging dentro de una transacción DW. Guarda hash por fila, hash agregado del artefacto y hash del esquema observado. Una fila/carga fallida no marca el manifiesto completo. La ejecución queda `EN_EJECUCION` al concluir extracción; transformación/publicación son responsables de completar el resto del ciclo.
+El extractor acepta solo la consulta DW-001 canónica (SHA-256 versionado) `infra/postgres-tx/extract/01_uatf_datos.sql`; una edición requiere una nueva versión aprobada. Recorre `public.uatf_datos` por keyset pagination, sin `OFFSET`. `SnapshotRequest.BatchSize` admite 1–10 000 filas (por defecto 1 000). Antes de leer, verifica tipos, longitudes, nulabilidad, colación y unicidad de `id_ra` en el catálogo OLTP. `id_ra`, `estado_civil` y `_modificado` son obligatorios en cada fila; los duplicados o nulos hacen fallar el snapshot. La colación PostgreSQL gobierna tanto `ORDER BY` como el cursor, sin comparación binaria adicional en Go. Cada lote confirma filas RAW, métricas y checkpoint v2 juntos.
+
+**Recuperación:** una extracción parcial no se reanuda con el mismo `run_id`: se marca `FALLIDA` y el reproceso usa otro `run_id` enlazado. Una vez terminada la transacción OLTP, el checkpoint v2 persiste `source_complete` y el SHA-256 final; si se interrumpe solo el cierre del manifiesto, `RecoverInterruptedRun` repite la finalización desde DW sin consultar Jachasun. El manifiesto, artefacto, paso y métricas finales se confirman juntos. Un intento v1 completo sigue consultable; uno v1 parcial no se reanuda.
 
 `staging.raw_uatf_datos` se crea en la migración aditiva DW-009 `0005`; no altera `0001`–`0004`. Las pruebas de integración ejecutan Go en Linux dentro del Compose contra fixtures sintéticos: validan Ping de OLTP/DW, que el principal OLTP efectivo solo tenga SELECT, que la sesión rechace escritura, que una consulta lenta se cancele y libere la conexión y que credenciales inválidas produzcan errores saneados. Algunos entornos Windows bloquean los binarios temporales generados por `go test`.
 
@@ -40,6 +42,7 @@ Para probar el vertical slice desde la raíz del repositorio:
 ```powershell
 docker compose -f infra/dw-integration/dw-integration-test.yml up -d postgres-dw jachasun-fixture
 docker compose -f infra/dw-integration/dw-integration-test.yml run --rm integration-test
+docker compose -f infra/dw-integration/dw-integration-test.yml run --rm upgrade-test
 docker compose -f infra/dw-integration/dw-integration-test.yml run --rm --no-deps loadmanager-integration-test
 docker compose -f infra/dw-integration/dw-integration-test.yml down
 ```
@@ -48,7 +51,7 @@ Los pasos se ejecutan en orden sobre las mismas bases efímeras: `--abort-on-con
 
 ## Arranque local contra fixtures
 
-`scripts/run-local.ps1` carga `loadmanager/.env` sin ejecutarlo como código, inicia las bases sintéticas y, si aún no están preparadas, corre una vez las migraciones y regresiones antes de ejecutar el servidor. El Compose publica la fuente en `127.0.0.1:5432` y el destino en `127.0.0.1:5433`. `.env.example` contiene credenciales públicas exclusivas de fixtures; copia ese archivo como `.env` y no uses esos valores con Jachasun real.
+`scripts/run-local.ps1` carga `loadmanager/.env` sin ejecutarlo como código, inicia las bases sintéticas, ejecuta siempre el migrador idempotente y si falta el fixture lo siembra una vez. No depende de un número fijo de migraciones. El Compose publica la fuente en `127.0.0.1:5432` y el destino en `127.0.0.1:5433`. `.env.example` contiene credenciales públicas exclusivas de fixtures; no uses esos valores con Jachasun real.
 
 Desde la raíz del repositorio:
 

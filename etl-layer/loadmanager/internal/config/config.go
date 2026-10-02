@@ -28,8 +28,16 @@ type Config struct {
 	ShutdownTimeout   time.Duration `json:"shutdown_timeout"`
 	ReadinessTimeout  time.Duration `json:"readiness_timeout"`
 	ConnectTimeout    time.Duration `json:"connect_timeout"`
+	Extraction        Extraction    `json:"extraction"`
 	Source            Database      `json:"-"`
 	Target            Database      `json:"-"`
+}
+
+type Extraction struct {
+	MaxDuration            time.Duration `json:"max_duration"`
+	SourceStatementTimeout time.Duration `json:"source_statement_timeout"`
+	SourceIdleTimeout      time.Duration `json:"source_idle_timeout"`
+	TargetWriteTimeout     time.Duration `json:"target_write_timeout"`
 }
 
 type lookupEnv func(string) (string, bool)
@@ -42,6 +50,12 @@ type fileConfig struct {
 		ReadinessTimeout  string `yaml:"readiness_timeout"`
 		ConnectTimeout    string `yaml:"connect_timeout"`
 	} `yaml:"server"`
+	Extraction struct {
+		MaxDuration            string `yaml:"max_duration"`
+		SourceStatementTimeout string `yaml:"source_statement_timeout"`
+		SourceIdleTimeout      string `yaml:"source_idle_timeout"`
+		TargetWriteTimeout     string `yaml:"target_write_timeout"`
+	} `yaml:"extraction"`
 	Databases struct {
 		Source databaseEnv `yaml:"source"`
 		Target databaseEnv `yaml:"target"`
@@ -107,6 +121,32 @@ func LoadWithLookup(path string, lookup func(string) (string, bool)) (Config, er
 	if err != nil {
 		return Config{}, fmt.Errorf("invalid server.connect_timeout: %w", err)
 	}
+	extractDuration := func(name, value string, fallback time.Duration) (time.Duration, error) {
+		if strings.TrimSpace(value) == "" {
+			return fallback, nil
+		}
+		parsed, err := time.ParseDuration(strings.TrimSpace(value))
+		if err != nil || parsed < time.Millisecond {
+			return 0, fmt.Errorf("extraction.%s must be a positive duration", name)
+		}
+		return parsed, nil
+	}
+	maxDuration, err := extractDuration("max_duration", raw.Extraction.MaxDuration, 30*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	sourceStatementTimeout, err := extractDuration("source_statement_timeout", raw.Extraction.SourceStatementTimeout, 30*time.Second)
+	if err != nil {
+		return Config{}, err
+	}
+	sourceIdleTimeout, err := extractDuration("source_idle_timeout", raw.Extraction.SourceIdleTimeout, 2*time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
+	targetWriteTimeout, err := extractDuration("target_write_timeout", raw.Extraction.TargetWriteTimeout, time.Minute)
+	if err != nil {
+		return Config{}, err
+	}
 	source, err := resolveDatabase("source", raw.Databases.Source, lookup)
 	if err != nil {
 		return Config{}, err
@@ -121,6 +161,7 @@ func LoadWithLookup(path string, lookup func(string) (string, bool)) (Config, er
 		ShutdownTimeout:   shutdownTimeout,
 		ReadinessTimeout:  readinessTimeout,
 		ConnectTimeout:    connectTimeout,
+		Extraction:        Extraction{maxDuration, sourceStatementTimeout, sourceIdleTimeout, targetWriteTimeout},
 		Source:            source, Target: target,
 	}
 	if err := cfg.Validate(); err != nil {
@@ -176,6 +217,9 @@ func (c Config) Validate() error {
 	}
 	if c.ReadHeaderTimeout <= 0 || c.ShutdownTimeout <= 0 || c.ReadinessTimeout <= 0 || c.ConnectTimeout <= 0 {
 		return errors.New("server timeouts must be positive")
+	}
+	if c.Extraction.MaxDuration < time.Millisecond || c.Extraction.SourceStatementTimeout < time.Millisecond || c.Extraction.SourceIdleTimeout < time.Millisecond || c.Extraction.TargetWriteTimeout < time.Millisecond {
+		return errors.New("extraction timeouts must be positive")
 	}
 	for _, entry := range []struct {
 		name string

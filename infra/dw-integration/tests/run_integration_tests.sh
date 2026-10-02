@@ -33,7 +33,7 @@ assert_target_count() {
 }
 
 echo 'Checking synthetic source counts'
-assert_source_count public.uatf_datos 2
+assert_source_count public.uatf_datos 2002
 assert_source_count academico.alumnos 3
 assert_source_count public.postulantes 4
 assert_source_count academico.alm_programas 2
@@ -64,13 +64,17 @@ fi
 
 echo 'Checking DW migrations and technical members'
 assert_target_count 'migration history' \
-    "SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005');" 5
+    "SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005','0006','0007');" 7
 assert_target_count 'conformed dimensions' \
     "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'dw' AND table_name IN ('dim_estudiante','dim_programa','dim_materia','dim_periodo_academico','dim_admision');" 5
 assert_target_count 'technical dimension members' \
     "SELECT count(*) FROM (SELECT estudiante_sk AS sk FROM dw.dim_estudiante UNION ALL SELECT programa_sk FROM dw.dim_programa UNION ALL SELECT materia_sk FROM dw.dim_materia UNION ALL SELECT periodo_academico_sk FROM dw.dim_periodo_academico UNION ALL SELECT admision_sk FROM dw.dim_admision) members WHERE sk IN (-1, 0);" 10
 assert_target_count 'uatf_datos RAW target' \
     "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'staging' AND table_name = 'raw_uatf_datos';" 1
+assert_target_count 'RAW append-only writer privileges' \
+    "SELECT count(*) FROM (SELECT has_table_privilege('dw_staging_writer', 'staging.raw_uatf_datos', 'SELECT') AS can_read, has_table_privilege('dw_staging_writer', 'staging.raw_uatf_datos', 'INSERT') AS can_insert, has_table_privilege('dw_staging_writer', 'staging.raw_uatf_datos', 'UPDATE') AS can_update, has_table_privilege('dw_staging_writer', 'staging.raw_uatf_datos', 'DELETE') AS can_delete) rights WHERE can_read AND can_insert AND NOT can_update AND NOT can_delete;" 1
+assert_target_count 'RAW historical rows preserved under NOT VALID check' \
+    "SELECT count(*) FROM pg_constraint WHERE conrelid = 'staging.raw_uatf_datos'::regclass AND conname = 'ck_raw_uatf_datos_required_fields' AND NOT convalidated;" 1
 
 echo 'Registering synthetic run and manifest'
 target_psql <<'SQL'
@@ -125,7 +129,7 @@ assert_file_hash /fixtures/source/notas_planilla.sql 4c6493a84d5a72a8184574755f5
 assert_file_hash /fixtures/source/pln_materias.sql e762d5583a202f09c20cee4530e693033b59605de6c5c784124b3cf3ab08a531
 assert_file_hash /fixtures/source/postulantes.sql c8091cda5cf13a37d2b12226b9dd9f83cf37822a8ab8547f8f0d6c525f43f6d1
 assert_file_hash /fixtures/source/prs_colegios.sql b7d9b8a0f208bd3cc28180bbe07e9441b1aee6e702170032f06c1f60d16ed1ea
-assert_file_hash /fixtures/source/uatf_datos.sql c6203e98fdc57387ee2a3387ac9c9a0450938fb9656ea876e49da4ea52d0aba0
+assert_file_hash /fixtures/source/uatf_datos.sql c7e2253debe9fb740dfa26c07086b79c90a2513073fc6f85f49a08a76fcf7b0c
 assert_file_hash /fixtures/expected/scd2-cases.yml 0efe7aec63e30d22c137cac05949a142dcde543ebee60f02f98170ebeb910a85
 assert_file_hash /fixtures/expected/closure-cases.yml 94d7ebc2ee8feaa1fe9e7df945754b77eaa61a70dbd4106fa10c3f5e5dbf5afe
 assert_file_hash /fixtures/expected/quality-cases.yml e7dffe9d18e686b9cdb8cc32de9d7c512fa8662d7871ff8fecfa9a74884de7d6
@@ -133,4 +137,4 @@ echo 'Provisioning restricted Load Manager test principal'
 target_psql -c "CREATE ROLE loadmanager_test LOGIN PASSWORD 'loadmanager_test' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION"
 target_psql -c 'GRANT dw_staging_writer TO loadmanager_test'
 sha256sum /fixtures/source/*.sql /fixtures/expected/*.yml
-echo 'DW-008 integration test passed'
+echo 'DW-011 integration test passed'

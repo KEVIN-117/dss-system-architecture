@@ -21,4 +21,8 @@ Contiene datos personales indirectos. No se extraen nombres, documento, teléfon
 
 ## Snapshot y controles
 
-Extracción completa por cierre; orden estable `id_ra ASC`. Duplicados de `id_ra` o referencias a colegio/localidad ausentes se reportan en el manifiesto y permanecen en RAW. TI/DBA valida esquema y privilegios; DSA valida el uso funcional de atributos.
+Extracción completa por cierre; orden estable `id_ra ASC`. El DDL local define `id_ra` como clave primaria. Si la instancia operativa contradice esa condición, el extractor rechaza el snapshot y lo deja incompleto; no deduplica ni omite silenciosamente registros. Referencias a colegio/localidad ausentes permanecen en RAW para su evaluación posterior. TI/DBA valida esquema y privilegios; DSA valida el uso funcional de atributos.
+
+DW-011 recorre el snapshot con keyset pagination: el cursor anterior y el tamaño de lote se envían como parámetros (`$1`, `$2`), con `id_ra > cursor`, `ORDER BY id_ra ASC` y lookahead de una fila. `id_ra` debe ser no nulo, único y estrictamente creciente para ese recorrido; si se observa una clave duplicada o desordenada, la ejecución falla y el manifiesto no se completa. La unicidad en la instancia productiva sigue pendiente de confirmación DSA/TI.
+
+La implementación acepta exclusivamente la consulta canónica v1 cuyo SHA-256 LF normalizado es `61518492c7c7d9d92fbc64902fcc6ec974d0676999902f2cb7c40bdfccd56ae8`. También verifica en el catálogo nombres, OID de tipo, longitud, nulabilidad, colación efectiva e índice único válido de `id_ra`. La unicidad/orden se rigen por la colación PostgreSQL, no por una comparación binaria de Go. Un `id_ra`, `estado_civil` o `_modificado` nulo, o una clave duplicada, bloquea el snapshot. El fixture sintético usa `integer` para `id_colegio` e `id_loc`; esta excepción de prueba no sustituye la aprobación del tipo real por TI/DBA.

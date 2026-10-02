@@ -29,7 +29,7 @@ No forman parte del primer DW relacional: `academico.docentes`, `moodle.*`, fuen
 
 El orquestador asigna un UUID `run_id` y entrega `snapshot_gestion`, `snapshot_periodo` y `snapshot_closed_at` a las consultas que requieren acotar hechos por periodo. Los catálogos y perfiles sin versión temporal se extraen completos y registran esos parámetros en el manifiesto, no como filtros artificiales.
 
-Por cada fuente, el manifiesto debe almacenar: nombre de contrato y versión, consulta/commit, orden estable, corte, inicio/fin, conteo leído, hash SHA-256 del esquema esperado, hash de cada artefacto RAW y estado. Los registros con claves nulas, duplicadas u huérfanas no se corrigen en origen: se conservan y se notifican para tratamiento posterior en Staging.
+Por cada fuente, el manifiesto debe almacenar: nombre de contrato y versión, consulta/commit, orden estable, corte, inicio/fin, conteo leído, hash SHA-256 del esquema esperado, hash de cada artefacto RAW y estado. En general, los registros con referencias huérfanas no se corrigen en origen: se conservan para su evaluación posterior. Para el extractor DW-011 `public.uatf_datos`, una clave natural nula/duplicada o un campo obligatorio nulo bloquea **todo** el snapshot y deja el manifiesto fallido; los lotes RAW previamente confirmados permanecen solo como evidencia del intento.
 
 ## Acceso y aprobación
 

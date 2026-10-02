@@ -1,5 +1,5 @@
 dataset: dw-integration-fixture
-version: "1.0.0"
+version: "1.2.0"
 privacy: synthetic_only
 source_system: jachasun-fixture
 target_system: dw-integration
@@ -9,7 +9,7 @@ snapshot:
   periodo: 2
   closed_at: "2025-12-15T18:00:00Z"
 expected_counts:
-  public.uatf_datos: 2
+  public.uatf_datos: 2002
   academico.alumnos: 3
   public.postulantes: 4
   academico.alm_programas: 2
@@ -38,7 +38,7 @@ files:
   source/prs_colegios.sql:
     sha256: b7d9b8a0f208bd3cc28180bbe07e9441b1aee6e702170032f06c1f60d16ed1ea
   source/uatf_datos.sql:
-    sha256: c6203e98fdc57387ee2a3387ac9c9a0450938fb9656ea876e49da4ea52d0aba0
+    sha256: c7e2253debe9fb740dfa26c07086b79c90a2513073fc6f85f49a08a76fcf7b0c
   expected/scd2-cases.yml:
     sha256: 0efe7aec63e30d22c137cac05949a142dcde543ebee60f02f98170ebeb910a85
   expected/closure-cases.yml:

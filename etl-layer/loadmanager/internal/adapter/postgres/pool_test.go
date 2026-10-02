@@ -6,7 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/google/uuid"
 	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/config"
+	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/domain"
 )
 
 func TestBuildPoolConfigAppliesSafetySettings(t *testing.T) {
@@ -26,6 +28,35 @@ func TestBuildPoolConfigAppliesSafetySettings(t *testing.T) {
 	}
 	if _, ok := target.ConnConfig.RuntimeParams["default_transaction_read_only"]; ok {
 		t.Fatal("writable target pool unexpectedly configured read-only")
+	}
+}
+
+func TestSnapshotRequestSupportsHistoricalAndClosureModes(t *testing.T) {
+	period := &domain.AcademicPeriod{Year: 2025, Period: 3}
+	historical := SnapshotRequest{RunID: domain.RunID(uuid.New()), Actor: "loadmanager:test", Period: period}
+	if err := validateSnapshotRequest(&historical); err != nil {
+		t.Fatalf("valid historical snapshot request: %v", err)
+	}
+	if historical.ExecutionKind != domain.ExecutionHistorical || historical.BatchSize != defaultSnapshotBatchSize {
+		t.Fatalf("unexpected historical defaults: %+v", historical)
+	}
+
+	closureID := int64(7)
+	closure := SnapshotRequest{
+		RunID: domain.RunID(uuid.New()), Actor: "loadmanager:test", ExecutionKind: domain.ExecutionClosure,
+		ClosureID: &closureID, BatchSize: 512,
+	}
+	if err := validateSnapshotRequest(&closure); err != nil {
+		t.Fatalf("valid academic-closure snapshot request: %v", err)
+	}
+	closure.ClosureID = nil
+	if err := validateSnapshotRequest(&closure); err == nil {
+		t.Fatal("closure snapshot without closure_id must be rejected")
+	}
+	closure.ExecutionKind = domain.ExecutionHistorical
+	closure.BatchSize = maxSnapshotBatchSize + 1
+	if err := validateSnapshotRequest(&closure); err == nil {
+		t.Fatal("oversized extraction batch must be rejected")
 	}
 }
 

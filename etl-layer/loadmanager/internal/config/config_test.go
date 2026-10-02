@@ -63,6 +63,19 @@ func TestLoadRejectsUnknownYAMLFields(t *testing.T) {
 	}
 }
 
+func TestExtractionTimeoutsRejectNonpositiveConfiguration(t *testing.T) {
+	for _, value := range []string{"0s", "not-a-duration", "-1s"} {
+		path := writeConfig(t, validConfigYAML+"extraction:\n  max_duration: "+value+"\n")
+		_, err := LoadWithLookup(path, func(key string) (string, bool) {
+			item, ok := validEnvironment()[key]
+			return item, ok
+		})
+		if err == nil || !strings.Contains(err.Error(), "extraction.max_duration") {
+			t.Fatalf("invalid extraction timeout %q accepted: %v", value, err)
+		}
+	}
+}
+
 const validConfigYAML = `server:
   address: ':8088'
   read_header_timeout: 5s

@@ -4,7 +4,7 @@ services:
   jachasun-fixture:
     image: postgres:15-alpine
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${DW_INTEGRATION_SOURCE_PORT:-5432}:5432"
     environment:
       POSTGRES_DB: jachasun_test
       POSTGRES_USER: source_test
@@ -23,7 +23,7 @@ services:
   postgres-dw:
     image: postgres:15-alpine
     ports:
-      - "127.0.0.1:5433:5432"
+      - "127.0.0.1:${DW_INTEGRATION_TARGET_PORT:-5433}:5432"
     environment:
       POSTGRES_DB: dw_integration
       POSTGRES_USER: dw_test
@@ -69,8 +69,43 @@ services:
       [
         "/bin/sh",
         "-c",
-        "tr -d '\\r' < /scripts/apply-migrations.sh | /bin/sh && tr -d '\\r' < /tests/run_integration_tests.sh | /bin/sh",
+        "tr -d '\\r' < /scripts/apply-migrations.sh | /bin/sh && tr -d '\\r' < /scripts/apply-migrations.sh | /bin/sh && tr -d '\\r' < /tests/run_integration_tests.sh | /bin/sh",
       ]
+    restart: "no"
+
+  migration-only:
+    image: postgres:15-alpine
+    depends_on:
+      postgres-dw:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres-dw
+      PGPORT: "5432"
+      PGDATABASE: dw_integration
+      PGUSER: dw_test
+      PGPASSWORD: dw_test
+    volumes:
+      - ../dw-schema/migrations:/migrations:ro
+      - ../dw-schema/scripts:/scripts:ro
+    entrypoint: ["/bin/sh", "-c", "tr -d '\r' < /scripts/apply-migrations.sh | /bin/sh"]
+    restart: "no"
+
+  upgrade-test:
+    image: postgres:15-alpine
+    depends_on:
+      postgres-dw:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres-dw
+      PGPORT: "5432"
+      PGDATABASE: dw_integration
+      PGUSER: dw_test
+      PGPASSWORD: dw_test
+    volumes:
+      - ../dw-schema/migrations:/migrations:ro
+      - ../dw-schema/scripts:/scripts:ro
+      - ./tests/test_dw011_upgrade.sh:/tests/test_dw011_upgrade.sh:ro
+    entrypoint: ["/bin/sh", "-c", "tr -d '\r' < /tests/test_dw011_upgrade.sh | /bin/sh"]
     restart: "no"
 
   loadmanager-integration-test:
