@@ -17,6 +17,10 @@
 !.env.template
 !**/.env.template
 
+# Load Manager: local fixture credentials stay untracked; its safe template is versioned.
+etl-layer/loadmanager/.env
+!etl-layer/loadmanager/.env.example
+
 # Certificados, llaves privadas y tokens
 *.pem
 *.key

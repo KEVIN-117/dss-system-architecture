@@ -1,6 +1,6 @@
 # DW-003 — Fundamentos de la plataforma analítica
 
-DW-003 establece las capas y controles de acceso de la base analítica. DW-004 incorpora el control de ejecuciones, DW-005 documenta el modelo dimensional lógico y DW-006 materializa sus dimensiones conformadas; las tablas RAW, los hechos y sus cargas permanecen en issues posteriores.
+DW-003 establece las capas y controles de acceso de la base analítica. DW-004 incorpora el control de ejecuciones, DW-005 documenta el modelo dimensional lógico y DW-006 materializa sus dimensiones conformadas. DW-009 añade una primera vertical de integración para `public.uatf_datos`, incluido su aterrizaje mínimo en `staging.raw_uatf_datos`; DW-012 conserva el alcance de completar y estandarizar el diseño RAW y las cargas para el conjunto de fuentes aprobadas.
 
 ## Capas
 

@@ -64,11 +64,13 @@ fi
 
 echo 'Checking DW migrations and technical members'
 assert_target_count 'migration history' \
-    "SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004');" 4
+    "SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005');" 5
 assert_target_count 'conformed dimensions' \
     "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'dw' AND table_name IN ('dim_estudiante','dim_programa','dim_materia','dim_periodo_academico','dim_admision');" 5
 assert_target_count 'technical dimension members' \
     "SELECT count(*) FROM (SELECT estudiante_sk AS sk FROM dw.dim_estudiante UNION ALL SELECT programa_sk FROM dw.dim_programa UNION ALL SELECT materia_sk FROM dw.dim_materia UNION ALL SELECT periodo_academico_sk FROM dw.dim_periodo_academico UNION ALL SELECT admision_sk FROM dw.dim_admision) members WHERE sk IN (-1, 0);" 10
+assert_target_count 'uatf_datos RAW target' \
+    "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'staging' AND table_name = 'raw_uatf_datos';" 1
 
 echo 'Registering synthetic run and manifest'
 target_psql <<'SQL'
@@ -106,7 +108,9 @@ echo 'Checking fixture hashes'
 assert_file_hash() {
     file_path=$1
     expected_hash=$2
-    actual_hash=$(sha256sum "$file_path" | awk '{print $1}')
+    # Git may check these fixtures out with CRLF on Windows; the manifest hashes
+    # canonical LF content so validation is stable across developer platforms.
+    actual_hash=$(tr -d '\r' < "$file_path" | sha256sum | awk '{print $1}')
     if [ "$actual_hash" != "$expected_hash" ]; then
         echo "Fixture checksum mismatch for $file_path: expected=$expected_hash actual=$actual_hash" >&2
         exit 1
@@ -125,5 +129,8 @@ assert_file_hash /fixtures/source/uatf_datos.sql c6203e98fdc57387ee2a3387ac9c9a0
 assert_file_hash /fixtures/expected/scd2-cases.yml 0efe7aec63e30d22c137cac05949a142dcde543ebee60f02f98170ebeb910a85
 assert_file_hash /fixtures/expected/closure-cases.yml 94d7ebc2ee8feaa1fe9e7df945754b77eaa61a70dbd4106fa10c3f5e5dbf5afe
 assert_file_hash /fixtures/expected/quality-cases.yml e7dffe9d18e686b9cdb8cc32de9d7c512fa8662d7871ff8fecfa9a74884de7d6
+echo 'Provisioning restricted Load Manager test principal'
+target_psql -c "CREATE ROLE loadmanager_test LOGIN PASSWORD 'loadmanager_test' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION"
+target_psql -c 'GRANT dw_staging_writer TO loadmanager_test'
 sha256sum /fixtures/source/*.sql /fixtures/expected/*.yml
 echo 'DW-008 integration test passed'

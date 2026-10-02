@@ -3,6 +3,8 @@ name: dss-dw-integration-test
 services:
   jachasun-fixture:
     image: postgres:15-alpine
+    ports:
+      - "127.0.0.1:5432:5432"
     environment:
       POSTGRES_DB: jachasun_test
       POSTGRES_USER: source_test
@@ -20,6 +22,8 @@ services:
 
   postgres-dw:
     image: postgres:15-alpine
+    ports:
+      - "127.0.0.1:5433:5432"
     environment:
       POSTGRES_DB: dw_integration
       POSTGRES_USER: dw_test
@@ -61,5 +65,33 @@ services:
       - ../dw-schema/migrations:/migrations:ro
       - ../dw-schema/scripts:/scripts:ro
       - ./tests/run_integration_tests.sh:/tests/run_integration_tests.sh:ro
-    entrypoint: ["/bin/sh", "-c", "tr -d '\\r' < /scripts/apply-migrations.sh | /bin/sh && tr -d '\\r' < /tests/run_integration_tests.sh | /bin/sh"]
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "tr -d '\\r' < /scripts/apply-migrations.sh | /bin/sh && tr -d '\\r' < /tests/run_integration_tests.sh | /bin/sh",
+      ]
+    restart: "no"
+
+  loadmanager-integration-test:
+    image: golang:1.26.5
+    depends_on:
+      integration-test:
+        condition: service_completed_successfully
+    working_dir: /workspace/etl-layer/loadmanager
+    environment:
+      SOURCE_HOST: jachasun-fixture
+      SOURCE_DB: jachasun_test
+      SOURCE_USER: dw_fixture_reader
+      SOURCE_PASSWORD: fixture_readonly
+      TARGET_HOST: postgres-dw
+      TARGET_DB: dw_integration
+      TARGET_USER: loadmanager_test
+      TARGET_PASSWORD: loadmanager_test
+      LOADMANAGER_QUERY_DIR: /workspace/infra/postgres-tx/extract
+      GOCACHE: /tmp/go-build
+      GOMODCACHE: /tmp/go-mod-cache
+    volumes:
+      - ../..:/workspace:ro
+    command: ["go", "test", "-tags=integration", "./..."]
     restart: "no"
