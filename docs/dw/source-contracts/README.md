@@ -1,6 +1,6 @@
 # DW-001 — Catálogo de contratos de extracción Jachasun
 
-Este directorio define el contrato entre Jachasun (OLTP) y la capa `staging` del Data Warehouse. Es la fuente normativa para el futuro Load Manager; Apache Hop no debe consultar Jachasun directamente.
+Este directorio define el contrato entre Jachasun (OLTP) y la capa `staging` del Data Warehouse. Es la fuente normativa del Load Manager; la primera integración implementada cubre `public.uatf_datos`, mientras las demás fuentes se incorporarán incrementalmente. Apache Hop no debe consultar Jachasun directamente.
 
 ## Política de extracción
 

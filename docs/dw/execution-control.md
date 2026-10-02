@@ -65,7 +65,7 @@ Los roles operativos no reciben DML directo sobre las tablas DW-004. Las operaci
 
 ## Límite con otras issues
 
-DW-004 define el contrato persistente del lock y su exclusión mediante un índice parcial. DW-013 implementará el coordinador, la renovación de leases, la recuperación de locks vencidos y las decisiones de reintento. DW-004 tampoco implementa el scheduler (DW-014), el Load Manager (DW-009), escrituras RAW (DW-012), Apache Hop ni la API/BFF.
+DW-004 define el contrato persistente del lock y su exclusión mediante un índice parcial. DW-013 implementará el coordinador, la renovación de leases, la recuperación de locks vencidos y las decisiones de reintento. DW-004 tampoco implementa el scheduler (DW-014), el Load Manager (DW-009), la expansión del aterrizaje RAW a todas las fuentes aprobadas (DW-012), Apache Hop ni la API/BFF. La vertical `uatf_datos` de DW-009 incluye solo la tabla RAW mínima necesaria para validar extracción, snapshot y manifiesto; no sustituye el alcance general de DW-012.
 
 ## Validación local
 

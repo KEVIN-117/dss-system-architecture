@@ -1,0 +1,24 @@
+# Operational values are configuration. Database credentials are resolved only
+# from the environment variables named below and must never be added to this file.
+server:
+  address: ":8088"
+  read_header_timeout: 5s
+  shutdown_timeout: 10s
+  readiness_timeout: 2s
+  connect_timeout: 5s
+
+databases:
+  source:
+    host_env: DB_TX_HOST
+    port_env: DB_TX_PORT
+    name_env: DB_TX_NAME
+    user_env: DB_TX_USER
+    password_env: DB_TX_PASS
+    sslmode_env: DB_TX_SSLMODE
+  target:
+    host_env: DB_DW_HOST
+    port_env: DB_DW_PORT
+    name_env: DB_DW_NAME
+    user_env: DB_DW_USER
+    password_env: DB_DW_PASS
+    sslmode_env: DB_DW_SSLMODE

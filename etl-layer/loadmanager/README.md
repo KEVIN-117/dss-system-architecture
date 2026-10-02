@@ -1,0 +1,75 @@
+# Load Manager (Go)
+
+Servicio Go responsable de coordinar la extracción OLTP hacia Staging. El primer vertical slice implementa la extracción full snapshot de `public.uatf_datos` al landing tipado `staging.raw_uatf_datos`, con manifiesto y auditoría DW-004. No expone todavía una operación HTTP para lanzar ejecuciones, ni configura cron.
+
+## Prerrequisitos y verificación
+
+Se usa la versión de Go declarada en `go.mod`.
+
+```powershell
+go mod tidy
+go test ./...
+go build ./cmd/loadmanager
+go vet ./...
+```
+
+## Dependencias directas
+
+- `github.com/google/uuid`: identificadores `run_id` de las ejecuciones.
+- `github.com/jackc/pgx/v5`: driver y pools PostgreSQL.
+- `gopkg.in/yaml.v3`: lectura estricta del archivo de configuración.
+
+HTTP, logging (`log/slog`), contextos, JSON y pruebas utilizan la biblioteca estándar.
+
+## Configuración
+
+`configs/loadmanager.example.yaml` contiene timeouts y nombres de variables de entorno, no valores secretos. `config.Load` resuelve dos conexiones: OLTP (`DB_TX_*`) y PostgreSQL DW (`DB_DW_*`). Staging y `etl_control` son esquemas de la misma base DW, no bases distintas. La configuración exige un `sslmode` explícito para cada conexión y falla con el nombre de la variable faltante, nunca con su valor.
+
+La fuente de Jachasun utiliza `DB_TX_HOST`, `DB_TX_PORT`, `DB_TX_NAME`, `DB_TX_USER`, `DB_TX_PASS` y `DB_TX_SSLMODE`. El target utiliza las variables equivalentes `DB_DW_HOST`, `DB_DW_PORT`, `DB_DW_NAME`, `DB_DW_USER`, `DB_DW_PASS` y `DB_DW_SSLMODE`. El pool de origen fuerza transacciones de solo lectura y su cuenta OLTP debe limitarse a las fuentes aprobadas en DW-001. Los pools tienen un límite inicial de cuatro conexiones cada uno.
+
+`GET /healthz` informa que el proceso HTTP está vivo. `GET /readyz` verifica OLTP y DW con el timeout configurado y devuelve solo `ready`/`not_ready`, sin revelar detalles de conexión. El servidor puede iniciar aunque una dependencia esté temporalmente caída; readiness queda en 503 hasta que ambas respondan.
+
+## Primer flujo de extracción
+
+El extractor usa únicamente la consulta DW-001 `infra/postgres-tx/extract/01_uatf_datos.sql`, valida el orden de columnas y el orden estable, abre una transacción OLTP `REPEATABLE READ READ ONLY` y escribe filas a Staging dentro de una transacción DW. Guarda hash por fila, hash agregado del artefacto y hash del esquema observado. Una fila/carga fallida no marca el manifiesto completo. La ejecución queda `EN_EJECUCION` al concluir extracción; transformación/publicación son responsables de completar el resto del ciclo.
+
+`staging.raw_uatf_datos` se crea en la migración aditiva DW-009 `0005`; no altera `0001`–`0004`. La prueba de integración ejecuta los tests Go en Linux dentro del Compose contra los fixtures sintéticos y una cuenta miembro de `dw_staging_writer`, ya que algunos entornos Windows bloquean los binarios temporales generados por `go test`.
+
+Para probar el vertical slice desde la raíz del repositorio:
+
+```powershell
+docker compose -f infra/dw-integration/dw-integration-test.yml up -d postgres-dw jachasun-fixture
+docker compose -f infra/dw-integration/dw-integration-test.yml run --rm integration-test
+docker compose -f infra/dw-integration/dw-integration-test.yml run --rm --no-deps loadmanager-integration-test
+docker compose -f infra/dw-integration/dw-integration-test.yml down
+```
+
+Los pasos se ejecutan en orden sobre las mismas bases efímeras: `--abort-on-container-exit` no se usa porque detendría el test Go al finalizar el contenedor previo de migración/regresión.
+
+## Arranque local contra fixtures
+
+`scripts/run-local.ps1` carga `loadmanager/.env` sin ejecutarlo como código, inicia las bases sintéticas y, si aún no están preparadas, corre una vez las migraciones y regresiones antes de ejecutar el servidor. El Compose publica la fuente en `127.0.0.1:5432` y el destino en `127.0.0.1:5433`. `.env.example` contiene credenciales públicas exclusivas de fixtures; copia ese archivo como `.env` y no uses esos valores con Jachasun real.
+
+Desde la raíz del repositorio:
+
+```powershell
+Copy-Item etl-layer/loadmanager/.env.example etl-layer/loadmanager/.env
+./etl-layer/loadmanager/scripts/run-local.ps1
+```
+
+Las bases usan `tmpfs`; sus datos se pierden al retirar los contenedores. Para detener y retirar únicamente este entorno de fixtures, usa `docker compose -f infra/dw-integration/dw-integration-test.yml down`. El proceso sigue sin disparar extracciones: `/healthz` y `/readyz` son los endpoints disponibles.
+
+El hash de filas se calcula sobre arrays JSON compactos en el orden SQL estable, delimitados por LF; `byte_count` es el tamaño de esa representación canónica, no el tamaño físico PostgreSQL. El URI del artefacto localiza la tabla RAW y no contiene datos ni credenciales. El fixture DW-008 declara `id_colegio` e `id_loc` como `integer`, mientras el contrato/DDL local esperan `smallint`; el validador acepta ambas representaciones y la columna RAW es `integer` para evitar truncar o corregir el origen. La instancia real aún debe confirmar cuál tipo opera Jachasun.
+
+## Modelos
+
+- `domain.Execution` y `ExecutionEvent` reflejan el `run_id`, tipos y estados definidos en DW-004. `Transition` valida únicamente la máquina de estados en memoria; la persistencia/auditoría corresponde a las funciones de `etl_control`.
+- `domain.SourceContract` fija fuente, columnas, clasificación, política de snapshot y orden estable; verifica que las claves de orden estén declaradas.
+- `domain.SourceManifest` y `ManifestArtifact` corresponden a la evidencia y hashes de DW-004; una URI con usuario o contraseña embebidos no es válida.
+- Pasos, métricas y errores mantienen tipos explícitos y validaciones básicas. Los detalles deben estar saneados antes de persistirse o registrarse en logs.
+
+Los cortes aceptan cualquier código de periodo positivo y no codifican semestres I/II. La política vigente es snapshot completo por cierre; los watermarks quedan fuera de esta base.
+
+## Límite de esta entrega
+
+No se implementan las otras ocho extracciones, cron, API autenticada para iniciar ejecuciones ni la fase ETL de Apache Hop. DW-001 aún requiere validación real y aprobación DSA/TI antes de usar Jachasun.
