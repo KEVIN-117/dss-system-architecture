@@ -43,12 +43,12 @@ func run(logger *slog.Logger) error {
 
 	startupCtx, cancelStartup := context.WithTimeout(context.Background(), cfg.ConnectTimeout)
 	defer cancelStartup()
-	source, err := postgres.NewPool(startupCtx, "jachasun-oltp", cfg.Source, true, sourcePoolMaxConns)
+	source, err := postgres.NewPool(startupCtx, "jachasun-oltp", cfg.Source, true, sourcePoolMaxConns, cfg.ConnectTimeout)
 	if err != nil {
 		return fmt.Errorf("initialize source pool: %w", err)
 	}
 	defer source.Close()
-	target, err := postgres.NewPool(startupCtx, "dw-postgresql", cfg.Target, false, targetPoolMaxConns)
+	target, err := postgres.NewPool(startupCtx, "dw-postgresql", cfg.Target, false, targetPoolMaxConns, cfg.ConnectTimeout)
 	if err != nil {
 		return fmt.Errorf("initialize target pool: %w", err)
 	}
