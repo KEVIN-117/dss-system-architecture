@@ -8,7 +8,9 @@ RUN CGO_ENABLED=0 go build -trimpath -ldflags="-s -w" -o /out/loadmanager ./cmd/
 FROM gcr.io/distroless/static-debian12:nonroot
 WORKDIR /app
 COPY --from=builder /out/loadmanager /app/loadmanager
+COPY etl-layer/loadmanager/configs/loadmanager.example.yaml /app/configs/loadmanager.yaml
 COPY infra/postgres-tx/extract/ /app/queries/
+ENV LOADMANAGER_CONFIG=/app/configs/loadmanager.yaml
 ENV LOADMANAGER_QUERY_DIR=/app/queries
 USER nonroot:nonroot
 EXPOSE 8088

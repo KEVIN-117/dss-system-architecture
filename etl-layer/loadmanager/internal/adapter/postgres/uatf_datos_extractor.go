@@ -6,213 +6,356 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/domain"
 	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/source"
 )
 
+const (
+	defaultSnapshotBatchSize = 1000
+	maxSnapshotBatchSize     = 10000
+	uatfStepCode             = "extract_uatf_datos"
+	uatfComponentVersion     = "v3-atomic-finalization"
+)
+
+var ErrRestartRequired = errors.New("partial snapshot requires a new run_id")
+
+type ExtractionLimits struct {
+	MaxDuration            time.Duration
+	SourceStatementTimeout time.Duration
+	SourceIdleTimeout      time.Duration
+	TargetWriteTimeout     time.Duration
+}
+
+func DefaultExtractionLimits() ExtractionLimits {
+	return ExtractionLimits{30 * time.Minute, 30 * time.Second, 2 * time.Minute, time.Minute}
+}
+
+func (l ExtractionLimits) valid() bool {
+	return l.MaxDuration >= time.Millisecond && l.SourceStatementTimeout >= time.Millisecond && l.SourceIdleTimeout >= time.Millisecond && l.TargetWriteTimeout >= time.Millisecond
+}
+
 type UATFDatosExtractor struct {
-	source    *pgxpool.Pool
-	target    *pgxpool.Pool
-	query     string
-	queryHash string
+	source      *pgxpool.Pool
+	target      *pgxpool.Pool
+	coordinator *pgxpool.Pool
+	slot        chan struct{}
+	limits      ExtractionLimits
+	logger      *slog.Logger
+	query       string
+	queryHash   string
+
+	// afterPage is a deterministic crash-injection seam used by integration tests.
+	beforePageCommit         func(context.Context, int64) error
+	afterPage                func(context.Context, int64) error
+	afterSourceComplete      func(context.Context) error
+	beforeFinalizationCommit func(context.Context) error
+}
+
+type SnapshotRequest struct {
+	RunID          domain.RunID
+	Actor          string
+	ExecutionKind  domain.ExecutionKind
+	Period         *domain.AcademicPeriod
+	ClosureID      *int64
+	RetryOfRunID   *domain.RunID
+	RequestedCutAt *time.Time
+	BatchSize      int
 }
 
 type ExtractedSnapshot struct {
 	RunID        string
 	RecordCount  int64
 	ByteCount    int64
+	BatchCount   int64
 	RowSHA256    string
 	SchemaSHA256 string
 }
 
-func NewUATFDatosExtractor(sourcePool, targetPool *Pool, query []byte) (*UATFDatosExtractor, error) {
-	if sourcePool == nil || targetPool == nil || sourcePool.pool == nil || targetPool.pool == nil || len(query) == 0 {
-		return nil, errors.New("source pool, target pool and approved query are required")
+type extractionCheckpoint struct {
+	Version            int     `json:"version"`
+	RequestFingerprint string  `json:"request_fingerprint"`
+	QuerySHA256        string  `json:"query_sha256"`
+	SchemaSHA256       string  `json:"schema_sha256,omitempty"`
+	BatchSize          int     `json:"batch_size"`
+	LastIDRA           *string `json:"last_id_ra,omitempty"`
+	RecordCount        int64   `json:"record_count"`
+	ByteCount          int64   `json:"byte_count"`
+	BatchCount         int64   `json:"batch_count"`
+	SourceComplete     bool    `json:"source_complete,omitempty"`
+	RowSHA256          string  `json:"row_sha256,omitempty"`
+	// V1 is retained only so completed historical runs remain readable.
+	HashState string `json:"sha256_state,omitempty"`
+}
+
+func NewUATFDatosExtractor(sourcePool, targetPool, coordinatorPool *Pool, query []byte, limits ExtractionLimits) (*UATFDatosExtractor, error) {
+	if sourcePool == nil || targetPool == nil || coordinatorPool == nil ||
+		sourcePool.pool == nil || targetPool.pool == nil || coordinatorPool.pool == nil ||
+		coordinatorPool.pool == targetPool.pool || len(query) == 0 || !limits.valid() {
+		return nil, errors.New("separate source, target, coordinator pools, approved query, and positive limits are required")
 	}
 	validatedQuery, err := source.ValidateUATFDatosQuery(query)
 	if err != nil {
 		return nil, err
 	}
 	return &UATFDatosExtractor{
-		source: sourcePool.pool, target: targetPool.pool, query: string(validatedQuery), queryHash: source.QuerySHA256(validatedQuery),
+		source: sourcePool.pool, target: targetPool.pool, coordinator: coordinatorPool.pool,
+		slot: make(chan struct{}, 1), limits: limits, logger: slog.Default(),
+		query: string(validatedQuery), queryHash: source.QuerySHA256(validatedQuery),
 	}, nil
 }
 
-// Extract writes one full source-observed snapshot. The execution remains
-// EN_EJECUCION after this extraction step; transformation/publication own its
-// eventual terminal state.
-func (e *UATFDatosExtractor) Extract(ctx context.Context, runID domain.RunID, actor string) (ExtractedSnapshot, error) {
-	if runID.IsZero() || strings.TrimSpace(actor) == "" {
-		return ExtractedSnapshot{}, errors.New("run id and actor are required")
+// Extract stages one source-observed snapshot. Partial reads are never resumed.
+func (e *UATFDatosExtractor) Extract(ctx context.Context, request SnapshotRequest) (ExtractedSnapshot, error) {
+	if err := validateSnapshotRequest(&request); err != nil {
+		return ExtractedSnapshot{}, err
 	}
-	id := uuid.UUID(runID)
-	var createdRunID uuid.UUID
-	if err := e.target.QueryRow(ctx, `SELECT execution.run_id FROM etl_control.create_etl_execution(
- $1::uuid, 'HISTORICA'::varchar(24), $2::varchar(255)
-) AS execution`, id, actor).Scan(&createdRunID); err != nil {
-		return ExtractedSnapshot{}, errors.New("could not create ETL execution")
+	ctx, cancel := context.WithTimeout(ctx, e.limits.MaxDuration)
+	defer cancel()
+	select {
+	case e.slot <- struct{}{}:
+		defer func() { <-e.slot }()
+	case <-ctx.Done():
+		return ExtractedSnapshot{}, errors.New("extraction slot wait exceeded its deadline")
 	}
-	if err := e.target.QueryRow(ctx, `SELECT execution.run_id FROM etl_control.start_etl_execution(
- $1::uuid, $2::varchar(255), 'Starting approved uatf_datos snapshot'::text
-) AS execution`, id, actor).Scan(&createdRunID); err != nil {
-		return ExtractedSnapshot{}, errors.New("could not start ETL execution")
-	}
-	stepID, err := e.registerStep(ctx, id, "EN_EJECUCION")
+	requestFingerprint, err := snapshotRequestFingerprint(request)
 	if err != nil {
-		return ExtractedSnapshot{}, e.fail(ctx, id, actor, "could not register extraction step", err)
+		return ExtractedSnapshot{}, errors.New("could not identify snapshot request")
 	}
-	manifestID, err := e.registerPendingManifest(ctx, id)
+	runID := uuid.UUID(request.RunID)
+	releaseRunLock, err := e.acquireRunLock(ctx, runID)
 	if err != nil {
-		return ExtractedSnapshot{}, e.fail(ctx, id, actor, "could not register source manifest", err)
+		return ExtractedSnapshot{}, err
+	}
+	defer releaseRunLock()
+	_, err = e.prepareExecution(ctx, request)
+	if err != nil {
+		return ExtractedSnapshot{}, err
+	}
+	var executionStarted time.Time
+	if err := e.target.QueryRow(ctx, `SELECT started_at FROM etl_control.etl_execution WHERE run_id = $1`, runID).Scan(&executionStarted); err != nil {
+		return ExtractedSnapshot{}, errors.New("could not read execution start time")
+	}
+	stepID, checkpoint, err := e.prepareCheckpoint(ctx, request, requestFingerprint)
+	if err != nil {
+		return ExtractedSnapshot{}, err
+	}
+	completed, result, err := e.completedSnapshot(ctx, runID, request.RunID.String(), stepID, checkpoint)
+	if err != nil {
+		return ExtractedSnapshot{}, err
+	}
+	if completed {
+		return result, nil
+	}
+	if checkpoint.SourceComplete {
+		if err := e.finalizeCompletedSource(ctx, runID, stepID, checkpoint, time.Since(executionStarted)); err != nil {
+			return ExtractedSnapshot{}, errors.New("source is complete but manifest finalization was not confirmed; retry the same run_id")
+		}
+		return snapshotFromCheckpoint(request.RunID.String(), checkpoint), nil
+	}
+	if checkpoint.Version == 1 || checkpoint.BatchCount > 0 {
+		return ExtractedSnapshot{}, errors.Join(ErrRestartRequired, e.fail(runID, request.Actor, stepID, "abandoned partial snapshot", nil))
+	}
+	manifestID, err := e.registerPendingManifest(ctx, runID)
+	if err != nil {
+		return ExtractedSnapshot{}, e.fail(runID, request.Actor, stepID, "could not register source manifest", err)
+	}
+	if err := e.verifyStagedCheckpoint(ctx, runID, checkpoint); err != nil {
+		return ExtractedSnapshot{}, e.fail(runID, request.Actor, stepID, "staging does not match its checkpoint", err)
 	}
 
-	result, err := e.extractRows(ctx, id)
+	result, err = e.extractPages(ctx, request, runID, stepID, checkpoint, sha256.New())
 	if err != nil {
-		return ExtractedSnapshot{}, e.failWithStep(ctx, id, stepID, actor, "source snapshot failed", err)
+		return ExtractedSnapshot{}, e.fail(runID, request.Actor, stepID, "source snapshot failed", err)
 	}
-	artifactURI := "postgresql://" + "dw/staging.raw_uatf_datos/" + runID.String()
-	var artifactID int64
-	if err = e.target.QueryRow(ctx, `SELECT artifact.artifact_id FROM etl_control.register_etl_source_manifest_artifact(
- $1::bigint, 'RAW_EXTRACT'::varchar(32), $2::text, $3::char(64), $4::bigint, $5::bigint
-) AS artifact`, manifestID, artifactURI, result.RowSHA256, result.ByteCount, result.RecordCount).Scan(&artifactID); err != nil {
-		return ExtractedSnapshot{}, e.failWithStep(ctx, id, stepID, actor, "could not register raw manifest artifact", err)
+
+	if err := e.verifyStagedCheckpoint(ctx, runID, checkpoint); err != nil {
+		return ExtractedSnapshot{}, e.fail(runID, request.Actor, stepID, "staging count does not reconcile", err)
 	}
-	var completedManifestID int64
-	if err = e.target.QueryRow(ctx, `SELECT manifest.manifest_id FROM etl_control.register_etl_source_manifest(
- $1::uuid, 'public.uatf_datos'::varchar(150), '1'::varchar(64), 'public'::varchar(63),
- 'uatf_datos'::varchar(63), $2::char(64), 'id_ra ASC'::text, 'COMPLETO'::varchar(16),
- $3::char(64), NULL::smallint, NULL::smallint, NULL::timestamptz, $4::bigint,
- jsonb_build_object('load_target', 'staging.raw_uatf_datos')
- ) AS manifest`, id, e.queryHash, result.SchemaSHA256, result.RecordCount).Scan(&completedManifestID); err != nil {
-		return ExtractedSnapshot{}, e.failWithStep(ctx, id, stepID, actor, "could not complete source manifest", err)
+	result.RunID = request.RunID.String()
+	checkpoint.SourceComplete = true
+	checkpoint.RowSHA256 = result.RowSHA256
+	if err := e.saveCheckpoint(ctx, runID, checkpoint); err != nil {
+		// A lost commit acknowledgement is ambiguous. Reconciliation checks the
+		// persisted marker before deciding whether to finalize or fail this run.
+		return ExtractedSnapshot{}, errors.New("source completion checkpoint was not confirmed; reconcile this run_id")
 	}
-	if completedManifestID != manifestID {
-		return ExtractedSnapshot{}, e.failWithStep(ctx, id, stepID, actor, "source manifest identity changed during completion", errors.New("manifest id mismatch"))
+	if e.afterSourceComplete != nil {
+		if err := e.afterSourceComplete(ctx); err != nil {
+			return ExtractedSnapshot{}, errors.New("source completion persisted; retry metadata finalization with the same run_id")
+		}
 	}
-	if _, err = e.registerStep(ctx, id, "EXITOSO"); err != nil {
-		return ExtractedSnapshot{}, e.fail(ctx, id, actor, "could not complete extraction step", err)
+	if err := e.completeSnapshot(ctx, runID, stepID, manifestID, result, checkpoint, time.Since(executionStarted)); err != nil {
+		return ExtractedSnapshot{}, errors.New("source is complete but manifest finalization was not confirmed; retry the same run_id")
 	}
-	var metricID int64
-	if err = e.target.QueryRow(ctx, `SELECT metric.metric_id FROM etl_control.record_etl_execution_metric(
- $1::uuid, 'source_rows_staged'::varchar(100), $2::numeric, 'ROWS'::varchar(32), NULL::bigint, '{}'::jsonb
- ) AS metric`, id, result.RecordCount).Scan(&metricID); err != nil {
-		return ExtractedSnapshot{}, e.fail(ctx, id, actor, "could not record extraction metric", err)
-	}
-	result.RunID = runID.String()
 	return result, nil
 }
 
-func (e *UATFDatosExtractor) extractRows(ctx context.Context, runID uuid.UUID) (ExtractedSnapshot, error) {
-	sourceTx, err := e.source.BeginTx(ctx, pgx.TxOptions{IsoLevel: pgx.RepeatableRead, AccessMode: pgx.ReadOnly})
+func (e *UATFDatosExtractor) acquireRunLock(ctx context.Context, runID uuid.UUID) (func(), error) {
+	connection, err := e.coordinator.Acquire(ctx)
 	if err != nil {
-		return ExtractedSnapshot{}, errors.New("could not begin read-only source snapshot")
+		return nil, errors.New("could not acquire execution coordinator connection")
 	}
-	defer sourceTx.Rollback(ctx)
-	rows, err := sourceTx.Query(ctx, e.query)
-	if err != nil {
-		return ExtractedSnapshot{}, errors.New("approved source query failed")
+	var acquired bool
+	if err := connection.QueryRow(ctx, `SELECT pg_try_advisory_lock(hashtext($1), hashtext('loadmanager:dw-011'))`, runID.String()).Scan(&acquired); err != nil {
+		connection.Release()
+		return nil, errors.New("could not acquire execution coordinator lock")
 	}
-	defer rows.Close()
-	fields := rows.FieldDescriptions()
-	schemaDescriptor := make([]map[string]any, len(fields))
-	fieldNames := make([]string, len(fields))
-	fieldOIDs := make([]uint32, len(fields))
-	for i, field := range fields {
-		fieldNames[i], fieldOIDs[i] = field.Name, field.DataTypeOID
-		schemaDescriptor[i] = map[string]any{"name": field.Name, "type_oid": field.DataTypeOID}
+	if !acquired {
+		connection.Release()
+		return nil, errors.New("this run_id is already being processed")
 	}
-	if err := source.ValidateUATFDatosSchema(fieldNames, fieldOIDs); err != nil {
-		return ExtractedSnapshot{}, err
-	}
-	schemaBytes, _ := json.Marshal(schemaDescriptor)
-	schemaHash := fmt.Sprintf("%x", sha256.Sum256(schemaBytes))
-
-	targetTx, err := e.target.BeginTx(ctx, pgx.TxOptions{})
-	if err != nil {
-		return ExtractedSnapshot{}, errors.New("could not begin staging transaction")
-	}
-	defer targetTx.Rollback(ctx)
-	if _, err := targetTx.Exec(ctx, `DELETE FROM staging.raw_uatf_datos WHERE run_id = $1`, runID); err != nil {
-		return ExtractedSnapshot{}, errors.New("could not prepare staging snapshot")
-	}
-
-	aggregate := sha256.New()
-	var byteCount, rowCount int64
-	for rows.Next() {
-		values, err := rows.Values()
-		if err != nil {
-			return ExtractedSnapshot{}, errors.New("could not decode source row")
+	return func() {
+		unlockCtx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+		var released bool
+		err := connection.QueryRow(unlockCtx, `SELECT pg_advisory_unlock(hashtext($1), hashtext('loadmanager:dw-011'))`, runID.String()).Scan(&released)
+		if err != nil || !released {
+			_ = connection.Conn().Close(unlockCtx)
 		}
-		rowBytes, err := json.Marshal(values)
-		if err != nil {
-			return ExtractedSnapshot{}, errors.New("source row cannot be represented as JSON")
-		}
-		rowHash := sha256.Sum256(rowBytes)
-		rowCount++
-		byteCount += int64(len(rowBytes))
-		_, _ = aggregate.Write(rowBytes)
-		_, _ = aggregate.Write([]byte{'\n'})
-		if _, err := targetTx.Exec(ctx, `
-INSERT INTO staging.raw_uatf_datos (
- run_id, row_ordinal, id_ra, id_sexo, estado_civil, nac_pais, id_colegio, id_loc,
- egr_gestion, _modificado, row_sha256
-) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)`,
-			runID, rowCount, values[0], values[1], values[2], values[3], values[4], values[5], values[6], values[7], fmt.Sprintf("%x", rowHash)); err != nil {
-			return ExtractedSnapshot{}, errors.New("staging row insert failed")
-		}
-	}
-	if err := rows.Err(); err != nil {
-		return ExtractedSnapshot{}, errors.New("source row stream failed")
-	}
-	rows.Close()
-	if err := sourceTx.Commit(ctx); err != nil {
-		return ExtractedSnapshot{}, errors.New("source snapshot could not be completed")
-	}
-	if err := targetTx.Commit(ctx); err != nil {
-		return ExtractedSnapshot{}, errors.New("staging snapshot transaction failed")
-	}
-	return ExtractedSnapshot{
-		RecordCount: rowCount, ByteCount: byteCount,
-		RowSHA256: fmt.Sprintf("%x", aggregate.Sum(nil)), SchemaSHA256: schemaHash,
+		connection.Release()
 	}, nil
 }
 
-func (e *UATFDatosExtractor) registerStep(ctx context.Context, id uuid.UUID, status string) (int64, error) {
-	var stepID int64
-	err := e.target.QueryRow(ctx, `SELECT step_id FROM etl_control.register_etl_execution_step(
- $1::uuid, 'extract_uatf_datos'::varchar(100), 'EXTRACCION'::varchar(20), $2::varchar(16), 1::smallint,
- 'loadmanager/uatf_datos'::text, 'v1'::varchar(255), '{}'::jsonb
-)`, id, status).Scan(&stepID)
-	return stepID, err
+func validateSnapshotRequest(request *SnapshotRequest) error {
+	if request == nil || request.RunID.IsZero() || strings.TrimSpace(request.Actor) == "" {
+		return errors.New("run_id and actor are required")
+	}
+	if request.ExecutionKind == "" {
+		request.ExecutionKind = domain.ExecutionHistorical
+	}
+	if request.BatchSize == 0 {
+		request.BatchSize = defaultSnapshotBatchSize
+	}
+	if request.BatchSize < 1 || request.BatchSize > maxSnapshotBatchSize {
+		return fmt.Errorf("batch size must be between 1 and %d", maxSnapshotBatchSize)
+	}
+	if request.RequestedCutAt != nil {
+		cut := request.RequestedCutAt.UTC()
+		request.RequestedCutAt = &cut
+	}
+	_, err := domain.NewExecution(domain.NewExecutionInput{
+		RunID: request.RunID, Kind: request.ExecutionKind, RequestedBy: request.Actor,
+		Period: request.Period, ClosureID: request.ClosureID, RetryOfRunID: request.RetryOfRunID,
+		RequestedCutAt: request.RequestedCutAt,
+	})
+	return err
 }
 
-func (e *UATFDatosExtractor) registerPendingManifest(ctx context.Context, id uuid.UUID) (int64, error) {
-	var manifestID int64
-	err := e.target.QueryRow(ctx, `SELECT manifest_id FROM etl_control.register_etl_source_manifest(
- $1::uuid, 'public.uatf_datos'::varchar(150), '1'::varchar(64), 'public'::varchar(63),
- 'uatf_datos'::varchar(63), $2::char(64), 'id_ra ASC'::text, 'PENDIENTE'::varchar(16), NULL::char(64),
- NULL::smallint, NULL::smallint, NULL::timestamptz, NULL::bigint, '{}'::jsonb
-)`, id, e.queryHash).Scan(&manifestID)
-	return manifestID, err
+func snapshotRequestFingerprint(request SnapshotRequest) (string, error) {
+	canonical := struct {
+		Kind           domain.ExecutionKind   `json:"kind"`
+		Period         *domain.AcademicPeriod `json:"period,omitempty"`
+		ClosureID      *int64                 `json:"closure_id,omitempty"`
+		RetryOfRunID   *domain.RunID          `json:"retry_of_run_id,omitempty"`
+		RequestedCutAt *time.Time             `json:"requested_cut_at,omitempty"`
+		BatchSize      int                    `json:"batch_size"`
+	}{request.ExecutionKind, request.Period, request.ClosureID, request.RetryOfRunID, request.RequestedCutAt, request.BatchSize}
+	encoded, err := json.Marshal(canonical)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("%x", sha256.Sum256(encoded)), nil
 }
 
-func (e *UATFDatosExtractor) fail(ctx context.Context, id uuid.UUID, actor, reason string, cause error) error {
-	_, _ = e.target.Exec(ctx, `SELECT etl_control.fail_etl_execution($1::uuid, $2::varchar(255), $3::text)`, id, actor, reason)
-	return errors.New(reason)
+func (e *UATFDatosExtractor) prepareExecution(ctx context.Context, request SnapshotRequest) (string, error) {
+	runID := uuid.UUID(request.RunID)
+	var status, kind, actor string
+	var closureID pgtype.Int8
+	var gestion, periodo pgtype.Int2
+	var cutAt pgtype.Timestamptz
+	var retryID pgtype.UUID
+	readExecution := func() error {
+		return e.target.QueryRow(ctx, `SELECT status, execution_kind, requested_by, closure_id, requested_gestion,
+requested_periodo, requested_cut_at, retry_of_run_id
+FROM etl_control.etl_execution WHERE run_id = $1`, runID).Scan(
+			&status, &kind, &actor, &closureID, &gestion, &periodo, &cutAt, &retryID)
+	}
+	err := readExecution()
+	if errors.Is(err, pgx.ErrNoRows) {
+		writeCtx, cancel := context.WithTimeout(ctx, e.limits.TargetWriteTimeout)
+		defer cancel()
+		var created uuid.UUID
+		if err := e.target.QueryRow(writeCtx, `SELECT execution.run_id FROM etl_control.create_etl_execution(
+ $1::uuid, $2::varchar(24), $3::varchar(255), $4::bigint, $5::smallint, $6::smallint,
+ $7::timestamptz, $8::uuid
+) AS execution`, runID, request.ExecutionKind, request.Actor, request.ClosureID,
+			periodValue(request.Period, true), periodValue(request.Period, false), request.RequestedCutAt, nullableRunID(request.RetryOfRunID)).Scan(&created); err != nil {
+			return "", errors.New("could not create ETL execution")
+		}
+		if err := readExecution(); err != nil {
+			return "", errors.New("could not inspect created ETL execution")
+		}
+	} else if err != nil {
+		return "", errors.New("could not inspect ETL execution")
+	}
+	if kind != string(request.ExecutionKind) || actor != request.Actor || !storedRequestMatches(request, closureID, gestion, periodo, cutAt, retryID) {
+		return "", errors.New("run_id belongs to different snapshot parameters")
+	}
+	if status == string(domain.ExecutionRequested) {
+		writeCtx, cancel := context.WithTimeout(ctx, e.limits.TargetWriteTimeout)
+		defer cancel()
+		var started uuid.UUID
+		if err := e.target.QueryRow(writeCtx, `SELECT execution.run_id FROM etl_control.start_etl_execution(
+ $1::uuid, $2::varchar(255), 'Starting paginated approved uatf_datos snapshot'::text
+) AS execution`, runID, request.Actor).Scan(&started); err != nil {
+			return "", errors.New("could not start ETL execution")
+		}
+		return string(domain.ExecutionRunning), nil
+	}
+	if status != string(domain.ExecutionRunning) {
+		return "", errors.New("only a requested or active run can start or resume extraction")
+	}
+	return status, nil
 }
 
-func (e *UATFDatosExtractor) failWithStep(ctx context.Context, id uuid.UUID, stepID int64, actor, reason string, cause error) error {
-	_, _ = e.target.Exec(ctx, `SELECT etl_control.register_etl_execution_step(
- $1, 'extract_uatf_datos', 'EXTRACCION', 'FALLIDO', 1, 'loadmanager/uatf_datos', 'v1', '{}'::jsonb
-)`, id)
-	_, _ = e.target.Exec(ctx, `SELECT etl_control.record_etl_execution_error(
-	 $1::uuid, 'ERROR'::varchar(12), 'SOURCE_EXTRACTION_FAILED'::varchar(100),
-	 'source or staging operation failed'::text, $2::text, TRUE, $3::bigint, '{}'::jsonb
-	)`, id, reason, stepID)
-	return e.fail(ctx, id, actor, reason, cause)
+func storedRequestMatches(request SnapshotRequest, closureID pgtype.Int8, gestion, periodo pgtype.Int2, cutAt pgtype.Timestamptz, retryID pgtype.UUID) bool {
+	if (request.ClosureID == nil) != !closureID.Valid {
+		return false
+	}
+	if request.ClosureID != nil && closureID.Int64 != *request.ClosureID {
+		return false
+	}
+	if request.RetryOfRunID == nil {
+		if retryID.Valid {
+			return false
+		}
+	} else if !retryID.Valid || uuid.UUID(retryID.Bytes) != uuid.UUID(*request.RetryOfRunID) {
+		return false
+	}
+	if request.Period != nil {
+		if !gestion.Valid || !periodo.Valid || gestion.Int16 != request.Period.Year || periodo.Int16 != request.Period.Period {
+			return false
+		}
+	} else if request.ClosureID == nil && (gestion.Valid || periodo.Valid) {
+		return false
+	}
+	if request.RequestedCutAt != nil {
+		return cutAt.Valid && cutAt.Time.Equal(*request.RequestedCutAt)
+	}
+	return request.ClosureID != nil || !cutAt.Valid
+}
+
+func periodValue(period *domain.AcademicPeriod, year bool) any {
+	if period == nil {
+		return nil
+	}
+	if year {
+		return period.Year
+	}
+	return period.Period
+}
+
+func nullableRunID(runID *domain.RunID) any {
+	if runID == nil {
+		return nil
+	}
+	return uuid.UUID(*runID)
 }

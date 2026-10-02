@@ -13,6 +13,10 @@ import (
 
 const UATFDatosContractID = "public.uatf_datos"
 
+// DW-001 v1 is approved as a whole: a supplementary predicate or projection
+// must not silently turn a complete snapshot into a partial one.
+const approvedUATFQuerySHA256 = "61518492c7c7d9d92fbc64902fcc6ec974d0676999902f2cb7c40bdfccd56ae8"
+
 var uatfDatosColumns = []string{
 	"id_ra", "id_sexo", "estado_civil", "nac_pais", "id_colegio", "id_loc", "egr_gestion", "_modificado",
 }
@@ -51,25 +55,8 @@ func LoadUATFDatosQuery(directory string) ([]byte, error) {
 
 func ValidateUATFDatosQuery(query []byte) ([]byte, error) {
 	normalized := strings.TrimSpace(strings.ReplaceAll(string(query), "\r\n", "\n"))
-	if normalized == "" {
-		return nil, errors.New("source query is empty")
-	}
-	statement := make([]string, 0, 12)
-	for _, line := range strings.Split(normalized, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if trimmed != "" && !strings.HasPrefix(trimmed, "--") {
-			statement = append(statement, trimmed)
-		}
-	}
-	selectSQL := strings.ToLower(strings.Join(statement, " "))
-	if !strings.HasPrefix(selectSQL, "select") || strings.Count(normalized, ";") > 1 ||
-		!strings.Contains(selectSQL, "from public.uatf_datos") || !strings.Contains(selectSQL, "order by id_ra asc") {
-		return nil, errors.New("source query does not match the approved read-only contract")
-	}
-	for _, forbidden := range []string{"insert ", "update ", "delete ", "truncate ", "drop ", "alter ", "create ", " join "} {
-		if strings.Contains(selectSQL, forbidden) {
-			return nil, errors.New("source query contains a forbidden operation")
-		}
+	if QuerySHA256([]byte(normalized)) != approvedUATFQuerySHA256 {
+		return nil, errors.New("source query differs from the versioned DW-001 contract")
 	}
 	return []byte(normalized), nil
 }

@@ -5,6 +5,7 @@ package postgres
 import (
 	"context"
 	"os"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -28,10 +29,26 @@ func TestUATFDatosExtractionIntegration(t *testing.T) {
 		t.Fatal("create target fixture pool")
 	}
 	defer targetPool.Close()
+	coordinatorPool, err := NewPool(ctx, "dw-fixture-coordinator", integrationDB("TARGET"), false, 2, 3*time.Second)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer coordinatorPool.Close()
 
 	if err := sourcePool.Ping(ctx); err != nil {
 		t.Fatalf("source fixture connectivity check failed: %v", err)
 	}
+	metadataTx, err := sourcePool.pool.Begin(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := metadataTx.Exec(ctx, `SELECT set_config('statement_timeout', $1, true), set_config('idle_in_transaction_session_timeout', $2, true)`, "30000ms", "120000ms"); err != nil {
+		t.Fatalf("source timeout config: %v", err)
+	}
+	if _, err := inspectUATFSource(ctx, metadataTx); err != nil {
+		t.Fatalf("source catalog validation: %v", err)
+	}
+	_ = metadataTx.Rollback(ctx)
 	if err := targetPool.Ping(ctx); err != nil {
 		t.Fatalf("DW fixture connectivity check failed: %v", err)
 	}
@@ -65,17 +82,23 @@ FROM pg_roles WHERE rolname = current_user`).Scan(&hasSelect, &hasInsert, &hasUp
 	if err != nil {
 		t.Fatal(err)
 	}
-	extractor, err := NewUATFDatosExtractor(sourcePool, targetPool, query)
+	extractor, err := NewUATFDatosExtractor(sourcePool, targetPool, coordinatorPool, query, DefaultExtractionLimits())
 	if err != nil {
 		t.Fatal(err)
 	}
+	request := SnapshotRequest{
+		Actor: "loadmanager:integration-test", ExecutionKind: domain.ExecutionHistorical, BatchSize: 256,
+		Period:         &domain.AcademicPeriod{Year: 2025, Period: 2},
+		RequestedCutAt: timePtr(time.Date(2025, 12, 15, 18, 0, 0, 0, time.UTC)),
+	}
 	for attempt := 0; attempt < 2; attempt++ {
 		runID := domain.RunID(uuid.New())
-		result, err := extractor.Extract(ctx, runID, "loadmanager:integration-test")
+		request.RunID = runID
+		result, err := extractor.Extract(ctx, request)
 		if err != nil {
 			t.Fatalf("extract synthetic source snapshot: %v", err)
 		}
-		if result.RecordCount != 2 || result.ByteCount == 0 || result.RowSHA256 == "" || result.SchemaSHA256 == "" {
+		if result.RecordCount != 2002 || result.BatchCount != 8 || result.ByteCount == 0 || result.RowSHA256 == "" || result.SchemaSHA256 == "" {
 			t.Fatalf("unexpected snapshot manifest: %+v", result)
 		}
 		var staged int64
@@ -91,6 +114,16 @@ FROM pg_roles WHERE rolname = current_user`).Scan(&hasSelect, &hasInsert, &hasUp
 		}
 		if status != "COMPLETO" {
 			t.Fatalf("expected complete manifest, got %s", status)
+		}
+		var snapshotYear, snapshotPeriod int16
+		var snapshotCut time.Time
+		if err := targetPool.pool.QueryRow(ctx, `SELECT snapshot_gestion, snapshot_periodo, snapshot_cut_at
+FROM etl_control.etl_source_manifest WHERE run_id = $1 AND source_contract_id = $2`, uuid.UUID(runID), source.UATFDatosContractID).
+			Scan(&snapshotYear, &snapshotPeriod, &snapshotCut); err != nil {
+			t.Fatal("read requested snapshot period and cut")
+		}
+		if snapshotYear != 2025 || snapshotPeriod != 2 || !snapshotCut.Equal(*request.RequestedCutAt) {
+			t.Fatalf("manifest did not preserve requested period/cut: gestion=%d periodo=%d cut=%s", snapshotYear, snapshotPeriod, snapshotCut)
 		}
 		var artifacts int64
 		if err := targetPool.pool.QueryRow(ctx, `
@@ -108,8 +141,41 @@ WHERE manifest.run_id = $1
 		if artifacts != 1 {
 			t.Fatalf("expected one verified artifact on the complete manifest, got %d", artifacts)
 		}
+		idempotentResult, err := extractor.Extract(ctx, request)
+		if err != nil || idempotentResult.RowSHA256 != result.RowSHA256 || idempotentResult.RecordCount != result.RecordCount {
+			t.Fatalf("repeat of a completed extraction was not idempotent: result=%+v err=%v", idempotentResult, err)
+		}
+		otherActor := request
+		otherActor.Actor = "loadmanager:other-actor"
+		if _, err := extractor.Extract(ctx, otherActor); err == nil {
+			t.Fatal("a different actor was allowed to reuse a persisted run_id")
+		}
+		var batchMetrics int64
+		if err := targetPool.pool.QueryRow(ctx, `SELECT count(*) FROM etl_control.etl_execution_metric
+WHERE run_id = $1 AND metric_name = 'source_rows_batch'`, uuid.UUID(runID)).Scan(&batchMetrics); err != nil {
+			t.Fatal("read per-batch extraction metrics")
+		}
+		if batchMetrics != result.BatchCount {
+			t.Fatalf("expected %d batch metrics, found %d", result.BatchCount, batchMetrics)
+		}
+		var totalMetrics int64
+		if err := targetPool.pool.QueryRow(ctx, `SELECT count(*) FROM etl_control.etl_execution_metric
+WHERE run_id = $1 AND metric_name = 'source_rows_total'`, uuid.UUID(runID)).Scan(&totalMetrics); err != nil {
+			t.Fatal("verify final metrics were not duplicated")
+		}
+		if totalMetrics != 1 {
+			t.Fatalf("expected one final row-total metric after an idempotent repeat, found %d", totalMetrics)
+		}
+		var durationMillis float64
+		if err := targetPool.pool.QueryRow(ctx, `SELECT metric_value FROM etl_control.etl_execution_metric
+WHERE run_id = $1 AND metric_name = 'extract_duration_ms'`, uuid.UUID(runID)).Scan(&durationMillis); err != nil {
+			t.Fatal("read extraction duration metric")
+		}
+		t.Logf("DW-011 synthetic volume: %d rows in %d batches; end-to-end duration %.0f ms", result.RecordCount, result.BatchCount, durationMillis)
 	}
 }
+
+func timePtr(value time.Time) *time.Time { return &value }
 
 func TestSourceQueryCancellationReleasesConnectionIntegration(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -169,9 +235,16 @@ func TestInvalidSourceCredentialsReturnSanitizedConnectivityErrorIntegration(t *
 }
 
 func integrationDB(prefix string) config.Database {
+	port := uint16(5432)
+	if configured := os.Getenv(prefix + "_PORT"); configured != "" {
+		parsed, err := strconv.ParseUint(configured, 10, 16)
+		if err == nil && parsed > 0 {
+			port = uint16(parsed)
+		}
+	}
 	return config.Database{
 		Host: os.Getenv(prefix + "_HOST"), Name: os.Getenv(prefix + "_DB"),
 		User: os.Getenv(prefix + "_USER"), Password: os.Getenv(prefix + "_PASSWORD"),
-		Port: 5432, SSLMode: "disable",
+		Port: port, SSLMode: "disable",
 	}
 }

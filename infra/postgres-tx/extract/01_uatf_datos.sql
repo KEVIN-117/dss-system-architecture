@@ -10,4 +10,6 @@ SELECT
     egr_gestion,
     _modificado
 FROM public.uatf_datos
-ORDER BY id_ra ASC;
+WHERE ($1::varchar IS NULL OR id_ra > $1::varchar)
+ORDER BY id_ra ASC
+LIMIT $2::integer;

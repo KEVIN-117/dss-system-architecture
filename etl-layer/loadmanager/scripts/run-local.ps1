@@ -44,12 +44,19 @@ try {
     & docker @composeArgs up -d postgres-dw jachasun-fixture
     if ($LASTEXITCODE -ne 0) { throw 'No se pudieron iniciar las bases de fixtures.' }
 
-    # The full DW-008 setup inserts a fixed synthetic run, so execute it only
-    # when the ephemeral DW has not yet been initialized.
-    $initialized = $false
+    & docker @composeArgs run --rm migration-only
+    if ($LASTEXITCODE -ne 0) { throw 'El migrador DW falló; no se iniciará Load Manager.' }
+
+    # Fixture seeding is separate from idempotent migrations. A partial seed
+    # must be reviewed, never overwritten implicitly.
     $status = & docker @composeArgs exec -T postgres-dw psql -U dw_test -d dw_integration -tAc `
-        "SELECT (count(*) = 5 AND to_regrole('loadmanager_test') IS NOT NULL)::text FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005')" 2>$null
-    if ($LASTEXITCODE -eq 0 -and ($status -join '').Trim() -eq 'true') { $initialized = $true }
+        "SELECT (to_regrole('loadmanager_test') IS NOT NULL)::text || ',' || (EXISTS(SELECT 1 FROM etl_control.etl_execution WHERE run_id = '88888888-8888-8888-8888-888888888888'))::text" 2>$null
+    if ($LASTEXITCODE -ne 0) { throw 'No se pudo inspeccionar el estado de fixtures.' }
+    $fixtureState = ($status -join '').Trim()
+    if ($fixtureState -eq 'true,false' -or $fixtureState -eq 'false,true') {
+        throw 'Fixtures parcialmente preparados; revisar el DW efímero antes de continuar.'
+    }
+    $initialized = $fixtureState -eq 'true,true'
 
     if (-not $initialized) {
         & docker @composeArgs run --rm integration-test
@@ -57,6 +64,8 @@ try {
             throw "Fixture setup/regression tests failed. Reset only these ephemeral databases with: docker compose -f `"$composeFile`" down"
         }
     }
+
+    $env:LOADMANAGER_QUERY_DIR = Join-Path $repoRoot 'infra\postgres-tx\extract'
 
     Write-Host 'Iniciando Load Manager. Health: http://localhost:8088/healthz ; readiness: http://localhost:8088/readyz'
     Write-Host 'Este proceso solo expone health/readiness; todavía no dispara la extracción.'
