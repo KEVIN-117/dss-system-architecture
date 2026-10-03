@@ -13,6 +13,9 @@ extraction:
   source_idle_timeout: 2m
   target_write_timeout: 1m
 
+staging:
+  raw_root_env: DW_RAW_ROOT
+
 databases:
   source:
     host_env: DB_TX_HOST

@@ -129,7 +129,10 @@ services:
     networks:
       - dss-net
   hop-web:
-    image: apache/hop-web:latest
+    image: dss-hop-web:local
+    build:
+      context: .
+      dockerfile: etl-layer/apache-hop/Dockerfile
     container_name: dss-hop-web
     depends_on:
       dw-migrator:
@@ -137,9 +140,12 @@ services:
     ports:
       - "8081:8080"
     volumes:
-      - ./etl-layer/project-uatf:/files/project
-      - ./etl-layer/config:/files/config
-      - ./etl-layer/jdbc:/files/jdbc
+      - ./etl-layer/apache-hop/project-uatf:/files/project:ro
+      - ./etl-layer/apache-hop/config:/files/config:ro
+      - ./etl-layer/apache-hop/jdbc:/files/jdbc:ro
+      - dw-raw:/dw-raw:ro
+    group_add:
+      - "65532"
     environment:
       # Definición de Proyecto
       HOP_PROJECT_NAME: dss-uatf
@@ -152,12 +158,81 @@ services:
       # Compartir librería de Drivers
       HOP_SHARED_JDBC_FOLDERS: /files/jdbc
       DB_DW_HOST: postgres-dw
-      DB_DW_PORT: 5434
-      DB_DW_NAME: dss_dw
-      DB_DW_USER: admin
-      DB_DW_PASS: secret
+      DB_DW_PORT: "5432"
+      DB_DW_NAME: ${POSTGRES_DW_NAME}
+      DB_DW_USER: ${POSTGRES_DW_USER}
+      DB_DW_PASS: ${POSTGRES_DW_PASSWORD}
+      DB_DW_SSLMODE: ${DB_DW_SSLMODE:-disable}
+      DB_DW_VERIFY_USER: ${DB_DW_VERIFY_USER:-}
+      DB_DW_VERIFY_PASS: ${DB_DW_VERIFY_PASS:-}
+      DW_RAW_ROOT: /dw-raw
     networks:
       - dss-net
+  loadmanager-raw-tools:
+    profiles: ["dw-raw"]
+    depends_on:
+      dw-raw-init:
+        condition: service_completed_successfully
+      postgres-dw:
+        condition: service_healthy
+      dw-migrator:
+        condition: service_completed_successfully
+    build:
+      context: .
+      dockerfile: etl-layer/loadmanager/Dockerfile
+      target: raw-tools
+    environment:
+      DW_RAW_ROOT: /dw-raw
+      LOADMANAGER_QUERY_DIR: /app/queries
+      DB_TX_HOST: ${DB_TX_HOST}
+      DB_TX_PORT: ${DB_TX_PORT:-5432}
+      DB_TX_NAME: ${DB_TX_NAME}
+      DB_TX_USER: ${DB_TX_USER}
+      DB_TX_PASS: ${DB_TX_PASS}
+      DB_TX_SSLMODE: ${DB_TX_SSLMODE:-disable}
+      DB_DW_HOST: ${DB_DW_HOST:-postgres-dw}
+      DB_DW_PORT: "5432"
+      DB_DW_NAME: ${DB_DW_NAME:-${POSTGRES_DW_NAME}}
+      DB_DW_USER: ${DB_DW_USER}
+      DB_DW_PASS: ${DB_DW_PASS}
+      DB_DW_SSLMODE: ${DB_DW_SSLMODE:-disable}
+    volumes:
+      - dw-raw:/dw-raw
+    networks:
+      - dss-net
+  loadmanager-raw-verifier:
+    profiles: ["dw-raw"]
+    depends_on:
+      dw-raw-init:
+        condition: service_completed_successfully
+      postgres-dw:
+        condition: service_healthy
+      dw-migrator:
+        condition: service_completed_successfully
+    build:
+      context: .
+      dockerfile: etl-layer/loadmanager/Dockerfile
+      target: raw-tools
+    environment:
+      DW_RAW_ROOT: /dw-raw
+      DB_DW_HOST: ${DB_DW_HOST:-postgres-dw}
+      DB_DW_PORT: "5432"
+      DB_DW_NAME: ${DB_DW_NAME:-${POSTGRES_DW_NAME}}
+      DB_DW_USER: ${DB_DW_VERIFY_USER}
+      DB_DW_PASS: ${DB_DW_VERIFY_PASS}
+      DB_DW_SSLMODE: ${DB_DW_SSLMODE:-disable}
+    volumes:
+      - dw-raw:/dw-raw:ro
+    networks:
+      - dss-net
+  dw-raw-init:
+    profiles: ["dw-raw"]
+    image: busybox:1.36
+    volumes:
+      - dw-raw:/dw-raw
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["mkdir -p /dw-raw && chown 65532:65532 /dw-raw && chmod 0750 /dw-raw"]
+    restart: "no"
   # ==========================================
   # MICROSERVICIOS PROPIOS
   # ==========================================
@@ -233,3 +308,5 @@ networks:
 
 volumes:
   postgres_data:
+  dw-raw:
+    name: dss-dw-raw

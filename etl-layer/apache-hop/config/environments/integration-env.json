@@ -1,0 +1,34 @@
+{
+  "variables": [
+    {
+      "name": "DB_DW_HOST",
+      "value": "postgres-dw",
+      "description": "DW sintético del perfil de integración Docker"
+    },
+    {
+      "name": "DB_DW_PORT",
+      "value": "5432",
+      "description": "Puerto interno del servicio postgres-dw"
+    },
+    {
+      "name": "DB_DW_NAME",
+      "value": "dw_integration",
+      "description": "Base sintética aislada de integración"
+    },
+    {
+      "name": "DB_DW_USER",
+      "value": "raw_verify_test",
+      "description": "Principal de solo lectura del preflight RAW"
+    },
+    {
+      "name": "DB_DW_PASS",
+      "value": "raw_verify_test",
+      "description": "Credencial de fixture local; no usar fuera de pruebas"
+    },
+    {
+      "name": "DB_DW_SSLMODE",
+      "value": "disable",
+      "description": "Conexión interna al PostgreSQL desechable de integración"
+    }
+  ]
+}

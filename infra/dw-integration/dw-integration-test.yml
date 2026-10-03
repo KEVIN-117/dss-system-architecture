@@ -87,7 +87,8 @@ services:
     volumes:
       - ../dw-schema/migrations:/migrations:ro
       - ../dw-schema/scripts:/scripts:ro
-    entrypoint: ["/bin/sh", "-c", "tr -d '\r' < /scripts/apply-migrations.sh | /bin/sh"]
+    entrypoint:
+      ["/bin/sh", "-c", "tr -d '\r' < /scripts/apply-migrations.sh | /bin/sh"]
     restart: "no"
 
   upgrade-test:
@@ -105,7 +106,8 @@ services:
       - ../dw-schema/migrations:/migrations:ro
       - ../dw-schema/scripts:/scripts:ro
       - ./tests/test_dw011_upgrade.sh:/tests/test_dw011_upgrade.sh:ro
-    entrypoint: ["/bin/sh", "-c", "tr -d '\r' < /tests/test_dw011_upgrade.sh | /bin/sh"]
+    entrypoint:
+      ["/bin/sh", "-c", "tr -d '\r' < /tests/test_dw011_upgrade.sh | /bin/sh"]
     restart: "no"
 
   loadmanager-integration-test:
@@ -123,10 +125,114 @@ services:
       TARGET_DB: dw_integration
       TARGET_USER: loadmanager_test
       TARGET_PASSWORD: loadmanager_test
+      VERIFY_HOST: postgres-dw
+      VERIFY_PORT: "5432"
+      VERIFY_DB: dw_integration
+      VERIFY_USER: raw_verify_test
+      VERIFY_PASSWORD: raw_verify_test
       LOADMANAGER_QUERY_DIR: /workspace/infra/postgres-tx/extract
+      DW_RAW_ROOT: /dw-raw
       GOCACHE: /tmp/go-build
       GOMODCACHE: /tmp/go-mod-cache
     volumes:
       - ../..:/workspace:ro
+      - dw-raw:/dw-raw
     command: ["go", "test", "-tags=integration", "./..."]
     restart: "no"
+
+  raw-extract-hop-fixture:
+    profiles: ["dw-012-hop"]
+    depends_on:
+      raw-volume-init:
+        condition: service_completed_successfully
+      integration-test:
+        condition: service_completed_successfully
+    build:
+      context: ../..
+      dockerfile: etl-layer/loadmanager/Dockerfile
+      target: raw-tools
+    environment:
+      DB_TX_HOST: jachasun-fixture
+      DB_TX_PORT: "5432"
+      DB_TX_NAME: jachasun_test
+      DB_TX_USER: dw_fixture_reader
+      DB_TX_PASS: fixture_readonly
+      DB_TX_SSLMODE: disable
+      DB_DW_HOST: postgres-dw
+      DB_DW_PORT: "5432"
+      DB_DW_NAME: dw_integration
+      DB_DW_USER: loadmanager_test
+      DB_DW_PASS: loadmanager_test
+      DB_DW_SSLMODE: disable
+      LOADMANAGER_QUERY_DIR: /workspace/infra/postgres-tx/extract
+      DW_RAW_ROOT: /dw-raw
+    volumes:
+      - ../..:/workspace:ro
+      - dw-raw:/dw-raw
+    entrypoint: ["/app/raw-extract"]
+    command:
+      [
+        "-run-id",
+        "${DW012_HOP_TEST_RUN_ID:-01234567-89ab-cdef-0123-456789abcdef}",
+        "-actor",
+        "loadmanager:dw012-hop-test",
+        "-year",
+        "2025",
+        "-period",
+        "2",
+        "-batch-size",
+        "128",
+      ]
+    restart: "no"
+
+  raw-volume-init:
+    profiles: ["dw-012-hop"]
+    image: busybox:1.36
+    volumes:
+      - dw-raw:/dw-raw
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      ["mkdir -p /dw-raw && chown 65532:65532 /dw-raw && chmod 0750 /dw-raw"]
+    restart: "no"
+
+  hop-raw-integration-test:
+    profiles: ["dw-012-hop"]
+    depends_on:
+      raw-extract-hop-fixture:
+        condition: service_completed_successfully
+    image: dss-hop-runner:dw-012-test
+    build:
+      context: ../..
+      dockerfile: etl-layer/apache-hop/Dockerfile
+      target: hop-runner
+    environment:
+      HOP_PROJECT_NAME: dss-uatf
+      HOP_PROJECT_FOLDER: /files/project
+      HOP_ENVIRONMENT_NAME: integration
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/config/environments/integration-env.json
+      HOP_FILE_PATH: /files/project/workflows/main_orchestrator.hwf
+      HOP_RUN_CONFIG: local
+      HOP_RUN_PARAMETERS: "RUN_ID=${DW012_HOP_TEST_RUN_ID:-01234567-89ab-cdef-0123-456789abcdef}"
+      RUN_ID: "${DW012_HOP_TEST_RUN_ID:-01234567-89ab-cdef-0123-456789abcdef}"
+      HOP_SHARED_JDBC_FOLDERS: /files/jdbc
+      DB_DW_HOST: postgres-dw
+      DB_DW_PORT: "5432"
+      DB_DW_NAME: dw_integration
+      DB_DW_USER: dw_test
+      DB_DW_PASS: dw_test
+      DB_DW_SSLMODE: disable
+      DB_DW_VERIFY_USER: raw_verify_test
+      DB_DW_VERIFY_PASS: raw_verify_test
+      DW_RAW_ROOT: /dw-raw
+    volumes:
+      - ../../etl-layer/apache-hop/project-uatf:/files/project:ro
+      - ../../etl-layer/apache-hop/config:/files/config:ro
+      - ../../etl-layer/apache-hop/jdbc:/files/jdbc:ro
+      - dw-raw:/dw-raw:ro
+    group_add:
+      - "65532"
+    restart: "no"
+
+volumes:
+  dw-raw:
+    name: dss-dw-integration-raw

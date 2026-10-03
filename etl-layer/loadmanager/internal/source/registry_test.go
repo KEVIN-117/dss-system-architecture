@@ -76,3 +76,79 @@ func TestUATFDatosMetadataRequiresDeclaredShapeAndUniqueKey(t *testing.T) {
 		t.Fatal("nullable mandatory source field must be rejected")
 	}
 }
+
+func TestAllDW001ContractsLoadOnlyApprovedQueries(t *testing.T) {
+	_, filename, _, _ := runtime.Caller(0)
+	repositoryRoot := filepath.Clean(filepath.Join(filepath.Dir(filename), "..", "..", "..", ".."))
+	queryDirectory := filepath.Join(repositoryRoot, "infra", "postgres-tx", "extract")
+	queries, err := LoadApprovedQueries(queryDirectory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(queries) != 9 || len(Contracts()) != 9 {
+		t.Fatalf("expected nine DW-001 sources, got %d approved queries and %d contracts", len(queries), len(Contracts()))
+	}
+	temporaryDirectory := t.TempDir()
+	for _, spec := range Contracts() {
+		if err := spec.Contract.Validate(); err != nil {
+			t.Fatalf("contract %s is invalid: %v", spec.Contract.ID, err)
+		}
+		if _, ok := queries[spec.Contract.ID]; !ok {
+			t.Errorf("approved query missing for %s", spec.Contract.ID)
+		}
+		if err := os.WriteFile(filepath.Join(temporaryDirectory, spec.Contract.QueryFile), queries[spec.Contract.ID], 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := os.WriteFile(filepath.Join(temporaryDirectory, "09_localidades.sql"), []byte("SELECT cod_loc FROM public.lugar_localidad WHERE cod_loc > 0 ORDER BY cod_loc;"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := LoadApprovedQueries(temporaryDirectory); err == nil {
+		t.Fatal("modified query was accepted without contract version/hash approval")
+	}
+}
+
+func TestValidateContractRowRejectsNullRequiredFieldsAndDuplicateNaturalKeys(t *testing.T) {
+	contract, ok := ContractByID("public.postulantes")
+	if !ok {
+		t.Fatal("postulantes contract is missing")
+	}
+	columns := make([]string, len(contract.Contract.Columns))
+	values := make([]any, len(columns))
+	for index, column := range contract.Contract.Columns {
+		columns[index] = column.Name
+		values[index] = "sample"
+	}
+	values[0], values[1], values[2], values[3], values[4] = int32(7), "RA-7", "P01", int16(2025), int16(2)
+	key, err := ValidateContractRow(contract.Contract, columns, values, "")
+	if err != nil {
+		t.Fatalf("valid contract row rejected: %v", err)
+	}
+	if _, err := ValidateContractRow(contract.Contract, columns, values, key); err == nil {
+		t.Fatal("duplicate natural key was accepted")
+	}
+	values[1] = nil
+	if _, err := ValidateContractRow(contract.Contract, columns, values, ""); err == nil {
+		t.Fatal("null required field was accepted")
+	}
+}
+
+func TestValidateContractTypeModifiersEnforcesDeclaredCharacterLengths(t *testing.T) {
+	contract, ok := ContractByID("public.uatf_datos")
+	if !ok {
+		t.Fatal("uatf_datos contract is missing")
+	}
+	columns := make([]string, len(contract.Contract.Columns))
+	modifiers := make([]int32, len(columns))
+	for index, column := range contract.Contract.Columns {
+		columns[index] = column.Name
+	}
+	modifiers[0], modifiers[1] = 14, 5 // varchar(10), varchar(1), including PostgreSQL's 4-byte varlena header.
+	if err := ValidateContractTypeModifiers(contract.Contract, columns, modifiers); err != nil {
+		t.Fatalf("declared column lengths rejected: %v", err)
+	}
+	modifiers[0] = 15
+	if err := ValidateContractTypeModifiers(contract.Contract, columns, modifiers); err == nil {
+		t.Fatal("incompatible source column length was accepted")
+	}
+}

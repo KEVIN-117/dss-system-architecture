@@ -1,6 +1,6 @@
 # Load Manager (Go)
 
-Servicio Go responsable de coordinar la extracción OLTP hacia Staging. El primer vertical slice implementa la extracción full snapshot de `public.uatf_datos` al landing tipado `staging.raw_uatf_datos`, con manifiesto y auditoría DW-004. No expone todavía una operación HTTP para lanzar ejecuciones, ni configura cron.
+Servicio Go responsable de coordinar los snapshots aprobados de Jachasun hacia artefactos RAW JSONL+GZip para Apache Hop. DW-012 implementa los nueve contratos DW-001, con manifiestos, hashes y auditoría DW-004. `staging.raw_uatf_datos` se conserva por compatibilidad histórica, pero ya no recibe nuevas extracciones. No se habilitan cron ni endpoint HTTP para iniciar ejecuciones.
 
 ## Prerrequisitos y verificación
 
@@ -29,13 +29,13 @@ La fuente de Jachasun utiliza `DB_TX_HOST`, `DB_TX_PORT`, `DB_TX_NAME`, `DB_TX_U
 
 `GET /healthz` informa que el proceso HTTP está vivo. `GET /readyz` verifica OLTP y DW con el timeout configurado y devuelve solo `ready`/`not_ready`, sin revelar detalles de conexión. Los contextos de cada operación se propagan a pgx para poder cancelar adquisición/conexión/consulta en curso. El servidor puede iniciar aunque una dependencia esté temporalmente caída; readiness queda en 503 hasta que ambas respondan.
 
-## Primer flujo de extracción
+## Contrato de extracción y recuperación
 
 El extractor acepta solo la consulta DW-001 canónica (SHA-256 versionado) `infra/postgres-tx/extract/01_uatf_datos.sql`; una edición requiere una nueva versión aprobada. Recorre `public.uatf_datos` por keyset pagination, sin `OFFSET`. `SnapshotRequest.BatchSize` admite 1–10 000 filas (por defecto 1 000). Antes de leer, verifica tipos, longitudes, nulabilidad, colación y unicidad de `id_ra` en el catálogo OLTP. `id_ra`, `estado_civil` y `_modificado` son obligatorios en cada fila; los duplicados o nulos hacen fallar el snapshot. La colación PostgreSQL gobierna tanto `ORDER BY` como el cursor, sin comparación binaria adicional en Go. Cada lote confirma filas RAW, métricas y checkpoint v2 juntos.
 
 **Recuperación:** una extracción parcial no se reanuda con el mismo `run_id`: se marca `FALLIDA` y el reproceso usa otro `run_id` enlazado. Una vez terminada la transacción OLTP, el checkpoint v2 persiste `source_complete` y el SHA-256 final; si se interrumpe solo el cierre del manifiesto, `RecoverInterruptedRun` repite la finalización desde DW sin consultar Jachasun. El manifiesto, artefacto, paso y métricas finales se confirman juntos. Un intento v1 completo sigue consultable; uno v1 parcial no se reanuda.
 
-`staging.raw_uatf_datos` se crea en la migración aditiva DW-009 `0005`; no altera `0001`–`0004`. Las pruebas de integración ejecutan Go en Linux dentro del Compose contra fixtures sintéticos: validan Ping de OLTP/DW, que el principal OLTP efectivo solo tenga SELECT, que la sesión rechace escritura, que una consulta lenta se cancele y libere la conexión y que credenciales inválidas produzcan errores saneados. Algunos entornos Windows bloquean los binarios temporales generados por `go test`.
+La migración DW-009 `0005` creó `staging.raw_uatf_datos`; DW-011 endureció su escritura histórica y DW-012 dejó de usarla para nuevas extracciones. Las pruebas de integración Go corren en Linux dentro de Compose contra fixtures sintéticos: validan permisos de solo lectura en OLTP, contratos de las nueve fuentes, artefactos/manifiestos y restricciones destino. Algunos entornos Windows bloquean los binarios temporales generados por `go test`.
 
 Para probar el vertical slice desde la raíz del repositorio:
 
@@ -75,4 +75,4 @@ Los cortes aceptan cualquier código de periodo positivo y no codifican semestre
 
 ## Límite de esta entrega
 
-No se implementan las otras ocho extracciones, cron, API autenticada para iniciar ejecuciones ni la fase ETL de Apache Hop. DW-001 aún requiere validación real y aprobación DSA/TI antes de usar Jachasun.
+La ruta Hop disponible está documentada en [apache-hop/README.md](../apache-hop/README.md): workflow preflight más lectura gzip/JSONL de los nueve contratos, sin escritura dimensional. No se implementan cron, API autenticada para iniciar ejecuciones ni transformación/publicación en dimensiones/hechos. DW-001 aún requiere validación real y aprobación DSA/TI antes de usar Jachasun.

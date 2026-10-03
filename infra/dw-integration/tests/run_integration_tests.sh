@@ -64,7 +64,7 @@ fi
 
 echo 'Checking DW migrations and technical members'
 assert_target_count 'migration history' \
-    "SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005','0006','0007');" 7
+	"SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005','0006','0007','0008');" 8
 assert_target_count 'conformed dimensions' \
     "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'dw' AND table_name IN ('dim_estudiante','dim_programa','dim_materia','dim_periodo_academico','dim_admision');" 5
 assert_target_count 'technical dimension members' \
@@ -74,7 +74,9 @@ assert_target_count 'uatf_datos RAW target' \
 assert_target_count 'RAW append-only writer privileges' \
     "SELECT count(*) FROM (SELECT has_table_privilege('dw_staging_writer', 'staging.raw_uatf_datos', 'SELECT') AS can_read, has_table_privilege('dw_staging_writer', 'staging.raw_uatf_datos', 'INSERT') AS can_insert, has_table_privilege('dw_staging_writer', 'staging.raw_uatf_datos', 'UPDATE') AS can_update, has_table_privilege('dw_staging_writer', 'staging.raw_uatf_datos', 'DELETE') AS can_delete) rights WHERE can_read AND can_insert AND NOT can_update AND NOT can_delete;" 1
 assert_target_count 'RAW historical rows preserved under NOT VALID check' \
-    "SELECT count(*) FROM pg_constraint WHERE conrelid = 'staging.raw_uatf_datos'::regclass AND conname = 'ck_raw_uatf_datos_required_fields' AND NOT convalidated;" 1
+	"SELECT count(*) FROM pg_constraint WHERE conrelid = 'staging.raw_uatf_datos'::regclass AND conname = 'ck_raw_uatf_datos_required_fields' AND NOT convalidated;" 1
+assert_target_count 'RAW verifier has read-only control access' \
+	"SELECT count(*) FROM (SELECT has_table_privilege('dw_raw_verifier','etl_control.etl_source_manifest','SELECT') AS can_read, has_table_privilege('dw_raw_verifier','etl_control.etl_source_manifest','UPDATE') AS can_update, has_table_privilege('dw_raw_verifier','etl_control.etl_execution_step','INSERT') AS can_insert) rights WHERE can_read AND NOT can_update AND NOT can_insert;" 1
 
 echo 'Registering synthetic run and manifest'
 target_psql <<'SQL'
@@ -136,5 +138,7 @@ assert_file_hash /fixtures/expected/quality-cases.yml e7dffe9d18e686b9cdb8cc32de
 echo 'Provisioning restricted Load Manager test principal'
 target_psql -c "CREATE ROLE loadmanager_test LOGIN PASSWORD 'loadmanager_test' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION"
 target_psql -c 'GRANT dw_staging_writer TO loadmanager_test'
+target_psql -c "CREATE ROLE raw_verify_test LOGIN PASSWORD 'raw_verify_test' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION"
+target_psql -c 'GRANT dw_raw_verifier TO raw_verify_test'
 sha256sum /fixtures/source/*.sql /fixtures/expected/*.yml
-echo 'DW-011 integration test passed'
+echo 'DW-012 RAW artifact and DW-011 integration checks passed'

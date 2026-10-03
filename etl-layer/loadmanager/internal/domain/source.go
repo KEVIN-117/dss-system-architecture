@@ -25,10 +25,11 @@ const (
 )
 
 type SourceColumn struct {
-	Name           string             `json:"name" yaml:"name"`
-	DataType       string             `json:"data_type" yaml:"data_type"`
-	Nullable       bool               `json:"nullable" yaml:"nullable"`
-	Classification DataClassification `json:"classification" yaml:"classification"`
+	Name             string             `json:"name" yaml:"name"`
+	DataType         string             `json:"data_type" yaml:"data_type"`
+	Nullable         bool               `json:"nullable" yaml:"nullable"`
+	Classification   DataClassification `json:"classification" yaml:"classification"`
+	ExpectedTypeOIDs []uint32           `json:"-" yaml:"-"`
 }
 
 type SourceContract struct {

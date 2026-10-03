@@ -14,6 +14,7 @@ func TestLoadResolvesSecretsFromEnvironment(t *testing.T) {
 		"DB_TX_USER": "extractor", "DB_TX_PASS": "source-secret", "DB_TX_SSLMODE": "verify-full",
 		"DB_DW_HOST": "warehouse", "DB_DW_PORT": "5433", "DB_DW_NAME": "dss_dw",
 		"DB_DW_USER": "dw_staging_writer", "DB_DW_PASS": "target-secret", "DB_DW_SSLMODE": "require",
+		"DW_RAW_ROOT": filepath.Join(t.TempDir(), "dw-raw"),
 	}
 	cfg, err := LoadWithLookup(path, func(key string) (string, bool) {
 		value, ok := env[key]
@@ -28,6 +29,9 @@ func TestLoadResolvesSecretsFromEnvironment(t *testing.T) {
 	}
 	if cfg.Source.Password != "source-secret" || cfg.Target.Password != "target-secret" || cfg.Source.SSLMode != "verify-full" {
 		t.Fatal("database credentials were not resolved from the environment")
+	}
+	if cfg.RawRoot != env["DW_RAW_ROOT"] {
+		t.Fatal("RAW storage root was not resolved from the environment")
 	}
 	encoded := string(mustRead(t, path))
 	for _, secret := range []string{cfg.Source.Password, cfg.Target.Password} {
@@ -82,6 +86,8 @@ const validConfigYAML = `server:
   shutdown_timeout: 10s
   readiness_timeout: 2s
   connect_timeout: 5s
+staging:
+  raw_root_env: DW_RAW_ROOT
 databases:
   source:
     host_env: DB_TX_HOST
@@ -105,6 +111,7 @@ func validEnvironment() map[string]string {
 		"DB_TX_USER": "reader", "DB_TX_PASS": "source-secret", "DB_TX_SSLMODE": "disable",
 		"DB_DW_HOST": "warehouse", "DB_DW_PORT": "5432", "DB_DW_NAME": "dss_dw",
 		"DB_DW_USER": "dw_staging_writer", "DB_DW_PASS": "target-secret", "DB_DW_SSLMODE": "disable",
+		"DW_RAW_ROOT": filepath.Join(os.TempDir(), "dw-raw"),
 	}
 }
 

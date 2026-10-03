@@ -29,6 +29,7 @@ type Config struct {
 	ReadinessTimeout  time.Duration `json:"readiness_timeout"`
 	ConnectTimeout    time.Duration `json:"connect_timeout"`
 	Extraction        Extraction    `json:"extraction"`
+	RawRoot           string        `json:"raw_root"`
 	Source            Database      `json:"-"`
 	Target            Database      `json:"-"`
 }
@@ -56,6 +57,9 @@ type fileConfig struct {
 		SourceIdleTimeout      string `yaml:"source_idle_timeout"`
 		TargetWriteTimeout     string `yaml:"target_write_timeout"`
 	} `yaml:"extraction"`
+	Staging struct {
+		RawRootEnv string `yaml:"raw_root_env"`
+	} `yaml:"staging"`
 	Databases struct {
 		Source databaseEnv `yaml:"source"`
 		Target databaseEnv `yaml:"target"`
@@ -155,6 +159,14 @@ func LoadWithLookup(path string, lookup func(string) (string, bool)) (Config, er
 	if err != nil {
 		return Config{}, err
 	}
+	rawRootEnv := strings.TrimSpace(raw.Staging.RawRootEnv)
+	if rawRootEnv == "" {
+		return Config{}, errors.New("staging.raw_root_env is required")
+	}
+	rawRoot, ok := lookup(rawRootEnv)
+	if !ok || strings.TrimSpace(rawRoot) == "" {
+		return Config{}, fmt.Errorf("staging: required environment variable %s is missing", rawRootEnv)
+	}
 	cfg := Config{
 		HTTPAddress:       strings.TrimSpace(raw.Server.Address),
 		ReadHeaderTimeout: readHeaderTimeout,
@@ -162,6 +174,7 @@ func LoadWithLookup(path string, lookup func(string) (string, bool)) (Config, er
 		ReadinessTimeout:  readinessTimeout,
 		ConnectTimeout:    connectTimeout,
 		Extraction:        Extraction{maxDuration, sourceStatementTimeout, sourceIdleTimeout, targetWriteTimeout},
+		RawRoot:           strings.TrimSpace(rawRoot),
 		Source:            source, Target: target,
 	}
 	if err := cfg.Validate(); err != nil {
@@ -209,6 +222,9 @@ func resolveDatabase(name string, names databaseEnv, lookup lookupEnv) (Database
 }
 
 func (c Config) Validate() error {
+	if strings.TrimSpace(c.RawRoot) == "" {
+		return errors.New("staging.raw_root is required")
+	}
 	if strings.TrimSpace(c.HTTPAddress) == "" {
 		return errors.New("server.address is required")
 	}

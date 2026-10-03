@@ -16,7 +16,6 @@ import (
 	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/app"
 	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/config"
 	"github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/observability"
-	sourcecatalog "github.com/kevin-117/dss-system-architecture/etl-layer/loadmanager/internal/source"
 )
 
 const (
@@ -64,15 +63,11 @@ func run(logger *slog.Logger) error {
 	if queryDirectory == "" {
 		queryDirectory = "../../infra/postgres-tx/extract"
 	}
-	query, err := sourcecatalog.LoadUATFDatosQuery(queryDirectory)
-	if err != nil {
-		return fmt.Errorf("load approved source contract: %w", err)
-	}
-	if _, err := postgres.NewUATFDatosExtractor(source, target, coordinator, query, postgres.ExtractionLimits{
+	if _, err := postgres.NewRawBundleExtractor(source, target, coordinator, queryDirectory, cfg.RawRoot, postgres.ExtractionLimits{
 		MaxDuration: cfg.Extraction.MaxDuration, SourceStatementTimeout: cfg.Extraction.SourceStatementTimeout,
 		SourceIdleTimeout: cfg.Extraction.SourceIdleTimeout, TargetWriteTimeout: cfg.Extraction.TargetWriteTimeout,
-	}); err != nil {
-		return fmt.Errorf("initialize source snapshot: %w", err)
+	}, 500); err != nil {
+		return fmt.Errorf("initialize approved nine-source RAW bundle: %w", err)
 	}
 
 	service := app.NewService(source, target, coordinator)
