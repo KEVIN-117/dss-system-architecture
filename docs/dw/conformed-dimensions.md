@@ -67,9 +67,10 @@ La migración repite los `REVOKE` y `GRANT` explícitos para que la seguridad no
 
 ## Límites con las siguientes issues
 
-- DW-007 define vigencias, versiones y la [política SCD de persona/estudiante](scd2-person-student-policy.md). DW-006 no crea `valid_from`, `valid_to`, `is_current` ni lógica de historización.
-- DW-019 cargará dimensiones desde las capas RAW y de trabajo. DW-006 no inserta datos OLTP ni interpreta códigos de estado.
-- DW-020 a DW-022 crearán los hechos. Los campos de notas, conteos, PPA, retención, deserción y grupo permanecen fuera de estas tablas.
+- DW-007 documenta vigencias y versiones; la [política SCD de persona/estudiante](scd2-person-student-policy.md) se materializa en `0008_add_student_scd2_versions.sql`. La migración agrega integridad temporal, pero la carga/hash en Hop sigue pendiente.
+- Para el MVP de #133, Hop cargará dimensiones directamente desde las fuentes contractuales; RAW y `etl_work` no son etapas obligatorias. DW-006 no inserta datos OLTP ni interpreta códigos de estado.
+- `0008_add_student_scd2_versions.sql` agrega vigencias a estudiante; `0009_create_constellation_facts.sql` crea los tres hechos con FKs a estas dimensiones. No se recrean dimensiones con nombres en inglés. Los campos de notas, conteos, PPA, retención, deserción y grupo permanecen fuera de estas tablas.
+- Matrícula y graduación quedan fuera del MVP; véase [la base consolidada de DW y ETL_CONTROL](mvp-direct-hop.md).
 - La validación de `public.postulantes`, los dominios de estado, la semántica de egreso y los joins OLTP continúan bajo la aprobación DSA/TI definida en DW-001 y DW-005.
 
 ## Validación local

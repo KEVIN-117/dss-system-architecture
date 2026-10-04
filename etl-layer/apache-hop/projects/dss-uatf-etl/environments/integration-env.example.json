@@ -1,0 +1,16 @@
+{
+  "variables": [
+    { "name": "DSS_DW_HOSTNAME", "value": "REPLACE_WITH_INTEGRATION_DW_HOST", "description": "Hostname for database connection DSS DW" },
+    { "name": "DSS_DW_PORT", "value": "REPLACE_WITH_INTEGRATION_DW_PORT", "description": "Port for database connection DSS DW" },
+    { "name": "DSS_DW_DATABASE", "value": "REPLACE_WITH_INTEGRATION_DW_DATABASE", "description": "Database name for database connection DSS DW" },
+    { "name": "DSS_DW_USERNAME", "value": "REPLACE_WITH_INTEGRATION_DW_RUNTIME_USER", "description": "Username for database connection DSS DW" },
+    { "name": "DSS_DW_PASSWORD", "value": "INJECT_FROM_INTEGRATION_SECRET_STORE", "description": "Password for database connection DSS DW" },
+    { "name": "DSS_DW_URL", "value": "jdbc:postgresql://REPLACE_WITH_INTEGRATION_DW_HOST:REPLACE_WITH_INTEGRATION_DW_PORT/REPLACE_WITH_INTEGRATION_DW_DATABASE", "description": "Manual JDBC URL for database connection DSS DW" },
+    { "name": "OLTP_DB_HOSTNAME", "value": "REPLACE_WITH_INTEGRATION_OLTP_HOST", "description": "Hostname for database connection OLTP db" },
+    { "name": "OLTP_DB_PORT", "value": "REPLACE_WITH_INTEGRATION_OLTP_PORT", "description": "Port for database connection OLTP db" },
+    { "name": "OLTP_DB_DATABASE", "value": "REPLACE_WITH_INTEGRATION_OLTP_DATABASE", "description": "Database name for database connection OLTP db" },
+    { "name": "OLTP_DB_USERNAME", "value": "REPLACE_WITH_INTEGRATION_OLTP_READ_ONLY_USER", "description": "Username for database connection OLTP db" },
+    { "name": "OLTP_DB_PASSWORD", "value": "INJECT_FROM_INTEGRATION_SECRET_STORE", "description": "Password for database connection OLTP db" },
+    { "name": "OLTP_DB_URL", "value": "jdbc:postgresql://REPLACE_WITH_INTEGRATION_OLTP_HOST:REPLACE_WITH_INTEGRATION_OLTP_PORT/REPLACE_WITH_INTEGRATION_OLTP_DATABASE", "description": "Manual JDBC URL for database connection OLTP db" }
+  ]
+}

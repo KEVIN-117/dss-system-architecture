@@ -1,0 +1,7 @@
+{
+  "variables": [],
+  "metadataBaseFolder": "${PROJECT_HOME}/metadata",
+  "unitTestsBasePath": "${PROJECT_HOME}",
+  "enforcingExecutionInHome": true,
+  "dataSetsCsvFolder": "${PROJECT_HOME}/datasets"
+}

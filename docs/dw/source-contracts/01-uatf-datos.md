@@ -21,7 +21,11 @@ Contiene datos personales indirectos. No se extraen nombres, documento, teléfon
 
 ## Snapshot y controles
 
-Extracción completa por cierre; orden estable `id_ra ASC`. El DDL local define `id_ra` como clave primaria. Si la instancia operativa contradice esa condición, el extractor rechaza el snapshot y lo deja incompleto; no deduplica ni omite silenciosamente registros. Referencias a colegio/localidad ausentes permanecen en RAW para su evaluación posterior. TI/DBA valida esquema y privilegios; DSA valida el uso funcional de atributos.
+Extracción completa por cierre; orden estable `id_ra ASC`. El DDL local define `id_ra` como clave primaria. Si la instancia operativa contradice esa condición, el extractor rechaza el snapshot y lo deja incompleto; no deduplica ni omite silenciosamente registros. Hop reportará las referencias a colegio/localidad ausentes y aplicará la política de calidad aprobada sin corregir el origen ni exigir persistencia RAW. TI/DBA valida esquema y privilegios; DSA valida el uso funcional de atributos.
+
+### Compatibilidad histórica de DW-011 (servicio pausado)
+
+Las reglas de paginación y hash siguientes describen el extractor Go conservado, no una dependencia de Hop. El MVP mantiene los campos y controles del contrato; adaptar placeholders/lectura JDBC requiere versión y checksum propios si cambia el SQL.
 
 DW-011 recorre el snapshot con keyset pagination: el cursor anterior y el tamaño de lote se envían como parámetros (`$1`, `$2`), con `id_ra > cursor`, `ORDER BY id_ra ASC` y lookahead de una fila. `id_ra` debe ser no nulo, único y estrictamente creciente para ese recorrido; si se observa una clave duplicada o desordenada, la ejecución falla y el manifiesto no se completa. La unicidad en la instancia productiva sigue pendiente de confirmación DSA/TI.
 

@@ -1,0 +1,71 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pipeline>
+  <info><name>pl_dim_admision_mvp</name><name_sync_with_filename>Y</name_sync_with_filename><description>Prepara el lote privado de DIM_ADMISION para publicación atómica</description><extended_description>Lee solo las fuentes/closures previamente auditados, transforma al contrato dimensional y usa exclusivamente la API de staging de Hop; no modifica dw.</extended_description><pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type><parameters><parameter><name>P_RUN_ID</name><default_value/><description>UUID de una ejecución EN_EJECUCION ya auditada</description></parameter></parameters><capture_transform_performance>N</capture_transform_performance><transform_performance_capturing_delay>1000</transform_performance_capturing_delay><transform_performance_capturing_size_limit>100</transform_performance_capturing_size_limit><created_user>DSA</created_user><created_date>2026/10/04 00:00:00.000</created_date><modified_user>DSA</modified_user><modified_date>2026/10/04 00:00:00.000</modified_date></info>
+  <notepads/>
+  <order>
+    <hop><from>Get run ID</from><to>Read admision source rows</to><enabled>Y</enabled></hop>
+    <hop><from>Read admision source rows</from><to>Stage DIM_ADMISION row</to><enabled>Y</enabled></hop>
+    <hop><from>Stage DIM_ADMISION row</from><to>Count staged rows</to><enabled>Y</enabled></hop>
+    <hop><from>Count staged rows</from><to>Seal DIM_ADMISION batch</to><enabled>Y</enabled></hop>
+  </order>
+  <transform><name>Get run ID</name><type>GetVariable</type><description>UUID para consulta preparada, nunca concatenada</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><fields><field><currency/><decimal/><format/><group/><length>36</length><name>run_id</name><precision>-1</precision><trim_type>both</trim_type><type>String</type><variable>${P_RUN_ID}</variable></field></fields><attributes/><GUI><xloc>128</xloc><yloc>128</yloc></GUI></transform>
+  <transform><name>Read admision source rows</name><type>TableInput</type><description>Transformación contractual a partir de OLTP o cierres autorizados</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>SELECT ?::uuid AS run_id,
+       row_number() OVER (ORDER BY x.id_acceso)::bigint AS row_ordinal,
+       x.id_acceso::varchar(2) AS id_acceso
+FROM (
+    SELECT DISTINCT btrim(id_acceso)::varchar(2) AS id_acceso
+    FROM public.postulantes
+    WHERE id_acceso IS NOT NULL AND btrim(id_acceso) &lt;&gt; ''
+) x
+ORDER BY x.id_acceso</sql><limit>0</limit><lookup>Get run ID</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>384</xloc><yloc>128</yloc></GUI></transform>
+  <transform><name>Stage DIM_ADMISION row</name><type>TableInput</type><description>Reserva o conserva surrogate key y envía payload al API privado</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection><sql>WITH p AS MATERIALIZED (
+    SELECT
+        ?::uuid AS run_id,
+        ?::bigint AS row_ordinal,
+        ?::varchar(2) AS id_acceso
+), dimension_key AS MATERIALIZED (
+    SELECT CASE WHEN p.run_id IS NULL THEN NULL ELSE etl_control.resolve_hop_dimension_key('admision', p.id_acceso::text) END AS surrogate_key
+    FROM p
+)
+SELECT p.run_id, etl_control.stage_hop_publication_row(
+    p.run_id, 'DIM_ADMISION'::varchar(40), p.row_ordinal, 'UPSERT'::varchar(12),
+    p.id_acceso::text,
+    jsonb_build_object(
+        'admision_sk', dimension_key.surrogate_key,
+        'member_type', 'STANDARD', 'technical_label', NULL,
+        'id_acceso', p.id_acceso,
+        'source_run_id', p.run_id,
+        'created_at', clock_timestamp(), 'updated_at', clock_timestamp()
+    )
+) AS staged_row_id
+FROM p CROSS JOIN dimension_key
+WHERE p.run_id IS NOT NULL</sql><limit>0</limit><lookup>Read admision source rows</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>896</xloc><yloc>128</yloc></GUI></transform>
+  <transform><name>Count staged rows</name><type>GroupBy</type><description>Calcula filas preparadas para sellar el lote</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><add_linenr>N</add_linenr><all_rows>N</all_rows><directory>${java.io.tmpdir}</directory><fields><field><aggregate>record_count</aggregate><subject>staged_row_id</subject><type>COUNT_ANY</type><valuefield/></field></fields><give_back_row>Y</give_back_row><group><field><name>run_id</name></field></group><ignore_aggregate>N</ignore_aggregate><prefix>grp</prefix><attributes/><GUI><xloc>1152</xloc><yloc>128</yloc></GUI></transform>
+  <transform><name>Seal DIM_ADMISION batch</name><type>TableInput</type><description>Sella exactamente las filas preparadas y registra paso de transformación</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection><sql>WITH params AS MATERIALIZED (
+    SELECT ?::uuid AS run_id, ?::bigint AS record_count
+), sealed AS MATERIALIZED (
+    SELECT (etl_control.seal_hop_publication_batch(
+        p.run_id, 'DIM_ADMISION'::varchar(40), p.record_count
+    )).target_code AS target_code
+    FROM params p WHERE p.run_id IS NOT NULL
+), step AS (
+    SELECT (etl_control.register_etl_execution_step(
+        p.run_id, 'dimension_admision'::varchar(100), 'TRANSFORMACION'::varchar(20),
+        'EXITOSO'::varchar(16), 23::smallint,
+        'pipelines/dimensions/pl_dim_admision_mvp.hpl'::text,
+        'hop-mvp-dimension-v1'::varchar(255),
+        jsonb_build_object('target_code','DIM_ADMISION','prepared_rows',p.record_count,'published',false)
+    )).step_id AS step_id
+    FROM params p CROSS JOIN sealed
+)
+SELECT step_id FROM step</sql><limit>0</limit><lookup>Count staged rows</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>1408</xloc><yloc>128</yloc></GUI></transform>
+  <transform_error_handling/><attributes/>
+</pipeline>
+
+
+
+
+
+
+
+
