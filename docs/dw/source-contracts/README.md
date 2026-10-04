@@ -1,13 +1,13 @@
 # DW-001 — Catálogo de contratos de extracción Jachasun
 
-Este directorio define el contrato entre Jachasun (OLTP) y la capa `staging` del Data Warehouse. Es la fuente normativa del Load Manager; la primera integración implementada cubre `public.uatf_datos`, mientras las demás fuentes se incorporarán incrementalmente. Apache Hop no debe consultar Jachasun directamente.
+Este directorio define los campos, claves, tipos y filtros autorizados para extraer Jachasun (OLTP). Para el MVP de la issue #133, **Apache Hop consultará directamente Jachasun** con una cuenta de solo lectura, validará y transformará los datos y publicará en `dw`. La [base consolidada](../mvp-direct-hop.md) sustituye la dependencia obligatoria de Go/Staging; Load Manager y su evidencia histórica se conservan como implementación futura.
 
 ## Política de extracción
 
 - **Carga inicial:** se extrae todo el historial disponible de las fuentes transaccionales y un snapshot completo de los catálogos.
 - **Cargas recurrentes:** se extrae un snapshot completo al cierre académico configurado. `academico.alumnos` y `academico.notas_planilla` no usan watermark como criterio de completitud.
-- **Consistencia:** una ejecución representa el estado observado durante una transacción de solo lectura; `run_id`, instante de inicio, corte solicitado, conteo, hash de esquema y hashes de artefactos se conservan en el manifiesto de staging.
-- **Transformaciones:** no se permiten joins analíticos, SCD, limpieza, flags ni métricas en las consultas de este directorio. Esas responsabilidades pertenecen a Staging/Hop.
+- **Consistencia:** las lecturas serán de solo lectura y con tiempos acotados. La implementación Hop deberá demostrar la consistencia entre fuentes: varias conexiones `REPEATABLE READ` y un `run_id` común no garantizan un snapshot compartido. Inicio, corte, conteos y hashes se registran en `etl_control`.
+- **Transformaciones:** no se permiten joins analíticos, SCD, limpieza, flags ni métricas en las consultas fuente. Esas responsabilidades pertenecen a Hop, sin capa RAW persistente obligatoria.
 
 ## Fuentes incluidas
 
@@ -25,11 +25,15 @@ Este directorio define el contrato entre Jachasun (OLTP) y la capa `staging` del
 
 No forman parte del primer DW relacional: `academico.docentes`, `moodle.*`, fuentes de personal, ni las tablas de otros esquemas homónimas a las fuentes aprobadas.
 
-## Parámetros y artefactos de snapshot
+Matrícula y graduación quedan fuera del MVP y de estos nueve contratos. `actas_graduacion.graduados` es la fuente oficial indicada para el futuro hecho de graduación, pero requiere un contrato propio y resolver su semántica y correspondencia temporal antes de ampliar las extracciones o permisos.
+
+## Parámetros y evidencia de snapshot
 
 El orquestador asigna un UUID `run_id` y entrega `snapshot_gestion`, `snapshot_periodo` y `snapshot_closed_at` a las consultas que requieren acotar hechos por periodo. Los catálogos y perfiles sin versión temporal se extraen completos y registran esos parámetros en el manifiesto, no como filtros artificiales.
 
-Por cada fuente, el manifiesto debe almacenar: nombre de contrato y versión, consulta/commit, orden estable, corte, inicio/fin, conteo leído, hash SHA-256 del esquema esperado, hash de cada artefacto RAW y estado. En general, los registros con referencias huérfanas no se corrigen en origen: se conservan para su evaluación posterior. Para el extractor DW-011 `public.uatf_datos`, una clave natural nula/duplicada o un campo obligatorio nulo bloquea **todo** el snapshot y deja el manifiesto fallido; los lotes RAW previamente confirmados permanecen solo como evidencia del intento.
+Por cada fuente, el manifiesto debe almacenar nombre de contrato y versión, checksum de consulta, orden estable, corte, tiempos, conteo leído, SHA-256 del esquema y estado. El flujo directo no exige artefactos RAW. Hop debe certificar el conjunto de nueve manifiestos y la calidad antes de publicar. No se corrigen referencias huérfanas en origen: se registran incidencias saneadas y se aplica la política aprobada de bloqueo o miembro técnico. Una clave obligatoria nula, duplicada o conflictiva no se omite silenciosamente.
+
+Las referencias a RAW y a la consulta canónica del extractor DW-011 describen compatibilidad histórica del servicio pausado. No obligan al MVP a generar archivos ni escribir `staging.raw_uatf_datos`. La adaptación de placeholders a JDBC debe conservar columnas/filtros y registrar su versión/hash; no se reutiliza un hash si cambió el SQL.
 
 ## Acceso y aprobación
 

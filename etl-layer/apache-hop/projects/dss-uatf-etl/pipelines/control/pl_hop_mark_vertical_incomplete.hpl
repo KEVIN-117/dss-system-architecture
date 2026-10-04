@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pipeline>
+  <info><name>pl_hop_mark_vertical_incomplete</name><name_sync_with_filename>Y</name_sync_with_filename><description>Marca el smoke vertical como no publicable</description><extended_description>Nueve fuentes, cinco dimensiones, FACT_ADMISION y FACT_CURSADO están preparados en el landing privado. FACT_RETENCION_DESERCION sigue pendiente. Registra el gate bloqueante y deja la ejecución FALLIDA; nunca la marca EXITOSA ni toca tablas DW.</extended_description><pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type><parameters><parameter><name>P_RUN_ID</name><default_value/><description>UUID del intento</description></parameter></parameters><capture_transform_performance>N</capture_transform_performance><transform_performance_capturing_delay>1000</transform_performance_capturing_delay><transform_performance_capturing_size_limit>100</transform_performance_capturing_size_limit><created_user>DSA</created_user><created_date>2026/10/03 00:00:00.000</created_date><modified_user>DSA</modified_user><modified_date>2026/10/03 00:00:00.000</modified_date></info>
+  <notepads/><order><hop><from>Get run ID</from><to>Record non-publishable outcome</to><enabled>Y</enabled></hop><hop><from>Record non-publishable outcome</from><to>Audit recorded</to><enabled>Y</enabled></hop></order>
+  <transform><name>Get run ID</name><type>GetVariable</type><description>UUID se enlaza como valor JDBC, no como texto SQL</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><fields><field><currency/><decimal/><format/><group/><length>36</length><name>run_id</name><precision>-1</precision><trim_type>both</trim_type><type>String</type><variable>${P_RUN_ID}</variable></field></fields><attributes/><GUI><xloc>128</xloc><yloc>160</yloc></GUI></transform>
+  <transform><name>Record non-publishable outcome</name><type>TableInput</type><description>Audita el incumplimiento esperado del conjunto de nueve fuentes y falla el intento de prueba</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection>
+    <sql>WITH request AS MATERIALIZED (
+    SELECT ?::uuid AS run_id
+), gate_step AS MATERIALIZED (
+    SELECT (etl_control.register_etl_execution_step(
+        request.run_id, 'mvp_completion_gate'::varchar(100), 'VALIDACION'::varchar(20),
+        'FALLIDO'::varchar(16), 99::smallint,
+        'workflows/wf_vertical_uatf_datos_smoke.hwf'::text,
+        'hop-mvp-vertical-1'::varchar(255),
+        '{"required_source_manifests":9,"observed_source_manifests":9,"prepared_dimension_batches":5,"prepared_fact_batches":2,"prepared_dimension_and_fact_batches":7,"required_dimension_and_fact_batches":8,"missing_target":"FACT_RETENCION_DESERCION","published":false}'::jsonb
+    )).step_id AS step_id
+    FROM request
+), gate_error AS MATERIALIZED (
+    SELECT (etl_control.record_etl_execution_error(
+        request.run_id, 'ERROR'::varchar(12), 'MVP_VERTICAL_ONLY'::varchar(100),
+        'El flujo vertical valida nueve fuentes, cinco dimensiones y dos hechos; falta FACT_RETENCION_DESERCION'::text,
+        'Falta FACT_RETENCION_DESERCION; no se inició publicación'::text,
+        TRUE, gate_step.step_id,
+        '{"required_source_manifests":9,"observed_source_manifests":9,"prepared_dimension_batches":5,"prepared_fact_batches":2,"prepared_dimension_and_fact_batches":7,"required_dimension_and_fact_batches":8,"missing_target":"FACT_RETENCION_DESERCION","published":false}'::jsonb
+    )).error_id AS error_id
+    FROM request CROSS JOIN gate_step
+), failed AS MATERIALIZED (
+    SELECT (etl_control.fail_hop_etl_execution(
+        request.run_id, 'Smoke no publicable: falta FACT_RETENCION_DESERCION'::text
+    )).run_id AS run_id
+    FROM request CROSS JOIN gate_error
+)
+SELECT run_id FROM failed;</sql>
+    <limit>0</limit><lookup>Get run ID</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>416</xloc><yloc>160</yloc></GUI>
+  </transform>
+  <transform><name>Audit recorded</name><type>Dummy</type><description>El estado FALLIDA es intencional para evitar representar una carga parcial como éxito</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><attributes/><GUI><xloc>704</xloc><yloc>160</yloc></GUI></transform>
+  <transform_error_handling/><attributes/>
+</pipeline>
+
+
+
+

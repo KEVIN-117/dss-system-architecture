@@ -15,7 +15,7 @@ Catálogo curricular. Una fila por `id_materia` en el snapshot completo.
 | `ciclo`, `nivel_academico` | integer/smallint | sí | nivel |
 | `hrs_teoricas`, `hrs_practicas`, `creditos` | numéricos | sí | carga académica |
 
-No contiene PII. Los joins curriculares se realizarán después de RAW. La compatibilidad de tipo con `academico.notas_planilla.id_materia` se valida en la instancia real.
+No contiene PII. Los joins curriculares se realizarán en la transformación Hop, después de la lectura contractual, sin requerir RAW persistente. La compatibilidad de tipo con `academico.notas_planilla.id_materia` se valida en la instancia real.
 
 ## Snapshot y controles
 

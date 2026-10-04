@@ -1,5 +1,7 @@
 # DW-011 — Snapshot paginado de `public.uatf_datos`
 
+> Implementación conservada para el futuro y pausada en el MVP de #133. Este documento no define su ruta activa ni impone dependencia de Go/RAW. La arquitectura vigente se describe en [mvp-direct-hop.md](mvp-direct-hop.md); el código y sus migraciones se conservan sin cambios.
+
 ## Contrato y límites
 
 El primer extractor solo cubre `public.uatf_datos` → `staging.raw_uatf_datos`. La consulta SQL parametrizada se compara contra el SHA-256 de la versión DW-001 aprobada; añadir filtros o cambiar la proyección exige otra versión. Antes de leer filas, se inspeccionan catálogo PostgreSQL, tipos, longitudes, nulabilidad, colación y un índice único válido de `id_ra`. La excepción de fixture para `id_colegio` e `id_loc` (`integer` en vez de `smallint`) no aprueba esos tipos en producción: TI/DBA debe confirmarlos en Jachasun. La cuenta fuente es de solo lectura.

@@ -1,0 +1,35 @@
+{
+  "virtualPath": "",
+  "rdbms": {
+    "POSTGRESQL": {
+      "sshTunnelPort": "22",
+      "sshTunnelUsePrivateKey": false,
+      "databaseName": "${DSS_DW_DATABASE}",
+      "pluginId": "POSTGRESQL",
+      "sshTunnelEnabled": false,
+      "accessType": 0,
+      "sshTunnelUsername": "",
+      "hostname": "${DSS_DW_HOSTNAME}",
+      "password": "${DSS_DW_PASSWORD}",
+      "pluginName": "PostgreSQL",
+      "port": "${DSS_DW_PORT}",
+      "manualUrl": "${DSS_DW_URL}",
+      "sshTunnelHost": "",
+      "attributes": {
+        "SUPPORTS_TIMESTAMP_DATA_TYPE": "Y",
+        "QUOTE_ALL_FIELDS": "N",
+        "SUPPORTS_BOOLEAN_DATA_TYPE": "Y",
+        "FORCE_IDENTIFIERS_TO_LOWERCASE": "N",
+        "PRESERVE_RESERVED_WORD_CASE": "Y",
+        "SQL_CONNECT": "",
+        "FORCE_IDENTIFIERS_TO_UPPERCASE": "N",
+        "PREFERRED_SCHEMA_NAME": ""
+      },
+      "sshTunnelPassphrase": "Encrypted ",
+      "sshTunnelPassword": "Encrypted ",
+      "sshTunnelPrivateKeyFile": "",
+      "username": "${DSS_DW_USERNAME}"
+    }
+  },
+  "name": "DSS DW"
+}

@@ -129,33 +129,32 @@ services:
     networks:
       - dss-net
   hop-web:
-    image: apache/hop-web:latest
+    image: apache/hop-web:${HOP_WEB_VERSION:-2.19.0}
     container_name: dss-hop-web
     depends_on:
       dw-migrator:
         condition: service_completed_successfully
     ports:
-      - "8081:8080"
+      - "127.0.0.1:${HOP_WEB_PORT:-8081}:8080"
     volumes:
-      - ./etl-layer/project-uatf:/files/project
-      - ./etl-layer/config:/files/config
-      - ./etl-layer/jdbc:/files/jdbc
+      - ./etl-layer/apache-hop/projects/dss-uatf-etl:/files/project:rw
+      - ./etl-layer/apache-hop/jdbc:/files/jdbc:ro
+      - ./etl-layer/apache-hop/scripts:/files/scripts:ro
+    entrypoint: ["/bin/bash", "/files/scripts/start-hop-web.sh"]
+    command: []
     environment:
-      # Definición de Proyecto
-      HOP_PROJECT_NAME: dss-uatf
+      HOP_PROJECT_NAME: dss-uatf-etl
       HOP_PROJECT_FOLDER: /files/project
-
-      # Definición de Entorno
-      HOP_ENVIRONMENT_NAME: dev
-      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/config/environments/dev-env.json
-
-      # Compartir librería de Drivers
+      HOP_ENVIRONMENT_NAME: ${HOP_ENVIRONMENT_NAME:-dev}
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/${HOP_ENVIRONMENT_NAME:-dev}-env.json
       HOP_SHARED_JDBC_FOLDERS: /files/jdbc
-      DB_DW_HOST: postgres-dw
-      DB_DW_PORT: 5434
-      DB_DW_NAME: dss_dw
-      DB_DW_USER: admin
-      DB_DW_PASS: secret
+      HOP_OPTIONS: >-
+        -DDB_DW_HOST=${DB_DW_HOST:-host.docker.internal}
+        -DDB_DW_PORT=${DB_DW_PORT:-5434}
+        -DDB_DW_NAME=${POSTGRES_DW_NAME}
+        -DDB_TX_HOST=${DB_TX_HOST:-host.docker.internal}
+        -DDB_TX_PORT=${DB_TX_PORT:-5432}
+        -DDB_TX_NAME=${POSTGRES_TX_NAME}
     networks:
       - dss-net
   # ==========================================

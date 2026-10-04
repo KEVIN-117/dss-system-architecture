@@ -133,3 +133,128 @@ services:
       - ../..:/workspace:ro
     command: ["go", "test", "-tags=integration", "./..."]
     restart: "no"
+
+  hop-vertical-integration-test:
+    image: apache/hop:2.19.0
+    profiles: ["dw-vertical"]
+    depends_on:
+      integration-test:
+        condition: service_completed_successfully
+    volumes:
+      - ../../etl-layer/apache-hop/projects/dss-uatf-etl:/files/project:ro
+      - ../../etl-layer/apache-hop/jdbc:/files/jdbc:ro
+    environment:
+      HOP_PROJECT_NAME: dss-uatf-etl
+      HOP_PROJECT_FOLDER: /files/project
+      HOP_PROJECT_CONFIG_FILE_NAME: project-config.json
+      HOP_ENVIRONMENT_NAME: integration
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/integration-test.json
+      HOP_SHARED_JDBC_FOLDERS: /files/jdbc
+      HOP_FILE_PATH: /files/project/workflows/wf_vertical_uatf_datos_smoke.hwf
+      HOP_RUN_CONFIG: local
+      HOP_RUN_PARAMETERS: P_RUN_ID=a1300000-0000-0000-0000-000000000001,P_REQUESTED_GESTION=2025,P_REQUESTED_PERIODO=2
+      HOP_OPTIONS: >-
+        -DDB_DW_HOST=postgres-dw
+        -DDB_DW_PORT=5432
+        -DDB_DW_NAME=dw_integration
+        -DDB_TX_HOST=jachasun-fixture
+        -DDB_TX_PORT=5432
+        -DDB_TX_NAME=jachasun_test
+    restart: "no"
+
+  hop-source-query-contract-test:
+    image: postgres:15-alpine
+    profiles: ["dw-req6-sources"]
+    depends_on:
+      jachasun-fixture:
+        condition: service_healthy
+    environment:
+      PGHOST: jachasun-fixture
+      PGPORT: "5432"
+      PGDATABASE: jachasun_test
+      PGUSER: dw_fixture_reader
+      PGPASSWORD: fixture_readonly
+    volumes:
+      - ../../etl-layer/apache-hop/projects/dss-uatf-etl/pipelines/source/sql:/queries:ro
+      - ./tests/test_hop_source_queries.sh:/tests/test_hop_source_queries.sh:ro
+    entrypoint: ["/bin/sh", "-c", "tr -d '\r' < /tests/test_hop_source_queries.sh | /bin/sh"]
+    restart: "no"
+
+  hop-vertical-assert:
+    image: postgres:15-alpine
+    profiles: ["dw-vertical"]
+    depends_on:
+      hop-vertical-integration-test:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres-dw
+      PGPORT: "5432"
+      PGDATABASE: dw_integration
+      PGUSER: dw_test
+      PGPASSWORD: dw_test
+    volumes:
+      - ./tests/assert_hop_vertical.sql:/tests/assert_hop_vertical.sql:ro
+    entrypoint: ["/bin/sh", "-c", "psql -X -v ON_ERROR_STOP=1 -f /tests/assert_hop_vertical.sql"]
+    restart: "no"
+
+  hop-publish-fixture:
+    image: postgres:15-alpine
+    profiles: ["dw-publish"]
+    depends_on:
+      integration-test:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres-dw
+      PGPORT: "5432"
+      PGDATABASE: dw_integration
+      PGUSER: dw_test
+      PGPASSWORD: dw_test
+    volumes:
+      - ./tests/prepare_hop_publish.sql:/tests/prepare_hop_publish.sql:ro
+    entrypoint: ["/bin/sh", "-c", "psql -X -v ON_ERROR_STOP=1 -f /tests/prepare_hop_publish.sql"]
+    restart: "no"
+
+  hop-publish-integration-test:
+    image: apache/hop:2.19.0
+    profiles: ["dw-publish"]
+    depends_on:
+      hop-publish-fixture:
+        condition: service_completed_successfully
+    volumes:
+      - ../../etl-layer/apache-hop/projects/dss-uatf-etl:/files/project:ro
+      - ../../etl-layer/apache-hop/jdbc:/files/jdbc:ro
+    environment:
+      HOP_PROJECT_NAME: dss-uatf-etl
+      HOP_PROJECT_FOLDER: /files/project
+      HOP_PROJECT_CONFIG_FILE_NAME: project-config.json
+      HOP_ENVIRONMENT_NAME: integration
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/integration-test.json
+      HOP_SHARED_JDBC_FOLDERS: /files/jdbc
+      HOP_FILE_PATH: /files/project/workflows/wf_hop_publish_staged_run.hwf
+      HOP_RUN_CONFIG: local
+      HOP_RUN_PARAMETERS: P_RUN_ID=b1300000-0000-0000-0000-000000000001
+      HOP_OPTIONS: >-
+        -DDB_DW_HOST=postgres-dw
+        -DDB_DW_PORT=5432
+        -DDB_DW_NAME=dw_integration
+        -DDB_TX_HOST=jachasun-fixture
+        -DDB_TX_PORT=5432
+        -DDB_TX_NAME=jachasun_test
+    restart: "no"
+
+  hop-publish-assert:
+    image: postgres:15-alpine
+    profiles: ["dw-publish"]
+    depends_on:
+      hop-publish-integration-test:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres-dw
+      PGPORT: "5432"
+      PGDATABASE: dw_integration
+      PGUSER: dw_test
+      PGPASSWORD: dw_test
+    volumes:
+      - ./tests/assert_hop_publish.sql:/tests/assert_hop_publish.sql:ro
+    entrypoint: ["/bin/sh", "-c", "psql -X -v ON_ERROR_STOP=1 -f /tests/assert_hop_publish.sql"]
+    restart: "no"

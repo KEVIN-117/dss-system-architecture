@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pipeline>
+  <info><name>pl_hop_fail_vertical_source</name><name_sync_with_filename>Y</name_sync_with_filename><description>Audita y falla de forma segura ante error de extracción vertical</description><extended_description>No registra datos personales ni mensajes SQL del driver; el motivo es genérico y saneado. La llamada de auditoría utiliza exclusivamente las funciones autorizadas.</extended_description><pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type><parameters><parameter><name>P_RUN_ID</name><default_value/><description>UUID del intento</description></parameter></parameters><capture_transform_performance>N</capture_transform_performance><transform_performance_capturing_delay>1000</transform_performance_capturing_delay><transform_performance_capturing_size_limit>100</transform_performance_capturing_size_limit><created_user>DSA</created_user><created_date>2026/10/03 00:00:00.000</created_date><modified_user>DSA</modified_user><modified_date>2026/10/03 00:00:00.000</modified_date></info>
+  <notepads/><order><hop><from>Get run ID</from><to>Audit source failure</to><enabled>Y</enabled></hop><hop><from>Audit source failure</from><to>Failure audited</to><enabled>Y</enabled></hop></order>
+  <transform><name>Get run ID</name><type>GetVariable</type><description>UUID enlazado como parámetro preparado</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><fields><field><currency/><decimal/><format/><group/><length>36</length><name>run_id</name><precision>-1</precision><trim_type>both</trim_type><type>String</type><variable>${P_RUN_ID}</variable></field></fields><attributes/><GUI><xloc>128</xloc><yloc>160</yloc></GUI></transform>
+  <transform><name>Audit source failure</name><type>TableInput</type><description>Registra error saneado y transición FALLIDA en una sola transacción</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection>
+    <sql>WITH request AS MATERIALIZED (
+    SELECT ?::uuid AS run_id
+), failed_step AS MATERIALIZED (
+    SELECT (etl_control.register_etl_execution_step(
+        request.run_id, 'source_contract_extraction'::varchar(100), 'EXTRACCION'::varchar(20),
+        'FALLIDO'::varchar(16), 1::smallint,
+        'workflows/wf_vertical_uatf_datos_smoke.hwf'::text,
+        'hop-mvp-vertical-1'::varchar(255), '{"rows_retained":false}'::jsonb
+    )).step_id AS step_id
+    FROM request
+), failure AS MATERIALIZED (
+    SELECT (etl_control.record_etl_execution_error(
+        request.run_id, 'ERROR'::varchar(12), 'SOURCE_CONTRACT_EXTRACTION_FAILED'::varchar(100),
+        'Una pipeline de fuente no completó la validación/extracción'::text,
+        'Revisar el log técnico saneado de Hop; no se publica ningún dato'::text,
+        TRUE, failed_step.step_id, '{"source_contracts":"approved_dw001"}'::jsonb
+    )).error_id AS error_id
+    FROM request CROSS JOIN failed_step
+), terminal AS MATERIALIZED (
+    SELECT (etl_control.fail_hop_etl_execution(
+        request.run_id, 'Falló una extracción de fuente contractual del flujo vertical'::text
+    )).run_id AS run_id
+    FROM request CROSS JOIN failure
+)
+SELECT run_id FROM terminal;</sql>
+    <limit>0</limit><lookup>Get run ID</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>416</xloc><yloc>160</yloc></GUI>
+  </transform>
+  <transform><name>Failure audited</name><type>Dummy</type><description>Fin de la ruta de error auditada</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><attributes/><GUI><xloc>704</xloc><yloc>160</yloc></GUI></transform>
+  <transform_error_handling/><attributes/>
+</pipeline>

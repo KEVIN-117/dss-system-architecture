@@ -1,0 +1,5 @@
+# Control de ejecución
+
+Las operaciones permitidas son las funciones `etl_control` que lista `docs/dw/hop-execution-contract.md`. El runtime se conecta como miembro exclusivo de `dw_hop_runtime`; no se usa `dw_owner`, `dw_publisher`, usuario migrador ni DML directo sobre tablas de control, `etl_work` o `dw`.
+
+`pl_hop_publish_staged_run.hpl` acepta un `P_RUN_ID` cuyos nueve manifiestos están completos y cuyos ocho lotes preparados están sellados. En una sola sentencia adquiere lease, valida manifiestos, cambia a `PUBLICANDO`, vuelve a verificar conteos/SHA-256, publica y termina `EXITOSA`. `wf_hop_publish_staged_run.hwf` conecta ese camino con `pl_hop_fail_publication.hpl`: si la sentencia falla, `abort_hop_publication` audita sin valores de negocio, libera el lease correcto, limpia las filas privadas del landing y deja `FALLIDA`. La transacción de error nunca toca el conjunto DW previo. Ejecutar estas pipelines requiere tener antes las pipelines de extracción/transformación del Req. 6; no es una carga funcional por sí sola.

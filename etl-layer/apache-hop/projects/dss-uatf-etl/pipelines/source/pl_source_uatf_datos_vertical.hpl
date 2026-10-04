@@ -1,0 +1,191 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pipeline>
+  <info>
+    <name>pl_source_uatf_datos_vertical</name>
+    <name_sync_with_filename>Y</name_sync_with_filename>
+    <description>Lee, valida y audita un snapshot completo de public.uatf_datos en memoria</description>
+    <extended_description>No conserva filas RAW ni escribe dimensiones/hechos. Unicidad se verifica por PK id_ra; el hash del esquema se calcula sobre el signature del catálogo JDBC/PostgreSQL.</extended_description>
+    <pipeline_version>1.0</pipeline_version>
+    <pipeline_type>Normal</pipeline_type>
+    <parameters>
+      <parameter><name>P_RUN_ID</name><default_value/><description>UUID del intento inicializado</description></parameter>
+    </parameters>
+    <capture_transform_performance>N</capture_transform_performance>
+    <transform_performance_capturing_delay>1000</transform_performance_capturing_delay>
+    <transform_performance_capturing_size_limit>100</transform_performance_capturing_size_limit>
+    <created_user>DSA</created_user>
+    <created_date>2026/10/03 00:00:00.000</created_date>
+    <modified_user>DSA</modified_user>
+    <modified_date>2026/10/03 00:00:00.000</modified_date>
+  </info>
+  <notepads/>
+  <order>
+    <hop><from>Validate source contract</from><to>SHA-256 schema signature</to><enabled>Y</enabled></hop>
+    <hop><from>SHA-256 schema signature</from><to>Contract accepted?</to><enabled>Y</enabled></hop>
+    <hop><from>Contract accepted?</from><to>Abort invalid contract</to><enabled>Y</enabled></hop>
+    <hop><from>Contract accepted?</from><to>Keep schema checksum</to><enabled>Y</enabled></hop>
+    <hop><from>Keep schema checksum</from><to>Read UATF snapshot</to><enabled>Y</enabled></hop>
+    <hop><from>Read UATF snapshot</from><to>Get run ID</to><enabled>Y</enabled></hop>
+    <hop><from>Get run ID</from><to>Audit parameters</to><enabled>Y</enabled></hop>
+    <hop><from>Audit parameters</from><to>Register source audit atomically</to><enabled>Y</enabled></hop>
+  </order>
+  <transform>
+    <name>Validate source contract</name><type>TableInput</type>
+    <description>Comprueba columnas, tipos admitidos, nulabilidad, PK id_ra y nulos obligatorios</description>
+    <distribute>Y</distribute><custom_distribution/><copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>OLTP db</connection>
+    <sql>WITH expected(ordinal_position, column_name, allowed_udt, char_length, is_nullable) AS (
+    VALUES
+        (1, 'id_ra',        ARRAY['varchar']::text[], 10::integer, 'NO'::text),
+        (2, 'id_sexo',      ARRAY['varchar']::text[],  1::integer, 'YES'::text),
+        (3, 'estado_civil', ARRAY['int2']::text[],     NULL::integer, 'NO'::text),
+        (4, 'nac_pais',     ARRAY['int4']::text[],     NULL::integer, 'YES'::text),
+        (5, 'id_colegio',   ARRAY['int2','int4']::text[], NULL::integer, 'YES'::text),
+        (6, 'id_loc',       ARRAY['int2','int4']::text[], NULL::integer, 'YES'::text),
+        (7, 'egr_gestion',  ARRAY['int2']::text[],     NULL::integer, 'YES'::text),
+        (8, '_modificado',  ARRAY['timestamp']::text[], NULL::integer, 'NO'::text)
+), observed AS (
+    SELECT e.ordinal_position, e.column_name, e.allowed_udt, e.char_length, e.is_nullable,
+           c.column_name AS actual_name, c.udt_name, c.character_maximum_length, c.is_nullable AS actual_nullable
+    FROM expected e
+    LEFT JOIN information_schema.columns c
+      ON c.table_schema = 'public' AND c.table_name = 'uatf_datos' AND c.column_name = e.column_name
+), signature AS (
+    SELECT string_agg(
+        concat_ws(':', column_name, coalesce(udt_name, '&lt;missing&gt;'),
+                  coalesce(character_maximum_length::text, ''), coalesce(actual_nullable, '&lt;missing&gt;')),
+        E'\n' ORDER BY ordinal_position
+    ) AS value
+    FROM observed
+)
+SELECT CASE WHEN
+    -- The contract is a projection, not the complete OLTP table definition.
+    -- Jachasun has additional columns that this pipeline must neither read nor validate.
+    NOT EXISTS (
+        SELECT 1 FROM observed
+        WHERE actual_name IS NULL
+           OR NOT (udt_name = ANY(allowed_udt))
+           OR character_maximum_length IS DISTINCT FROM char_length
+           OR actual_nullable &lt;&gt; is_nullable
+    )
+    AND EXISTS (
+        SELECT 1 FROM pg_constraint c
+        WHERE c.conrelid = 'public.uatf_datos'::regclass AND c.contype = 'p'
+          AND c.conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a
+                                WHERE a.attrelid = c.conrelid AND a.attname = 'id_ra'
+                                  AND NOT a.attisdropped)]::smallint[]
+    )
+    AND NOT EXISTS (
+        SELECT 1 FROM public.uatf_datos
+        WHERE id_ra IS NULL OR estado_civil IS NULL OR _modificado IS NULL
+    )
+    THEN 1 ELSE 0 END AS contract_ok,
+    signature.value AS schema_signature
+FROM signature;</sql>
+    <limit>0</limit><lookup/><execute_each_row>N</execute_each_row><variables_active>N</variables_active>
+    <attributes/><GUI><xloc>128</xloc><yloc>160</yloc></GUI>
+  </transform>
+  <transform>
+    <name>SHA-256 schema signature</name><type>CheckSum</type>
+    <description>Fingerprint del esquema efectivamente observado</description>
+    <distribute>Y</distribute><custom_distribution/><copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <checksumtype>SHA-256</checksumtype><resultfieldName>schema_sha256</resultfieldName><resultType>hexadecimal</resultType>
+    <fields><field><name>schema_signature</name></field></fields>
+    <attributes/><GUI><xloc>352</xloc><yloc>160</yloc></GUI>
+  </transform>
+  <transform>
+    <name>Contract accepted?</name><type>FilterRows</type>
+    <description>Una discrepancia bloquea el snapshot antes de extraer filas</description>
+    <distribute>Y</distribute><custom_distribution/><copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <compare><condition><conditions/><function>=</function><leftvalue>contract_ok</leftvalue><negated>N</negated><operator>-</operator>
+      <value><isnull>N</isnull><length>-1</length><mask>####0;-####0</mask><name>constant</name><precision>0</precision><text>1</text><type>Integer</type></value>
+    </condition></compare>
+    <send_false_to>Abort invalid contract</send_false_to><send_true_to>Keep schema checksum</send_true_to>
+    <attributes/><GUI><xloc>592</xloc><yloc>160</yloc></GUI>
+  </transform>
+  <transform>
+    <name>Abort invalid contract</name><type>Abort</type>
+    <description>Detiene la ejecución ante discrepancias de estructura, clave o calidad obligatoria</description>
+    <distribute>Y</distribute><custom_distribution/><copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <abort_option>ABORT_WITH_ERROR</abort_option><always_log_rows>N</always_log_rows>
+    <message>El contrato public.uatf_datos no coincide con el esquema aprobado o contiene nulos obligatorios</message><row_threshold>0</row_threshold>
+    <attributes/><GUI><xloc>848</xloc><yloc>64</yloc></GUI>
+  </transform>
+  <transform>
+    <name>Keep schema checksum</name><type>SelectValues</type>
+    <description>Evita propagar la firma de columnas fuera del cálculo de SHA-256</description>
+    <distribute>Y</distribute><custom_distribution/><copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <fields><field><name>schema_sha256</name><length>-2</length><precision>-2</precision></field><select_unspecified>N</select_unspecified></fields>
+    <attributes/><GUI><xloc>848</xloc><yloc>208</yloc></GUI>
+  </transform>
+  <transform>
+    <name>Read UATF snapshot</name><type>TableInput</type>
+    <description>Snapshot completo, columnas contractuales explícitas y orden por clave natural</description>
+    <distribute>Y</distribute><custom_distribution/><copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <connection>OLTP db</connection>
+    <sql>SELECT count(*)::bigint AS record_count,
+       ?::char(64) AS source_schema_sha256
+FROM public.uatf_datos;</sql>
+    <limit>0</limit><lookup>Keep schema checksum</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active>
+    <attributes/><GUI><xloc>1104</xloc><yloc>208</yloc></GUI>
+  </transform>
+  <transform>
+    <name>Get run ID</name><type>GetVariable</type>
+    <description>Adjunta el run_id ya validado; las operaciones de control usan prepared statements</description>
+    <distribute>Y</distribute><custom_distribution/><copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <fields><field><currency/><decimal/><format/><group/><length>36</length><name>run_id</name><precision>-1</precision><trim_type>both</trim_type><type>String</type><variable>${P_RUN_ID}</variable></field></fields>
+    <attributes/><GUI><xloc>1616</xloc><yloc>208</yloc></GUI>
+  </transform>
+  <transform>
+    <name>Audit parameters</name><type>SelectValues</type><description>run_id, hash de esquema y conteo para registrar la fuente en una sentencia atómica</description>
+    <distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning>
+    <fields><field><name>run_id</name><length>-2</length><precision>-2</precision></field><field><name>source_schema_sha256</name><rename>schema_sha256</rename><length>-2</length><precision>-2</precision></field><field><name>record_count</name><length>-2</length><precision>-2</precision></field><select_unspecified>N</select_unspecified></fields>
+    <attributes/><GUI><xloc>1872</xloc><yloc>208</yloc></GUI>
+  </transform>
+  <transform>
+    <name>Register source audit atomically</name><type>TableInput</type><description>Manifiesto, métrica y paso se confirman en una única sentencia; cualquier fallo revierte la auditoría completa</description>
+    <distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning>
+    <connection>DSS DW</connection>
+    <sql>WITH params AS MATERIALIZED (
+    SELECT ?::uuid AS run_id, ?::char(64) AS schema_sha256, ?::bigint AS record_count
+), registered_manifest AS (
+    SELECT (etl_control.register_etl_source_manifest(
+        p.run_id, 'public.uatf_datos'::varchar(150), 'hop-v1'::varchar(64),
+        'public'::varchar(63), 'uatf_datos'::varchar(63),
+        '100540481de4279f6ba618c0863a9561b3d1d543432dae457dce41c409e104dd'::char(64),
+        'id_ra ASC'::text, 'COMPLETO'::varchar(16), p.schema_sha256,
+        NULL::smallint, NULL::smallint, NULL::timestamptz, p.record_count,
+        '{"engine":"apache-hop","source_rows_retained":false,"flow":"vertical-smoke"}'::jsonb
+    )).manifest_id AS manifest_id
+    FROM params p
+), registered_metric AS (
+    SELECT (etl_control.record_etl_execution_metric(
+        p.run_id, 'source_rows_observed'::varchar(100), p.record_count::numeric,
+        'ROWS'::varchar(32), NULL::bigint,
+        '{"source_contract_id":"public.uatf_datos"}'::jsonb
+    )).metric_id AS metric_id
+    FROM params p CROSS JOIN registered_manifest
+), registered_step AS (
+    SELECT (etl_control.register_etl_execution_step(
+        p.run_id, 'source_uatf_datos'::varchar(100), 'EXTRACCION'::varchar(20),
+        'EXITOSO'::varchar(16), 1::smallint,
+        'pipelines/source/pl_source_uatf_datos_vertical.hpl'::text,
+        'hop-mvp-vertical-1'::varchar(255),
+        jsonb_build_object('record_count', p.record_count, 'manifest_contract_count', 1, 'source_rows_retained', false)
+    )).step_id AS step_id
+    FROM params p CROSS JOIN registered_manifest CROSS JOIN registered_metric
+)
+SELECT step_id FROM registered_step;</sql>
+    <limit>0</limit><lookup>Audit parameters</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active>
+    <attributes/><GUI><xloc>2128</xloc><yloc>208</yloc></GUI>
+  </transform>
+  <transform_error_handling/>
+  <attributes/>
+</pipeline>

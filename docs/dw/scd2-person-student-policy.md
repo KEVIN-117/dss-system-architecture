@@ -2,7 +2,7 @@
 
 ## Propósito y alcance
 
-Este documento define la política aprobable para conservar la historia de la persona y del estudiante en el Data Warehouse. Complementa el modelo lógico de DW-005 y las dimensiones físicas de DW-006, pero no crea migraciones, no carga datos y no ejecuta procesos ETL.
+Este documento define la política aprobable para conservar la historia de la persona y del estudiante en el Data Warehouse. Complementa el modelo lógico de DW-005 y las dimensiones físicas de DW-006. La preparación SCD2 para `dim_estudiante` se implementa en la migración `0014` y el flujo de Apache Hop de la fase 6.4; los fixtures validan su comportamiento, pero la aprobación DSA/TI y la validación con Jachasun siguen pendientes.
 
 La prioridad es preservar la interpretación histórica de los hechos: una fila publicada debe poder resolverse contra la versión de estudiante vigente para el cierre académico correspondiente. La política se aplica inicialmente a `dw.dim_estudiante`; las dimensiones de programa, materia, periodo y admisión conservan sus propias decisiones cuando una issue posterior las requiera.
 
@@ -61,7 +61,7 @@ Esta clasificación evita tratar como SCD1 los cambios que alteran la interpreta
 
 ## Detección mediante hash
 
-La detección utiliza un hash de atributos SCD2, denominado conceptualmente `attribute_hash_scd2`. No se incluye todavía como columna física en DW-006; esta sección fija el contrato para la futura carga.
+La detección utiliza un hash de atributos SCD2, denominado `attribute_hash_scd2`, que se incorpora físicamente en `0008_add_student_scd2_versions.sql`. La migración exige el hash en nuevas filas estándar y permite temporalmente nulos heredados con una restricción `NOT VALID`. Hop debe calcularlo y guardarlo; la migración no calcula hashes de atributos ni ejecuta cargas.
 
 ### Serialización canónica
 
@@ -72,7 +72,7 @@ Antes de calcular SHA-256, cada campo debe normalizarse de forma determinista:
 3. Recortar espacios externos solo cuando el contrato fuente lo permita; no eliminar espacios internos.
 4. Usar representación decimal y de fechas estable, con fechas ISO `YYYY-MM-DD`.
 5. No convertir un valor vacío en `NULL` sin registrar una regla de calidad explícita.
-6. Usar UTF-8 y unir pares `nombre=valor` con un separador no ambiguo.
+6. Serializar en UTF-8 con longitud en bytes (`nombre=longitud:valor`), usando longitud `-1` para `NULL`; así se evita ambigüedad por separadores o valores vacíos.
 7. Aplicar SHA-256 y almacenar el resultado hexadecimal en minúsculas.
 
 El hash no incluye surrogate keys, timestamps de procesamiento, `run_id`, estado del manifiesto ni campos derivados. Cambiar únicamente `source_run_id` no crea una versión de negocio. Un cambio SCD1 tampoco altera el hash SCD2.
@@ -81,13 +81,13 @@ Si se requiere distinguir una corrección de fuente con los mismos atributos SCD
 
 ## Vigencias y versiones
 
-La futura implementación usará un intervalo semiabierto:
+La implementación usa un intervalo semiabierto:
 
 ```text
 [valid_from, valid_to)
 ```
 
-- La versión actual tiene `valid_to = NULL` y una sola versión actual puede existir por identidad lógica.
+- La versión actual tiene `valid_to = NULL` y los índices SCD2 permiten una sola versión actual por `id_ra` y por `id_alumno`; un trigger serializa las escrituras y rechaza intervalos solapados por cualquiera de los identificadores.
 - `valid_from` representa la fecha/hora efectiva del cierre que observó el cambio, no el momento en que el ETL terminó.
 - `observed_at` o el timestamp de procesamiento se conserva como metadato de auditoría separado.
 - Al detectar un cambio SCD2, la versión anterior se cierra en el mismo instante efectivo que inicia la nueva versión.
@@ -98,7 +98,7 @@ Para snapshots repetidos con el mismo `valid_from`, el desempate se realiza por 
 
 ## Reglas de carga conceptual
 
-El flujo futuro deberá seguir esta secuencia:
+El flujo deberá seguir esta secuencia:
 
 ```mermaid
 flowchart LR
@@ -121,6 +121,20 @@ flowchart LR
 El snapshot representa una observación completa, no una orden de sobrescritura. Primero se resuelve la identidad y se validan duplicados, claves nulas y conflictos. Solo después se calcula el hash de atributos historizables.
 
 Si la identidad no existe, se crea su primera versión. Si existe y el hash SCD2 no cambió, no se multiplica la historia; como máximo se actualizan atributos SCD1 y la evidencia técnica. Si el hash cambió, se cierra la versión vigente y se crea otra con una fecha efectiva coherente con el cierre DSA. Un conflicto de identidad o de fecha no puede continuar hacia publicación: debe quedar en la auditoría de errores del `run_id`.
+
+## Implementación Hop — Req. 6.4
+
+El pipeline `pl_dim_estudiante_scd2_mvp.hpl` obtiene el snapshot de `academico.alumnos` y lo enriquece con los campos aprobados de `public.uatf_datos`, colegios y localidades. La ejecución debe corresponder a un cierre académico elegible; `effective_at` del cierre determina `valid_from`, no el reloj del contenedor.
+
+La rutina `etl_control.prepare_hop_student_scd2(run_id, student_json)` valida la ejecución y el cierre, resuelve la clave `RA:<id_ra>` o provisional `ALUMNO:<id_alumno>`, serializa los atributos SCD2 de forma canónica y compara el hash con la versión vigente. La rutina no publica directamente: solo registra operaciones `INSERT` o `CLOSE` mediante `stage_hop_publication_row`, para que el publisher las aplique atómicamente con el resto de la carga.
+
+- Primera observación: prepara un `INSERT` de versión estándar.
+- Hash sin cambios: no prepara una nueva versión.
+- Cambio de atributos: prepara el cierre de la versión vigente y el `INSERT` de la nueva versión con el mismo corte efectivo.
+- Identidad ambigua, discrepancia entre RA y alumno, perfil demográfico faltante para un RA o corte fuera de orden: bloquea la preparación.
+- La ausencia de un estudiante en una extracción no cierra su versión; la expiración por ausencia requiere una política explícita posterior.
+
+Las pruebas de integración verifican tanto las operaciones preparadas como una publicación transaccional sintética de cambios, con rollback al terminar. El workflow smoke general mantiene desactivada la publicación deliberadamente; ni estos fixtures ni esa prueba sustituyen la validación DSA/TI en Jachasun.
 
 ## Correcciones tardías y duplicados
 
@@ -185,7 +199,7 @@ DW-007 estará lista para cierre cuando DSA/TI aprueben la matriz y los casos an
 - uso de `run_id`, cierre DSA y manifiestos;
 - límites explícitos con DW-006, DW-019 y los hechos DW-020 a DW-022.
 
-La prueba física de estas reglas y la incorporación de columnas o índices serán parte de una issue posterior de implementación. Esta separación evita alterar el esquema estable de DW-006 antes de que la política funcional sea aprobada.
+La migración `0008_add_student_scd2_versions.sql` incorpora columnas, índices de versión vigente y una protección transaccional contra solapamientos. Aún falta demostrar el cálculo reproducible del hash desde Hop, el manejo de snapshots/reprocesos y aprobar la matriz funcional con DSA/TI. Las filas estándar que ya existían reciben `created_at` como baseline técnico con hash nulo; no se afirma que esa fecha sea la vigencia OLTP. Antes de cargar hechos históricos, se debe reconciliar esa línea base.
 
 ## Límites y dependencias
 
@@ -194,5 +208,5 @@ La prueba física de estas reglas y la incorporación de columnas o índices ser
 - DW-004 aporta `run_id`, eventos, manifiestos, métricas y errores.
 - DW-005 define la constelación y el grano de los hechos.
 - DW-006 aporta las dimensiones físicas y los miembros técnicos.
-- DW-019 implementará la carga de dimensiones desde RAW/ETL y deberá respetar esta política.
+- Para el MVP de #133, la carga directa desde Jachasun con Apache Hop deberá respetar esta política, sin exigir RAW ni Load Manager. `0008` materializa vigencias e identidad temporal; `0009` crea los hechos. Hop aún debe calcular el hash, usar effective_at del cierre y resolver la versión aplicable a cada hecho.
 - DW-007 no implementa extracción, transformación Apache Hop, Go, cron, API, hechos ni modelos ML.

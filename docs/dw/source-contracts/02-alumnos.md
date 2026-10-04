@@ -22,4 +22,4 @@ Estado académico de pregrado. Una fila por `id_alumno` observada en el snapshot
 
 ## Snapshot y controles
 
-La fuente se lee completa, ordenada por `id_alumno ASC`. No se usa `_fecha_registro` para detectar modificaciones: el DDL no demuestra que represente todas las actualizaciones. Nulos de `id_ra`, programas inexistentes y duplicados de `id_alumno` se conservan en RAW y se reportan.
+La fuente se lee completa, ordenada por `id_alumno ASC`. No se usa `_fecha_registro` para detectar modificaciones: el DDL no demuestra que represente todas las actualizaciones. Hop reportará nulos de `id_ra`, programas inexistentes y duplicados de `id_alumno` mediante evidencia saneada y aplicará la política aprobada de identidad/bloqueo; no requiere RAW persistente ni corrige el origen.

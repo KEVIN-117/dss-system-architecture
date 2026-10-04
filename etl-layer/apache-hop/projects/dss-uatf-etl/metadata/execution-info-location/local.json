@@ -1,0 +1,14 @@
+{
+  "executionInfoLocation": {
+    "caching-file-location": {
+      "persistenceDelay": "5000",
+      "rootFolder": "${java.io.tmpdir}/dss-hop-executions",
+      "maxCacheAge": "86400000",
+      "createParentFolder": true
+    }
+  },
+  "dataLoggingDelay": "2000",
+  "name": "local",
+  "description": "Local filesystem execution telemetry for Hop runs",
+  "dataLoggingInterval": "5000"
+}
