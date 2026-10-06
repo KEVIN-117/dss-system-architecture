@@ -19,7 +19,7 @@ class UserAcademicContextTest {
         UUID id = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
         Integer facultyId = 101;
-        Integer careerId = 202;
+        String careerId = "A01";
 
         UserAcademicContext context = new UserAcademicContext(id, userId, facultyId, careerId);
 
@@ -64,7 +64,7 @@ class UserAcademicContextTest {
         UUID userId = UUID.randomUUID();
 
         assertThrows(FacultyRequiredException.class, () ->
-                new UserAcademicContext(id, userId, null, 202)
+                new UserAcademicContext(id, userId, null, "202")
         );
     }
 
@@ -83,16 +83,16 @@ class UserAcademicContextTest {
     }
 
     @Test
-    @DisplayName("Should throw InvalidAcademicContextException when careerId is negative or zero")
-    void shouldThrowInvalidAcademicContextExceptionWhenCareerIdNonPositive() {
+    @DisplayName("Should throw InvalidAcademicContextException when careerId is not a three-character code")
+    void shouldThrowInvalidAcademicContextExceptionWhenCareerIdHasInvalidFormat() {
         UUID id = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
         assertThrows(InvalidAcademicContextException.class, () ->
-                new UserAcademicContext(id, userId, 10, 0)
+                new UserAcademicContext(id, userId, 10, "0")
         );
         assertThrows(InvalidAcademicContextException.class, () ->
-                new UserAcademicContext(id, userId, 10, -3)
+                new UserAcademicContext(id, userId, 10, "-3")
         );
     }
 }

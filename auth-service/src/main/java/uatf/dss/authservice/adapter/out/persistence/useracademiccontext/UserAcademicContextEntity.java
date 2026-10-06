@@ -24,8 +24,8 @@ public class UserAcademicContextEntity {
     @Column(name = "faculty_id", nullable = true)
     private Integer facultyId;
 
-    @Column(name = "career_id", nullable = true)
-    private Integer careerId;
+    @Column(name = "career_id", nullable = true, length = 3, columnDefinition = "char(3)")
+    private String careerId;
 
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)

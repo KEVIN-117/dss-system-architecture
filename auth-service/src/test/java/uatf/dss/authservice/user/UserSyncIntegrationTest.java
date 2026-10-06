@@ -158,8 +158,10 @@ public class UserSyncIntegrationTest {
                 LOCAL_ROLE_ID, "LOCAL_SYNC_TEST", "Role preserved during profile synchronization");
         jdbcTemplate.update("INSERT INTO user_roles (user_id, role_id) VALUES (?, ?)",
                 savedInitial.id(), LOCAL_ROLE_ID);
+        jdbcTemplate.update("INSERT INTO academic_faculties (faculty_id, name) VALUES (?, ?) ON CONFLICT (faculty_id) DO NOTHING", 10, "Faculty 10");
+        jdbcTemplate.update("INSERT INTO academic_programs (career_id, faculty_id, name) VALUES (?, ?, ?) ON CONFLICT (career_id) DO NOTHING", "025", 10, "Program 25");
         jdbcTemplate.update("INSERT INTO user_academic_contexts (id, user_id, faculty_id, career_id) VALUES (?, ?, ?, ?)",
-                contextId, savedInitial.id(), 10, 25);
+                contextId, savedInitial.id(), 10, "025");
 
         String jsonPayload = """
         {
@@ -203,7 +205,7 @@ public class UserSyncIntegrationTest {
                 contextId,
                 savedInitial.id(),
                 10,
-                25));
+                "025"));
     }
 
     @Test

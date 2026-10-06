@@ -37,6 +37,9 @@ public class UserAcademicContextAdapterIntegrationTest {
     @BeforeEach
     void setUp() {
         jdbcTemplate.execute("TRUNCATE TABLE user_academic_contexts, user_roles, users CASCADE");
+        jdbcTemplate.execute("TRUNCATE TABLE academic_programs, academic_faculties CASCADE");
+        jdbcTemplate.update("INSERT INTO academic_faculties (faculty_id, name) VALUES (5, 'Faculty 5'), (8, 'Faculty 8'), (10, 'Faculty 10')");
+        jdbcTemplate.update("INSERT INTO academic_programs (career_id, faculty_id, name) VALUES ('025', 10, 'Program 25'), ('015', 8, 'Program 15')");
     }
 
     private User createAndSaveTestUser(String username, String email) {
@@ -61,7 +64,7 @@ public class UserAcademicContextAdapterIntegrationTest {
                 null,
                 user.id(),
                 10,
-                25
+                "025"
         );
 
         UserAcademicContext savedContext = academicContextRepository.save(context);
@@ -69,14 +72,14 @@ public class UserAcademicContextAdapterIntegrationTest {
         assertNotNull(savedContext.id(), "Context ID should be generated");
         assertEquals(user.id(), savedContext.userId());
         assertEquals(10, savedContext.facultyId());
-        assertEquals(25, savedContext.careerId());
+        assertEquals("025", savedContext.careerId());
 
         Optional<UserAcademicContext> foundOpt = academicContextRepository.findByUserId(user.id());
         assertTrue(foundOpt.isPresent(), "Should find academic context by userId");
         assertEquals(savedContext.id(), foundOpt.get().id());
         assertEquals(user.id(), foundOpt.get().userId());
         assertEquals(10, foundOpt.get().facultyId());
-        assertEquals(25, foundOpt.get().careerId());
+        assertEquals("025", foundOpt.get().careerId());
     }
 
     @Test
@@ -134,7 +137,7 @@ public class UserAcademicContextAdapterIntegrationTest {
                 null,
                 user.id(),
                 8,
-                15
+                "015"
         );
         UserAcademicContext saved = academicContextRepository.save(context);
 

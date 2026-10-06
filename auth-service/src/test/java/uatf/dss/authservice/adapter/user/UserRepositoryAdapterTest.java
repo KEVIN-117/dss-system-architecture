@@ -92,7 +92,7 @@ class UserRepositoryAdapterTest {
         RoleEntity localRole = new RoleEntity(7, "DIRECTOR", "Local director role", null);
         existingEntity.getRoles().add(localRole);
         UserAcademicContextEntity localContext = new UserAcademicContextEntity(
-                UUID.randomUUID(), 10, 25, existingEntity);
+                UUID.randomUUID(), 10, "025", existingEntity);
         existingEntity.getAcademicContexts().add(localContext);
 
         User updatedProfile = User.create(

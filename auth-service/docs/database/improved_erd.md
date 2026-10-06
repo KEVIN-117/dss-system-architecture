@@ -23,6 +23,8 @@ Este documento contiene la propuesta de mejora para el modelo de base de datos d
 | **USER_ACADEMIC_CONTEXT** | `CHECK constraint` | SQL Rule | Regla de consistencia: `CHECK (career_id IS NULL OR faculty_id IS NOT NULL)`. |
 | **USER_ACADEMIC_CONTEXT** | `created_at` | `TIMESTAMP` | Registro histórico de cuándo se le otorgó el contexto académico al usuario. |
 | **Relaciones** | `USER` a `CONTEXT` (1:N) | Cardinalidad | Cambiado de `1:1` a `1:N` para permitir múltiples contextos simultáneos a un usuario. |
+| **ACADEMIC_FACULTIES** | `faculty_id` | `INTEGER` | Réplica local del catálogo fuente `academico.alm_programas_facultades`; no es fuente de verdad. |
+| **ACADEMIC_PROGRAMS** | `career_id` | `CHAR(3)` | Réplica de `academico.alm_programas.id_programa`, con su facultad para validar el contexto. |
 
 ---
 
@@ -57,13 +59,34 @@ erDiagram
         uuid id PK
         uuid user_id FK "Borrado en cascada"
         int faculty_id "Null si es Rector"
-        int career_id "Null si es Decano/Rector"
+        string career_id "CHAR(3); Null si es Decano/Rector"
         timestamp created_at
+    }
+
+    academic_faculties {
+        int faculty_id PK "ID de academico.alm_programas_facultades"
+        string name
+        string abbreviation
+        string source_status
+        boolean is_active
+        timestamp last_synced_at
+    }
+
+    academic_programs {
+        string career_id PK "CHAR(3), ID de academico.alm_programas"
+        int faculty_id FK
+        string name
+        string source_status
+        boolean is_active
+        timestamp last_synced_at
     }
 
     users ||--o{ user_roles : "posee"
     roles ||--o{ user_roles : "asociado a"
     users ||--o{ user_academic_contexts : "tiene asignado"
+    academic_faculties ||--o{ academic_programs : "agrupa"
+    academic_faculties ||--o{ user_academic_contexts : "contexto de facultad"
+    academic_programs ||--o{ user_academic_contexts : "contexto carrera-facultad"
 ```
 
 ---
@@ -120,4 +143,34 @@ CREATE TABLE user_academic_contexts (
     -- Regla de integridad: Si tiene carrera asignada, obligatoriamente debe definirse su facultad
     CONSTRAINT chk_career_requires_faculty CHECK (career_id IS NULL OR faculty_id IS NOT NULL)
 );
+
+-- 5. Catálogo académico local; las tablas fuente continúan siendo autoridad.
+CREATE TABLE academic_faculties (
+    faculty_id INTEGER NOT NULL PRIMARY KEY,
+    name VARCHAR(100) NOT NULL,
+    abbreviation VARCHAR(50),
+    source_status CHAR(1),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    last_synced_at TIMESTAMP WITH TIME ZONE
+);
+
+CREATE TABLE academic_programs (
+    career_id CHAR(3) NOT NULL PRIMARY KEY,
+    faculty_id INTEGER NOT NULL REFERENCES academic_faculties (faculty_id) ON DELETE RESTRICT,
+    name VARCHAR(255) NOT NULL,
+    source_status VARCHAR(16),
+    is_active BOOLEAN NOT NULL DEFAULT TRUE,
+    last_synced_at TIMESTAMP WITH TIME ZONE,
+    CONSTRAINT uq_academic_programs_career_faculty UNIQUE (career_id, faculty_id)
+);
+
+ALTER TABLE user_academic_contexts
+    ALTER COLUMN career_id TYPE CHAR(3),
+    ADD CONSTRAINT fk_user_academic_contexts_on_faculty
+        FOREIGN KEY (faculty_id) REFERENCES academic_faculties (faculty_id) ON DELETE RESTRICT,
+    ADD CONSTRAINT fk_user_academic_contexts_on_career_faculty
+        FOREIGN KEY (career_id, faculty_id)
+        REFERENCES academic_programs (career_id, faculty_id) ON DELETE RESTRICT;
 ```
+
+La carga de los catálogos desde el sistema académico queda a cargo de un pipeline Apache Hop y se implementará por separado cuando esté disponible el acceso al microservicio ETL. V3 crea las dos claves foráneas del contexto como `NOT VALID`: PostgreSQL las aplica a nuevas escrituras sin bloquear la migración por contextos históricos, pero esos registros aún no quedan certificados. Después de cargar el catálogo y resolver huérfanos, validar con `ALTER TABLE user_academic_contexts VALIDATE CONSTRAINT fk_user_academic_contexts_on_faculty;` y `ALTER TABLE user_academic_contexts VALIDATE CONSTRAINT fk_user_academic_contexts_on_career_faculty;`. Hasta completar ese paso, el catálogo debe cargarse antes de guardar contextos académicos con facultad o carrera.

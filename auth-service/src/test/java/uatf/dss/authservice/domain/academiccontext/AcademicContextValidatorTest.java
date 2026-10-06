@@ -48,7 +48,7 @@ class AcademicContextValidatorTest {
         @Test
         @DisplayName("Should throw InvalidRectorAcademicContextException when both facultyId and careerId are present")
         void shouldThrowWhenBothArePresent() {
-            UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, 20);
+            UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, "020");
 
             assertThrows(InvalidRectorAcademicContextException.class, () ->
                     AcademicContextValidator.validate(context, RoleType.RECTOR));
@@ -81,7 +81,7 @@ class AcademicContextValidatorTest {
         @Test
         @DisplayName("Should throw InvalidDeanAcademicContextException when careerId is present")
         void shouldThrowWhenCareerIsPresent() {
-            UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, 20);
+            UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, "020");
 
             assertThrows(InvalidDeanAcademicContextException.class, () ->
                     AcademicContextValidator.validate(context, RoleType.DECANO));
@@ -95,7 +95,7 @@ class AcademicContextValidatorTest {
         @Test
         @DisplayName("Should pass validation when both facultyId and careerId are present")
         void shouldPassWhenBothFacultyAndCareerPresent() {
-            UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, 20);
+            UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, "020");
 
             assertDoesNotThrow(() -> AcademicContextValidator.validate(context, RoleType.DIRECTOR));
         }
