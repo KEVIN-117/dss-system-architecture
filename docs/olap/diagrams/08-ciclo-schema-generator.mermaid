@@ -1,0 +1,38 @@
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant API as SchemaGeneratorResource
+    participant Store as SessionStore
+    participant Orch as SchemaGenOrchestrator
+    participant JDBC as JDBC Provider
+    participant DW as DW
+    participant Infer as SchemaInferrer
+    participant Enrich as LlmEnricher
+    participant Writer as MondrianSchemaWriter
+    participant Repo as Repository
+    Admin->>API: POST /start/{dataSourceId}
+    API->>Store: crear PENDING + sessionId
+    API->>Orch: iniciar asíncrono
+    API-->>Admin: 202 + sessionId
+    Orch->>Store: INTROSPECTING
+    Orch->>JDBC: abrir conexión
+    JDBC->>DW: DatabaseMetaData
+    DW-->>Orch: tablas, columnas, FKs
+    Orch->>JDBC: cerrar conexión
+    Orch->>Store: INFERRING
+    Orch->>Infer: construir DraftSchema
+    Infer-->>Orch: borrador
+    Orch->>Store: ENRICHING
+    Orch->>Enrich: sugerencias opcionales
+    Enrich-->>Orch: sugerencias
+    Orch->>Store: READY
+    Admin->>API: GET status/draft/suggestions
+    API->>Store: consultar sesión
+    Store-->>Admin: estado y borrador
+    Admin->>API: POST ops
+    API->>Store: aplicar op y registrar log
+    Admin->>API: POST save
+    API->>Writer: generar XML + sidecar
+    Writer->>Repo: addSchema + saveInternalFile
+    API->>Store: SAVED
+    API-->>Admin: 204

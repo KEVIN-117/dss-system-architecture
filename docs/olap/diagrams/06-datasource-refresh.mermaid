@@ -1,0 +1,20 @@
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant Sec as Spring Security
+    participant R as AdminResource
+    participant DS as DatasourceService
+    participant Repo as RepositoryDatasourceManager / repository
+    participant CM as ConnectionManager
+    participant Factory as SaikuConnectionFactory
+    participant DW as Data Warehouse
+    Admin->>Sec: GET /rest/saiku/admin/datasources/{id}/refresh
+    Sec->>R: exige usuario admin
+    R->>DS: refresh datasource
+    DS->>Repo: resolver definición persistida
+    DS->>CM: refreshConnection(id)
+    CM->>Factory: crear/reemplazar backend
+    Factory->>DW: abrir conexión
+    DW-->>CM: conexión o fallo
+    CM-->>R: estado del refresh
+    R-->>Admin: respuesta HTTP

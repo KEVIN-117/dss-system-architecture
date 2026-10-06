@@ -1,0 +1,20 @@
+C4Deployment
+    title Despliegue local documentado
+    Deployment_Node(host, "Host / contenedor", "Windows, Linux o entorno de ejecución") {
+        Deployment_Node(java, "JVM Java 21+", "Proceso saiku-launcher") {
+            Container(runtime, "Saiku Launcher + saiku-api.war", "Java / Jetty 12 EE10")
+            Container_Instance(api, "saiku-api.war", "Spring + Jersey")
+            Deployment_Node(home, "--home", "Filesystem") {
+                ContainerDb(repo, "Saiku Repository", "Definiciones de datasource y XML Mondrian")
+            }
+        }
+    }
+    Deployment_Node(identity, "Keycloak", "Servicio remoto") {
+        Container(kc, "Realm UATF DSS", "OIDC/JWKS")
+    }
+    Deployment_Node(dwHost, "Host DW", "Red privada") {
+        ContainerDb(dw, "Data Warehouse", "RDBMS")
+    }
+    Rel(runtime, repo, "filesystem")
+    Rel(runtime, kc, "HTTPS/JWKS")
+    Rel(runtime, dw, "JDBC/TLS según datasource")

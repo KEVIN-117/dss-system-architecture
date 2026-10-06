@@ -1,0 +1,485 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {
+    "hyperedges": [
+      {
+        "id": "hexagonal_architecture_layers",
+        "label": "Hexagonal Architecture Layers",
+        "nodes": [
+          "architecture_guide_domain",
+          "architecture_guide_application",
+          "architecture_guide_adapter"
+        ],
+        "relation": "form",
+        "confidence": "INFERRED",
+        "confidence_score": 0.95,
+        "source_file": "ARCHITECTURE_GUIDE.md"
+      },
+      {
+        "id": "keycloak_realm_roles",
+        "label": "Keycloak Realm Roles",
+        "nodes": [
+          "docs_keycloak_keycloak_specification_superadmin",
+          "docs_keycloak_keycloak_specification_rector",
+          "docs_keycloak_keycloak_specification_decano",
+          "docs_keycloak_keycloak_specification_director"
+        ],
+        "relation": "form",
+        "confidence": "EXTRACTED",
+        "confidence_score": 1.0,
+        "source_file": "docs/keycloak/keycloak_specification.md"
+      }
+    ]
+  },
+  "nodes": [
+    {
+      "label": "Ports and Adapters",
+      "file_type": "concept",
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "architecture_guide_ports_and_adapters",
+      "community": 0,
+      "norm_label": "ports and adapters"
+    },
+    {
+      "label": "Dependency Inversion",
+      "file_type": "rationale",
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "architecture_guide_dependency_inversion",
+      "community": 0,
+      "norm_label": "dependency inversion"
+    },
+    {
+      "label": "Domain Layer",
+      "file_type": "concept",
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "architecture_guide_domain",
+      "community": 0,
+      "norm_label": "domain layer"
+    },
+    {
+      "label": "Application Layer",
+      "file_type": "concept",
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "architecture_guide_application",
+      "community": 0,
+      "norm_label": "application layer"
+    },
+    {
+      "label": "Adapter Layer",
+      "file_type": "concept",
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "architecture_guide_adapter",
+      "community": 0,
+      "norm_label": "adapter layer"
+    },
+    {
+      "label": "MapStruct",
+      "file_type": "concept",
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "architecture_guide_mapstruct",
+      "community": 4,
+      "norm_label": "mapstruct"
+    },
+    {
+      "label": "ArchUnit",
+      "file_type": "concept",
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "architecture_guide_archunit",
+      "community": 3,
+      "norm_label": "archunit"
+    },
+    {
+      "label": "Auth Service",
+      "file_type": "concept",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "readme_auth_service",
+      "community": 2,
+      "norm_label": "auth service"
+    },
+    {
+      "label": "Keycloak",
+      "file_type": "concept",
+      "source_file": "README.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "readme_keycloak",
+      "community": 2,
+      "norm_label": "keycloak"
+    },
+    {
+      "label": "users table",
+      "file_type": "concept",
+      "source_file": "docs/database/improved_erd.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_database_improved_erd_users",
+      "community": 1,
+      "norm_label": "users table"
+    },
+    {
+      "label": "roles table",
+      "file_type": "concept",
+      "source_file": "docs/database/improved_erd.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_database_improved_erd_roles",
+      "community": 1,
+      "norm_label": "roles table"
+    },
+    {
+      "label": "user_roles table",
+      "file_type": "concept",
+      "source_file": "docs/database/improved_erd.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_database_improved_erd_user_roles",
+      "community": 1,
+      "norm_label": "user_roles table"
+    },
+    {
+      "label": "user_academic_contexts table",
+      "file_type": "concept",
+      "source_file": "docs/database/improved_erd.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_database_improved_erd_user_academic_contexts",
+      "community": 1,
+      "norm_label": "user_academic_contexts table"
+    },
+    {
+      "label": "uatf-realm",
+      "file_type": "concept",
+      "source_file": "docs/keycloak/keycloak_specification.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_keycloak_keycloak_specification_uatf_realm",
+      "community": 2,
+      "norm_label": "uatf-realm"
+    },
+    {
+      "label": "uatf-dss-spa",
+      "file_type": "concept",
+      "source_file": "docs/keycloak/keycloak_specification.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_keycloak_keycloak_specification_uatf_dss_spa",
+      "community": 8,
+      "norm_label": "uatf-dss-spa"
+    },
+    {
+      "label": "uatf-auth-service client",
+      "file_type": "concept",
+      "source_file": "docs/keycloak/keycloak_specification.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_keycloak_keycloak_specification_uatf_auth_service",
+      "community": 2,
+      "norm_label": "uatf-auth-service client"
+    },
+    {
+      "label": "SUPERADMIN",
+      "file_type": "concept",
+      "source_file": "docs/keycloak/keycloak_specification.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_keycloak_keycloak_specification_superadmin",
+      "community": 1,
+      "norm_label": "superadmin"
+    },
+    {
+      "label": "RECTOR",
+      "file_type": "concept",
+      "source_file": "docs/keycloak/keycloak_specification.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_keycloak_keycloak_specification_rector",
+      "community": 7,
+      "norm_label": "rector"
+    },
+    {
+      "label": "DECANO",
+      "file_type": "concept",
+      "source_file": "docs/keycloak/keycloak_specification.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_keycloak_keycloak_specification_decano",
+      "community": 5,
+      "norm_label": "decano"
+    },
+    {
+      "label": "DIRECTOR",
+      "file_type": "concept",
+      "source_file": "docs/keycloak/keycloak_specification.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_keycloak_keycloak_specification_director",
+      "community": 6,
+      "norm_label": "director"
+    },
+    {
+      "label": "Keycloak Webhook",
+      "file_type": "concept",
+      "source_file": "docs/keycloak/keycloak_specification.md",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "docs_keycloak_keycloak_specification_webhook",
+      "community": 9,
+      "norm_label": "keycloak webhook"
+    },
+    {
+      "label": "application.yaml",
+      "file_type": "document",
+      "source_file": "src/main/resources/application.yaml",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null,
+      "id": "src_main_resources_application_yaml_application",
+      "community": 10,
+      "norm_label": "application.yaml"
+    }
+  ],
+  "links": [
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "architecture_guide_adapter",
+      "target": "architecture_guide_ports_and_adapters"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "architecture_guide_application",
+      "target": "architecture_guide_ports_and_adapters"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "architecture_guide_domain",
+      "target": "architecture_guide_ports_and_adapters"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "readme_auth_service",
+      "target": "architecture_guide_ports_and_adapters"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "architecture_guide_application",
+      "target": "architecture_guide_dependency_inversion"
+    },
+    {
+      "relation": "rationale_for",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "ARCHITECTURE_GUIDE.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "architecture_guide_domain",
+      "target": "architecture_guide_dependency_inversion"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "README.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "readme_auth_service",
+      "target": "docs_keycloak_keycloak_specification_uatf_auth_service"
+    },
+    {
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "README.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "readme_auth_service",
+      "target": "readme_keycloak"
+    },
+    {
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "README.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "readme_keycloak",
+      "target": "docs_keycloak_keycloak_specification_uatf_realm"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/database/improved_erd.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "docs_database_improved_erd_users",
+      "target": "docs_database_improved_erd_user_academic_contexts"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/database/improved_erd.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "docs_database_improved_erd_users",
+      "target": "docs_database_improved_erd_user_roles"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/database/improved_erd.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "docs_database_improved_erd_roles",
+      "target": "docs_database_improved_erd_user_roles"
+    },
+    {
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "docs/keycloak/keycloak_specification.md",
+      "source_location": null,
+      "weight": 1.0,
+      "source": "docs_keycloak_keycloak_specification_superadmin",
+      "target": "docs_database_improved_erd_roles"
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "hexagonal_architecture_layers",
+      "label": "Hexagonal Architecture Layers",
+      "nodes": [
+        "architecture_guide_domain",
+        "architecture_guide_application",
+        "architecture_guide_adapter"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "ARCHITECTURE_GUIDE.md"
+    },
+    {
+      "id": "keycloak_realm_roles",
+      "label": "Keycloak Realm Roles",
+      "nodes": [
+        "docs_keycloak_keycloak_specification_superadmin",
+        "docs_keycloak_keycloak_specification_rector",
+        "docs_keycloak_keycloak_specification_decano",
+        "docs_keycloak_keycloak_specification_director"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "docs/keycloak/keycloak_specification.md"
+    }
+  ],
+  "built_at_commit": "7be64363a09af71c5180878a7a1660b8cd537728"
+}

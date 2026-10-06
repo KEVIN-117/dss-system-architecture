@@ -1,0 +1,21 @@
+C4Component
+    title Componentes relevantes dentro de saiku-api
+    Container_Boundary(api, "saiku-api") {
+        Component(security, "Spring Security", "OAuth2 Resource Server", "Valida Bearer JWT y aplica reglas de ruta")
+        Component(converter, "SaikuKeycloakJwtAuthenticationConverter", "Spring Security", "Mapea roles olap-service a authorities Saiku")
+        Component(jaxfilter, "SaikuJaxrsSecurityContextFilter", "JAX-RS filter", "Propaga Authentication al SecurityContext Jersey")
+        Component(resources, "Recursos Jersey", "JAX-RS", "Admin, discover, query, schema generator y cube designer")
+        Component(datasource, "DatasourceService / RepositoryDatasourceManager", "Servicios Saiku", "Configura datasources y acceso al repositorio")
+        Component(discover, "OlapDiscoverService / ConnectionManager", "Servicios OLAP", "Conexiones y metadatos OLAP")
+        Component(query, "ThinQueryService", "Servicios OLAP", "Deriva MDX/querymodel u OSSIE y produce resultados")
+        Component(schema, "SchemaGenOrchestrator", "Generador Mondrian", "Introspección, inferencia, enriquecimiento y guardado")
+    }
+    Rel(security, converter, "crea authorities desde JWT")
+    Rel(security, jaxfilter, "establece contexto autenticado")
+    Rel(jaxfilter, resources, "contexto JAX-RS")
+    Rel(resources, datasource, "administra datasources")
+    Rel(resources, discover, "descubre catálogos")
+    Rel(resources, query, "ejecuta consultas")
+    Rel(resources, schema, "genera esquemas")
+    Rel(query, discover, "resuelve conexión")
+    Rel(schema, datasource, "resuelve datasource y guarda XML")

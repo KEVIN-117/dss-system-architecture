@@ -1,0 +1,31 @@
+sequenceDiagram
+    autonumber
+    actor Client
+    participant R as Query2Resource
+    participant Jobs as Async job manager
+    participant Thin as ThinQueryService
+    participant OLAP as backend OLAP
+    participant Store as Job state/result
+    Client->>R: POST /query/execute-async
+    R->>Jobs: submit(query)
+    Jobs-->>R: jobId
+    R-->>Client: aceptación + jobId
+    Jobs->>Thin: ejecutar background
+    Thin->>OLAP: ejecutar
+    OLAP-->>Thin: resultado/error
+    Thin-->>Jobs: completar
+    Jobs->>Store: guardar estado y resultado
+    Client->>R: GET /async/{id}/status
+    R->>Store: leer estado
+    Store-->>R: estado
+    R-->>Client: estado
+    Client->>R: GET /async/{id}/result
+    R->>Store: leer resultado
+    Store-->>R: resultado listo
+    R-->>Client: QueryResult
+    opt Cancelación
+        Client->>R: DELETE /async/{id}/cancel
+        R->>Jobs: intentar cancelar
+        Jobs-->>R: cancelado o ya ejecutando/completado
+        R-->>Client: estado cancelación
+    end

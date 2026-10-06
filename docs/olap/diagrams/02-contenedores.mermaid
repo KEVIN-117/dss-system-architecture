@@ -1,0 +1,17 @@
+C4Container
+    title Contenedores del OLAP Service
+    Person(client, "Cliente DSS", "BFF/frontend")
+    System_Ext(keycloak, "Keycloak", "OIDC, JWKS y roles")
+    System_Ext(dw, "Data Warehouse", "Base relacional externa")
+    System_Boundary(olap, "OLAP Service") {
+        Container(launcher, "Saiku Launcher", "Java / Jetty 12 EE10", "Arranca HTTP y despliega saiku-api.war")
+        Container(api, "saiku-api", "Spring Security + Jersey", "Resource Server, REST, servicios y recursos")
+        ContainerDb(repo, "Saiku Repository", "Filesystem dentro de --home", "Datasources .sds, esquemas Mondrian y sidecars")
+        ContainerDb(session, "Jetty session store", "Filesystem/configurable", "Persistencia de sesión HTTP Jetty si está habilitada")
+    }
+    Rel(client, api, "REST/JSON + Bearer")
+    Rel(launcher, api, "despliega WAR")
+    Rel(api, keycloak, "descarga JWKS; valida token")
+    Rel(api, repo, "lee/escribe definiciones")
+    Rel(api, dw, "JDBC")
+    Rel(launcher, session, "sesiones HTTP Jetty")
