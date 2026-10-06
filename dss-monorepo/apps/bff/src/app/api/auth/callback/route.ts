@@ -40,11 +40,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       code,
       codeVerifier: transaction.codeVerifier,
     });
-    
 
-    console.log('====================');
-    console.log('Tokens: ', tokens);
-    console.log('====================');
     await verifyKeycloakIdToken(tokens.idToken, {
       keycloakUrl: config.oidc.keycloakUrl,
       realm: config.oidc.realm,
@@ -62,20 +58,8 @@ export async function GET(request: Request): Promise<NextResponse> {
       idToken: tokens.idToken,
     });
 
-    console.log('====================');
-    console.log('Session: ', session);
-    console.log('====================');
-
     const response = NextResponse.redirect(new URL(transaction.returnTo, requestUrl.origin), 303);
     const sessionConfig = getBffSessionConfig();
-
-    console.log('====================');
-    console.log('Session Config: ', sessionConfig);
-    console.log('====================');
-
-    console.log('====================');
-    console.log('Response: ', response);
-    console.log('====================');
 
     response.cookies.set({
       name: sessionConfig.cookieName,

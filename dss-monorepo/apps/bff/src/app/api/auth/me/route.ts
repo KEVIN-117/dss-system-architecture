@@ -19,9 +19,6 @@ export async function GET(request: Request): Promise<NextResponse> {
     return withCors(request, authentication.response);
   }
 
-  console.log('====================');
-  console.log('Authentication: ', authentication);
-  console.log('====================');
   return withCors(
     request,
     NextResponse.json(
