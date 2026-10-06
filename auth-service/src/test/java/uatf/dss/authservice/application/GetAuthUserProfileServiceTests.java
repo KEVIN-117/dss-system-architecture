@@ -55,7 +55,7 @@ public class GetAuthUserProfileServiceTests {
                 UUID.randomUUID(),
                 userId,
                 1,
-                1
+                "001"
         );
 
         when(userRepository.findByKeycloakId(keycloakId)).thenReturn(Optional.of(user));

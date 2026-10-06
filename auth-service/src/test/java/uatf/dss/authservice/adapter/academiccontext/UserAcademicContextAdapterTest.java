@@ -40,13 +40,13 @@ class UserAcademicContextAdapterTest {
     @DisplayName("Should save academic context and map user ID correctly")
     void shouldSaveAcademicContext() {
         UUID userId = UUID.randomUUID();
-        UserAcademicContext domain = new UserAcademicContext(null, userId, 5, 12);
+        UserAcademicContext domain = new UserAcademicContext(null, userId, 5, "012");
 
         UUID generatedId = UUID.randomUUID();
         UserEntity userEntity = new UserEntity();
         userEntity.setId(userId);
 
-        UserAcademicContextEntity savedEntity = new UserAcademicContextEntity(generatedId, 5, 12, userEntity);
+        UserAcademicContextEntity savedEntity = new UserAcademicContextEntity(generatedId, 5, "012", userEntity);
         when(repository.save(any(UserAcademicContextEntity.class))).thenReturn(savedEntity);
 
         UserAcademicContext result = adapter.save(domain);
@@ -55,7 +55,7 @@ class UserAcademicContextAdapterTest {
         assertEquals(generatedId, result.id());
         assertEquals(userId, result.userId());
         assertEquals(5, result.facultyId());
-        assertEquals(12, result.careerId());
+        assertEquals("012", result.careerId());
         verify(repository).save(any(UserAcademicContextEntity.class));
     }
 
@@ -67,7 +67,7 @@ class UserAcademicContextAdapterTest {
         UserEntity userEntity = new UserEntity();
         userEntity.setId(userId);
 
-        UserAcademicContextEntity entity = new UserAcademicContextEntity(contextId, 3, 9, userEntity);
+        UserAcademicContextEntity entity = new UserAcademicContextEntity(contextId, 3, "009", userEntity);
         when(repository.findByUserId(userId)).thenReturn(Optional.of(entity));
 
         Optional<UserAcademicContext> result = adapter.findByUserId(userId);
@@ -76,7 +76,7 @@ class UserAcademicContextAdapterTest {
         assertEquals(contextId, result.get().id());
         assertEquals(userId, result.get().userId());
         assertEquals(3, result.get().facultyId());
-        assertEquals(9, result.get().careerId());
+        assertEquals("009", result.get().careerId());
     }
 
     @Test
@@ -87,7 +87,7 @@ class UserAcademicContextAdapterTest {
         UserEntity userEntity = new UserEntity();
         userEntity.setId(userId);
 
-        UserAcademicContextEntity entity = new UserAcademicContextEntity(contextId, 1, 2, userEntity);
+        UserAcademicContextEntity entity = new UserAcademicContextEntity(contextId, 1, "002", userEntity);
         when(repository.findById(contextId)).thenReturn(Optional.of(entity));
 
         Optional<UserAcademicContext> result = adapter.delete(contextId);
