@@ -27,6 +27,18 @@ export async function GET(request: Request): Promise<NextResponse> {
   );
   const authorizationUrl = createAuthorizationUrl(config.oidc, transaction);
   const response = NextResponse.redirect(authorizationUrl, 302);
+  console.log('====================');
+  console.log('Authorization URL: ', authorizationUrl);
+  console.log('====================');
+
+  console.log('====================');
+  console.log('Transaction: ', transaction);
+  console.log('====================');
+
+  console.log('====================');
+  console.log('Response: ', response);
+  console.log('====================');
+
   response.cookies.set({
     name: getOAuthTransactionCookieName(),
     value: await sealOAuthTransaction(transaction),

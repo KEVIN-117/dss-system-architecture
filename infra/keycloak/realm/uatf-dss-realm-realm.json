@@ -447,6 +447,26 @@
       "security-admin-console": [],
       "admin-cli": [],
       "account-console": [],
+      "olap-service": [
+        {
+          "id": "6297d9a2-280b-4e36-9887-ca58a13b95bc",
+          "name": "OLAP_ADMIN",
+          "description": "Administra fuentes de datos y operaciones OLAP administrativas.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "987f2715-bcb8-467c-827d-2d9bfed09fde",
+          "attributes": {}
+        },
+        {
+          "id": "fab8625c-bc27-4b0c-8b67-bce5cc66799b",
+          "name": "OLAP_USER",
+          "description": "Acceso de usuario a las operaciones OLAP autorizadas.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "987f2715-bcb8-467c-827d-2d9bfed09fde",
+          "attributes": {}
+        }
+      ],
       "broker": [
         {
           "id": "20e7f31b-601a-4fec-9ca1-d2201421485e",
@@ -866,7 +886,7 @@
       "attributes": {
         "oauth2.jwt.authorization.grant.enabled": "false",
         "frontchannel.logout.session.required": "true",
-        "post.logout.redirect.uris": "http://localhost:3001/login",
+        "post.logout.redirect.uris": "http://localhost:3000/login",
         "oauth2.device.authorization.grant.enabled": "false",
         "use.jwks.url": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
@@ -890,6 +910,77 @@
         "tls.client.certificate.bound.access.tokens": "false",
         "display.on.consent.screen": "false",
         "token.response.type.bearer.lower-case": "false"
+      },
+      "protocolMappers": [
+        {
+          "id": "13c5f758-8b82-4115-b308-cf2c817ec941",
+          "name": "audience-olap-service",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "olap-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ],
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "organization",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "id": "987f2715-bcb8-467c-827d-2d9bfed09fde",
+      "clientId": "olap-service",
+      "name": "",
+      "description": "",
+      "rootUrl": "",
+      "adminUrl": "",
+      "baseUrl": "",
+      "surrogateAuthRequired": false,
+      "enabled": true,
+      "alwaysDisplayInConsole": false,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [],
+      "webOrigins": [],
+      "notBefore": 0,
+      "bearerOnly": false,
+      "consentRequired": false,
+      "standardFlowEnabled": true,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": true,
+      "frontchannelLogout": true,
+      "protocol": "openid-connect",
+      "attributes": {
+        "logout.confirmation.enabled": "false",
+        "realm_client": "false",
+        "oidc.ciba.grant.enabled": "false",
+        "backchannel.logout.session.required": "true",
+        "oauth2.jwt.authorization.grant.enabled": "false",
+        "standard.token.exchange.enabled": "false",
+        "frontchannel.logout.session.required": "true",
+        "display.on.consent.screen": "false",
+        "oauth2.device.authorization.grant.enabled": "false",
+        "backchannel.logout.revoke.offline.tokens": "false",
+        "dpop.bound.access.tokens": "false"
       },
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": true,
@@ -1055,11 +1146,11 @@
         "oidc.ciba.grant.enabled": "false",
         "client.secret.creation.time": "1786855472",
         "backchannel.logout.session.required": "true",
-        "oauth2.jwt.authorization.grant.enabled": "false",
         "standard.token.exchange.enabled": "false",
+        "oauth2.jwt.authorization.grant.enabled": "false",
         "post.logout.redirect.uris": "http://localhost:8000",
-        "display.on.consent.screen": "false",
         "oauth2.device.authorization.grant.enabled": "false",
+        "display.on.consent.screen": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
         "dpop.bound.access.tokens": "false"
       },
@@ -1128,11 +1219,11 @@
         "realm_client": "false",
         "oidc.ciba.grant.enabled": "false",
         "backchannel.logout.session.required": "true",
-        "oauth2.jwt.authorization.grant.enabled": "false",
         "standard.token.exchange.enabled": "false",
+        "oauth2.jwt.authorization.grant.enabled": "false",
         "post.logout.redirect.uris": "http://localhost:3000/*##http://localhost:3001/*##http://localhost:3002/*##http://localhost:3003/*##http://localhost:3004/*##http://localhost:3005/*##http://localhost:3006/*",
-        "display.on.consent.screen": "false",
         "oauth2.device.authorization.grant.enabled": "false",
+        "display.on.consent.screen": "false",
         "pkce.code.challenge.method": "S256",
         "backchannel.logout.revoke.offline.tokens": "false",
         "dpop.bound.access.tokens": "false"
@@ -1904,6 +1995,10 @@
     "strictTransportSecurity": "max-age=31536000; includeSubDomains"
   },
   "smtpServer": {},
+  "loginTheme": "dss",
+  "accountTheme": "keycloak.v3",
+  "adminTheme": "keycloak.v2",
+  "emailTheme": "keycloak",
   "eventsEnabled": true,
   "eventsExpiration": 604800,
   "eventsListeners": [
@@ -2107,13 +2202,7 @@
       }
     ]
   },
-  "loginTheme": "dss",
-  "internationalizationEnabled": true,
-  "supportedLocales": [
-    "es",
-    "en"
-  ],
-  "defaultLocale": "es",
+  "internationalizationEnabled": false,
   "authenticationFlows": [
     {
       "id": "59ffdf79-7106-4f71-a0cb-fac87d01e9aa",
@@ -2956,7 +3045,8 @@
     "oauth2DeviceCodeLifespan": "600",
     "parRequestUriLifespan": "60",
     "clientSessionMaxLifespan": "0",
-    "scimApiEnabled": "false"
+    "scimApiEnabled": "false",
+    "darkMode": "true"
   },
   "keycloakVersion": "26.7.4",
   "userManagedAccessAllowed": false,

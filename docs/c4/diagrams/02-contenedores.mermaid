@@ -1,0 +1,47 @@
+C4Container
+  title Diagrama de contenedores — DSS-DW-ML UATF
+  Person(administrador, "Administrador", "Administra usuarios y roles del sistema")
+  Person(autoridades, "Autoridades UATF", "Rector, Vicerrector, Decano y Director; consultan información según su ámbito")
+  Person(analista, "Analista institucional", "Explora indicadores y resultados autorizados")
+
+  System_Boundary(dss, "DSS-DW-ML UATF — arquitectura objetivo") {
+    Container(spa, "Aplicación web", "Next.js 16, React 19", "Presenta dashboards e inicia la autenticación de los usuarios")
+    Container(gateway, "API Gateway", "Traefik v3 (objetivo)", "Enruta el tráfico web y las solicitudes GraphQL")
+    Container(bff, "Backend for Frontend", "Node.js, Apollo GraphQL (objetivo)", "Compone las consultas de la aplicación y coordina los servicios DSS")
+
+    Container(auth, "Servicio de autenticación y contexto", "Java 21, Spring Boot", "Gestiona el perfil y el contexto académico; valida tokens")
+    Container(keycloak, "Proveedor de identidad", "Keycloak 26.7.1", "Autentica usuarios y emite tokens OIDC con roles")
+    ContainerDb(authdb, "Base de datos IAM", "PostgreSQL 15", "Almacena perfiles y contexto académico local")
+
+    Container(etl, "Servicio ETL", "Java 21, Spring Boot", "Orquesta la extracción y carga de datos académicos")
+    ContainerDb(etldb, "Base de datos de metadatos ETL", "PostgreSQL 16", "Almacena metadatos y estado de pipelines en el entorno ETL local")
+    ContainerDb(dw, "Data Warehouse", "PostgreSQL (versión por confirmar)", "Conserva los datos académicos preparados para análisis")
+
+    Container(olap, "Servicio de análisis OLAP", "Java 21, Saiku/Mondrian", "Consulta el almacén analítico y entrega resultados multidimensionales")
+    Container(prediction, "Servicio de predicción", "Python, FastAPI", "Expone solicitudes de predicción; la implementación actual devuelve resultados simulados")
+    Container(graphapi, "Servicio de análisis de grafos", "Go (objetivo)", "Expone consultas sobre relaciones académicas")
+    ContainerDb(graphdb, "Base de datos de grafos", "Neo4j (versión por confirmar)", "Almacena relaciones académicas")
+  }
+
+  Container_Ext(fuentes, "Sistemas y bases académicas UATF", "Sistemas institucionales", "Fuentes operacionales de información académica")
+
+  Rel(administrador, keycloak, "Administra usuarios y roles", "Consola web")
+  Rel(autoridades, spa, "Consulta dashboards", "HTTPS")
+  Rel(analista, spa, "Explora indicadores autorizados", "HTTPS")
+  Rel(spa, keycloak, "Inicia sesión y obtiene tokens", "OIDC Authorization Code + PKCE")
+  Rel(spa, gateway, "Solicita datos para dashboards", "HTTPS/GraphQL")
+  Rel(gateway, bff, "Enruta las consultas GraphQL", "HTTP interno")
+
+  Rel(bff, auth, "Consulta perfil y contexto académico", "REST/JSON")
+  Rel(auth, keycloak, "Valida tokens y consulta claves públicas", "OIDC/JWKS sobre HTTPS")
+  Rel(auth, authdb, "Lee y actualiza perfiles y contexto", "JDBC")
+  Rel(bff, olap, "Solicita indicadores multidimensionales", "REST/JSON")
+  Rel(bff, prediction, "Solicita estimaciones", "REST/JSON")
+  Rel(bff, graphapi, "Consulta relaciones académicas", "REST/JSON")
+
+  Rel(etl, fuentes, "Extrae datos académicos", "JDBC / conectores")
+  Rel(etl, dw, "Carga los datos preparados")
+  Rel(etl, etldb, "Registra metadatos y ejecuciones", "JDBC")
+  Rel(olap, dw, "Consulta hechos y dimensiones", "JDBC/SQL")
+  Rel(prediction, dw, "Lee datos y persiste predicciones (objetivo)", "PostgreSQL/psycopg2 (referencia)")
+  Rel(graphapi, graphdb, "Lee y actualiza relaciones", "Protocolo por confirmar")

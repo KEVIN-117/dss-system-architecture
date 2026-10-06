@@ -1,0 +1,631 @@
+% Compilar este documento con XeLaTeX.
+\documentclass[11pt,oneside,openany]{book}
+\usepackage[spanish]{babel}
+\usepackage[letterpaper,top=2.5cm,bottom=2.5cm,right=2.5cm,left=3cm]{geometry}
+\usepackage{fontspec}
+\setmainfont{Arial}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{enumitem}
+\usepackage{caption}
+\usepackage{graphicx}
+\usepackage{fancyhdr}
+\usepackage[hidelinks]{hyperref}
+
+\doublespacing
+\frenchspacing
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{3}
+\renewcommand{\thechapter}{\Roman{chapter}}
+\renewcommand{\thesection}{\arabic{chapter}.\arabic{section}}
+\renewcommand{\thesubsection}{\thesection.\arabic{subsection}}
+\renewcommand{\thesubsubsection}{\thesubsection.\arabic{subsubsection}}
+\setlength{\parindent}{0.5in}
+\setlength{\parskip}{0pt}
+\setlength{\headheight}{15pt}
+\pagestyle{fancy}
+\fancyhf{}
+\fancyhead[R]{\thepage}
+\renewcommand{\headrulewidth}{0pt}
+\fancypagestyle{plain}{\fancyhf{}\fancyhead[R]{\thepage}\renewcommand{\headrulewidth}{0pt}}
+\titleformat{\chapter}[block]
+  {\normalfont\bfseries\centering}
+  {CAPÍTULO \thechapter.}
+  {0.5em}
+  {}
+\titleformat{\section}[block]
+  {\normalfont\normalsize\bfseries}
+  {\thesection}
+  {0.6em}
+  {}
+\titleformat{\subsection}[block]
+  {\normalfont\normalsize\bfseries\itshape}
+  {\thesubsection}
+  {0.6em}
+  {}
+\titleformat{\subsubsection}[runin]
+  {\normalfont\normalsize\bfseries}
+  {\thesubsubsection}
+  {0.5em}
+  {}
+  [.]
+\titlespacing*{\chapter}{0pt}{0pt}{1em}
+\titlespacing*{\section}{0pt}{1em}{0pt}
+\titlespacing*{\subsection}{0pt}{1em}{0pt}
+\titlespacing*{\subsubsection}{0.5in}{1em}{0.5em}
+
+\begin{document}
+\pagenumbering{gobble}
+\begin{titlepage}
+\thispagestyle{fancy}
+\centering
+\vspace*{1.2cm}
+{\large\bfseries UNIVERSIDAD AUTÓNOMA TOMÁS FRÍAS\\[0.4cm]
+CARRERA DE INGENIERÍA DE SISTEMAS}\\[1.5cm]
+{\large PERFIL DE PROYECTO DE GRADO}\\[1.2cm]
+ {\bfseries Sistema de Soporte a Decisiones basado en Data Warehouse y Machine Learning para la Gestión Estratégica Académica en la Universidad Autónoma Tomás Frías}\\[1.5cm]
+Proyecto para optar al título de\\ Licenciado en\\ Ingeniería de Sistemas\\[1cm]
+Autor: Kevin Alexis Rodríguez Condori\\[0.35cm]
+Tutora: M.Sc. Lic. Anny Mercado Algarañaz\par
+\vfill
+Potosí, Bolivia\\
+2026
+\end{titlepage}
+
+\chapter*{Resumen}
+\addcontentsline{toc}{chapter}{Resumen}
+\begingroup
+\setlength{\parindent}{0pt}
+El proyecto propuso el desarrollo de un Sistema de Soporte a Decisiones (DSS) para fortalecer la gestión estratégica académica de la Universidad Autónoma Tomás Frías (UATF), con énfasis en la información administrada por la Dirección de Servicios Académicos (DSA). La propuesta partió de la fragmentación de los datos académicos y de la dependencia de reportes manuales, cuya consolidación dificultaba el análisis oportuno de la matrícula, el rendimiento y la demanda de asignaturas. Para responder a esta situación, se integraron datos institucionales en un Data Warehouse multidimensional y se evaluó la aplicación de modelos de Machine Learning que permitieron estimar riesgos académicos y apoyar la planificación. La investigación tuvo un enfoque mixto y fue de tipo aplicado y tecnológico. El diagnóstico consideró revisión documental, observación directa y entrevistas a autoridades y personal administrativo. La solución contempló procesos de extracción, transformación y carga, almacenamiento analítico, consultas de indicadores, modelos predictivos y dashboards dirigidos a usuarios institucionales autorizados. La funcionalidad y el desempeño de los modelos se verificaron mediante pruebas de integración y métricas de clasificación, entre ellas la matriz de confusión, la sensibilidad y el F1-score. Se esperó que el sistema facilitara el acceso a información consistente y contribuyera a que las decisiones académicas se fundamentaran en datos disponibles, dentro de los límites de calidad, cobertura y autorización definidos para las fuentes institucionales.
+
+\medskip
+\noindent\emph{Palabras clave:} sistema de soporte a decisiones, Data Warehouse, Machine Learning, gestión académica, UATF.
+\endgroup
+
+\chapter*{Dedicatoria}
+\addcontentsline{toc}{chapter}{Dedicatoria}
+Dedico este proyecto a\ldots{}
+
+\tableofcontents
+\setcounter{chapter}{0}
+\pagenumbering{arabic}
+\chapter*{1. Introducción}
+\addcontentsline{toc}{chapter}{1. Introducción}
+
+Las universidades producen información académica de manera continua mediante sus procesos de admisión, matrícula, evaluación y planificación. Sin embargo, disponer de registros no garantizaba que estos pudieran analizarse de forma integrada ni que se convirtieran con facilidad en evidencia para decidir. En la Universidad Autónoma Tomás Frías (UATF), la Dirección de Servicios Académicos (DSA) administraba información que podía contribuir a comprender la trayectoria estudiantil, el rendimiento por asignatura y la demanda de recursos, siempre que se organizara para su análisis.
+
+Este proyecto propuso un Sistema de Soporte a Decisiones (DSS) que combinó un almacén de datos multidimensional con técnicas de Machine Learning y herramientas de visualización. La propuesta se orientó a transformar datos operacionales en indicadores comprensibles y estimaciones que apoyaron la planificación académica. En las secciones siguientes se presentaron los antecedentes, el problema, los objetivos, la metodología y los límites previstos para el desarrollo.
+
+\subsection*{Antecedentes}
+
+La revisión de antecedentes permitió ubicar la propuesta dentro de la evolución de la inteligencia de negocios y la analítica en educación superior. Se examinaron enfoques de integración de datos y experiencias universitarias que ayudaron a reconocer decisiones de diseño pertinentes para la realidad de la UATF.
+
+Se analizaron los principios de los Data Warehouses y del modelado dimensional, incluidos los esquemas en estrella que organizaban hechos académicos alrededor de dimensiones como tiempo, facultad, asignatura y programa.
+
+Se revisaron experiencias de instituciones de educación superior de América Latina en las que se abordaron la integración de fuentes, la elaboración de indicadores, el análisis del rendimiento o la alerta temprana.
+
+Se estudió el uso de modelos supervisados, como árboles de decisión, bosques aleatorios, regresión logística y métodos de boosting, considerando sus condiciones de aplicación y sus límites para anticipar situaciones académicas.
+
+La revisión no asumió que los resultados de otras universidades podrían trasladarse directamente a la UATF. Su utilidad consistió en comparar enfoques, identificar requisitos de calidad de datos y establecer criterios para seleccionar y evaluar una solución ajustada a los procesos y registros institucionales.
+
+\subsection*{Problema de investigación}
+
+El diagnóstico preliminar descrito en el perfil identificó una brecha entre el volumen de información académica disponible en la DSA y la capacidad institucional para consultarla de manera integrada y oportuna. Los sistemas transaccionales estaban diseñados principalmente para registrar operaciones cotidianas; por ello, la elaboración de análisis que relacionaran matrícula, calificaciones, carga docente y periodos académicos requería consolidaciones manuales.
+
+Cuando los reportes tardaban en prepararse, presentaban diferencias entre unidades o describían únicamente periodos ya concluidos, las autoridades tenían menos elementos para planificar cupos, asignaturas y carga horaria con anticipación. El proyecto abordó este problema mediante un diagnóstico que verificó las condiciones existentes con personal y documentación de la DSA, sin presuponer que todos los sistemas o datos tenían la misma calidad o disponibilidad.
+
+De acuerdo con el análisis preliminar, las causas que se investigaron incluyeron:
+
+La dispersión de los registros en sistemas operacionales que respondían a necesidades de áreas distintas y no estaban preparados para consultas analíticas transversales.
+
+La dependencia de hojas de cálculo y reportes elaborados manualmente, que podía aumentar el tiempo de consolidación y el riesgo de inconsistencias.
+
+La ausencia de un proceso institucionalizado para estimar riesgos académicos o proyectar la demanda a partir de datos históricos.
+
+Al mantenerse estas condiciones, se presentaron consecuencias como las siguientes:
+
+Decisiones tardías o con información incompleta, que dificultaron la identificación oportuna de necesidades de apoyo académico.
+
+Planificación de recursos con incertidumbre sobre la demanda de asignaturas, aulas y carga docente.
+
+Dificultades para producir indicadores consistentes que respalden la gestión y los procesos institucionales de evaluación.
+
+A partir de esta situación, el problema de investigación se formulará mediante la siguiente pregunta:
+
+¿Cómo contribuyó un Sistema de Soporte a Decisiones basado en Data Warehouse y Machine Learning a fortalecer la gestión estratégica académica de la Universidad Autónoma Tomás Frías mediante la integración y el análisis de datos institucionales?
+
+\subsection*{Objeto de estudio}
+
+El objeto de estudio comprendió los Sistemas de Soporte a Decisiones basados en Data Warehouse y Machine Learning, aplicados al análisis de información académica para apoyar decisiones institucionales.
+
+\subsection*{Campo de acción}
+
+El campo de acción se delimitó a la arquitectura de datos y a la analítica predictiva que se aplicaron a la información gestionada por la Dirección de Servicios Académicos de la UATF. El diseño consideró diferencias entre programas, periodos y mallas curriculares, así como las variables que efectivamente estuvieron disponibles y autorizadas para el estudio.
+
+El componente predictivo se enfocó en la población estudiantil definida dentro del alcance, con especial atención a los primeros años de formación. La delimitación final dependió de la cobertura, consistencia y suficiencia de los registros históricos obtenidos.
+
+\subsection*{Objetivo general}
+
+El proyecto tuvo como objetivo general:
+
+Desarrollar un Sistema de Soporte a Decisiones basado en Data Warehouse y Machine Learning para fortalecer la gestión estratégica académica en la Universidad Autónoma Tomás Frías, mediante la integración de datos institucionales y la generación de analítica predictiva.
+
+\subsection*{Preguntas científicas}
+
+Las preguntas científicas guiaron las etapas de fundamentación, diagnóstico, diseño y validación de la propuesta. Se buscó responder las siguientes:
+
+\begin{enumerate}[leftmargin=*]
+\item ¿Qué fundamentos teóricos, metodológicos y tecnológicos sustentaron la construcción de un DSS con Data Warehouse y Machine Learning para el análisis de información académica?
+\item ¿Cuál fue la situación de los datos operacionales y de los procesos de toma de decisiones académicas en la DSA de la UATF?
+\item ¿Qué arquitectura y modelo multidimensional respondieron mejor a las necesidades de análisis académico identificadas en la institución?
+\item ¿Cómo se comprobaron la integración, la funcionalidad y el desempeño de los componentes del DSS propuesto?
+\end{enumerate}
+\subsection*{Tareas de investigación}
+
+Para alcanzar el objetivo y responder las preguntas, se organizó el trabajo en tareas progresivas que relacionaron el análisis académico con la construcción técnica del sistema:
+
+\begin{enumerate}[leftmargin=*]
+\item Se elaboró el marco teórico sobre DSS, Data Warehouses, inteligencia de negocios, analítica académica y modelos de Machine Learning.
+\item Se diagnosticó la gestión existente de los datos, la calidad de los registros históricos y las necesidades de información de la DSA mediante revisión documental, observación y entrevistas.
+\item Se diseñaron la arquitectura del sistema y el modelo multidimensional, considerando HEFESTO para el almacén de datos y CRISP-DM para el trabajo analítico y predictivo.
+\item Se implementaron los procesos de integración, el repositorio analítico, los modelos seleccionados y los dashboards mediante las herramientas definidas durante el diseño.
+\item Se realizaron pruebas funcionales, de integración, de aceptación y de usabilidad, además de la evaluación de los modelos con métricas apropiadas a la distribución de los datos.
+\end{enumerate}
+\subsection*{Diseño metodológico}
+
+El diseño metodológico orientó tanto la recolección de información como el desarrollo del artefacto tecnológico. La elección de métodos buscó responder al problema y permitió separar el diagnóstico institucional de la evaluación técnica del sistema.
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Enfoque y tipo de investigación}
+\end{itemize}
+La investigación adoptó un enfoque mixto. La parte cualitativa permitió comprender los procesos de trabajo, las necesidades de las autoridades y las reglas de negocio de la DSA; la parte cuantitativa se utilizó para revisar y procesar datos académicos, construir indicadores y evaluar los modelos predictivos. El estudio fue aplicado y tecnológico porque se diseñó e implementó una solución informática para atender una necesidad institucional concreta.
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Métodos teóricos}
+\end{itemize}
+Los métodos teóricos permitieron organizar la información y fundamentar las decisiones de diseño:
+
+\begin{itemize}[leftmargin=*]
+\item Análisis y síntesis: se examinaron las entidades y variables de los sistemas de origen y luego se integraron en una estructura analítica coherente para el Data Warehouse.
+\item Modelación: se representaron los hechos, dimensiones y relaciones académicas mediante un esquema multidimensional; también se definieron los flujos de trabajo para preparar y evaluar los modelos predictivos.
+\item Enfoque sistémico: se estudiaron los procesos, datos, componentes de software y usuarios como partes relacionadas de una solución institucional.
+\item \textbf{Métodos empíricos}
+\end{itemize}
+Los métodos empíricos permitieron obtener información directa sobre los procesos y necesidades que debía atender el sistema:
+
+\begin{itemize}[leftmargin=*]
+\item Revisión documental: se examinarán diccionarios de datos, reglamentos académicos y reportes disponibles para identificar definiciones, reglas y limitaciones de los registros.
+\item Entrevistas semiestructuradas: se consultó a autoridades académicas, directores de carrera y personal administrativo para precisar indicadores prioritarios y necesidades de uso.
+\item Observación directa: se describió el flujo de preparación de reportes para ubicar tareas manuales, dependencias y puntos automatizables.
+\end{itemize}
+\subsection*{Justificación de la investigación}
+
+La propuesta respondió a la necesidad de aprovechar mejor la información académica sin interferir con la operación de los sistemas de origen. Su pertinencia se analizó desde las dimensiones social, económica y tecnológica, y dependió de que el diagnóstico confirmara los requerimientos y la viabilidad de acceso a los datos.
+
+\begin{itemize}[leftmargin=*]
+\item Desde la perspectiva social, el sistema buscó ofrecer a las autoridades información oportuna sobre rendimiento y trayectoria académica. Los beneficiarios directos fueron las autoridades, decanos, directores de carrera y personal de la DSA, quienes pudieron consultar indicadores sin depender de cada consolidación manual. De manera indirecta, la comunidad estudiantil pudo beneficiarse si la institución utilizó las alertas como insumo para valorar apoyos tempranos; las predicciones no sustituyeron la evaluación ni la decisión de las personas responsables.
+\item En lo económico, se priorizó el aprovechamiento de infraestructura y recursos disponibles. La automatización pudo reducir parte del tiempo dedicado a recopilar y combinar reportes, mientras que el uso de tecnologías de código abierto limitó los gastos de licenciamiento. Estos beneficios se estimaron durante la evaluación; no se asumieron ahorros ni retornos financieros antes de contar con mediciones.
+\item En la perspectiva tecnológica, se propuso una arquitectura ajustada a las capacidades de los servidores institucionales y a la naturaleza tabular de los datos académicos. Se evaluó un despliegue local y se utilizarán herramientas de código abierto para el procesamiento, almacenamiento y análisis. Los requisitos de hardware y la selección definitiva de herramientas se establecieron después de revisar el volumen, la calidad y las condiciones de acceso a los datos.
+\end{itemize}
+\subsection*{Aporte práctico}
+
+El aporte práctico consistió en diseñar y poner a disposición de la DSA un DSS con componentes integrados para consolidar, analizar y presentar información académica. El sistema se orientó a entregar:
+
+Un Data Warehouse que reunió datos seleccionados en una estructura consistente y apta para consultas analíticas.
+
+Procesos programados de integración que redujeron la dependencia de consolidaciones manuales y permitieron conocer la fecha y el estado de cada actualización.
+
+Indicadores y visualizaciones para explorar matrícula, rendimiento, retención, reprobación y demanda académica.
+
+Modelos predictivos evaluados con datos disponibles, cuyas estimaciones pudieron apoyar la identificación de casos que requirieron revisión institucional.
+
+En el uso previsto, una autoridad ingresó al dashboard que correspondía a su ámbito y filtró los indicadores por gestión, programa o periodo. Si el modelo identificó registros con un nivel de riesgo que superó los criterios acordados, el sistema presentó esa información junto con las variables que contribuyeron a la estimación, en la medida en que el modelo lo permitió. La autoridad revisó los antecedentes y decidió si correspondía coordinar una acción de apoyo. El sistema funcionó como herramienta informativa: no asignó tutores ni ejecutó intervenciones de manera automática.
+
+\subsection*{Alcances}
+
+El proyecto abarcó los componentes que resultaron viables después del diagnóstico y de la autorización institucional. El alcance previsto se organizó en cinco subsistemas:
+
+\begin{itemize}[leftmargin=*]
+\item Ingesta y preprocesamiento
+\end{itemize}
+Este subsistema extrajo y preparó datos académicos de origen bajo permisos de solo lectura. La cobertura temporal se definió con la DSA según la disponibilidad y autorización de los registros.
+
+\begin{itemize}[leftmargin=*]
+\item Se extrajeron datos de estudiantes, matrículas, calificaciones y asignación docente que resultaron pertinentes al estudio.
+\item Se procesaron datos por lotes y se evaluó la incorporación incremental de cambios, con tareas programadas fuera de los periodos de mayor actividad operativa.
+\item Se aplicaron reglas de depuración y transformación, además de técnicas de preparación de variables para los análisis previstos.
+\item Las técnicas para atender el desbalance entre clases, incluido el sobremuestreo sintético, se utilizaron solo si el diagnóstico estadístico confirmó su necesidad y si no produjeron filtración de información entre conjuntos de entrenamiento y prueba.
+\item Almacenamiento analítico
+\end{itemize}
+El repositorio central organizó el historial que pudo integrarse de forma confiable. La estructura se diseñó para consultas académicas y respetó las restricciones de acceso y calidad identificadas en las fuentes.
+
+\begin{itemize}[leftmargin=*]
+\item Se construyó un Data Warehouse relacional en PostgreSQL con un modelo multidimensional de hechos y dimensiones.
+\item Se incorporaron índices y estructuras que facilitaron las consultas sobre el historial de rendimiento.
+\item Se evaluó representar las mallas curriculares y sus prerrequisitos como grafos, siempre que esa necesidad se confirmó durante el diseño.
+\item Se mantuvo un diccionario de datos que describió las entidades, variables y transformaciones del repositorio.
+\item Gestión de consultas
+\end{itemize}
+La capa de consulta centralizó las peticiones analíticas y tradujo conceptos académicos a consultas sobre las fuentes del almacén. También aplicó controles para que cada usuario accediera únicamente a la información permitida.
+
+\begin{itemize}[leftmargin=*]
+\item Se implementó una capa semántica para representar conceptos del negocio y generar consultas estructuradas.
+\item Se optimizaron las consultas recurrentes mediante índices y, cuando correspondió, mecanismos de caché.
+\item Se definieron roles y permisos para resguardar la confidencialidad de los datos.
+\item Motor predictivo
+\end{itemize}
+El motor analizó datos tabulares y produjo estimaciones que se presentaron como apoyo a la revisión académica. La selección final del modelo dependió de la calidad, el volumen y la distribución de los datos.
+
+\begin{itemize}[leftmargin=*]
+\item Se evaluaron modelos de clasificación supervisada, entre ellos Random Forest y métodos de boosting como XGBoost, si las condiciones técnicas y de datos lo justificaron.
+\item Se definieron las etiquetas y la población de análisis con base en los registros y los criterios académicos acordados; la propuesta preliminar priorizó a estudiantes de primero y segundo año.
+\item El desempeño se analizó con matriz de confusión, sensibilidad, precisión y F1-score, considerando el costo de falsos positivos y falsos negativos.
+\item Visualización
+\end{itemize}
+El módulo de visualización presentó indicadores y alertas a autoridades y personal administrativo autorizado, con filtros acordes a sus responsabilidades.
+
+\begin{itemize}[leftmargin=*]
+\item Se mostraron indicadores académicos, como retención, reprobación, arrastre de materias y evolución de matrícula.
+\item Se pudieron incluir mapas de calor curriculares y listas de registros que requirieron revisión, según la validez de los datos y de los modelos.
+\item Se evaluó la exportación de reportes filtrados a formatos tabulares y se mostró el estado de actualización del proceso de datos.
+\end{itemize}
+\subsection*{Limitaciones}
+
+El sistema se ajustó a la cobertura y confiabilidad de los registros disponibles, a las autorizaciones institucionales y a los objetivos del proyecto. Las siguientes limitaciones definieron lo que no se pretendió resolver:
+
+\begin{itemize}[leftmargin=*]
+\item Ingesta y preprocesamiento
+\item Los procesos accedieron a las fuentes con permisos de solo lectura y no modificaron los registros operacionales.
+\item El alcance no incluyó inicialmente becas, trámites financieros, recursos humanos ni titulación, salvo que el diseño y la autorización ampliaron expresamente la cobertura.
+\item No se habilitó digitación manual para completar registros ausentes; la ingesta dependió de la disponibilidad de datos digitales en las fuentes autorizadas.
+\item Almacenamiento analítico
+\item Los registros eliminados, incompletos o corruptos pudieron excluirse cuando impidieron un análisis confiable; la calidad de las fuentes limitó la precisión del almacén.
+\item El modelo se diseñó para la normativa, los periodos y las estructuras curriculares de la UATF, por lo que no se consideró directamente transferible a otras universidades.
+\item Consultas
+\item La capa respondió consultas analíticas y no reemplazó los sistemas transaccionales ni resolvió operaciones de matrícula en tiempo real.
+\item Las integraciones se limitaron a los componentes autorizados del proyecto; no se ofrecieron servicios públicos de consulta.
+\item Motor predictivo
+\item Los modelos utilizaron las variables estructuradas disponibles en los sistemas oficiales y no infirieron estados psicológicos, emocionales o socioeconómicos que no hubieran sido registrados con autorización.
+\item La población prevista se limitó a los primeros años de formación, sujeta a la suficiencia de datos; no se asumieron predicciones válidas para estudiantes de cursos superiores, tesistas o egresados.
+\item El motor se limitó a estimar riesgo. No recomendó tratamientos pedagógicos de forma autónoma ni asignó tutores.
+\item Visualización
+\item El acceso se restringió a autoridades y personal administrativo autorizados; no se desarrolló un portal de consulta para estudiantes.
+\item Las alertas fueron informativas. El sistema no bloqueó matrículas, envió sanciones ni ejecutó acciones institucionales por cuenta propia.
+\item El panel de estado mostró metadatos e historial del proceso, pero no incluyó controles para ejecutar cargas forzadas ni alterar la configuración automática.
+\end{itemize}
+\subsection*{Estructura tentativa del documento}
+
+El informe final se organizó en tres capítulos, cuya secuencia permitió pasar del sustento conceptual al diseño y luego a la implementación y evaluación:
+
+\begin{itemize}[leftmargin=*]
+\item Capítulo I. Fundamentación teórica: desarrolló el estado del arte y el marco conceptual sobre inteligencia de negocios, Data Warehouse, la metodología HEFESTO, Machine Learning, CRISP-DM, persistencia de datos y procesamiento de información.
+\item Capítulo II. Análisis y diseño: presentó el diagnóstico de los sistemas de la DSA y describió la arquitectura, el modelo multidimensional, la integración de datos y el diseño de los componentes analíticos.
+\item Capítulo III. Implementación y pruebas: documentó la construcción de los procesos de datos, los modelos, las interfaces y las pruebas que se realizaron para evaluar la integración y el desempeño del sistema.
+\end{itemize}
+\subsection*{Cronograma de trabajo}
+
+La planificación combinó entregas iterativas con actividades de análisis, diseño, construcción y validación. HEFESTO orientó el modelado del almacén y CRISP-DM organizó el ciclo analítico; para el seguimiento de tareas se utilizarán prácticas ágiles, como Kanban. La herramienta ETL y la duración total se confirmaron durante la planificación detallada. El cronograma preliminar distribuyó las actividades entre abril y diciembre:
+
+Anteproyecto: la redacción y consolidación del perfil se realizó entre abril y mayo; las revisiones y la defensa se programaron para junio.
+
+Fundamentación y diagnóstico: la recolección de información y revisión del estado del arte se desarrollaron en julio; las entrevistas y el análisis de requerimientos y fuentes se organizaron entre julio y agosto.
+
+Análisis y diseño: el modelado del Data Warehouse se realizó en agosto; el diseño de la arquitectura ETL se abordó entre agosto y septiembre; el modelado predictivo y las capas de red se trabajaron entre septiembre y octubre.
+
+Implementación y pruebas: las bases de datos y componentes de integración se prepararon entre agosto y septiembre; la ingesta ETL se desarrolló entre septiembre y octubre; el entrenamiento de modelos y los dashboards se trabajaron entre octubre y noviembre; las pruebas funcionales y de integración se realizaron en noviembre.
+
+Cierre: la redacción del documento final avanzó entre julio y noviembre; los borradores y la predefensa se prepararon en diciembre, al igual que las correcciones y la defensa pública, de acuerdo con el calendario institucional.
+
+\chapter{Marco teórico}
+
+\section{Introducción}
+
+La toma de decisiones constituye el eje fundamental para la gestión de cualquier organización, independientemente de su sector económico o institucional. En el contexto universitario, la gestión estratégica tradicional suele verse limitada por el uso de reportes estáticos y la fragmentación de la información operacional. Ante este escenario, el presente proyecto aborda la necesidad de transformar grandes volúmenes de datos académicos en conocimiento analítico y prospectivo. Para ello, se propone la concepción de un Sistema de Soporte a Decisiones (DSS) integrado a una arquitectura de Data Warehouse multidimensional y fortalecido con algoritmos de Machine Learning, orientados a la generación de analítica predictiva para la detección oportuna de riesgos académicos y la optimización de la planificación institucional.
+
+El presente capítulo tiene por objetivo primordial proporcionar los fundamentos conceptuales, metodológicos y tecnológicos indispensables para comprender, diseñar e implementar un Sistema de Soporte a Decisiones (DSS) con capacidades analíticas y predictivas. En el ámbito de la Ingeniería de Sistemas.
+
+\section{Fundamentación teórica del dominio}
+
+\subsection{Gestión estratégica académica}
+
+La gestión académica estratégica implica coordinar y alinear recursos pedagógicos, administrativos y tecnológicos para asegurar la eficiencia institucional y responder a las exigencias del entorno social, cultural y económico (Farfán Cabrera \& Reyes Adan, 2023; Ortega et al., 2021). En este contexto, poner la "inteligencia educativa" al servicio de la institución requiere consolidar la evaluación continua del desarrollo estudiantil mediante la gestión de datos e indicadores clave de rendimiento, constituyendo así el pilar fundamental para la excelencia académica (Bañes, 2023).
+
+\subsection{Analítica deductiva}
+
+La analítica deductiva en el ámbito de la ingeniería de sistemas se fundamenta en la aplicación de principios lógicos e históricos generales para derivar conclusiones sobre casos específicos. En la investigación cuantitativa, el enfoque deductivo parte de marcos teóricos y normativos preestablecidos para comprobar hipótesis mediante el análisis estructurado de datos empíricos (Hernández Sampieri et al., 2014).
+
+\subsection{Inteligencia de negocios (BI)}
+
+De acuerdo con Reis y Housley (2022), la inteligencia de negocios abarca las estructuras, metodologías y recursos tecnológicos destinados a convertir registros de origen en conocimiento analítico útil para la gestión. Los autores destacan que la finalidad central de esta disciplina radica en respaldar los procesos de decisión institucional a través de la presentación de reportes, paneles interactivos y análisis de carácter descriptivo.
+
+Asimismo, Grus (2019) complementa esta visión al plantear que la inteligencia de negocios proporciona el sustento requerido para el despliegue de enfoques analíticos avanzados. De acuerdo con el autor, el valor de la infraestructura analítica reside en la adecuada depuración y almacenamiento de la información, en tanto la fiabilidad de las evaluaciones e indicadores generados depende estrechamente de la consistencia de las fuentes utilizadas.
+
+Para el presente proyecto, la inteligencia de negocios se consideró como el componente técnico clave para transformar la información operacional de la universidad en evidencia analítica relevante. El almacenamiento de calificaciones y matrículas en los sistemas vigentes no garantizó por sí mismo su aprovechamiento para el análisis de la gestión. Por ello, la incorporación de capacidades analíticas facilitó el monitoreo de indicadores académicos y contribuyó a que la planificación institucional se fundamentara en datos consistentes y orientados a respaldar las decisiones oportunas.
+
+\subsection{Ingeniería de datos}
+
+La ingeniería de datos comprende el diseño, implementación y mantenimiento de procesos para transformar datos crudos en información útil y de calidad (Reis \& Housley, 2022). Esta disciplina abarca todo el ciclo de vida de los datos ---desde su ingesta operacional hasta su almacenamiento y disponibilización---, aislando los sistemas transaccionales para erigir almacenes analíticos (Data Warehouse) que respondan a interrogantes estratégicas sin comprometer el rendimiento en origen (Bernabeu, 2010; Reis \& Housley, 2022).
+
+El ciclo de vida de la ingeniería de datos
+
+El ciclo de vida de la ingeniería de datos es un proceso iterativo constituido por cinco etapas clave (Reis \& Housley, 2022):
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Generación de datos:} Producción de registros primarios desde sistemas transaccionales (OLTP), APIs o archivos (Reis \& Housley, 2022).
+\item \textbf{Almacenamiento:} Componente transversal que determina la escalabilidad y rendimiento según la arquitectura seleccionada (Reis \& Housley, 2022).
+\item \textbf{Ingesta de datos:} Captura y traslado de información mediante procesamiento por lotes o flujos continuos (Reis \& Housley, 2022).
+\item \textbf{Consultas, modelado y transformación:} Limpieza, estandarización y desnormalización de estructuras para aplicar la lógica de negocio (Reis \& Housley, 2022).
+\item \textbf{Suministro de datos:} Exposición de datos refinados para Inteligencia de Negocios, tableros de control y algoritmos de Machine Learning (Reis \& Housley, 2022).
+\end{itemize}
+\subsubsection*{Pilares de la ingeniería de datos}
+
+Este ciclo de vida está respaldado por tres pilares esenciales (Reis \& Housley, 2022):
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Seguridad y gobernanza de datos:} Garantiza la protección, confidencialidad y calidad de la información para evitar predicciones sesgadas o accesos no autorizados (Reis \& Housley, 2022).
+\item \textbf{DataOps y orquestación:} Automatiza la ejecución y monitoreo programado de las tuberías de datos mediante prácticas ágiles y control de calidad (Reis \& Housley, 2022).
+\item \textbf{Arquitectura e ingeniería de software:} Aplica principios de modularidad, versionado y pruebas para construir sistemas escalables y mantenibles (Reis \& Housley, 2022).
+\end{itemize}
+\subsubsection*{Arquitectura de datos}
+
+La arquitectura de datos establece las reglas y modelos para recolectar, almacenar e integrar activos de información (Calcagno, 2023; Reis \& Housley, 2022). Entre los principales enfoques analíticos destacan:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Data Lake:} Repositorio centralizado para almacenar volúmenes masivos de datos estructurados o no estructurados en su formato nativo (Reis \& Housley, 2022).
+\item \textbf{Data Lakehouse:} Arquitectura híbrida que combina la flexibilidad del Data Lake con el soporte a transacciones ACID y la gobernanza del Data Warehouse (Reis \& Housley, 2022).
+\item \textbf{Data Mesh:} Paradigma descentralizado que organiza la gestión de la información por dominios de negocio, tratando los datos como un producto (Reis \& Housley, 2022).
+\item \textbf{Data Warehouse:} Repositorio estructurado y optimizado mediante esquemas predefinidos para el procesamiento analítico (OLAP) y reporte institucional (Bernabeu, 2010; Calcagno, 2023).
+\end{itemize}
+\subsubsection*{Almacenes de datos (Data Warehouse)}
+
+A diferencia de los sistemas transaccionales, el almacén de datos optimiza el rendimiento analítico mediante el modelado dimensional. Este contrapone tablas de hechos (métricas cuantitativas) con tablas de dimensiones (contexto descriptivo) (Bernabeu, 2010), estructurando en tres tipos principales de esquemas:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Estrella:} Una tabla de hechos rodeada por dimensiones desnormalizadas, optimizando la velocidad de consulta (Bernabeu, 2010).
+\item \textbf{Copo de nieve:} Variante normalizada de la estrella que reduce redundancias pero incrementa la complejidad de las uniones (Bernabeu, 2010).
+\item \textbf{Constelación:} Conjunto de múltiples tablas de hechos que comparten dimensiones conformadas (Bernabeu, 2010).
+\end{itemize}
+\subsubsection*{Captura de datos}
+
+La ingesta abarca los mecanismos para trasladar datos desde las fuentes operacionales hacia los entornos analíticos de forma segura e íntegra. Este proceso se sustenta en diversos conceptos y patrones técnicos (Bernabeu, 2010; Reis \& Housley, 2022):
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Tubería de datos (Data Pipeline) y Payload:} Flujo automatizado que transporta la carga útil (payload) o datos de interés hacia el sistema analítico (Reis \& Housley, 2022).
+\item \textbf{Patrones de captura:} Modalidades de extracción clasificadas en empuje (pushing), extracción (pulling) y sondeo periódico (polling) (Reis \& Housley, 2022).
+\item \textbf{Modalidades de procesamiento:} Transferencia de datos ejecutada por lotes (batch) a intervalos definidos o en tiempo real (streaming) de manera continua (Reis \& Housley, 2022).
+\item \textbf{Integración ETL vs. ELT:} Paradigmas diferenciados según la secuencia del procesamiento; ETL transforma previamente en un servidor intermedio, mientras que ELT delega la transformación al propio motor de almacenamiento analítico (Reis \& Housley, 2022).
+\item \textbf{Orquestación mediante DAGs:} Coordinación de flujos de trabajo mediante Grafos Acíclicos Dirigidos para estructurar tareas secuenciales sin bucles (Reis \& Housley, 2022).
+\end{itemize}
+\subsubsection*{Sistemas de gestión de bases de datos relacionales}
+
+\begin{itemize}[leftmargin=*]
+\item Los RDBMS organizan información estructurada en tablas vinculadas por claves (Calcagno, 2023). Dentro de este ámbito, una consulta (query) en SQL permite solicitar o manipular registros (Reis \& Housley, 2022), mientras que el modelado de datos asegura la integridad referencial. A nivel estructural, se aplica normalización para eliminar redundancias en sistemas operacionales o desnormalización para optimizar la velocidad de lectura en el almacén analítico (Bernabeu, 2010; Calcagno, 2023; Reis \& Housley, 2022).
+\end{itemize}
+\subsubsection*{Calidad, gobernanza y privacidad de los datos}
+
+Bajo el principio de que datos deficientes generan resultados ambiguos, la gobernanza establece estándares para garantizar la calidad y seguridad de los activos de información (Reis \& Housley, 2022). Esto comprende el perfilado y limpieza para eliminar inconsistencias o duplicados históricos antes del entrenamiento analítico, así como la anonimización y enmascaramiento para proteger datos personales sensibles conforme a criterios éticos y de privacidad (Reis \& Housley, 2022).
+
+\subsection{Ciencia de datos}
+
+La ciencia de datos es una disciplina multidisciplinaria que extrae información útil y patrones de conjuntos de datos complejos mediante la integración de programación, métodos estadísticos y conocimiento del dominio (Daniel, 2019; Grus, 2019). Dentro de este campo, el aprendizaje automático (Machine Learning) capacita a los sistemas informáticos para inferir patrones y aprender autónomamente de la experiencia empírica sin depender de instrucciones explícitamente codificadas (Géron, 2019; Mitchell, 1997).
+
+Desde una perspectiva pragmática y fundacional, Grus (2019) conceptualiza la ciencia de datos como la disciplina encargada de extraer información útil y conocimiento accionable a partir de volúmenes de datos desestructurados y ruidosos. El autor sostiene que esta área opera en la intersección de las habilidades de programación, el conocimiento matemático-estadístico y la experiencia en el dominio del problema. Bajo este enfoque, la ciencia de datos no se limita a la simple ejecución de algoritmos, sino que abarca el ciclo completo de resolución de problemas: desde la formulación de la pregunta correcta y la limpieza de la información.
+
+\subsubsection*{Aprendizaje automático (Machine Learning)}
+
+Desde una perspectiva computacional y matemática fundacional, Mitchell (1997) define el aprendizaje automático como el estudio de algoritmos que mejoran su rendimiento empírico a través de la experiencia. El autor formaliza este concepto estableciendo que un programa informático aprende de una experiencia E con respecto a una clase de tareas T y una medida de rendimiento P, si su desempeño en T, medido por P, mejora iterativamente con la experiencia E. Bajo este paradigma, el aprendizaje automático representa una evolución de la programación tradicional, delegando a la máquina la capacidad de inferir reglas matemáticas a partir de datos históricos en lugar de depender de instrucciones lógicas explícitamente codificadas por un humano.
+
+En un contexto más contemporáneo y aplicado, Géron (2019) describe el machine learning como el arte y la ciencia de programar sistemas para que aprendan de los datos de manera autónoma. El autor destaca que, frente a problemas complejos donde los enfoques algorítmicos tradicionales resultan ineficientes ---debido a la interminable proliferación de reglas condicionales---, los modelos de aprendizaje automático destacan por su capacidad de adaptación y generalización. Mediante el entrenamiento con grandes volúmenes de información, estos sistemas logran modelar patrones e interacciones complejas, permitiendo clasificar nuevos casos o predecir tendencias con alta precisión.
+
+\subsubsection*{Sobreajuste y subajuste}
+
+Grus (2019) explica que el sobreajuste (overfitting) ocurre cuando un modelo se ajusta de manera excesiva a los datos de entrenamiento, llegando a memorizar el ruido y las fluctuaciones aleatorias de la muestra en lugar de aprender el patrón subyacente; esto destruye su capacidad de generalización ante datos no observados. Por el contrario, el subajuste (underfitting) se presenta cuando el modelo es demasiado simple para capturar la estructura real de la información, lo que se traduce en un rendimiento deficiente tanto en el conjunto de entrenamiento como en el de prueba.
+
+El autor señala que el sobreajuste se produce habitualmente cuando el modelo tiene una alta complejidad en relación con la cantidad y la calidad de los datos disponibles, mientras que el subajuste es la consecuencia de utilizar un algoritmo con supuestos teóricos demasiado rígidos o con una capacidad matemática insuficiente para representar la complejidad intrínseca del problema.
+
+\subsubsection*{Exactitud, sesgo y varianza}
+
+Grus (2019) examina la relación entre la exactitud, el sesgo y la varianza a través del concepto fundamental del dilema del sesgo y la varianza. El autor define el sesgo como el error matemático derivado de suposiciones erróneas en el algoritmo, lo cual incapacita al modelo para capturar la estructura real de los datos y provoca subajuste. Por el contrario, la varianza es descrita como la sensibilidad extrema del modelo a las fluctuaciones y ruidos específicos del conjunto de entrenamiento, lo que conduce al sobreajuste. La exactitud general del sistema, por tanto, depende críticamente de encontrar un punto de equilibrio óptimo donde ambos tipos de error se minimicen.
+
+El autor formaliza el error de generalización de cualquier modelo predictivo descomponiéndolo teóricamente en tres elementos: el sesgo, la varianza y el error irreducible debido al ruido de los datos. Desde esta perspectiva, un modelo con alto sesgo carece de la flexibilidad matemática necesaria para aprender de la información, mientras que un modelo con alta varianza demuestra una complejidad excesiva que se desestabiliza ante cambios mínimos en las muestras de entrada. El diseño analítico exige la reducción simultánea de ambos componentes para maximizar la precisión predictiva ante observaciones completamente nuevas.
+
+\subsubsection*{Extracción y selección de características}
+
+Géron (2019) define la ingeniería de características, que engloba tanto a la extracción como a la selección, como un paso crítico para determinar el éxito de cualquier algoritmo de aprendizaje automático. La extracción de características consiste en transformar o combinar variables existentes para crear nuevos atributos que representen de mejor manera el patrón subyacente del problema. Por su parte, la selección de características se centra en identificar y elegir los atributos más informativos y prometedores del conjunto de datos original, descartando aquellos que resulten redundantes, irrelevantes o ruidosos.
+
+Por otro lado, Zheng y Casari (2018) abordan estos conceptos desde la perspectiva de la representación de la información, señalando que un modelo predictivo es tan bueno como la calidad de los datos que se le suministran. Los autores explican que la extracción altera el espacio de características original al proyectar los datos estructurados o no estructurados hacia una nueva dimensión matemática de mayor utilidad analítica; mientras que la selección filtra de manera directa el espacio original basándose en pruebas estadísticas de relevancia o correlación.
+
+\subsubsection*{Clasificación BInaria}
+
+La clasificación binaria es una tarea fundamental del aprendizaje automático supervisado que consiste en predecir una variable cualitativa dividiendo el espacio muestral en dos categorías (clases 0 y 1) mediante fronteras de decisión eficientes (Grus, 2019; James et al., 2013). Para ello, los clasificadores probabilísticos modelan la probabilidad condicional Pr(Y=1|X=x) empleando funciones de enlace no lineales como la logística sigmoide, la cual transforma combinaciones lineales en medidas de probabilidad dentro del intervalo [0, 1] (Hastie \& Tibshirani, 2009). Durante el entrenamiento, la optimización matemática busca reducir la función de pérdida de entropía cruzada binaria (Log Loss) ---que penaliza los errores cometidos con alta confianza--- ajustando iterativamente los parámetros del modelo mediante algoritmos como el descenso de gradiente (Goodfellow \& Bengio, 2016).
+
+\subsubsection*{Árboles de decisión (decision trees)}
+
+Los árboles de decisión son métodos supervisados no paramétricos para clasificación y regresión que dividen recursivamente el espacio de predictores mediante reglas condicionales estructuradas en forma de grafo jerárquico (James et al., 2013). Se consideran modelos de "caja blanca" por la alta transparencia e interpretabilidad de su proceso de inferencia (Géron, 2019).
+
+Su construcción sigue un enfoque descendente e codicioso (greedy top-down) orientado a identificar la mejor división en cada nodo (Hastie et al., 2009). En el marco del aprendizaje automático supervisado, la clasificación binaria constituye una tarea esencial orientada a predecir variables categóricas mediante la división del espacio de datos en dos clases (0 y 1) a través de límites de decisión eficientes. Para lograrlo, los clasificadores probabilísticos estiman la probabilidad condicional Pr(Y=1|X=x) haciendo uso de funciones de activación no lineales, como la función logística sigmoide, la cual proyecta combinaciones lineales hacia un rango de probabilidad acotado entre [0, 1]. Durante la etapa de ajuste, el proceso de optimización persigue la minimización de la función de pérdida de entropía cruzada binaria (Log Loss) ---restringiendo y penalizando aquellas predicciones erróneas emitidas con un alto grado de certeza--- mediante la actualización iterativa de los parámetros a través de algoritmos como el descenso de gradiente.
+
+Entre las principales fortalezas de esta metodología figuran su gran facilidad de interpretación, los requerimientos mínimos de preprocesamiento de datos y su capacidad para capturar patrones no lineales. No obstante, presentan desventajas considerables, como la susceptibilidad al sobreajuste (overfitting) y una marcada inestabilidad ante pequeñas alteraciones en las muestras de entrenamiento.
+
+\subsubsection*{Algoritmo Random Forest}
+
+Random Forest, introducido por (Breiman, 2001), es un método de aprendizaje por ensamble que construye y combina múltiples árboles de decisión independientes para mejorar la capacidad predictiva. Su fundamento es el bagging (bootstrap aggregating) donde cada árbol se entrena con una muestra aleatoria del conjunto de datos original.
+
+La innovación clave, señalada por (Géron, 2019), consiste en añadir aleatoriedad doble:
+
+\begin{itemize}[leftmargin=*]
+\item En las observaciones \(\rightarrow\) cada árbol recibe un subconjunto distinto de datos.
+\item En los atributos \(\rightarrow\) al dividir un nodo, el algoritmo selecciona aleatoriamente un subconjunto de variables en lugar de evaluar todas.
+\end{itemize}
+Esta estrategia incrementa la diversidad entre los árboles individuales. Al promediar sus predicciones, se logra disminuir la varianza global del modelo sin aumentar de manera significativa el sesgo, obteniendo así un clasificador robusto y preciso.
+
+\subsubsection*{Algoritmo XGBoost}
+
+Chen (2016) desarrolló XGBoost (\emph{Extreme Gradient Boosting}) como una implementación optimizada y altamente escalable del algoritmo de potenciación de gradiente (\emph{Gradient Boosting}). A diferencia de \emph{Random Forest}, donde los árboles se construyen de manera independiente y en paralelo, el principio de \emph{boosting} es intrínsecamente secuencial, cada nuevo árbol de decisión se entrena explícitamente para corregir los errores residuales o predicciones deficientes cometidas por los árboles precedentes (Hastie \& Tibshirani, 2009).
+
+\subsubsection*{Desbalance de clases}
+
+De acuerdo con Fernández y otros (2018), el desbalance de clases constituye una anomalía en la estructura de los datos, caracterizada por una acusada asimetría en la distribución de las observaciones entre las categorías existentes. En el ámbito de la clasificación binaria, dicha condición se manifiesta mediante el predominio numérico de una "clase mayoritaria" sobre una "clase minoritaria" considerablemente subrepresentada.
+
+\textbf{Sesgo algorítmico:} el entrenamiento de modelos de aprendizaje automático con datos desbalanceados produce un marcado sesgo algorítmico (Géron, 2019). Debido a que los algoritmos buscan reducir la tasa de error global, centran su optimización en los patrones de la clase dominante y relegan de forma sustancial el aprendizaje de la categoría minoritaria.
+
+\textbf{Técnicas de remuestreo:} Para mitigar el sesgo algorítmico, Kuhn y Johnson (2013) establecen que la intervención más efectiva ocurre a nivel de los datos mediante técnicas de remuestreo. Estas estrategias modifican artificialmente la distribución del conjunto de entrenamiento antes de la fase de modelado algorítmico, garantizando que el modelo matemático asigne la misma importancia estadística a ambas categorías.
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Submuestreo (\emph{Undersampling})}: Esta técnica busca nivelar la proporción de clases disminuyendo de forma aleatoria la cantidad de registros de la categoría mayoritaria hasta equipararla con la minoritaria. Aunque permite optimizar el uso de memoria computacional y reducir sustancialmente los tiempos de ejecución, Zheng y Casari (2018) advierten sobre el riesgo de prescindir de patrones esenciales e información crítica presentes en las muestras descartadas, lo cual puede derivar en un subajuste del modelo.
+\item \textbf{Sobremuestreo (\emph{Oversampling})}: A diferencia del enfoque anterior, el sobremuestreo equilibra la distribución incrementando la representación de la clase minoritaria. En lugar de duplicar observaciones existentes ---práctica que suele provocar sobreajuste---, las aproximaciones contemporáneas emplean algoritmos sintéticos como SMOTE (\emph{Synthetic Minority Over-sampling Technique}). De acuerdo con Chawla et al. (2002), SMOTE actúa sobre el espacio de atributos mediante la interpolación matemática de nuevos casos a lo largo de las líneas que conectan a los vecinos más próximos de la categoría minoritaria, lo que expande el espacio de decisión sin introducir redundancias ni ruido artificial.
+\end{itemize}
+\section{Fundamentos para el análisis y diseño del sistema}
+
+\subsection{Sistema y sistema de información}
+
+En el ámbito de la ingeniería, un sistema se entiende como un conjunto organizado de elementos interrelacionados que actúan de manera coordinada para alcanzar un propósito común (Von Bertalanffy, 1969). Los sistemas son estructuras que intercambian información con su entorno y cuyo comportamiento global depende de la interacción entre sus componentes; esta concepción permite analizar, modelar y optimizar procesos complejos bajo una visión integral. Por su parte, un sistema de información constituye la aplicación práctica de estos principios al tratamiento y gestión de datos (Laudon \& Laudon, 2016): integra personas, procedimientos y tecnología con el fin de transformar los datos en información útil para la toma de decisiones, garantizando que esta fluya de manera precisa, oportuna y segura.
+
+\subsection{Metodologías ágiles en el desarrollo de software}
+
+Las metodologías ágiles surgieron como alternativa a los modelos tradicionales de desarrollo, al priorizar la adaptabilidad, la colaboración y la entrega continua de valor. En ingeniería de software, este enfoque permite integrar módulos de manera flexible y validar resultados de forma temprana, reduciendo riesgos y mejorando la calidad del producto final. Su carácter iterativo resulta especialmente apropiado para un sistema como el presente, en el que cada incremento puede construirse y verificarse antes de avanzar al siguiente.
+
+\subsection{Metodología kanban}
+
+El método Kanban es un marco de trabajo fundamentado en la filosofía Lean y el pensamiento ágil, orientado a la gestión del cambio y la entrega continua de servicios a través del respeto a los roles y responsabilidades actuales, el liderazgo en todos los niveles y el enfoque en las necesidades del cliente (De los Campos \& Hernández, 2021; Kanban University, 2021). Su aplicación se basa en valores como la transparencia, la minimización del desperdicio y la adaptación constante, sustentándose en la visibilización del flujo de trabajo (Workflow) mediante tableros físicos o virtuales para monitorear el avance de las tareas, identificar cuellos de botella y eliminar bloqueos o retrasos que afecten la entrega de valor (De los Campos \& Hernández, 2021; Kanban University, 2021). El propósito central de optimizar este flujo es habilitar entregas fluidas, predecibles y sostenibles, reduciendo el tiempo total desde que se acepta un requerimiento hasta su despliegue mediante ciclos de retroalimentación continuos y el seguimiento de métricas clave como el Lead Time y el Cycle Time (De los Campos \& Hernández, 2021; Kanban University, 2021).
+
+\section{Metodologías orientadas al análisis y tratamiento de datos}
+
+\subsection{Metodología HEFESTO}
+
+La metodología HEFESTO, desarrollada por Bernabeu (2010), se define como un marco estructurado, sistemático y práctico orientado exclusivamente a la construcción de almacenes de datos (Data Warehouses). Este enfoque simplifica los procesos de diseño analítico mediante una guía paso a paso, independiente de las herramientas de software o gestores de bases de datos utilizados. Una de sus principales fortalezas radica en centrarse en las necesidades del negocio más que en los requerimientos exclusivamente técnicos, facilitando la colaboración entre analistas y usuarios finales para garantizar que la estructura multidimensional responda fielmente a las preguntas estratégicas de la organización (Bernabeu, 2010).
+
+El desarrollo de la metodología HEFESTO comprende las siguientes fases interrelacionadas (Bernabeu, 2010):
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Análisis de requerimientos:} Consiste en recopilar y estructurar las interrogantes estratégicas que los directivos necesitan responder para optimizar la toma de decisiones, identificando los indicadores (métricas numéricas) y las perspectivas (dimensiones) que las contextualizan (Bernabeu, 2010).
+\item \textbf{Modelo conceptual:} Involucra la inspección de los sistemas transaccionales para determinar el origen exacto de los datos en bruto y establecer formalmente la lógica de cálculo y consolidación que los transformará en indicadores listos para el análisis (Bernabeu, 2010).
+\item \textbf{Establecimiento de correspondencias:} Define el nivel de detalle o atomicidad de los datos almacenados y documenta las relaciones de procedencia, uniones y transformaciones necesarias para conectar las fuentes origen con la estructura multidimensional (Bernabeu, 2010).
+\item \textbf{Modelo lógico del DW:} Abarca la selección del esquema arquitectónico (estrella o copo de nieve), el diseño de las tablas de dimensiones (atributos cualitativos), el diseño de las tablas de hechos (métricas numéricas) y la definición de las uniones y relaciones multidimensionales para optimizar la resolución de consultas (Bernabeu, 2010).
+\item \textbf{Integración de datos y actualización periódica:} Define los procedimientos técnicos para la carga inicial del histórico de datos, así como la estrategia de actualización periódica incremental para mantener al día el almacén con las nuevas transacciones (Bernabeu, 2010).
+\end{itemize}
+\subsection{Metodología CRISP-DM}
+
+CRISP-DM (Cross-Industry Standard Process for Data Mining) es el modelo de proceso estándar y probado para el desarrollo de proyectos de minería de datos y analítica predictiva (IBM Corporation, 2012). Proporciona un marco estructurado, cíclico e iterativo que permite planificar, organizar y ejecutar proyectos analíticos, facilitando el retorno a fases previas según las necesidades del modelado y de la institución (IBM Corporation, 2012). Sus seis fases se estructuran de la siguiente manera:
+
+\begin{itemize}[leftmargin=*]
+\item \textbf{Entendimiento del negocio:} Comprende los objetivos y requisitos institucionales para traducirlos en la definición de un problema técnico de minería de datos (IBM Corporation, 2012).
+\item \textbf{Entendimiento de los datos:} Recolecta y explora estadísticamente los datos iniciales para evaluar su calidad, distribución y nivel de desbalance (IBM Corporation, 2012).
+\item \textbf{Preparación de los datos:} Construye el conjunto de datos final mediante tareas de limpieza, ingeniería de características y balanceo de muestras (IBM Corporation, 2012).
+\item \textbf{Modelado:} Selecciona, entrena y calibra algoritmos predictivos (como Random Forest y XGBoost) ajustando sus parámetros para optimizar la detección de patrones (IBM Corporation, 2012).
+\item \textbf{Evaluación:} Examina exhaustivamente los modelos con conjuntos de prueba mediante métricas como la matriz de confusión y el F1-score para verificar el cumplimiento de los objetivos (IBM Corporation, 2012).
+\item \textbf{Despliegue:} Integra el motor predictivo validado en el sistema para permitir la evaluación continua y la visualización de alertas tempranas (IBM Corporation, 2012).
+\end{itemize}
+\section{Fundamentos para la implementación tecnológica}
+
+\subsection{Arquitectura general del sistema}
+
+\subsection{Tecnologías de ingesta de datos}
+
+\subsection{Persistencia y almacenamiento}
+
+\subsection{Tecnologías de modelado predictivo}
+
+\subsection{Backend}
+
+\subsection{Frontend}
+
+\section{Fundamentos de pruebas y validación}
+
+\subsection{Niveles de pruebas de software}
+
+\subsection{Evaluación de modelos predictivos}
+
+\chapter{Planificación y diseño}
+
+\section{Introducción}
+
+\section{Análisis del problema}
+
+\subsection{Situación actual}
+
+\subsection{Diagnóstico}
+
+\subsection{Requerimientos funcionales}
+
+\subsection{Requerimientos no funcionales}
+
+\section{Estudio de factiBIlidad}
+
+\section{Técnica}
+
+\section{Económica}
+
+\section{Operativa}
+
+\section{Análisis de riesgos}
+
+\section{Diseño de la arquitectura}
+
+\subsection{Vista funcional del DSS}
+
+\begin{figure}[htbp]\centering
+\fbox{\parbox{0.82\textwidth}{\centering Referencia a \texttt{image2}: el archivo de imagen no está incluido en el Markdown de origen.}}
+\caption*{Imagen referenciada en el documento fuente, pendiente de adjuntar.}
+\end{figure}
+
+\subsection{Arquitectura general}
+
+\subsubsection{C4 nivel 1: contexto}
+
+\begin{figure}[htbp]\centering
+\fbox{\parbox{0.82\textwidth}{\centering Referencia a \texttt{image3}: el archivo de imagen no está incluido en el Markdown de origen.}}
+\caption*{Imagen referenciada en el documento fuente, pendiente de adjuntar.}
+\end{figure}
+
+\subsubsection{C4 nivel 2: contenedores}
+
+\begin{figure}[htbp]\centering
+\fbox{\parbox{0.82\textwidth}{\centering Referencia a \texttt{image4}: el archivo de imagen no está incluido en el Markdown de origen.}}
+\caption*{Imagen referenciada en el documento fuente, pendiente de adjuntar.}
+\end{figure}
+
+\subsection{Arquitectura del Data Warehouse}
+
+\subsection{Arquitectura ETL}
+
+\subsection{Arquitectura del modelo predictivo}
+
+\subsection{Arquitectura del de seguridad}
+
+\subsection{Arquitectura OLAP}
+
+\subsection{Arquitectura módulo de visualización}
+
+\section{Modelado del sistema}
+
+\subsection{Casos de uso}
+
+\subsection{Diagrama de secuencias}
+
+\subsection{Diagrama de clases / modelo de dominio}
+
+\subsection{Modelo dimensional}
+
+\section{Planificación mediante kanban}
+
+\subsection{Estructura del tablero}
+
+\subsection{Épicas del proyecto}
+
+\subsection{Historias de usuario}
+
+\subsection{Flujo de trabajo}
+
+\subsection{Métricas kanban}
+
+\chapter{Implementación y pruebas}
+
+\section{Introducción}
+
+\chapter*{ANEXO D: Cronograma de trabajo}
+\addcontentsline{toc}{chapter}{ANEXO D: Cronograma de trabajo}
+
+% APA 7 requiere una lista de referencias que corresponda a las citas autor-fecha.
+% El Markdown de origen no incluye esa lista; debe añadirse cuando se disponga de los datos bibliográficos completos.
+\end{document}

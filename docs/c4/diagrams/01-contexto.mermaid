@@ -1,0 +1,18 @@
+C4Context
+  title Diagrama de contexto — DSS-DW-ML de la UATF
+  Person(administrador, "Administrador", "Gestiona usuarios y accesos al sistema")
+  Person(rector, "Rector", "Consulta información para la gestión institucional")
+  Person(vicerrector, "Vicerrector", "Consulta información para la gestión académica")
+  Person(decano, "Decano", "Consulta información de su facultad")
+  Person(director, "Director", "Consulta información de su carrera o programa")
+  Person(analista, "Analista institucional", "Explora indicadores y resultados analíticos autorizados")
+  System(dss, "DSS-DW-ML UATF", "Integra datos académicos y ofrece indicadores, dashboards y análisis predictivo para apoyar decisiones institucionales")
+  System_Ext(fuentes_academicas, "Sistemas y bases de datos académicas de la UATF", "Fuentes operacionales institucionales de información académica")
+
+  Rel(administrador, dss, "Administra usuarios y accesos")
+  Rel(rector, dss, "Consulta dashboards e indicadores institucionales")
+  Rel(vicerrector, dss, "Consulta dashboards e indicadores académicos")
+  Rel(decano, dss, "Consulta indicadores de su facultad")
+  Rel(director, dss, "Consulta indicadores de su carrera o programa")
+  Rel(analista, dss, "Analiza indicadores y resultados predictivos autorizados")
+  Rel(dss, fuentes_academicas, "Consulta y extrae datos académicos", "JDBC / conectores")
