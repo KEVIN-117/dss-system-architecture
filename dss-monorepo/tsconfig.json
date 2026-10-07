@@ -65,6 +65,15 @@
     },
     {
       "path": "./apps/landing"
+    },
+    {
+      "path": "./apps/olap-workspace"
+    },
+    {
+      "path": "./libs/shared/i18n"
+    },
+    {
+      "path": "./libs/shared/dashboard-engine"
     }
   ]
 }

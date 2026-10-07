@@ -75,7 +75,7 @@ function WithButtonsRender() {
             onClick={handleCopy}
           >
             {copied ? (
-              <CheckIcon className="size-3.5 text-emerald-500" />
+              <CheckIcon className="size-3.5 text-success" />
             ) : (
               <CopyIcon className="size-3.5" />
             )}
@@ -183,26 +183,26 @@ export const Variations: Story = {
 
 export const Cyberpunk: Story = {
   render: () => (
-    <div className="p-6 bg-black rounded-lg border border-primary/40 font-mono w-96 space-y-4 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
+    <div className="p-6 bg-background rounded-lg border border-primary/40 font-mono w-96 space-y-4 shadow-md">
       <div className="flex items-center justify-between border-b border-primary/20 pb-2">
-        <div className="flex items-center gap-1.5 text-xs text-cyan-400 font-bold">
+        <div className="flex items-center gap-1.5 text-xs text-primary font-bold">
           <TerminalIcon className="size-4" />
           <span>DECANAL_ROOT_TERMINAL</span>
         </div>
-        <span className="text-[10px] text-emerald-400">TTY_1</span>
+        <span className="text-[10px] text-success">TTY_1</span>
       </div>
 
       <div className="space-y-1">
         <div className="text-[10px] text-primary/70 tracking-wider">
           EXECUTE RAW CYPHER / SQL
         </div>
-        <InputGroup className="border-primary/50 bg-card/40 focus-within:border-cyan-400 focus-within:ring-cyan-500/30">
+        <InputGroup className="border-primary/50 bg-card/40 focus-within:border-primary focus-within:ring-primary/30">
           <InputGroupAddon align="inline-start">
-            <span className="text-emerald-400 font-bold text-xs">{'>'}</span>
+            <span className="text-success font-bold text-xs">{'>'}</span>
           </InputGroupAddon>
           <InputGroupInput
             defaultValue="MATCH (s:Estudiante)-[r:MATRICULADO]->(m) RETURN s, count(r)"
-            className="text-cyan-200 text-xs font-mono"
+            className="text-foreground text-xs font-mono"
           />
           <InputGroupAddon align="inline-end">
             <InputGroupButton

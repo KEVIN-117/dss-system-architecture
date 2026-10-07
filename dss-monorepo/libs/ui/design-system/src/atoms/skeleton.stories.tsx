@@ -44,7 +44,7 @@ export const TableSkeleton: Story = {
 
 export const Cyberpunk: Story = {
   render: () => (
-    <div className="p-6 bg-black rounded-lg border border-primary/30 max-w-md space-y-4 font-mono">
+    <div className="p-6 bg-background rounded-lg border border-primary/30 max-w-md space-y-4 font-mono">
       <div className="flex items-center justify-between">
         <div className="text-xs text-primary animate-pulse tracking-wider">
           {'// ACQUIRING TELEMETRY STREAM...'}

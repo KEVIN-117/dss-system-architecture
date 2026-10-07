@@ -62,7 +62,7 @@ export const MetricIndicator = React.forwardRef<
                 'font-mono text-xs shadow-sm',
                 trend === 'down' &&
                   !isCritical &&
-                  'bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30',
+                  'bg-success/20 text-success hover:bg-success/30',
                 trend === 'up' &&
                   !isCritical &&
                   'bg-primary/20 text-primary hover:bg-primary/30',

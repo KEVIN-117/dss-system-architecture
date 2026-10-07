@@ -118,7 +118,7 @@ export const Default: Story = {
 
 export const CyberpunkTerminal: Story = {
   render: () => (
-    <div className="p-6 bg-black/95 rounded-xl border border-primary/30 shadow-[0_0_30px_rgba(0,255,200,0.1)] max-w-2xl font-mono">
+    <div className="p-6 bg-background/95 rounded-xl border border-primary/30 shadow-md max-w-2xl font-mono">
       <div className="flex items-center justify-between border-b border-primary/20 pb-3 mb-4 text-xs">
         <div className="flex items-center gap-2 text-primary">
           <Terminal className="size-4 animate-pulse" />
@@ -127,13 +127,13 @@ export const CyberpunkTerminal: Story = {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <span className="size-2 rounded-full bg-emerald-400 animate-ping inline-block" />
-          <span className="text-[11px] text-emerald-400">NODE:ONLINE</span>
+          <span className="size-2 rounded-full bg-success animate-ping inline-block" />
+          <span className="text-[11px] text-success">NODE:ONLINE</span>
         </div>
       </div>
 
       <Tabs defaultValue="sys_diag" className="w-full">
-        <TabsList className="w-full grid grid-cols-4 bg-black/60 border border-primary/30 p-1">
+        <TabsList className="w-full grid grid-cols-4 bg-background/60 border border-primary/30 p-1">
           <TabsTrigger
             value="sys_diag"
             className="font-mono text-xs gap-1.5 data-[state=active]:border-primary data-[state=active]:bg-primary/25"
@@ -145,27 +145,27 @@ export const CyberpunkTerminal: Story = {
             value="ml_core"
             className="font-mono text-xs gap-1.5 data-[state=active]:border-primary data-[state=active]:bg-primary/25"
           >
-            <Cpu className="size-3 text-cyan-400" />
+            <Cpu className="size-3 text-primary" />
             [ML.CORE]
           </TabsTrigger>
           <TabsTrigger
             value="dw_graph"
             className="font-mono text-xs gap-1.5 data-[state=active]:border-primary data-[state=active]:bg-primary/25"
           >
-            <Database className="size-3 text-amber-400" />
+            <Database className="size-3 text-warning" />
             [DW.GRAPH]
           </TabsTrigger>
           <TabsTrigger
             value="sec_vault"
             className="font-mono text-xs gap-1.5 data-[state=active]:border-primary data-[state=active]:bg-primary/25"
           >
-            <Shield className="size-3 text-emerald-400" />
+            <Shield className="size-3 text-success" />
             [SEC.VAULT]
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="sys_diag" className="mt-4 space-y-3">
-          <div className="p-4 rounded-md bg-black/70 border border-primary/20 text-xs space-y-2">
+          <div className="p-4 rounded-md bg-background/70 border border-primary/20 text-xs space-y-2">
             <div className="flex justify-between items-center text-muted-foreground border-b border-primary/10 pb-1.5">
               <span>SYSTEM_UPTIME</span>
               <span className="text-primary font-semibold">
@@ -174,7 +174,7 @@ export const CyberpunkTerminal: Story = {
             </div>
             <div className="flex justify-between items-center text-muted-foreground border-b border-primary/10 pb-1.5">
               <span>GOROUTINE_POOL_ACTIVE</span>
-              <span className="text-emerald-400">128 THREADS</span>
+              <span className="text-success">128 THREADS</span>
             </div>
             <div className="flex justify-between items-center text-muted-foreground border-b border-primary/10 pb-1.5">
               <span>HEAP_ALLOCATED</span>
@@ -190,29 +190,29 @@ export const CyberpunkTerminal: Story = {
         </TabsContent>
 
         <TabsContent value="ml_core" className="mt-4 space-y-3">
-          <div className="p-4 rounded-md bg-black/70 border border-cyan-500/20 text-xs space-y-2">
-            <div className="flex justify-between items-center text-muted-foreground border-b border-cyan-500/10 pb-1.5">
+          <div className="p-4 rounded-md bg-background/70 border border-primary/20 text-xs space-y-2">
+            <div className="flex justify-between items-center text-muted-foreground border-b border-primary/10 pb-1.5">
               <span>ACTIVE_MODEL</span>
-              <span className="text-cyan-400 font-semibold">
+              <span className="text-primary font-semibold">
                 XGBoost Student Retention v2.4
               </span>
             </div>
-            <div className="flex justify-between items-center text-muted-foreground border-b border-cyan-500/10 pb-1.5">
+            <div className="flex justify-between items-center text-muted-foreground border-b border-primary/10 pb-1.5">
               <span>BALANCER_STATUS</span>
               <Badge
                 variant="default"
-                className="text-[10px] bg-cyan-500/20 text-cyan-300 border-cyan-500/40"
+                className="text-[10px] bg-primary/20 text-primary border-primary/40"
               >
                 SMOTE: 1:1 RATIO
               </Badge>
             </div>
-            <div className="flex justify-between items-center text-muted-foreground border-b border-cyan-500/10 pb-1.5">
+            <div className="flex justify-between items-center text-muted-foreground border-b border-primary/10 pb-1.5">
               <span>TEST_ACCURACY / AUC</span>
-              <span className="text-emerald-400">94.8% / 0.962 ROC</span>
+              <span className="text-success">94.8% / 0.962 ROC</span>
             </div>
             <div className="flex justify-between items-center text-muted-foreground">
               <span>EXPLAINABILITY_ENGINE</span>
-              <span className="text-cyan-300">
+              <span className="text-primary">
                 SHAP TreeExplainer (Enabled)
               </span>
             </div>
@@ -220,37 +220,37 @@ export const CyberpunkTerminal: Story = {
         </TabsContent>
 
         <TabsContent value="dw_graph" className="mt-4 space-y-3">
-          <div className="p-4 rounded-md bg-black/70 border border-amber-500/20 text-xs space-y-2">
-            <div className="flex justify-between items-center text-muted-foreground border-b border-amber-500/10 pb-1.5">
+          <div className="p-4 rounded-md bg-background/70 border border-warning/20 text-xs space-y-2">
+            <div className="flex justify-between items-center text-muted-foreground border-b border-warning/10 pb-1.5">
               <span>POSTGRES_STAR_SCHEMA</span>
-              <span className="text-amber-400 font-semibold">
+              <span className="text-warning font-semibold">
                 HEFESTO v2 (synced)
               </span>
             </div>
-            <div className="flex justify-between items-center text-muted-foreground border-b border-amber-500/10 pb-1.5">
+            <div className="flex justify-between items-center text-muted-foreground border-b border-warning/10 pb-1.5">
               <span>FACT_TABLE_ROWS</span>
               <span className="text-primary font-mono">1,482,910 records</span>
             </div>
-            <div className="flex justify-between items-center text-muted-foreground border-b border-amber-500/10 pb-1.5">
+            <div className="flex justify-between items-center text-muted-foreground border-b border-warning/10 pb-1.5">
               <span>NEO4J_TOPOLOGY</span>
-              <span className="text-amber-300">Bolt v5.1 // 12,450 Nodes</span>
+              <span className="text-warning">Bolt v5.1 // 12,450 Nodes</span>
             </div>
             <div className="flex justify-between items-center text-muted-foreground">
               <span>ETL_LOAD_MANAGER_LATENCY</span>
-              <span className="text-emerald-400">12ms avg batch ingest</span>
+              <span className="text-success">12ms avg batch ingest</span>
             </div>
           </div>
         </TabsContent>
 
         <TabsContent value="sec_vault" className="mt-4 space-y-3">
-          <div className="p-4 rounded-md bg-black/70 border border-emerald-500/20 text-xs space-y-2">
-            <div className="flex justify-between items-center text-muted-foreground border-b border-emerald-500/10 pb-1.5">
+          <div className="p-4 rounded-md bg-background/70 border border-success/20 text-xs space-y-2">
+            <div className="flex justify-between items-center text-muted-foreground border-b border-success/10 pb-1.5">
               <span>AUTHORIZATION_GATEWAY</span>
-              <span className="text-emerald-400 font-semibold">
+              <span className="text-success font-semibold">
                 RBAC + Row-Level Security
               </span>
             </div>
-            <div className="flex justify-between items-center text-muted-foreground border-b border-emerald-500/10 pb-1.5">
+            <div className="flex justify-between items-center text-muted-foreground border-b border-success/10 pb-1.5">
               <span>DECANAL_ISOLATION</span>
               <span className="text-primary">
                 ENFORCED (Carrera: Ing. Sistemas)
@@ -260,7 +260,7 @@ export const CyberpunkTerminal: Story = {
               <span>FIREWALL_STATUS</span>
               <Badge
                 variant="outline"
-                className="text-[10px] text-emerald-400 border-emerald-500/40"
+                className="text-[10px] text-success border-success/40"
               >
                 ZERO_TRUST_ARMED
               </Badge>
@@ -315,7 +315,7 @@ export const WithBadges: Story = {
         value="resolved"
         className="p-4 rounded-lg border border-primary/20 bg-background/50"
       >
-        <p className="text-sm text-emerald-500">
+        <p className="text-sm text-success">
           15 alerts resolved within SLA.
         </p>
       </TabsContent>

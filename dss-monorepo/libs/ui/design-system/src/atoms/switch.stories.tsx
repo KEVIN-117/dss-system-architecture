@@ -43,6 +43,14 @@ export const WithLabel: Story = {
   ),
 };
 
+export const WithDescription: Story = {
+  args: {
+    label: 'Enable notifications',
+    description: 'Receive updates about saved dashboards.',
+    defaultChecked: true,
+  },
+};
+
 export const Variations: Story = {
   render: () => (
     <div className="flex flex-col gap-6">
@@ -97,7 +105,7 @@ export const Variations: Story = {
 
 export const Cyberpunk: Story = {
   render: () => (
-    <div className="w-[380px] p-5 rounded-lg border border-primary/30 bg-black/60 shadow-[0_0_15px_rgba(0,255,200,0.1)] font-mono text-xs">
+    <div className="w-[380px] p-5 rounded-lg border border-primary/30 bg-background/60 shadow-md font-mono text-xs">
       <div className="flex items-center justify-between pb-3 mb-4 border-b border-primary/20">
         <span className="font-bold text-primary tracking-widest">
           {'// MAINFRAME_SUBSYSTEMS'}

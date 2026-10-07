@@ -106,32 +106,32 @@ export const Cyberpunk: Story = {
     ];
 
     return (
-      <div className="p-6 bg-black rounded-lg border border-primary/40 font-mono w-96 space-y-4 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
+      <div className="p-6 bg-background rounded-lg border border-primary/40 font-mono w-96 space-y-4 shadow-md">
         <div className="flex items-center justify-between border-b border-primary/20 pb-2">
           <div className="flex items-center gap-2 text-xs text-primary font-bold tracking-wider">
-            <CpuIcon className="size-4 text-cyan-400" />
+            <CpuIcon className="size-4 text-primary" />
             <span>NODE_TARGET_SELECTOR</span>
           </div>
-          <span className="text-[10px] text-emerald-400 font-mono">READY</span>
+          <span className="text-[10px] text-success font-mono">READY</span>
         </div>
 
         <div className="space-y-1">
           <label className="text-[11px] text-muted-foreground uppercase tracking-wider flex items-center gap-1.5">
-            <TerminalIcon className="size-3 text-cyan-400" />
+            <TerminalIcon className="size-3 text-primary" />
             Target Cluster Node
           </label>
           <Combobox items={nodeEndpoints}>
             <ComboboxInput
               placeholder="Select neural cluster..."
-              className="border-primary/40 bg-card/30 focus-within:border-cyan-400"
+              className="border-primary/40 bg-card/30 focus-within:border-primary"
             />
-            <ComboboxContent className="border-primary/30 bg-card/90 backdrop-blur-md shadow-[0_0_15px_rgba(59,130,246,0.2)]">
+            <ComboboxContent className="border-primary/30 bg-card/90 backdrop-blur-md shadow-md">
               <ComboboxList>
                 {nodeEndpoints.map((node) => (
                   <ComboboxItem
                     key={node.value}
                     value={node.value}
-                    className="hover:bg-primary/20 hover:text-cyan-300 font-mono text-xs"
+                    className="hover:bg-primary/20 hover:text-primary font-mono text-xs"
                   >
                     <DatabaseIcon className="size-3.5 text-primary mr-1" />
                     {node.label}

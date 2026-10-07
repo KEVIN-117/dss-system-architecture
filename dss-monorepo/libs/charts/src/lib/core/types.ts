@@ -13,8 +13,9 @@ export interface CommonChartProps {
   onChartClick?: (event: ChartClickEvent) => void;
   className?: string;
   themeTokens?: ChartThemeOverrides;
-  height?: CSSProperties['height'];
+  height?: number | string;
   style?: CSSProperties;
   ariaLabel?: string;
   emptyMessage?: string;
+  invalidMessage?: string;
 }

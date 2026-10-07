@@ -1,4 +1,3 @@
-/// <reference types='vitest' />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import dts from 'vite-plugin-dts';
@@ -64,19 +63,6 @@ export default defineConfig(() => ({
         // library output otherwise drops the source directive.
         banner: '"use client";',
       },
-    },
-  },
-  test: {
-    name: '@dss-monorepo/design-system',
-    watch: false,
-    passWithNoTests: true,
-    globals: true,
-    environment: 'jsdom',
-    include: ['{src,tests}/**/*.{test,spec}.{js,mjs,cjs,ts,mts,cts,jsx,tsx}'],
-    reporters: ['default'],
-    coverage: {
-      reportsDirectory: './test-output/vitest/coverage',
-      provider: 'v8' as const,
     },
   },
 }));

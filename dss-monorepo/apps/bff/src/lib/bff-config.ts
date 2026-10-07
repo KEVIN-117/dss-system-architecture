@@ -30,6 +30,10 @@ export class BffConfigurationError extends Error {
   }
 }
 
+export function getOlapServiceUrl(environment: Environment = process.env): string {
+  return requiredHttpUrl(environment, 'OLAP_SERVICE_URL');
+}
+
 /**
  * The BFF is the only layer allowed to read environment variables. Connector
  * functions receive this resolved, typed configuration as arguments.

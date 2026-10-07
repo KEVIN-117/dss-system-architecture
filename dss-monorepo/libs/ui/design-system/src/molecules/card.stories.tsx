@@ -39,7 +39,7 @@ export const Default: Story = {
           </div>
           <div className="flex justify-between border-b border-primary/20 pb-2">
             <span>LOAD</span>
-            <span className="text-emerald-500">Normal</span>
+            <span className="text-success">Normal</span>
           </div>
         </div>
       </CardContent>

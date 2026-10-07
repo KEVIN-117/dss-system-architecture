@@ -104,7 +104,7 @@ export function BaseChart(props: BaseChartProps) {
   }, []);
 
   const message = props.loading ? 'Cargando…' : props.invalid ?
-    'Datos inválidos: se requieren valores finitos y no negativos.' : props.empty ?
+    props.invalidMessage ?? 'Datos inválidos: se requieren valores finitos y no negativos.' : props.empty ?
     props.emptyMessage ?? 'Sin datos disponibles' : null;
   return (
     <div className={props.className} data-chart-state={props.loading ? 'loading' : props.invalid ? 'invalid' : props.empty ? 'empty' : 'ready'}

@@ -94,10 +94,10 @@ export const WithIcons: Story = {
 
 export const CyberpunkTerminal: Story = {
   render: () => (
-    <div className="p-6 bg-black/90 rounded-xl border border-primary/30 space-y-4 font-mono max-w-2xl shadow-[0_0_30px_rgba(0,0,0,0.8)]">
+    <div className="p-6 bg-background/90 rounded-xl border border-primary/30 space-y-4 font-mono max-w-2xl shadow-md">
       <div className="flex items-center justify-between border-b border-primary/20 pb-2 text-xs text-primary/70">
         <span className="flex items-center gap-2">
-          <span className="size-2 rounded-full bg-emerald-400 animate-ping inline-block" />
+          <span className="size-2 rounded-full bg-success animate-ping inline-block" />
           DSS KERNEL INTERRUPT LOG
         </span>
         <span>SECURITY_CLEARANCE: LEVEL_4</span>

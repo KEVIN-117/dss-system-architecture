@@ -74,27 +74,27 @@ export const WithIcons: Story = {
 
 export const Cyberpunk: Story = {
   render: () => (
-    <div className="p-6 bg-black rounded-lg border border-primary/20 space-y-4 font-mono">
+    <div className="p-6 bg-background rounded-lg border border-primary/20 space-y-4 font-mono">
       <div className="text-xs text-muted-foreground uppercase tracking-widest mb-2">
         System Telemetry Flags
       </div>
       <div className="flex flex-wrap gap-3 items-center">
         <Badge
           variant="default"
-          className="shadow-[0_0_8px_rgba(34,197,94,0.4)]"
+          className="shadow-md"
         >
-          <span className="size-1.5 rounded-full bg-emerald-400 animate-ping inline-block mr-1" />
+          <span className="size-1.5 rounded-full bg-success animate-ping inline-block mr-1" />
           SYS:ONLINE
         </Badge>
         <Badge
           variant="outline"
-          className="border-primary/50 text-primary shadow-[0_0_8px_rgba(59,130,246,0.3)]"
+          className="border-primary/50 text-primary shadow-md"
         >
           CORE:v2.4
         </Badge>
         <Badge
           variant="destructive"
-          className="shadow-[0_0_8px_rgba(239,68,68,0.4)]"
+          className="shadow-md"
         >
           BREACH:NULL
         </Badge>

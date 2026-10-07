@@ -88,7 +88,7 @@ export const TrendsComparison: Story = {
 
 export const CyberpunkTerminalDashboard: Story = {
   render: () => (
-    <div className="p-6 bg-black/95 rounded-2xl border border-primary/30 space-y-6 max-w-4xl font-mono shadow-[0_0_40px_rgba(0,0,0,0.9)]">
+    <div className="p-6 bg-background/95 rounded-2xl border border-primary/30 space-y-6 max-w-4xl font-mono shadow-md">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-primary/20 pb-3">
         <div className="flex items-center gap-2 text-xs text-primary">
           <Activity className="size-4 animate-pulse text-primary" />
@@ -98,7 +98,7 @@ export const CyberpunkTerminalDashboard: Story = {
         </div>
         <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
           <span className="flex items-center gap-1">
-            <Server className="size-3 text-emerald-400" /> CLUSTER: 8 NODES
+            <Server className="size-3 text-success" /> CLUSTER: 8 NODES
           </span>
           <span className="flex items-center gap-1">
             <Database className="size-3 text-primary" /> POSTGRES: SYNCED

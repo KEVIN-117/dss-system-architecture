@@ -92,6 +92,10 @@ export default [
               onlyDependOnLibsWithTags: ['scope:shared', 'scope:director'],
             },
             {
+              sourceTag: 'scope:olap',
+              onlyDependOnLibsWithTags: ['scope:shared', 'scope:olap'],
+            },
+            {
               sourceTag: 'scope:shared',
               onlyDependOnLibsWithTags: ['scope:shared'],
             },

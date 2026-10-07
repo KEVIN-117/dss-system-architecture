@@ -21,6 +21,7 @@
     }
   },
   "dependencies": {
+    "@dss-monorepo/olap-models": "workspace:*",
     "echarts": "^6.1.0"
   },
   "devDependencies": {

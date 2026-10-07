@@ -129,13 +129,13 @@ function CyberpunkRender() {
   );
 
   return (
-    <div className="p-6 bg-black rounded-lg border border-primary/40 font-mono max-w-md mx-auto space-y-4 shadow-[0_0_20px_rgba(59,130,246,0.15)]">
+    <div className="p-6 bg-background rounded-lg border border-primary/40 font-mono max-w-md mx-auto space-y-4 shadow-md">
       <div className="flex items-center justify-between border-b border-primary/20 pb-3">
         <div className="flex items-center gap-2 text-xs text-primary font-bold tracking-widest uppercase">
-          <CpuIcon className="size-4 text-cyan-400 animate-pulse" />
+          <CpuIcon className="size-4 text-primary animate-pulse" />
           CRON-DISPATCH // MATRIX
         </div>
-        <span className="text-[10px] text-emerald-400 bg-emerald-950/60 border border-emerald-500/40 px-2 py-0.5 rounded">
+        <span className="text-[10px] text-success bg-success/15 border border-success/40 px-2 py-0.5 rounded">
           SYNCED: UTC-4
         </span>
       </div>
@@ -144,11 +144,11 @@ function CyberpunkRender() {
         mode="single"
         selected={scheduledDate}
         onSelect={setScheduledDate}
-        className="rounded-lg border border-primary/30 bg-card/20 backdrop-blur-md p-3 text-cyan-200"
+        className="rounded-lg border border-primary/30 bg-card/20 backdrop-blur-md p-3 text-foreground"
       />
 
       <div className="bg-card/40 border border-primary/20 rounded p-3 text-xs space-y-1">
-        <div className="flex items-center gap-1 text-cyan-400 font-semibold">
+        <div className="flex items-center gap-1 text-primary font-semibold">
           <TerminalIcon className="size-3.5" />
           <span>SCHEDULED EVENT QUEUE</span>
         </div>
@@ -160,7 +160,7 @@ function CyberpunkRender() {
               : 'STANDBY'}
           </span>
         </p>
-        <p className="text-emerald-400/90 text-[11px]">
+        <p className="text-success/90 text-[11px]">
           Task: BATCH_EVALUATION_DESERCIÓN_UATF.RUN
         </p>
       </div>

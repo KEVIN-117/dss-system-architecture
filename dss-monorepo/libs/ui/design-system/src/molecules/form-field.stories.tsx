@@ -101,7 +101,7 @@ export const WithTextarea: Story = {
 
 export const CyberpunkTerminal: Story = {
   render: () => (
-    <div className="p-6 bg-black/95 rounded-xl border border-primary/30 max-w-lg space-y-6 font-mono shadow-[0_0_35px_rgba(0,0,0,0.85)]">
+    <div className="p-6 bg-background/95 rounded-xl border border-primary/30 max-w-lg space-y-6 font-mono shadow-md">
       <div className="flex items-center justify-between border-b border-primary/20 pb-3">
         <div className="flex items-center gap-2 text-xs text-primary">
           <Terminal className="size-4 animate-pulse" />
@@ -123,7 +123,7 @@ export const CyberpunkTerminal: Story = {
             <Input
               id="operator-id"
               defaultValue="SEC_AGENT_095"
-              className="pl-9 font-mono text-xs border-primary/40 bg-black/50 focus-visible:ring-primary"
+              className="pl-9 font-mono text-xs border-primary/40 bg-background/50 focus-visible:ring-primary"
             />
             <Shield className="size-3.5 text-primary/70 absolute left-3 top-2.5 pointer-events-none" />
           </div>
@@ -140,7 +140,7 @@ export const CyberpunkTerminal: Story = {
               id="matrix-key"
               type="password"
               defaultValue="0xDEADBEEF_SECRET"
-              className="pl-9 font-mono text-xs border-primary/40 bg-black/50 focus-visible:ring-primary"
+              className="pl-9 font-mono text-xs border-primary/40 bg-background/50 focus-visible:ring-primary"
             />
             <KeyRound className="size-3.5 text-primary/70 absolute left-3 top-2.5 pointer-events-none" />
           </div>

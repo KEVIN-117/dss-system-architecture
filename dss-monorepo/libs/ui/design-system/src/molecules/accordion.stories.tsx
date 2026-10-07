@@ -68,7 +68,7 @@ export const Default: Story = {
 
 export const CyberpunkTerminal: Story = {
   render: () => (
-    <div className="p-6 bg-black/95 rounded-xl border border-primary/30 shadow-[0_0_25px_rgba(0,255,200,0.08)] max-w-2xl font-mono">
+    <div className="p-6 bg-background/95 rounded-xl border border-primary/30 shadow-md max-w-2xl font-mono">
       <div className="flex items-center justify-between border-b border-primary/20 pb-3 mb-4">
         <div className="flex items-center gap-2 text-primary">
           <Terminal className="size-4 animate-pulse" />
@@ -78,7 +78,7 @@ export const CyberpunkTerminal: Story = {
         </div>
         <Badge
           variant="outline"
-          className="text-[10px] text-emerald-400 border-emerald-500/40"
+          className="text-[10px] text-success border-success/40"
         >
           ALL_SERVICES_NOMINAL
         </Badge>
@@ -92,16 +92,16 @@ export const CyberpunkTerminal: Story = {
       >
         <AccordionItem
           value="subsystem-1"
-          className="rounded-md border border-primary/20 bg-black/50"
+          className="rounded-md border border-primary/20 bg-background/50"
         >
           <AccordionTrigger className="text-xs font-mono hover:text-primary">
             <div className="flex items-center gap-2 text-left">
-              <Database className="size-3.5 text-amber-400 shrink-0" />
+              <Database className="size-3.5 text-warning shrink-0" />
               <span>SUBSYSTEM_01: HEFESTO_DATA_WAREHOUSE</span>
             </div>
             <Badge
               variant="default"
-              className="mr-2 text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30"
+              className="mr-2 text-[10px] bg-success/20 text-success border border-success/30"
             >
               PORT 5432 [ONLINE]
             </Badge>
@@ -118,7 +118,7 @@ export const CyberpunkTerminal: Story = {
               &gt; INGESTION_PIPELINE: Go Load Manager (ETL Concurrency: 8
               Goroutines)
             </p>
-            <p className="text-emerald-400">
+            <p className="text-success">
               &gt; INTEGRITY: 1,482,910 records verified | Checksum: 0x8FA4
             </p>
           </AccordionContent>
@@ -126,22 +126,22 @@ export const CyberpunkTerminal: Story = {
 
         <AccordionItem
           value="subsystem-2"
-          className="rounded-md border border-primary/20 bg-black/50"
+          className="rounded-md border border-primary/20 bg-background/50"
         >
           <AccordionTrigger className="text-xs font-mono hover:text-primary">
             <div className="flex items-center gap-2 text-left">
-              <Cpu className="size-3.5 text-cyan-400 shrink-0" />
+              <Cpu className="size-3.5 text-primary shrink-0" />
               <span>SUBSYSTEM_02: PREDICTIVE_ML_ENGINE</span>
             </div>
             <Badge
               variant="default"
-              className="mr-2 text-[10px] bg-cyan-500/20 text-cyan-300 border border-cyan-500/30"
+              className="mr-2 text-[10px] bg-primary/20 text-primary border border-primary/30"
             >
               XGBOOST [READY]
             </Badge>
           </AccordionTrigger>
           <AccordionContent className="font-mono text-xs text-muted-foreground space-y-1.5 pt-2">
-            <p className="text-cyan-400">
+            <p className="text-primary">
               &gt; METHODOLOGY: CRISP-DM Machine Learning Pipeline
             </p>
             <p>
@@ -152,7 +152,7 @@ export const CyberpunkTerminal: Story = {
               &gt; SHAP_EXPLAINER: TreeExplainer enabled (Feature vectors
               cached)
             </p>
-            <p className="text-emerald-400">
+            <p className="text-success">
               &gt; METRICS: Precision: 92.4% | Recall: 91.8% | ROC-AUC: 0.962
             </p>
           </AccordionContent>
@@ -160,27 +160,27 @@ export const CyberpunkTerminal: Story = {
 
         <AccordionItem
           value="subsystem-3"
-          className="rounded-md border border-primary/20 bg-black/50"
+          className="rounded-md border border-primary/20 bg-background/50"
         >
           <AccordionTrigger className="text-xs font-mono hover:text-primary">
             <div className="flex items-center gap-2 text-left">
-              <Network className="size-3.5 text-purple-400 shrink-0" />
+              <Network className="size-3.5 text-primary shrink-0" />
               <span>SUBSYSTEM_03: NEO4J_KNOWLEDGE_GRAPH</span>
             </div>
             <Badge
               variant="default"
-              className="mr-2 text-[10px] bg-purple-500/20 text-purple-300 border border-purple-500/30"
+              className="mr-2 text-[10px] bg-primary/20 text-primary border border-primary/30"
             >
               BOLT [LINKED]
             </Badge>
           </AccordionTrigger>
           <AccordionContent className="font-mono text-xs text-muted-foreground space-y-1.5 pt-2">
-            <p className="text-purple-400">
+            <p className="text-primary">
               &gt; GRAPH_TOPOLOGY: Academic Prerequisite & Cohort Network
             </p>
             <p>&gt; GRAPH_NODES: 12,450 (:Student, :Course, :Professor)</p>
             <p>&gt; RELATIONSHIPS: 48,200 (:ENROLLED_IN, :PREREQUISITE_FOR)</p>
-            <p className="text-emerald-400">
+            <p className="text-success">
               &gt; CYPHER_QUERY_LATENCY: 3.2ms average traverse time
             </p>
           </AccordionContent>
@@ -188,22 +188,22 @@ export const CyberpunkTerminal: Story = {
 
         <AccordionItem
           value="subsystem-4"
-          className="rounded-md border border-primary/20 bg-black/50"
+          className="rounded-md border border-primary/20 bg-background/50"
         >
           <AccordionTrigger className="text-xs font-mono hover:text-primary">
             <div className="flex items-center gap-2 text-left">
-              <Shield className="size-3.5 text-emerald-400 shrink-0" />
+              <Shield className="size-3.5 text-success shrink-0" />
               <span>SUBSYSTEM_04: SECURITY_RBAC_GATEWAY</span>
             </div>
             <Badge
               variant="outline"
-              className="mr-2 text-[10px] text-emerald-400 border-emerald-500/40"
+              className="mr-2 text-[10px] text-success border-success/40"
             >
               ENFORCING
             </Badge>
           </AccordionTrigger>
           <AccordionContent className="font-mono text-xs text-muted-foreground space-y-1.5 pt-2">
-            <p className="text-emerald-400">
+            <p className="text-success">
               &gt; AUTH: RS256 Bearer Tokens with Zero-Trust Revocation
             </p>
             <p>
