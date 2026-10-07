@@ -7,12 +7,23 @@ Decisión de alcance para la [issue #133](https://github.com/KEVIN-117/dss-syste
 ```mermaid
 flowchart LR
     J["Jachasun OLTP · usuario de solo lectura"] --> H["Apache Hop · extracción, validación y transformación"]
-    H --> D["dw · dimensiones y tres hechos"]
+    H --> W["etl_work · buffer privado por run_id"]
+    W --> P["Publisher PostgreSQL · transacción atómica"]
+    P --> D["dw · dimensiones y tres hechos"]
     C["etl_control · cierres, ejecución y evidencia"] -. autoriza y controla .-> H
     H -. registra metadatos .-> C
+    P -. valida lease y registra resultado .-> C
 ```
 
-**Interpretación:** Hop lee exclusivamente las nueve fuentes contractuales y carga el modelo dimensional en `dw`. `etl_control` es control lateral, no una capa por la que circulan los datos de negocio. No hay dependencia activa de Load Manager, `raw-verify`, archivos JSONL/gzip, `staging` ni `etl_work`. La implementación Go y sus datos históricos se conservan para una evolución futura, sin eliminarlos.
+**Interpretación:** Hop lee exclusivamente las nueve fuentes contractuales. Prepara las filas por `run_id` en el buffer privado `etl_work`; el publisher las valida y sustituye el corte en `dw` dentro de una transacción atómica. `etl_control` aporta autorización, locks y auditoría. El buffer privado no es una zona de consumo ni una etapa de extracción desde OLTP.
+
+### Límite del staging en el MVP
+
+- **Pausado:** el staging de extracción del Load Manager en Go, incluidas las escrituras nuevas a `staging.raw_*`, los checkpoints del extractor y los artefactos JSONL/gzip. Se conserva su código, esquema e historial para una evolución futura.
+- **Activo y sin rediseño:** `etl_work.hop_publication_row` y sus lotes son el buffer transaccional privado que ya utiliza el publisher de Hop. Las pipelines lo alimentan exclusivamente mediante las funciones autorizadas; el runtime no tiene DML directo sobre `etl_work`.
+- **Publicación:** `publish_hop_staged_run` continúa siendo la única ruta que escribe las tablas visibles de `dw`, validando los lotes y ejecutando el cambio dentro de una transacción. Un fallo no publica una carga parcial.
+
+Por tanto, “ETL directo Jachasun → Hop → DW” significa que no se implementa el microservicio Go ni una capa RAW de extracción para transportar los datos. No significa eliminar el buffer privado que necesita el publisher atómico.
 
 ## Base física que se conserva
 
@@ -26,7 +37,7 @@ flowchart LR
 | `0008_add_student_scd2_versions.sql` | Vigencias e identidad temporal para `dim_estudiante` | Requisito para asignar la versión dimensional según fecha efectiva. |
 | `0009_create_constellation_facts.sql` | Tres tablas de hechos, granos, FKs, restricciones e índices | Destino físico de la carga posterior de Hop. |
 | `0010_add_hop_execution_gates.sql` | API de preflight, manifiestos exactos, leases de publicación y grupo `dw_hop_runtime` | Base de control para Hop; no transforma ni publica datos de negocio. |
-| `0011_create_hop_atomic_publisher.sql` | Lotes privados por `run_id`, sellado SHA-256 canónico y publisher transaccional con fencing token | Única ruta autorizada que sustituye el corte DW y finaliza un run exitoso. |
+| `0011_create_hop_atomic_publisher.sql` | Buffer privado por `run_id` en `etl_work`, sellado SHA-256 canónico y publisher transaccional con fencing token | Única ruta autorizada que sustituye el corte DW y finaliza un run exitoso. |
 | `0012_add_hop_publication_abort.sql` | Salida de error con token, error/paso auditables, lease liberado, limpieza del landing y estado FALLIDA | La ruta de fallo no escribe en DW y conserva la publicación previa. |
 
 Los esquemas adicionales creados por `0002` permanecen físicamente presentes; no son etapas del flujo activo. No se cambia ninguna migración existente ni se eliminan objetos o datos de una base desplegada. Retirar los borradores locales `0000_create_schemas.sql`, `0008_create_dw_model.sql` y `0009_create_etl_control_model.sql` no equivale a revertir DDL ya ejecutado. Si alguno fue aplicado manualmente, TI/DBA deberá inventariar objetos e historial antes de continuar; no se borrarán automáticamente.
@@ -75,7 +86,7 @@ Se conservan los gates de DW-004: validación exitosa, manifiestos completos y a
 - `dw_hop_runtime` es el grupo dedicado a Hop: lectura de evidencia y funciones de control/landing únicamente. No tiene DML directo sobre `dw` ni acceso directo a `etl_work`; las filas de preparación entran por API y solo el publisher SECURITY DEFINER escribe dimensiones/hechos.
 - La autorización funcional DSA puede ser manual en el MVP; una futura API/BFF no es requisito para ejecutar Hop. El actor declarado en una función SQL no prueba por sí solo esa autorización.
 - Un `run_id` común no garantiza snapshot compartido entre conexiones JDBC. La lectura multisource todavía requiere política de corte y validación operativa. La sustitución del conjunto DW sí es atómica: PostgreSQL MVCC conserva el conjunto anterior hasta el commit; una excepción revierte deletes, upserts, cierre de lease y éxito.
-- Reintentar exige un nuevo `run_id`; sin landing persistente se vuelve a leer OLTP. Un fallo no debe dejar datos parciales visibles ni alterar el corte ya publicado.
+- Reintentar exige un nuevo `run_id` y volver a leer OLTP para preparar un nuevo buffer privado; el buffer no es un checkpoint de extracción ni permite reanudar una lectura parcial. Un fallo no debe dejar datos parciales visibles ni alterar el corte ya publicado.
 
 ## Implementación incremental pendiente
 
