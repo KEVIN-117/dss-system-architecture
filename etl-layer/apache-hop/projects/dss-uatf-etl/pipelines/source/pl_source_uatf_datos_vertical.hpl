@@ -25,7 +25,8 @@
     <hop><from>Contract accepted?</from><to>Abort invalid contract</to><enabled>Y</enabled></hop>
     <hop><from>Contract accepted?</from><to>Keep schema checksum</to><enabled>Y</enabled></hop>
     <hop><from>Keep schema checksum</from><to>Read UATF snapshot</to><enabled>Y</enabled></hop>
-    <hop><from>Read UATF snapshot</from><to>Get run ID</to><enabled>Y</enabled></hop>
+    <hop><from>Read UATF snapshot</from><to>Count snapshot rows</to><enabled>Y</enabled></hop>
+    <hop><from>Count snapshot rows</from><to>Get run ID</to><enabled>Y</enabled></hop>
     <hop><from>Get run ID</from><to>Audit parameters</to><enabled>Y</enabled></hop>
     <hop><from>Audit parameters</from><to>Register source audit atomically</to><enabled>Y</enabled></hop>
   </order>
@@ -129,11 +130,31 @@ FROM signature;</sql>
     <distribute>Y</distribute><custom_distribution/><copies>1</copies>
     <partitioning><method>none</method><schema_name/></partitioning>
     <connection>OLTP db</connection>
-    <sql>SELECT count(*)::bigint AS record_count,
-       ?::char(64) AS source_schema_sha256
-FROM public.uatf_datos;</sql>
+    <sql>SELECT
+    id_ra,
+    id_sexo,
+    estado_civil,
+    nac_pais,
+    id_colegio,
+    id_loc,
+    egr_gestion,
+    _modificado,
+    ?::char(64) AS source_schema_sha256
+FROM public.uatf_datos
+ORDER BY id_ra ASC;</sql>
     <limit>0</limit><lookup>Keep schema checksum</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active>
     <attributes/><GUI><xloc>1104</xloc><yloc>208</yloc></GUI>
+  </transform>
+  <transform>
+    <name>Count snapshot rows</name><type>GroupBy</type>
+    <description>Cuenta el snapshot ordenado y descarta las columnas personales antes de la auditoría</description>
+    <distribute>Y</distribute><custom_distribution/><copies>1</copies>
+    <partitioning><method>none</method><schema_name/></partitioning>
+    <add_linenr>N</add_linenr><all_rows>N</all_rows><directory>${java.io.tmpdir}</directory>
+    <fields><field><aggregate>record_count</aggregate><subject>id_ra</subject><type>COUNT_ANY</type><valuefield/></field></fields>
+    <give_back_row>Y</give_back_row><group><field><name>source_schema_sha256</name></field></group>
+    <ignore_aggregate>N</ignore_aggregate><prefix>grp</prefix><attributes/>
+    <GUI><xloc>1360</xloc><yloc>208</yloc></GUI>
   </transform>
   <transform>
     <name>Get run ID</name><type>GetVariable</type>

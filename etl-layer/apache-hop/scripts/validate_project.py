@@ -93,12 +93,17 @@ def validate() -> list[str]:
             errors.append(f"Missing project directory: {relative}")
 
     environment_values: dict[str, dict[str, str]] = {}
+    checked_runtime_environments: set[str] = set()
     expected_names = set(EXPECTED_ENV["dev"]) | set(CONSISTENT_FINAL_VALUES)
     for env_name in ("dev", "integration", "prod"):
         path = PROJECT / "environments" / f"{env_name}-env.json"
+        is_example = False
         if not path.is_file():
-            errors.append(f"Missing environment file: {path.name}")
-            continue
+            path = PROJECT / "environments" / f"{env_name}-env.example.json"
+            is_example = True
+            if not path.is_file():
+                errors.append(f"Missing runtime or example environment file: {env_name}-env.json")
+                continue
         variables = load_json(path).get("variables", [])
         actual = {item.get("name"): item.get("value") for item in variables}
         environment_values[env_name] = actual
@@ -106,12 +111,24 @@ def validate() -> list[str]:
             missing = sorted(expected_names - set(actual))
             extra = sorted(set(actual) - expected_names)
             errors.append(f"{path.name}: variable names differ or contain duplicates (missing={missing}, extra={extra})")
-        for variable, expected_value in EXPECTED_ENV[env_name].items():
-            if actual.get(variable) != expected_value:
-                errors.append(f"{path.name}: {variable} must retain {expected_value}")
+        if is_example:
+            for variable, value in actual.items():
+                if not isinstance(value, str) or not (
+                    value.startswith("REPLACE_WITH_")
+                    or "REPLACE_WITH_" in value
+                    or value == "INJECT_FROM_INTEGRATION_SECRET_STORE"
+                    or value == "INJECT_FROM_PRODUCTION_SECRET_STORE"
+                ):
+                    errors.append(f"{path.name}: example value for {variable} must remain a non-secret placeholder")
+        else:
+            checked_runtime_environments.add(env_name)
+            for variable, expected_value in EXPECTED_ENV[env_name].items():
+                if actual.get(variable) != expected_value:
+                    errors.append(f"{path.name}: {variable} must retain {expected_value}")
 
-    if "dev" in environment_values:
-        for env_name, actual in environment_values.items():
+    if checked_runtime_environments == {"dev", "integration", "prod"}:
+        for env_name in ("integration", "prod"):
+            actual = environment_values[env_name]
             for variable in CONSISTENT_FINAL_VALUES:
                 if actual.get(variable) != environment_values["dev"].get(variable):
                     errors.append(f"{env_name}-env.json: {variable} differs from the agreed dev value")
@@ -144,6 +161,20 @@ def validate() -> list[str]:
         if test_values.get("DSS_DW_USERNAME") != "hop_vertical_test" \
                 or test_values.get("OLTP_DB_USERNAME") != "dw_fixture_reader":
             errors.append("integration-test.json must use only the restricted synthetic DB principals")
+
+    docker_test_env = PROJECT / "environments" / "integration-test.example.json"
+    if not docker_test_env.is_file():
+        errors.append("Missing versioned Docker integration environment: integration-test.example.json")
+    else:
+        docker_test_values = {
+            item.get("name"): item.get("value")
+            for item in load_json(docker_test_env).get("variables", [])
+        }
+        if docker_test_values.get("DSS_DW_HOSTNAME") != "postgres-dw" \
+                or docker_test_values.get("DSS_DW_USERNAME") != "hop_vertical_test" \
+                or docker_test_values.get("OLTP_DB_HOSTNAME") != "jachasun-fixture" \
+                or docker_test_values.get("OLTP_DB_USERNAME") != "dw_fixture_reader":
+            errors.append("Docker integration environment must target only the isolated fixture services")
 
     compose_path = PROJECT.parents[3] / "docker-compose.yml"
     if compose_path.is_file():

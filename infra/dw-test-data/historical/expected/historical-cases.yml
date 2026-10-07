@@ -1,0 +1,46 @@
+version: 1
+dataset: jachasun-historical-synthetic-v1
+calendar:
+  first_gestion: 2000
+  last_gestion: 2025
+  annual_periods: [1]
+  semester_periods: [1, 2]
+catalog:
+  faculties: 13
+  unambiguous_program_codes: 85
+  excluded_duplicate_program_code: TST
+  schedule_codes:
+    annual: A
+    semester: S
+  expected_distinct_schedule_counts:
+    A: 21
+    S: 64
+synthetic_volume_targets:
+  persons: 6000
+  applications: "6000 first applications plus one retry for each person_no divisible by 7"
+  enrolled_students: "admitted primary applicants except person_no divisible by 13"
+  course_attempts: "all four synthetic subjects in each represented program-period, plus controlled repeats"
+quality_cases:
+  privacy:
+    id_ra_prefix: TEST
+    personal_attributes: null
+  missing_study_duration:
+    preserve_catalog_value: null
+    synthetic_curriculum_year_fallback: 3
+  academic_status:
+    student: "A (fixture value; not a certified production domain)"
+    applicants: "A/P per source comment; validate domain with DSA/TI"
+    grades: "raw synthetic A/R; domain not certified by DDL"
+  dropout_per_user_rule:
+    meaning: "abandono si deja de asistir y rinde menos de dos parciales"
+    cases:
+      - attended_partial_count: 0
+        expected_case: abandonment-candidate
+      - attended_partial_count: 1
+        expected_case: abandonment-candidate
+      - attended_partial_count: 2
+        expected_case: not-abandonment-by-partial-count-rule
+    note: "Fixture scenarios only; ETL must not infer attendance from a zero score or treat missing grade as zero."
+  retry:
+    marker: "DW_TEST_SEED_V1:reintento"
+    expected: "same student repeats a previously failed subject in a later period"
