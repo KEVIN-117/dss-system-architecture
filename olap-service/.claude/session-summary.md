@@ -76,10 +76,10 @@ pushed down; normal sessions append and the history stays useful.
 ## Log
 
 ## 2026-10-07 — feature/OLAP-001 — replaced the OLAP gitlink with tracked source
-**Was doing:** converted `olap-service` from a gitlink to ordinary tracked files; build outputs, IDE files, local `saiku-home` data and keys remain excluded by its `.gitignore`. The staged tree has been reviewed but is not yet pushed.
-**Now:** commit and push this change to lowercase `feature/OLAP-001`, replace PR #134 (whose head is uppercase), then remove the uppercase remote branch after verifying the replacement PR.
+**Was doing:** converted `olap-service` from a gitlink to ordinary tracked files; build outputs, IDE files, local `saiku-home` data and keys remain excluded by its `.gitignore`. The change is committed and pushed; PR #137 is open from the lowercase branch.
+**Now:** review checks and merge PR #137; keep `feature/OLAP-001` as the sole OLAP branch.
 **Watch out:** do not add `target/`, `saiku-home/`, `.idea/`, or local credentials; preserve only one canonical lowercase branch.
-**Refs:** PR #134; `feature/OLAP-001`
+**Refs:** PR #137; `feature/OLAP-001`
 
 ## 2026-10-06 — documentation — mapped OLAP runtime flows
 **Was doing:** documented C4 context/containers/components/deployment, launcher and datasource refresh, Keycloak JWT role propagation, Mondrian schema generation with state/class/entity models, cube designer, discovery, MDX/OSSIE and asynchronous query execution under `docs/olap/`. Added editable Mermaid sources. The parent workspace treats `olap-service` as a submodule, so its nested Git status was not available from this checkout.
