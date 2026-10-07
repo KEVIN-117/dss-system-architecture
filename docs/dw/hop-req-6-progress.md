@@ -10,7 +10,7 @@ Este documento registra el avance del Req. 6 de la issue #133. Las fases 6.2–6
 | 6.2 Extracción Hop y manifiestos de nueve fuentes | Completa en fixture sintético | Un workflow ejecutó las nueve fuentes; cada una registró manifiesto, filas, huella de consulta/esquema, métrica y paso. |
 | 6.3 `DIM_PROGRAMA`, `DIM_MATERIA`, `DIM_PERIODO_ACADEMICO`, `DIM_ADMISION` | Completa en fixture sintético | Cuatro lotes tipados fueron preparados y sellados en el landing privado con conteos esperados; ninguna fila se publicó directamente en `dw`. |
 | 6.4 `DIM_ESTUDIANTE` SCD2 | Completa en fixture sintético | Pipeline Hop, hash canónico, corte DSA, transiciones privadas `CLOSE`/`INSERT`, no-cambio, conflicto de identidad, orden temporal y aplicación por publisher atómico probados. |
-| 6.5 `fact_admision` y `fact_cursado` | Completa en fixture sintético | Dos pipelines Hop consultan el corte autorizado, resuelven claves temporales, validan calidad y sellan lotes privados; Retención sigue bloqueando publicación. |
+| 6.5 `fact_admision` y `fact_cursado` | Completa en fixture sintético | Ambos pipelines pasan la integración Docker, consultan el corte autorizado, validan grano/calidad y sellan lotes privados; Retención sigue bloqueando publicación. |
 | 6.6 `fact_retencion_desercion` | Bloqueada por decisión funcional DSA | Aprobar continuidad entre cierres, egreso y dominio de estados; `NO_EVALUABLE` debe excluirse del denominador. |
 | 6.7 Integración y regresión de extremo a extremo | Pendiente | Éxito/fallo por fase, nuevo `run_id` en retry, persistencia de publicación previa y permisos mínimos. |
 | 6.8 Aprobación operativa | Bloqueada por DSA/TI | Validación real de contratos, cardinalidades/volúmenes, cuenta OLTP read-only y evidencia de operación. |
@@ -46,6 +46,9 @@ Este documento registra el avance del Req. 6 de la issue #133. Las fases 6.2–6
 - `pl_fact_cursado_mvp.hpl` procesa una fila por PK `notas_planilla.id_matricula`, con joins requeridos a alumno, programa y materia, filtro de programa y periodo. Las notas fuera de `[0,100]` bloquean la fila; se conserva `estado` crudo y no se inventan flags mientras DSA/TI no confirme el dominio.
 - Ambos flujos resuelven `DIM_ESTUDIANTE` para el `effective_at` del cierre y las dimensiones conformadas preparadas o publicadas. Registran pasos/métricas y sellan conteos contra las filas privadas reales. Solo `etl_work.hop_publication_row` recibe los resultados; las tablas `dw.fact_*` permanecen vacías.
 - El smoke ahora verifica cinco lotes dimensionales y dos lotes de hechos (1 admisión y 3 intentos de cursado para 2025/2). El gate sigue terminando `FALLIDA` deliberadamente porque no se preparó `FACT_RETENCION_DESERCION`; por tanto, no llama al publisher ni expone un DW parcial.
+- Verificación adicional Docker: el workflow ejecutó las nueve fuentes (incluido el snapshot UATF de 2.002 filas, usado solo para el conteo de auditoría), preparó cinco dimensiones y selló ambos hechos. La aserción confirmó 9 manifiestos, 7 lotes privados, 17 filas preparadas, rechazo de nota fuera de rango y ninguna fila visible en `dw.fact_*`.
+- El fixture histórico ahora normaliza `carreras.xlsx.activo` (`A/B`) al dominio contractual `S/N` dentro de `academico.alm_programas`; el catálogo auxiliar preserva `A/B`. Se agregó validación del dominio y un corrector acotado para una base de prueba ya sembrada con la versión previa.
+- Esta evidencia concluye la preparación técnica de los dos hechos, no una carga histórica completa 2000–2025 ni una publicación visible: el smoke usa 2025/2 y el cierre global continúa correctamente bloqueado hasta completar retención.
 
 ## Prueba reproducible
 

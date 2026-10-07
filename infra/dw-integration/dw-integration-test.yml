@@ -147,8 +147,8 @@ services:
       HOP_PROJECT_NAME: dss-uatf-etl
       HOP_PROJECT_FOLDER: /files/project
       HOP_PROJECT_CONFIG_FILE_NAME: project-config.json
-      HOP_ENVIRONMENT_NAME: integration
-      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/integration-test.json
+      HOP_ENVIRONMENT_NAME: integration-test
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/integration-test.example.json
       HOP_SHARED_JDBC_FOLDERS: /files/jdbc
       HOP_FILE_PATH: /files/project/workflows/wf_vertical_uatf_datos_smoke.hwf
       HOP_RUN_CONFIG: local
@@ -227,8 +227,8 @@ services:
       HOP_PROJECT_NAME: dss-uatf-etl
       HOP_PROJECT_FOLDER: /files/project
       HOP_PROJECT_CONFIG_FILE_NAME: project-config.json
-      HOP_ENVIRONMENT_NAME: integration
-      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/integration-test.json
+      HOP_ENVIRONMENT_NAME: integration-test
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/integration-test.example.json
       HOP_SHARED_JDBC_FOLDERS: /files/jdbc
       HOP_FILE_PATH: /files/project/workflows/wf_hop_publish_staged_run.hwf
       HOP_RUN_CONFIG: local

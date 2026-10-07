@@ -64,6 +64,26 @@ infra/**/data/*
 docker-compose.override.yml
 
 # ------------------------------------------
+# Datos fuente / históricos locales (no versionar)
+# ------------------------------------------
+# Exportaciones OLTP y datasets originales pueden contener datos personales.
+# Los fixtures sintéticos aprobados bajo infra/dw-test-data sí se versionan.
+/dataset/
+**/dataset/
+**/data/out_oltp/
+**/out_oltp/
+**/raw-data/
+**/raw_data/
+**/data/raw/
+*.xlsx
+*.xls
+*.parquet
+*.sqlite
+*.sqlite3
+*.dump
+*.sql.gz
+
+# ------------------------------------------
 # 3. Apache Hop & ETL Drivers / Runtime
 # ------------------------------------------
 **/jdbc/*.jar

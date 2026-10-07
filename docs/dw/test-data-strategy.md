@@ -82,6 +82,7 @@ La ejecución correcta muestra `integration-test` con `Exited (0)`. La restaurac
 - No se implementan las cargas SCD2 ni de hechos, workflows Apache Hop, cron ni API en este entorno. Load Manager se conserva como regresión de la arquitectura anterior.
 - No se usa `session_replication_role = replica`.
 - Los datos de prueba no prueban la cardinalidad real de Jachasun; esa validación permanece en DW-001.
+- El perfil efímero anterior sigue aislado e inmutable. Para cargas Hop de mayor volumen existe un perfil separado de OLTP sintético histórico en [`infra/dw-test-data/historical/`](../../infra/dw-test-data/historical/README.md), dirigido solo a PostgreSQL local y persistente. Exige tablas objetivo vacías y no contiene historia real ni autoriza producción.
 
 ## Definition of Done
 
@@ -92,4 +93,4 @@ La ejecución correcta muestra `integration-test` con `Exited (0)`. La restaurac
 - Fuente consultable mediante las columnas de los contratos.
 - Ejecución y manifiesto de prueba registrados con `run_id`.
 - Validación de repetición y restauración documentada.
-- Runner finaliza con código `0` sin datos persistentes fuera del entorno efímero.
+- Runner de integración finaliza con código `0` sin datos persistentes fuera de su entorno efímero; el perfil histórico local queda documentado por separado.
