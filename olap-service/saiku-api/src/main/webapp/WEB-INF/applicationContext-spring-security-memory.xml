@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<beans xmlns="http://www.springframework.org/schema/beans"
+       xmlns:security="http://www.springframework.org/schema/security"
+       xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+       xsi:schemaLocation="http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security.xsd
+       		   http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+
+  <!--+
+      | In-memory AuthenticationProvider for the bundled WAR.
+      |
+      | Production posture (default profile): only users.properties is
+      | loaded → ships with admin/admin which the launcher warns about
+      | and operators are expected to rotate or replace before exposure.
+      |
+      | Demo posture: when the "demo" Spring profile is active, the
+      | additional users-demo.properties file is also loaded, enabling
+      | the pre-seeded bob/krishna/smith accounts whose home folders
+      | contain example saved queries. The saiku-launcher activates
+      | this profile automatically when the SAIKU_DEMO=true env var is
+      | set (or via -Dspring.profiles.active=demo). See saiku#897.
+      |
+      | CASE-INSENSITIVE-USERNAME INVARIANT (saiku#1907, CWE-178):
+      | Saiku canonicalises identity to a single lower-cased form for ACL
+      | ownership and the /homes/<user> path (org.saiku.service.util.security.Usernames).
+      | This is CORRECT for the in-memory provider above — Spring Security's
+      | InMemoryUserDetailsManager lower-cases its keys, so admin/Admin/ADMIN
+      | are ONE account and cannot coexist. If you swap in an external provider
+      | (LDAP / OAuth-OIDC / SAML / a JDBC UserDetailsService), it MUST match
+      | usernames case-insensitively too, or two accounts differing only in case
+      | would be conflated onto one ACL identity + home. Configure the external
+      | store case-insensitively (or normalise usernames at the provider) before use.
+      +-->
+
+  <beans profile="!demo">
+    <security:authentication-manager alias="authenticationManager">
+      <security:authentication-provider>
+        <!-- saiku#1512: users file is overridable at runtime via
+             -Dsaiku.security.usersFile (the launcher sets it from
+             SAIKU_ADMIN_PASSWORD or an external <saiku-home>/users.properties),
+             so operators can rotate the admin password without rebuilding the
+             WAR. Defaults to the baked-in file. -->
+        <security:user-service id="uds" properties="${saiku.security.usersFile:/WEB-INF/users.properties}"/>
+      </security:authentication-provider>
+    </security:authentication-manager>
+  </beans>
+
+  <beans profile="demo">
+    <security:authentication-manager alias="authenticationManager">
+      <security:authentication-provider>
+        <!-- saiku#1512: users file is overridable at runtime via
+             -Dsaiku.security.usersFile (the launcher sets it from
+             SAIKU_ADMIN_PASSWORD or an external <saiku-home>/users.properties),
+             so operators can rotate the admin password without rebuilding the
+             WAR. Defaults to the baked-in file. -->
+        <security:user-service id="uds" properties="${saiku.security.usersFile:/WEB-INF/users.properties}"/>
+      </security:authentication-provider>
+      <security:authentication-provider>
+        <security:user-service id="udsDemo" properties="/WEB-INF/users-demo.properties"/>
+      </security:authentication-provider>
+    </security:authentication-manager>
+  </beans>
+
+</beans>

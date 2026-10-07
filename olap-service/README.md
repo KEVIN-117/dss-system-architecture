@@ -1,0 +1,270 @@
+<a href="#readme"></a>
+
+<h1 align="center"><a href="https://saiku.bi">Saiku Analytics</a></h1>
+
+<p align="center">
+  Open-source Semantic Layer analytics for cubes — drag-and-drop in the
+  browser, SQL through Mondrian + Calcite, and a typed REST surface so AI
+  agents can query without ever seeing MDX.
+</p>
+
+<p align="center">
+  <a href="https://saiku.bi"><b>saiku.bi</b></a> ·
+  <a href="https://github.com/spiculedata/saiku/issues"><b>Issues</b></a> ·
+  <a href="https://github.com/spiculedata/saiku/discussions"><b>Discussions</b></a>
+</p>
+
+<p align="center">
+  <a href="https://github.com/spiculedata/saiku/releases"><img src="https://img.shields.io/github/v/tag/spiculedata/saiku?label=release&sort=semver" alt="Latest release"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0%20%2B%20EPL--1.0-blue" alt="License: Apache 2.0 + EPL 1.0"></a>
+  <a href="https://github.com/spiculedata/saiku/pkgs/container/saiku"><img src="https://img.shields.io/badge/docker-ghcr.io%2Fspiculedata%2Fsaiku-2496ED?logo=docker&logoColor=white" alt="Docker image"></a>
+  <a href="https://join.slack.com/t/saikucloud/shared_invite/zt-3yor7kgiv-YUPhqK0pvd4WljctIQVOTA"><img src="https://img.shields.io/badge/slack-Saiku%20Cloud-4A154B?logo=slack&logoColor=white" alt="Slack community"></a>
+</p>
+
+***
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
+  <img alt="A Saiku dashboard: KPI tiles, a sales-by-product-family bar chart, and pie charts built from a FoodMart cube" src="docs/images/dashboard-light.png">
+</picture>
+
+## Try it in 30 seconds
+
+```sh
+docker run -d -p 8080:8080 --name saiku -e SAIKU_DEMO=true ghcr.io/spiculedata/saiku
+```
+
+The service exposes REST at <http://localhost:8080/rest/> and XMLA at <http://localhost:8080/xmla/>. Demo mode seeds the local FoodMart datasource.
+
+> **For a real deployment**, drop `SAIKU_DEMO=true` and set an admin password:
+> `-e SAIKU_ADMIN_PASSWORD='a-strong-password'`. Saiku **refuses to start** on the
+> default `admin`/`admin` once it's network-reachable, so one of those two is
+> required.
+
+> **The container runs as a non-root user** (uid/gid `10001:10001`). A *fresh*
+> named/anonymous volume works out of the box. Any **pre-existing** `saiku-home`
+> from an older root container — bind mount or named volume — must be re-owned
+> once: `sudo chown -R 10001:10001 <host-dir>`, or for a named volume
+> `docker run --rm -v saiku-home:/app/saiku-home --user 0 --entrypoint chown
+> ghcr.io/spiculedata/saiku:latest -R 10001:10001 /app/saiku-home`. The
+> container fails closed with a `FATAL:` message (naming the fix) rather than
+> silently rotating its encryption key. On Kubernetes set
+> `securityContext: { runAsUser: 10001, fsGroup: 10001 }`. See the
+> [CHANGELOG](CHANGELOG.md) upgrade note for details.
+
+A hosted instance is always live at <https://demo.saiku.bi> (auto-reset
+nightly).
+
+## What is Saiku
+
+Saiku started in 2010 as an open-source OLAP browser for Mondrian. In 2026
+it was rebuilt as a modern Semantic Layer on top of:
+
+- **Mondrian 4.8.1.x (Spicule fork)** — with a Calcite-based SQL planner
+  alongside the legacy `SqlQuery` builder. Calcite is the default; force
+  legacy with `-Dmondrian.backend=legacy`. The Calcite planner reaches
+  modern engines too — see [`examples/lakehouse-demo`](examples/lakehouse-demo)
+  for a Saiku → Mondrian → Calcite → Trino → Iceberg walkthrough.
+- **Apache Arrow** wire format for cellsets, so the browser and any
+  programmatic consumer share a zero-copy result envelope.
+- **Jetty 12 EE10 + Jersey 3.1 + Spring 6 + Spring Security 6.5** in a
+  single-JAR Picocli launcher.
+
+## AI Query API + MCP
+
+Saiku 4.x exposes a typed REST surface — `/rest/saiku/api/ai/*` — designed
+for LLM agents. Hierarchies, levels, measures and synonyms are discoverable
+via `/ai/cubes` and `/ai/schema`, and a single `POST /ai/query` translates
+a JSON description of a question into validated MDX, runs it, and returns
+typed `{value, formatted, unit}` cells. Every validation failure carries
+a `{status, field, available}` envelope so an agent can self-correct
+without scraping logs.
+
+The same self-describing, self-correcting contract has a **SQL-side twin at
+`/rest/saiku/api/ai/ossie/*`** for datasets modelled with the Ossie semantic
+layer — same list → schema → query shape, same `VALIDATION_ERROR` envelope,
+plus `POST /ai/ossie/ask` for a plain-language question. Anomaly and forecast
+endpoints (`/ai/anomaly`, `/ai/forecast`) share the same typed envelope.
+
+The container also bundles **`saiku-mcp`**, a stdio
+[Model Context Protocol](https://modelcontextprotocol.io) wrapper so Claude
+Desktop / Cursor / Cline can wire to a running Saiku with one line of
+config:
+
+```json
+{
+  "command": "docker",
+  "args":    ["exec", "-i", "saiku", "saiku-mcp"]
+}
+```
+
+See [`docs/AI-QUERY-API.md`](docs/AI-QUERY-API.md) and
+[`docs/schema-annotations.md`](docs/schema-annotations.md) for the typed
+contract and the `saiku.semantic.*` annotation namespace cubes use to
+describe themselves to agents.
+
+## Agent Skills & Spaces
+
+Admins can extend the AI surface without code:
+
+- **Skills** (`saiku-home/skills/*.md`) — markdown workflows with YAML
+  frontmatter, discoverable from `/ai/ask`. Invoke one explicitly by prefixing
+  an ask with `/<skill-name>`, or ask naturally and let the LLM route via the
+  skill catalogue.
+- **Spaces** (`saiku-home/agent-spaces/*.json`) — named personas that scope an
+  ask to a system prompt, a cube allowlist and a skill allowlist.
+  `POST /ai/spaces/{id}/ask` enforces the persona server-side, so a cube outside
+  the allowlist is a 403 the user can't override.
+
+See [`docs/SKILLS-SPEC.md`](docs/SKILLS-SPEC.md) and
+[`docs/AGENT-SPACES-SPEC.md`](docs/AGENT-SPACES-SPEC.md).
+
+## Dashboards
+
+Build shareable dashboards of chart / table / KPI / text / image tiles over your
+cubes — with cross-tile filters, click- and brush-cross-filtering,
+drill-down/through, conditional formatting, combo charts, anomaly/forecast
+overlays, auto-refresh, PDF/PNG export and read-only share links. See the
+[`docs/dashboards-user-guide.md`](docs/dashboards-user-guide.md) for the full
+walkthrough. The service exposes the dashboard and sharing APIs; deploy a separate client to provide the user interface.
+
+## Observability
+
+Saiku ships **opt-in OpenTelemetry instrumentation** via the OTel Java
+agent — zero code changes, zero overhead when off. Setting
+`OTEL_EXPORTER_OTLP_ENDPOINT` activates auto-instrumentation for Jetty,
+Jersey, JDBC (every Mondrian-emitted SQL becomes a child span),
+outbound HTTP, JVM metrics, and DBCP2 connection pool metrics. Trace
+context is injected into the Saiku log pattern automatically.
+
+```sh
+docker run -d -p 8080:8080 \
+  -e OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318 \
+  -e OTEL_SERVICE_NAME=saiku-prod \
+  ghcr.io/spiculedata/saiku:latest
+```
+
+Without the endpoint env var the agent is never loaded. See
+[`docs/observability.md`](docs/observability.md) for the full env-var
+reference, sampling guidance, and what's not yet covered (Tier 2
+custom spans for `ThinQueryService` etc.).
+
+## Quality
+
+Quality signals — per-module test-count and line-coverage floors — are declared as files (`.github/test-floors.json`,
+`.coverage-thresholds.json`) and **gated on every PR** by the `ci` workflow.
+A separate weekly run, `.github/workflows/quality-report.yml`, renders the same
+signals as one Markdown **quality dashboard** in its job summary: where each
+module stands, and by how much headroom. That run is read-only and is not a
+gate — the gates stay in CI. See [`docs/quality.md`](docs/quality.md).
+
+## Build from source
+
+JDK 21 + Maven 3.9+ required.
+
+**Set up GitHub Packages auth first, or the build fails before it compiles.** Saiku's Mondrian fork, olap4j,
+saiku-query and Ossie artifacts are published to GitHub Packages, which requires an authenticated token **even
+though the packages are public**. Without it you get a bare `401 Unauthorized` on `pentaho:mondrian` that never
+mentions tokens:
+
+1. Create a **classic** personal access token with only the `read:packages` scope
+   ([Tokens (classic)](https://github.com/settings/tokens/new)). It must be classic — [GitHub's Maven registry
+   does not accept fine-grained tokens](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-apache-maven-registry),
+   and the UI defaults to fine-grained. Our packages are public, so no `repo` scope or org membership is needed.
+2. Add five `<server>` entries to `~/.m2/settings.xml` — `github-mondrian-saiku`, `github-olap4j`,
+   `github-olap4j-xmlaserver`, `github-saiku-query`, `github-ossie`. Copy the block from
+   [`.github/workflows/ci.yml`](.github/workflows/ci.yml); one token covers all five.
+
+Still getting a 401? A fine-grained token and a classic token missing `read:packages` produce an identical error,
+so check what the token actually has before minting another —
+`curl -sI -H "Authorization: token $PAT" https://api.github.com/user | grep -i x-oauth-scopes`. A classic token's
+scopes are editable in place, and the value doesn't change, so `settings.xml` needs no edit.
+
+```sh
+# Compile, unit tests, Spotless format check (CI gate):
+mvn verify
+
+# Build the runnable fat-JAR:
+mvn -pl saiku-launcher -am -Dmaven.test.skip=true package
+
+# Run:
+java -jar saiku-launcher/target/saiku-*.jar serve --port 8080 --home ./saiku-home
+```
+
+Whole-API integration tests (boots Jetty + the launcher's WAR in-process
+against the seeded FoodMart H2 datasource):
+
+```sh
+mvn verify -P integration
+```
+
+See [`CLAUDE.md`](CLAUDE.md) for the full layout, the dependency catalog
+(`saiku-bom`), and the GitHub Packages auth gotcha for local builds.
+
+## Verifying release artifacts
+
+The fat JAR, dist zip, SBOM and container image carry
+keyless [Sigstore](https://www.sigstore.dev/)-signed SLSA build provenance,
+and each release ships a `SHA256SUMS` file. See
+[Verifying release artifacts](docs/releasing.md#verifying-release-artifacts)
+for the commands per artifact type (`gh attestation verify`,
+`cosign verify-attestation` and `sha256sum -c`).
+
+## Repository layout
+
+```
+saiku-bom/             # central dependency-version catalogue
+saiku-core/
+  saiku-olap-util/     # olap4j helpers
+  saiku-service/       # Semantic Layer service, AI Query, schema gen, async, cache
+  saiku-semantic/      # YAML semantic layer
+  saiku-web/           # JAX-RS REST resources
+saiku-api/             # Servlet API runtime WAR (Spring XML wiring)
+saiku-launcher/        # Picocli CLI + embedded Jetty serving the WAR
+saiku-mcp/             # stdio JSON-RPC MCP wrapper
+
+```
+
+## Getting help
+
+- **Bugs and feature requests**:
+  [open an issue](https://github.com/spiculedata/saiku/issues/new/choose).
+- **Questions, ideas, walkthroughs**:
+  [GitHub Discussions](https://github.com/spiculedata/saiku/discussions).
+- **Chat**: [Saiku Cloud Slack](https://join.slack.com/t/saikucloud/shared_invite/zt-3yor7kgiv-YUPhqK0pvd4WljctIQVOTA).
+- **Stack Overflow tag**:
+  [`saiku`](https://stackoverflow.com/questions/tagged/saiku).
+- **Commercial support, hosted, training**: <hello@saiku.bi>.
+
+The old `groups.google.com/a/saiku.meteorite.bi` lists and `##saiku` IRC
+channel are no longer monitored.
+
+## Contributing
+
+See [CONTRIBUTING.md](./CONTRIBUTING.md). Short version:
+
+- `feature/<name>` branch off `development` — see the Gitflow note in
+  [CLAUDE.md](CLAUDE.md).
+- Run `mvn spotless:apply` before committing (a pre-commit hook is
+  available via `./scripts/install-hooks.sh`).
+- Tests live in `**/src/test/java/`; integration tests in
+  `saiku-launcher/src/test/java/org/saiku/launcher/it/`.
+- Open the PR against `development`, not `main`. `main` is the release
+  branch — only release/* and hotfix/* PRs go there.
+
+## License
+
+Saiku is dual-licensed under **Apache 2.0** and **EPL 1.0**. See
+[`LICENSE`](LICENSE). A summary lives at
+<https://saiku.bi/#license>.
+
+## History
+
+The original Saiku project was started by Tom Barber and Paul Stoellberger
+in 2010 at Meteorite BI and now lives at [Spicule](https://spicule.co.uk).
+Contributors are listed on the
+[GitHub contributors page](https://github.com/spiculedata/saiku/graphs/contributors).
+
+For release notes see [Releases](https://github.com/spiculedata/saiku/releases).
+
+**[⬆ back to top](#readme)**

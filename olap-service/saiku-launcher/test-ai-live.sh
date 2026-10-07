@@ -1,0 +1,1054 @@
+#!/usr/bin/env bash
+# Live AI Query API regression test suite.
+#
+# Exercises a running saiku-launcher against the Foodmart H2 cube. Asserts on
+# response shape for every scenario surfaced by the ralph-loop live fuzz
+# sessions (2026-05-15) plus the unit-test-mirrored happy paths.
+#
+# Usage:
+#   ./run.sh            # in another terminal, then
+#   ./test-ai-live.sh   # exits 0 on all-pass, non-zero on first FAIL
+#
+# Override base URL / creds via env:
+#   SAIKU_URL=http://host:port SAIKU_USER=admin SAIKU_PASS=admin ./test-ai-live.sh
+#
+# Fresh-home runs:
+#   CUBE=<connection/catalog/schema/cube>  overrides the default foodmart
+#     cube id (default: unknown_foodmart/FoodMart/FoodMart/Sales — the
+#     settled fresh-home datasource name).
+#   SKIP_ENRICHMENT_ITERS=1  fresh-home mode: skips iterations that only
+#     hold against the long-established dev home — unit/currency sniffs
+#     and schema shapes from the dev-home enrichment overlays / annotated
+#     FoodMart4.xml (which has drifted from the launcher seed, see
+#     saiku#1662) plus known fresh-home repository gaps. Each skip prints
+#     its reason; rerun with the flag unset on a dev home for the full
+#     assertion surface.
+#
+# Windows (Git Bash): every mktemp path is handed to the python3 that
+# evaluates the predicates. Native Windows Python cannot open MSYS /tmp
+# paths, so run with a native temp dir and a real python3 on PATH (not
+# the WindowsApps store stub):
+#   TMPDIR=C:/Users/<you>/AppData/Local/Temp ./test-ai-live.sh
+# An inherited TMPDIR is always honoured; if it is unset under Git Bash
+# the script defaults it to %LOCALAPPDATA%/Temp automatically.
+
+set -u
+URL="${SAIKU_URL:-http://localhost:8080}"
+USER="${SAIKU_USER:-admin}"
+PASS="${SAIKU_PASS:-admin}"
+CUBE="${CUBE:-unknown_foodmart/FoodMart/FoodMart/Sales}"
+FOODMART_CONN="${CUBE%%/*}"
+SKIP_ENRICHMENT_ITERS="${SKIP_ENRICHMENT_ITERS:-0}"
+
+# Temp files must be readable by whatever python3 runs the predicates.
+# mktemp honours an inherited TMPDIR; under Git Bash with no TMPDIR set,
+# default to the Windows-native temp dir so native python can open the
+# files too (MSYS python also accepts C:/ paths, so this is always safe).
+if [[ -z "${TMPDIR:-}" && -n "${MSYSTEM:-}" && -n "${LOCALAPPDATA:-}" ]]; then
+  TMPDIR="$(cygpath -m "$LOCALAPPDATA")/Temp"
+  export TMPDIR
+fi
+
+# Responses are UTF-8 but python's open()/stdin default to the locale
+# codec on Windows (cp1252), which silently mojibakes every non-ASCII
+# assertion (the euro-formatted cells read back as 'â‚¬'). Force UTF-8
+# mode for every python the suite spawns.
+export PYTHONUTF8=1
+
+COOKIES=$(mktemp)
+ERR_OUT=$(mktemp)
+trap 'rm -f "$COOKIES" "$ERR_OUT"' EXIT
+
+PASS_COUNT=0
+FAIL_COUNT=0
+SKIP_COUNT=0
+FAILURES=()
+
+login() {
+  curl -sS -c "$COOKIES" "$URL/login" -o /dev/null
+  local code
+  code=$(curl -sS -b "$COOKIES" -c "$COOKIES" -X POST "$URL/login" \
+    --data "username=$USER&password=$PASS" -o /dev/null -w '%{http_code}')
+  if [[ "$code" != "302" ]]; then
+    echo "fatal: login expected 302 got $code" >&2
+    exit 1
+  fi
+  # Prime the XSRF-TOKEN cookie with one authenticated API GET, then lift
+  # it from the cookie jar — every mutating call must echo it back in an
+  # X-XSRF-TOKEN header or Spring Security rejects the request with 403.
+  curl -sS -b "$COOKIES" -c "$COOKIES" "$URL/rest/saiku/api/ai/cubes" -o /dev/null
+  XSRF=$(awk '$6=="XSRF-TOKEN" {t=$7} END {print t}' "$COOKIES")
+  if [[ -z "$XSRF" ]]; then
+    echo "fatal: no XSRF-TOKEN cookie after login — POST/DELETE checks would all 403" >&2
+    exit 1
+  fi
+}
+
+# Run a query, capture the JSON response, assert with a Python predicate.
+# Args: 1=label  2=method  3=path  4=body (JSON or '')  5=predicate over r
+check() {
+  local label="$1" method="$2" path="$3" body="$4" predicate="$5"
+  local out; out=$(mktemp)
+  local code
+  if [[ "$method" == "GET" ]]; then
+    code=$(curl -sS -b "$COOKIES" "$URL$path" -o "$out" -w '%{http_code}')
+  elif [[ "$method" == "DELETE" ]]; then
+    code=$(curl -sS -b "$COOKIES" -X DELETE "$URL$path" \
+      -H "X-XSRF-TOKEN: $XSRF" -o "$out" -w '%{http_code}')
+  else
+    code=$(curl -sS -b "$COOKIES" -X "$method" "$URL$path" \
+      -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+      --data "$body" -o "$out" -w '%{http_code}')
+  fi
+  if ! python3 -c "
+import json, sys
+try:
+    r = json.load(open('$out'))
+except Exception as e:
+    print('json-parse-fail:', e, file=sys.stderr); sys.exit(1)
+http = $code
+if not ($predicate):
+    print('predicate-fail | http={} | response={}'.format(http, json.dumps(r)[:400]), file=sys.stderr)
+    sys.exit(1)
+" 2>"$ERR_OUT"; then
+    FAIL_COUNT=$((FAIL_COUNT+1))
+    FAILURES+=("$label")
+    echo "FAIL  $label"
+    sed 's/^/      /' "$ERR_OUT"
+  else
+    PASS_COUNT=$((PASS_COUNT+1))
+    echo "pass  $label"
+  fi
+  rm -f "$out"
+}
+
+# check_skip <reason> <check-args...> — same as check(), for iterations
+# that only hold against the long-established dev home: enrichment
+# overlays / annotated-schema metadata the launcher seed does not carry
+# (the bundled FoodMart4.xml has drifted from the dev canonical copy —
+# saiku#1662) plus a couple of known fresh-home repository gaps. A
+# fresh-home run skips them with SKIP_ENRICHMENT_ITERS=1 instead of
+# failing on state the home cannot have; each call site records why.
+check_skip() {
+  local reason="$1"; shift
+  if [[ "$SKIP_ENRICHMENT_ITERS" == "1" ]]; then
+    SKIP_COUNT=$((SKIP_COUNT+1))
+    echo "skip  $1 ($reason)"
+    return
+  fi
+  check "$@"
+}
+
+echo "saiku-ai-live: $URL"
+login
+echo ""
+
+# ---- discovery ----
+check "cubes list non-empty" GET "/rest/saiku/api/ai/cubes" '' \
+  "isinstance(r, list) and len(r) >= 1 and any(c['cubeName']=='Sales' for c in r)"
+
+check "schema Sales has Product dim" GET "/rest/saiku/api/ai/schema/$CUBE" '' \
+  "'product' in r.get('dimensions',{}) and 'store sales' in r.get('measures',{})"
+
+check "schema 3-segment cubeId → 400 cubeId" GET "/rest/saiku/api/ai/schema/foo/bar/baz" '' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='cubeId'"
+
+check "schema unknown cube → 400 cube + available" GET "/rest/saiku/api/ai/schema/unknown_foodmart/FoodMart/FoodMart/Nonsense" '' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='cube' and 'Sales' in r.get('available',[])"
+
+# ---- happy-path query shapes ----
+check "simple measure × rows" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Store Sales']['value'] > 0"
+
+check "order+limit emits TopCount" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"order":[{"by":"Store Sales","direction":"desc"}],"limit":2}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and 'TopCount' in r['metadata']['generatedMdx']"
+
+check "visualTotals=true" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Category"}],"visualTotals":true,"limit":3}' \
+  "r.get('status')=='SUCCESS' and 'VISUALTOTALS' in r['metadata']['generatedMdx']"
+
+check "explicit members on rows" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family","members":["[Product].[Products].[Drink]","[Product].[Products].[Food]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2"
+
+check "columns axis cross-join (Quarter × measures)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"columns":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}]}' \
+  "r.get('status')=='SUCCESS' and 'CROSSJOIN' in r['metadata']['generatedMdx'] and any('Q1' in c['caption'] for c in r['metadata']['columns'])"
+
+check "multi-measure × dim crossjoin preserves all cells (saiku#789)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"},{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"columns":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}]}' \
+  "r.get('status')=='SUCCESS' and len(r['metadata']['columns'])==8 and 'Store Sales | Q1' in [c['caption'] for c in r['metadata']['columns']] and 'Unit Sales | Q1' in [c['caption'] for c in r['metadata']['columns']] and r['data'][0]['Store Sales | Q1']['value']!=r['data'][0]['Unit Sales | Q1']['value']"
+
+check "rows from same hierarchy → Hierarchize (Store State + Store Name)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Store","hierarchy":"Stores","level":"Store State"},{"dimension":"Store","hierarchy":"Stores","level":"Store Name"}],"limit":4,"nonEmpty":false}' \
+  "r.get('status')=='SUCCESS' and 'Hierarchize' in r['metadata']['generatedMdx'] and 'CROSSJOIN' not in r['metadata']['generatedMdx']"
+
+check "distinct-hierarchy rows CROSSJOIN (Time × Product)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Year"},{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"limit":6}' \
+  "r.get('status')=='SUCCESS' and 'CROSSJOIN' in r['metadata']['generatedMdx']"
+
+# ---- filter operators ----
+check "filter op=in (single year)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Time].[Time].[1997]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3"
+
+check "filter op=between (Year 1997-1998 bare slicer set)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","op":"between","members":["[Time].[Time].[1997]","[Time].[Time].[1998]"]}],"nonEmpty":false}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][1]['Unit Sales']['value'] > 0"
+
+check "filter op=not_in (exclude Canada)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Store","hierarchy":"Stores","level":"Store Country","op":"not_in","members":["[Store].[Stores].[Canada]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3"
+
+check "filter op=descendants_of (USA)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Store","hierarchy":"Stores","level":"Store Country","op":"descendants_of","members":["[Store].[Stores].[USA]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3"
+
+check "filter op=relative last_n_quarters n=2 (executes; empty under NON EMPTY is data-specific)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"relative","value":"last_n_quarters","n":2}]}' \
+  "r.get('status')=='SUCCESS' and 'Tail' in r['metadata']['generatedMdx']"
+
+# ---- validation paths ----
+check "validation: unknown measure" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Made Up Measure"}],"rows":[]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='measures[].name' and 'Store Sales' in r.get('available',[])"
+
+check "validation: two filters on one hierarchy" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Time].[Time].[1997]"]},{"dimension":"Time","hierarchy":"Time","level":"Quarter","members":["[Time].[Time].[1997].[Q1]"]}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field').endswith('.hierarchy') and 'Multiple filters' in r.get('error','')"
+
+check "validation: MDX injection in members[] rejected" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family","members":["[Product].[Products].[Drink], Crossjoin([Time].[1997])"]}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='rows[0].members[0]' and 'Embedded MDX' in r.get('error','')"
+
+check "validation: axis hierarchy reused in filter rejected (saiku#784)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Customer","hierarchy":"Customers","level":"City"}],"filters":[{"dimension":"Customer","hierarchy":"Customers","level":"State Province","op":"descendants_of","members":["[Customer].[Customers].[USA].[CA]"]}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='filters[0].hierarchy' and 'already on the rows/columns axis' in r.get('error','')"
+
+check "validation: nonexistent member ref translated to 400" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family","members":["[Product].[Products].[Drink]","[Product].[Products].[Pizza]"]}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='members' and 'Pizza' in r.get('error','') and 'not found in cube' in r.get('error','')"
+
+check "validation: multi-key order rejected" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"},{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"order":[{"by":"Store Sales","direction":"desc"},{"by":"Unit Sales","direction":"asc"}],"limit":2}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='order' and 'Only one sort key' in r.get('error','')"
+
+check "validation: member at wrong level rejected (saiku#790)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family","members":["[Product].[Products].[Drink].[Beverages]"]}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='rows[0].members[0]' and 'Product Department' in r.get('error','') and 'Product Family' in r.get('error','')"
+
+check "validation: order direction must be asc/desc" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"order":[{"by":"Store Sales","direction":"invalid"}],"limit":2}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='order[0].direction' and 'Unknown order direction' in r.get('error','') and set(r.get('available',[]))=={'asc','desc'}"
+
+check "validation: duplicate measures rejected (saiku#796)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"},{"name":"Store Sales"},{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='measures' and 'appears more than once' in r.get('error','')"
+
+check "validation: duplicate rows[] axis rejected (saiku#797)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"},{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='rows' and 'Duplicate axis selection' in r.get('error','')"
+
+check "validation: cross-dim member ref in filter rejected (saiku#798)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Customer].[Customers].[USA]"]}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='filters[0].members[0]' and 'Customer' in r.get('error','') and 'Time' in r.get('error','')"
+
+check "validation: cross-hier member ref in filter rejected (saiku#799)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Promotion","hierarchy":"Media Type","level":"Media Type","members":["[Promotion].[Promotions].[Bag Stuffers]"]}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='filters[0].members[0]' and 'Promotions' in r.get('error','') and 'Media Type' in r.get('error','')"
+
+check "drillthrough on bogus queryId returns 404 (saiku#783)" GET "/rest/saiku/api/ai/query/bogus-uuid-1234/drillthrough?maxrows=5" '' \
+  "http==404 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='queryId' and 'Unknown queryId' in r.get('error','')"
+
+# Drillthrough with an unknown `returns` member should be 400, not 500
+# leaking Mondrian's "unknown member ... in RETURN clause" text (saiku#795).
+RET_QID=$(curl -sS -b "$COOKIES" -X POST "$URL/rest/saiku/api/ai/query" \
+  -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+  --data '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('queryId',''))")
+if [[ -n "$RET_QID" ]]; then
+  check "drillthrough with unknown returns member is 400 (saiku#795)" GET "/rest/saiku/api/ai/query/$RET_QID/drillthrough?maxrows=3&returns=%5BMeasures%5D.%5BFake%5D" '' \
+    "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='returns' and 'RETURN' in r.get('error','')"
+fi
+
+# Drillthrough on a 0-row query (Foodmart has no 1998 data) should be a clean
+# 200 with rowCount=0 — not a 500 leaking Mondrian's "Cell coordinates fall
+# outside CellSet bounds" internal message (saiku#794).
+EMPTY_OUT=$(mktemp)
+EMPTY_QID=$(curl -sS -b "$COOKIES" -X POST "$URL/rest/saiku/api/ai/query" \
+  -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+  --data '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Time].[Time].[1998]"]}],"nonEmpty":true}' \
+  | python3 -c "import json,sys;d=json.load(sys.stdin);print(d.get('queryId',''))")
+if [[ -n "$EMPTY_QID" ]]; then
+  check "drillthrough on 0-row query returns 200 + empty rows (saiku#794)" GET "/rest/saiku/api/ai/query/$EMPTY_QID/drillthrough?maxrows=5" '' \
+    "http==200 and r.get('rowCount')==0 and r.get('rows')==[]"
+fi
+rm -f "$EMPTY_OUT"
+
+# ---- members search ----
+check "members search case-insensitive (q=Excellent)" GET "/rest/saiku/api/ai/members/search?cubeId=$CUBE&dimension=Product&hierarchy=Products&level=Brand%20Name&q=Excellent&limit=5" '' \
+  "isinstance(r, list) and len(r) >= 1 and any(m['caption']=='Excellent' for m in r)"
+
+# ---- preview ----
+check "preview emits MDX without execute" POST "/rest/saiku/api/ai/query/preview" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "r.get('status')=='PREVIEW' and 'SELECT' in r.get('generatedMdx','')"
+
+# ---- async pipeline ----
+ASYNC_OUT=$(mktemp)
+curl -sS -b "$COOKIES" -X POST "$URL/rest/saiku/api/ai/query/execute-async" \
+  -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+  --data '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  -o "$ASYNC_OUT"
+ASYNC_QID=$(python3 -c "import json; print(json.load(open('$ASYNC_OUT')).get('queryId',''))")
+rm -f "$ASYNC_OUT"
+if [[ -n "$ASYNC_QID" ]]; then
+  check "async result is SUCCESS with rows" GET "/rest/saiku/api/ai/query/result/$ASYNC_QID" '' \
+    "r.get('status')=='SUCCESS' and r.get('totalRows')==3"
+else
+  FAIL_COUNT=$((FAIL_COUNT+1)); FAILURES+=("async submit returned no queryId"); echo "FAIL  async submit returned no queryId"
+fi
+
+# Submit a fresh query for the cancel test
+ASYNC_OUT=$(mktemp)
+curl -sS -b "$COOKIES" -X POST "$URL/rest/saiku/api/ai/query/execute-async" \
+  -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+  --data '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Name"}],"limit":1000}' \
+  -o "$ASYNC_OUT"
+ASYNC_QID=$(python3 -c "import json; print(json.load(open('$ASYNC_OUT')).get('queryId',''))")
+rm -f "$ASYNC_OUT"
+if [[ -n "$ASYNC_QID" ]]; then
+  # The cancel races the executor: on a warm cache / fast H2 the query can
+  # finish before the DELETE lands, which is reported as ALREADY_COMPLETED.
+  # Both outcomes prove the cancel endpoint resolved the queryId correctly.
+  check "async cancel returns CANCELLED (or ALREADY_COMPLETED when the race is lost)" DELETE "/rest/saiku/api/ai/query/$ASYNC_QID" '' \
+    "r.get('status') in ('CANCELLED','ALREADY_COMPLETED') and r.get('queryId')=='$ASYNC_QID'"
+fi
+
+# ---- drillthrough ----
+DRILL_OUT=$(mktemp)
+curl -sS -b "$COOKIES" -X POST "$URL/rest/saiku/api/ai/query" \
+  -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+  --data '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  -o "$DRILL_OUT"
+DRILL_QID=$(python3 -c "import json; print(json.load(open('$DRILL_OUT')).get('queryId',''))")
+rm -f "$DRILL_OUT"
+if [[ -n "$DRILL_QID" ]]; then
+  check "drillthrough returns typed cell envelopes" GET "/rest/saiku/api/ai/query/$DRILL_QID/drillthrough?maxrows=3" '' \
+    "r.get('rowCount')==3 and 'Year' in r['rows'][0] and r['rows'][0]['Year'].get('value')==1997.0"
+fi
+
+# ---- other cubes ----
+# GBP unit sniff needs the £ format strings that only exist in the dev-home
+# annotated FoodMart4.xml — the launcher seed has drifted (saiku#1662).
+check_skip "GBP format only in dev-home schema — saiku#1662" \
+  "HR cube (avoiding Department) — Time × Org Salary works" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Org Salary"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Year"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and r['data'][0]['Org Salary'].get('unit')=='GBP'"
+
+check "Store cube — Store Type level" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/Store","measures":[{"name":"Store Sqft"}],"rows":[{"dimension":"Store Type","level":"Store Type"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5"
+
+check "validation: same-member two-form filter rejected (saiku#804)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","op":"in","members":["[Time].[Time].[1997]","[Time].[Time].[Year].&[1997]"]}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='filters[0].members[1]' and 'same member' in r.get('error','')"
+
+check "validation: relative n<=0 rejected" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"relative","value":"last_n_quarters","n":0}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='filters[0].n' and 'n >= 1' in r.get('error','')"
+
+check "validation: between with heterogeneous-level endpoints rejected (saiku#802)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"between","members":["[Time].[Time].[1997]","[Time].[Time].[1997].[Q3]"]}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='filters[0].members' and 'same level' in r.get('error','')"
+
+check "validation: relative + members[] combo rejected" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"relative","value":"ytd","members":["[Time].[Time].[1997].[Q1]"]}]}' \
+  "r.get('status')=='VALIDATION_ERROR' and r.get('field')=='filters[0].members' and 'doesn' in r.get('error','')"
+
+check "two multi-member slicer filters (saiku#801 — CROSSJOIN tuple slicer)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"in","members":["[Time].[Time].[1997].[Q1]","[Time].[Time].[1997].[Q4]"]},{"dimension":"Promotion","hierarchy":"Media Type","level":"Media Type","members":["[Promotion].[Media Type].[No Media]","[Promotion].[Media Type].[Daily Paper]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and 'CROSSJOIN' in r['metadata']['generatedMdx']"
+
+check "Promotion Sales (CASE-expr measure) × Quarter (saiku#805 — Calcite segment-load fallback)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Promotion Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"columns":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')>=3 and r['data'][0]['Promotion Sales | Q1']['value']>0"
+
+check "Warehouse cube — Country level (saiku#781 — Calcite cardinality probe fallback)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/Warehouse","measures":[{"name":"Warehouse Sales"}],"rows":[{"dimension":"Warehouse","hierarchy":"Warehouses","level":"Country"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')>=1 and r['data'][0]['Warehouse Sales']['value']>0"
+
+check "Sales 2 cube — Quarter × Sales+Customer Count" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/Sales 2","measures":[{"name":"Sales Count"},{"name":"Customer Count"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==4"
+
+check "Customer Count by Yearly Income desc (untested hier — iter 267)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Customer Count"}],"rows":[{"dimension":"Customer","hierarchy":"Yearly Income","level":"Yearly Income"}],"order":[{"by":"Customer Count","direction":"desc"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==8 and r['data'][0]['Yearly Income']=='\$30K - \$50K' and r['data'][0]['Customer Count']['value']==1786.0 and 'Order(' in r['metadata']['generatedMdx']"
+
+check "rows from two hierarchies of same dim → CROSSJOIN not Hierarchize (iter 268)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Sales Count"}],"rows":[{"dimension":"Customer","hierarchy":"Marital Status","level":"Marital Status"},{"dimension":"Customer","hierarchy":"Education Level","level":"Education Level"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==10 and 'CROSSJOIN' in r['metadata']['generatedMdx'] and 'Hierarchize' not in r['metadata']['generatedMdx']"
+
+check "Profit calc measure by Media Type top 5 — currency sniff EUR (iter 269)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Profit"}],"rows":[{"dimension":"Promotion","hierarchy":"Media Type","level":"Media Type"}],"order":[{"by":"Profit","direction":"desc"}],"limit":5}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and r['data'][0]['Media Type']=='No Media' and r['data'][0]['Profit']['unit']=='EUR' and 'TopCount(' in r['metadata']['generatedMdx']"
+
+check "localised measure name resolves uniqueName + % unit sniff (iter 270)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Gewinn-Wachstum"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==4 and '[Measures].[Profit Growth]' in r['metadata']['generatedMdx'] and r['data'][0]['Gewinn-Wachstum']['unit']=='%'"
+
+check "rows-deep + columns + slicer combo: Product Subcategory × Quarter / USA (iter 271)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Subcategory"}],"columns":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}],"filters":[{"dimension":"Store","hierarchy":"Stores","level":"Store Country","op":"descendants_of","members":["[Store].[Stores].[USA]"]}],"limit":3}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and len(r['metadata']['columns'])==4 and 'HEAD(' in r['metadata']['generatedMdx'] and 'WHERE ([Store].[Stores].[USA])' in r['metadata']['generatedMdx']"
+
+check "parallel Time hierarchy: Time/Weekly/Year (iter 272)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Time","hierarchy":"Weekly","level":"Year"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==1 and r['data'][0]['Year']=='1997' and r['data'][0]['Unit Sales']['value']==266773.0 and '[Time].[Weekly].[Year]' in r['metadata']['generatedMdx']"
+
+# Drillthrough on a real successfully-executed query (iter 273).
+DT_QID=$(curl -sS -b "$COOKIES" -X POST "$URL/rest/saiku/api/ai/query" \
+  -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+  --data '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"limit":1}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('queryId',''))")
+if [[ -n "$DT_QID" ]]; then
+  check "drillthrough on real queryId returns fact rows (iter 273)" GET "/rest/saiku/api/ai/query/$DT_QID/drillthrough?maxrows=5" '' \
+    "http==200 and r.get('rowCount')==5 and len(r['rows'])==5 and 'Year' in r['rows'][0] and 'Product Family' in r['rows'][0] and 'Unit Sales' in r['rows'][0] and r['rows'][0]['Product Family']['formatted']=='Drink'"
+fi
+
+check "format=matrix uses positional keys, labels live in metadata (iter 274)" POST "/rest/saiku/api/ai/query?format=matrix" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"columns":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}]}' \
+  "r.get('format')=='matrix' and len(r.get('data',[]))==0 and len(r['matrix'])==3 and list(r['matrix'][0].keys())==['0','1','2','3'] and r['matrix'][0]['0']['value']==11585.8 and r['metadata']['rows'][0]['caption']=='Drink'"
+
+check "explicit Year members on rows + nonEmpty=false in hasAll=false hier (saiku#807 — iter 275)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Time].[Time].[1997]","[Time].[Time].[1998]"]}],"nonEmpty":false}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and r['data'][0]['Year']=='1997' and r['data'][0]['Store Sales']['value']==565238.13 and r['data'][1]['Year']=='1998' and r['data'][1]['Store Sales']['value'] is None"
+
+check "explicit Quarter members in hasAll=false hier — cross-validates saiku#807 at depth>0 (iter 276)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","members":["[Time].[Time].[1997].[Q1]","[Time].[Time].[1997].[Q3]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and r['data'][0]['Quarter']=='Q1' and r['data'][0]['Store Sales']['value']==139628.35 and r['data'][1]['Quarter']=='Q3' and r['data'][1]['Store Sales']['value']==140271.89"
+
+check "Customer/Gender single-member slicer — F-only (iter 277)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Sales Count"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Customer","hierarchy":"Gender","level":"Gender","op":"in","members":["[Customer].[Gender].[F]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Sales Count']['value']==3953.0 and r['data'][1]['Sales Count']['value']==30848.0 and 'WHERE ([Customer].[Gender].[F])' in r['metadata']['generatedMdx']"
+
+check "Performance Season Day dim — TopCount(5) Unit Sales (iter 278)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Performance Season Day","hierarchy":"Performance","level":"Performance Season Day"}],"order":[{"by":"Unit Sales","direction":"desc"}],"limit":5}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and r['data'][0]['Performance Season Day']=='0' and r['data'][0]['Unit Sales']['value']==195448.0 and 'TopCount(' in r['metadata']['generatedMdx']"
+
+check "order direction=asc + limit emits BottomCount (iter 279)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Store","hierarchy":"Stores","level":"Store Name"}],"order":[{"by":"Unit Sales","direction":"asc"}],"limit":3}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and 'BottomCount(' in r['metadata']['generatedMdx'] and r['data'][0]['Unit Sales']['value']==2117.0 and r['data'][2]['Unit Sales']['value']==2237.0"
+
+check "empty result set under nonEmpty=true returns 200 SUCCESS / 0 rows (iter 280)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","op":"in","members":["[Time].[Time].[1998]"]}],"nonEmpty":true}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==0 and r.get('data')==[] and 'WHERE ([Time].[Time].[1998])' in r['metadata']['generatedMdx']"
+
+check "deepest level (Product Name, depth 6) — TopCount(5) Store Sales (iter 281)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Name"}],"order":[{"by":"Store Sales","direction":"desc"}],"limit":5}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and r['data'][0]['Product Name']=='Hermanos Green Pepper' and r['data'][0]['Store Sales']['value']==922.54 and 'TopCount(' in r['metadata']['generatedMdx']"
+
+check "Customer/Customers/Country geo level — single-country data (iter 282)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Customer Count"}],"rows":[{"dimension":"Customer","hierarchy":"Customers","level":"Country"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==1 and r['data'][0]['Country']=='USA' and r['data'][0]['Customer Count']['value']==5581.0"
+
+check "Store Size in SQFT — numeric-keyed hier with #null member (iter 283)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Store","hierarchy":"Store Size in SQFT","level":"Store Sqft"}],"order":[{"by":"Store Sales","direction":"desc"}],"limit":5}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and r['data'][0]['Store Sqft']=='27694' and r['data'][1]['Store Sqft']=='#null' and r['data'][0]['Store Sales']['value']==87218.28"
+
+check "Promotion Name × Promotion Sales (saiku#805 CASE-expr × deep promo level — iter 284)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Promotion Sales"}],"rows":[{"dimension":"Promotion","hierarchy":"Promotions","level":"Promotion Name"}],"order":[{"by":"Promotion Sales","direction":"desc"}],"limit":3}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Promotion Name']=='Cash Register Lottery' and r['data'][0]['Promotion Sales']['value']==9821.71"
+
+check "maximally-shaped query: 2 measures × Quarter cols × Family rows + Gender slicer + TopCount (iter 285)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"},{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"columns":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}],"filters":[{"dimension":"Customer","hierarchy":"Gender","level":"Gender","op":"in","members":["[Customer].[Gender].[M]"]}],"order":[{"by":"Unit Sales","direction":"desc"}],"limit":3}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and len(r['metadata']['columns'])==8 and r['data'][0]['Product Family']=='Food' and r['data'][0]['Unit Sales | Q1']['value']==23977.0 and 'TopCount(' in r['metadata']['generatedMdx'] and 'WHERE ([Customer].[Gender].[M])' in r['metadata']['generatedMdx']"
+
+check "Customer State Province + Order(desc, no limit) emits Order BDESC (iter 286)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Customer Count"}],"rows":[{"dimension":"Customer","hierarchy":"Customers","level":"State Province"}],"order":[{"by":"Customer Count","direction":"desc"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and [d['State Province'] for d in r['data']]==['CA','WA','OR'] and r['data'][0]['Customer Count']['value']==2716.0 and sum(d['Customer Count']['value'] for d in r['data'])==5581.0 and 'Order(' in r['metadata']['generatedMdx'] and 'BDESC' in r['metadata']['generatedMdx']"
+
+check "mixed-format multi-measure: EUR + % unit sniffers independent per cell (iter 287)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Profit"},{"name":"Gewinn-Wachstum"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==4 and r['data'][0]['Profit']['unit']=='EUR' and r['data'][0]['Gewinn-Wachstum']['unit']=='%' and r['data'][0]['Profit']['formatted']=='83,876.11 \u20ac' and r['data'][0]['Gewinn-Wachstum']['value']==0.0"
+
+check "Time/Date Only/Date String TopCount(5) — string-keyed date hier (iter 288)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Time","hierarchy":"Date Only","level":"Date String"}],"order":[{"by":"Unit Sales","direction":"desc"}],"limit":5}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and r['data'][0]['Date String']=='1997/07/27' and r['data'][0]['Unit Sales']['value']==3850.0 and '[Time].[Date Only].[Date String]' in r['metadata']['generatedMdx']"
+
+check_skip "GBP format only in dev-home schema — saiku#1662" \
+  "HR cube: Pay Type × Org Salary + Number of Employees — GBP unit sniff (iter 289)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Org Salary"},{"name":"Number of Employees"}],"rows":[{"dimension":"Employee","hierarchy":"Pay Type","level":"Pay Type"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and r['data'][0]['Pay Type']=='Hourly' and r['data'][0]['Org Salary']['unit']=='GBP' and r['data'][0]['Number of Employees']['value']==283.0 and r['data'][1]['Number of Employees']['value']==333.0"
+
+check_skip "GBP format only in dev-home schema — saiku#1662" \
+  "HR Management Role + Avg Salary — org-pyramid shape (iter 290)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Number of Employees"},{"name":"Avg Salary"}],"rows":[{"dimension":"Employee","hierarchy":"Position","level":"Management Role"}],"order":[{"by":"Number of Employees","direction":"desc"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and r['data'][0]['Management Role']=='Store Full Time Staff' and r['data'][0]['Number of Employees']['value']==405.0 and r['data'][4]['Management Role']=='Senior Management' and r['data'][4]['Number of Employees']['value']==8.0 and r['data'][4]['Avg Salary']['unit']=='GBP'"
+
+# The dev-home schema leaves HR/Store unwired (PhysPath 400); the launcher
+# seed wires it, so the same query is a legitimate 200 there (saiku#1662).
+check_skip "HR/Store wiring differs in launcher seed — saiku#1662" \
+  "HR cube + unwirable Store dim returns structured 400 not opaque 500 (saiku#808 — iter 291)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Org Salary"}],"rows":[{"dimension":"Store","hierarchy":"Stores","level":"Store Country"}]}' \
+  "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='rows' and 'PhysPath' in r.get('error','') and 'wired' in r.get('error','')"
+
+check "3-dim rows crossjoin: Family × Quarter × Gender + HEAD (iter 292)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"},{"dimension":"Time","hierarchy":"Time","level":"Quarter"},{"dimension":"Customer","hierarchy":"Gender","level":"Gender"}],"limit":6}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==6 and r['data'][0]['Product Family']=='Drink' and r['data'][0]['Quarter']=='Q1' and r['data'][0]['Gender']=='F' and r['data'][0]['Unit Sales']['value']==2934.0 and r['metadata']['generatedMdx'].count('CROSSJOIN')==2"
+
+check "columns 2-dim crossjoin: Quarter × Gender — pipe-separated captions (iter 293)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Sales Count"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"columns":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"},{"dimension":"Customer","hierarchy":"Gender","level":"Gender"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and len(r['metadata']['columns'])==8 and 'Sales Count | Q1 | F' in [c['caption'] for c in r['metadata']['columns']] and r['data'][0]['Sales Count | Q1 | F']['value']==953.0 and r['metadata']['generatedMdx'].count('CROSSJOIN')==2"
+
+check "HR Education Level × Avg Salary — education-salary correlation (iter 294)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Avg Salary"},{"name":"Number of Employees"}],"rows":[{"dimension":"Employee","hierarchy":"Education Level","level":"Education Level"}],"order":[{"by":"Avg Salary","direction":"desc"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and r['data'][0]['Education Level']=='Graduate Degree' and r['data'][4]['Education Level']=='Partial High School' and sum(d['Number of Employees']['value'] for d in r['data'])==616.0"
+
+check "Sales 2 cube: Profit is USD not EUR (per-cube format isolation, iter 295)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/Sales 2","measures":[{"name":"Sales Count"},{"name":"Profit"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"columns":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}],"filters":[{"dimension":"Gender","hierarchy":"Gender","level":"Gender","op":"in","members":["[Gender].[Gender].[F]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and len(r['metadata']['columns'])==8 and r['data'][0]['Sales Count | Q1']['value']==953.0 and r['data'][0]['Profit | Q1']['unit']=='USD' and 'WHERE ([Gender].[Gender].[F])' in r['metadata']['generatedMdx']"
+
+check "Customer descendants_of slicer compacts to ancestor in WHERE (iter 296)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Customer Count"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Customer","hierarchy":"Customers","level":"State Province","op":"descendants_of","members":["[Customer].[Customers].[USA].[CA]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Customer Count']['value']==1434.0 and r['data'][1]['Customer Count']['value']==2676.0 and 'WHERE ([Customer].[Customers].[USA].[CA])' in r['metadata']['generatedMdx']"
+
+check "HR Employee/Gender — 4th path to 616 aggregate (iter 297)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Number of Employees"},{"name":"Avg Salary"}],"rows":[{"dimension":"Employee","hierarchy":"Gender","level":"Gender"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and r['data'][0]['Gender']=='F' and r['data'][0]['Number of Employees']['value']==330.0 and r['data'][1]['Number of Employees']['value']==286.0 and sum(d['Number of Employees']['value'] for d in r['data'])==616.0"
+
+check "members search with no-match q returns empty list 200 (iter 298)" GET "/rest/saiku/api/ai/members/search?cubeId=$CUBE&dimension=Product&hierarchy=Products&level=Brand%20Name&q=ZZZZNothingMatches&limit=10" '' \
+  "http==200 and isinstance(r, list) and r==[]"
+
+check "members search unknown dim → 400 + field + available list (iter 299)" GET "/rest/saiku/api/ai/members/search?cubeId=$CUBE&dimension=NotARealDim&hierarchy=Products&level=Product%20Family&q=&limit=10" '' \
+  "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='dimension' and 'Unknown dimension' in r.get('error','') and 'Product' in r.get('available',[]) and 'Customer' in r.get('available',[])"
+
+check "preview emits the same MDX /query would execute, status=PREVIEW (iter 300)" POST "/rest/saiku/api/ai/query/preview" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"},{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"columns":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}],"filters":[{"dimension":"Customer","hierarchy":"Gender","level":"Gender","op":"in","members":["[Customer].[Gender].[M]"]}],"order":[{"by":"Unit Sales","direction":"desc"}],"limit":3}' \
+  "r.get('status')=='PREVIEW' and r.get('queryId') and 'TopCount' in r.get('generatedMdx','') and 'WHERE ([Customer].[Gender].[M])' in r.get('generatedMdx','') and 'CROSSJOIN' in r.get('generatedMdx','')"
+
+check "preview with bogus measure uses same validation envelope as /query (iter 301)" POST "/rest/saiku/api/ai/query/preview" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Made-Up Measure"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='measures[].name' and 'Unknown measure' in r.get('error','') and 'Store Sales' in r.get('available',[]) and 'Profit' in r.get('available',[])"
+
+check "2-axis nonEmpty=false preserves empty cells across both axes (iter 302)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Time].[Time].[1997]","[Time].[Time].[1998]"]}],"columns":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"nonEmpty":false}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and len(r['metadata']['columns'])==3 and r['data'][0]['Unit Sales | Drink']['value']==24597.0 and r['data'][1]['Unit Sales | Drink']['value'] is None and r['data'][1]['Unit Sales | Drink']['formatted']=='' and 'NON EMPTY' not in r['metadata']['generatedMdx']"
+
+check "filter via parallel Time/Weekly hier — slicer agrees with Time/Time totals (iter 303)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Weekly","level":"Year","op":"in","members":["[Time].[Weekly].[1997]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Unit Sales']['value']==24597.0 and r['data'][1]['Unit Sales']['value']==191940.0 and r['data'][2]['Unit Sales']['value']==50236.0 and 'WHERE ([Time].[Weekly].[1997])' in r['metadata']['generatedMdx']"
+
+check "HR Marital Status — 5th path to 616 aggregate (iter 304)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Number of Employees"},{"name":"Avg Salary"}],"rows":[{"dimension":"Employee","hierarchy":"Marital Status","level":"Marital Status"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and r['data'][0]['Marital Status']=='M' and r['data'][0]['Number of Employees']['value']==311.0 and r['data'][1]['Number of Employees']['value']==305.0 and sum(d['Number of Employees']['value'] for d in r['data'])==616.0"
+
+check "order.by targets named measure, not first measure (iter 305)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"},{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"order":[{"by":"Store Sales","direction":"asc"}],"limit":2}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and r['data'][0]['Product Family']=='Drink' and r['data'][0]['Store Sales']['value']==48836.21 and 'BottomCount(' in r['metadata']['generatedMdx'] and '[Measures].[Store Sales])' in r['metadata']['generatedMdx']"
+
+check "members search unknown level → 400 + 7-level available (iter 306)" GET "/rest/saiku/api/ai/members/search?cubeId=$CUBE&dimension=Product&hierarchy=Products&level=NotALevel&q=&limit=5" '' \
+  "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='level' and 'Unknown level' in r.get('error','') and 'Product Family' in r.get('available',[]) and 'Product Name' in r.get('available',[])"
+
+check "members search unknown hier → 400 + 5-hier available — completes the leg trifecta (iter 307)" GET "/rest/saiku/api/ai/members/search?cubeId=$CUBE&dimension=Customer&hierarchy=NotAHier&level=Country&q=&limit=5" '' \
+  "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='hierarchy' and 'Unknown hierarchy' in r.get('error','') and 'Customers' in r.get('available',[]) and 'Yearly Income' in r.get('available',[])"
+
+check "legacy /query/execute with bad MDX → 200 + error field (legacy envelope) (iter 308)" POST "/rest/saiku/api/query/execute" \
+  '{"name":"bad-mdx","cube":{"connection":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","name":"Sales","uniqueName":"[Sales]","caption":"Sales"},"type":"MDX","mdx":"SELECT [NotAMeasure] ON COLUMNS FROM [Sales]"}' \
+  "http==200 and r.get('error') is not None and 'not found in cube' in r.get('error','') and r.get('cellset') is None and r.get('height') is None"
+
+# Drillthrough with returns=[Measures].[Unit Sales] (iter 309) — chained from a fresh queryId.
+DT2_QID=$(curl -sS -b "$COOKIES" -X POST "$URL/rest/saiku/api/ai/query" \
+  -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+  --data '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"limit":1}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('queryId',''))")
+if [[ -n "$DT2_QID" ]]; then
+  check "drillthrough with custom returns yields aggregate, not fact rows (iter 309)" GET "/rest/saiku/api/ai/query/$DT2_QID/drillthrough?maxrows=3&returns=%5BMeasures%5D.%5BUnit%20Sales%5D" '' \
+    "http==200 and r.get('rowCount')==1 and len(r['rows'])==1 and list(r['rows'][0].keys())==['Unit Sales'] and r['rows'][0]['Unit Sales']['value']==24597.0"
+fi
+
+check "filter op=relative last_n_months n=3 emits Tail (iter 310)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Month","op":"relative","value":"last_n_months","n":3}],"nonEmpty":false}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and 'Tail([Time].[Time].[Month].Members, 3)' in r['metadata']['generatedMdx']"
+
+check "filter op=relative ytd emits Ytd() — matches full-year totals (iter 311)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"relative","value":"ytd"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Unit Sales']['value']==24597.0 and r['data'][1]['Unit Sales']['value']==191940.0 and 'WHERE (Ytd())' in r['metadata']['generatedMdx']"
+
+check "filter op=relative qtd emits Qtd() (iter 312)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Month","op":"relative","value":"qtd"}]}' \
+  "r.get('status')=='SUCCESS' and 'WHERE (Qtd())' in r['metadata']['generatedMdx']"
+
+check "filter op=relative mtd emits Mtd() (iter 313)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Month","op":"relative","value":"mtd"}]}' \
+  "r.get('status')=='SUCCESS' and 'WHERE (Mtd())' in r['metadata']['generatedMdx']"
+
+check "filter op=relative previous_period emits Tail(...,2).Item(0) (iter 314)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"relative","value":"previous_period","n":1}]}' \
+  "r.get('status')=='SUCCESS' and 'Tail([Time].[Time].[Quarter].Members, 2).Item(0)' in r['metadata']['generatedMdx']"
+
+check "unknown relative preset → 400 + field + 8 presets in available (iter 314b)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"relative","value":"parallel_period","n":1}]}' \
+  "http==400 and r.get('field')=='filters[0].value' and 'Unknown relative preset' in r.get('error','') and 'parallel_period' in r.get('error','') and 'ytd' in r.get('available',[]) and 'previous_period' in r.get('available',[]) and len(r.get('available',[]))==8"
+
+# On a fresh home NON EMPTY combined with a multi-member/compound slicer
+# ({a,b}, {a : b}, Tail(...)) evaluates to an empty axis even though the
+# cells exist (reproduces with raw MDX via the legacy /query/execute
+# endpoint, so it is Mondrian-level, not the AI layer; nonEmpty=false
+# returns the correct cells). The dev home does not exhibit it — schema/
+# config drift, saiku#1662.
+check_skip "NON EMPTY x compound slicer empty on fresh home — saiku#1662" \
+  "filter op=relative last_n_years n=2 emits Tail at Year level (iter 315)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","op":"relative","value":"last_n_years","n":2}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Unit Sales']['value']==24597.0 and 'Tail([Time].[Time].[Year].Members, 2)' in r['metadata']['generatedMdx']"
+
+check "filter op=relative last_n_days at Time/Weekly/Day — 8/8 relative presets pinned (iter 316)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Weekly","level":"Day","op":"relative","value":"last_n_days","n":5}]}' \
+  "r.get('status')=='SUCCESS' and 'Tail([Time].[Weekly].[Day].Members, 5)' in r['metadata']['generatedMdx']"
+
+check "HR Employee/Store Type — 6th path to 616, HQ-salary anomaly (iter 317)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Number of Employees"},{"name":"Avg Salary"}],"rows":[{"dimension":"Employee","hierarchy":"Store Type","level":"Store Type"}],"order":[{"by":"Number of Employees","direction":"desc"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==6 and r['data'][0]['Store Type']=='Supermarket' and r['data'][0]['Number of Employees']['value']==372.0 and sum(d['Number of Employees']['value'] for d in r['data'])==616.0 and any(d['Store Type']=='HeadQuarters' and d['Avg Salary']['value']>200 for d in r['data'])"
+
+# Pins saiku#809: TopCount on HR/Employee/Salary (numeric-keyed level)
+# returns the right *members* but in natural ordinal order, not
+# descending order of the sort criterion. Top member (Salary=20.0
+# with 283 employees) is correct; the rest are the right 4 but
+# shuffled. Asserting top + membership only, not the in-order
+# ranking.
+check "TopCount on numeric-keyed Salary level — top-by-membership not by ordering (saiku#809 — iter 318)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Number of Employees"}],"rows":[{"dimension":"Employee","hierarchy":"Salary","level":"Salary"}],"order":[{"by":"Number of Employees","direction":"desc"}],"limit":5}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and r['data'][0]['Salary']=='20.0' and r['data'][0]['Number of Employees']['value']==283.0 and set(d['Salary'] for d in r['data'])=={'20.0','7000.0','8200.0','4400.0','6700.0'}"
+
+check "Customer City TopCount(5) — string-keyed level sorts strictly desc (control for saiku#809 — iter 319)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Customer Count"}],"rows":[{"dimension":"Customer","hierarchy":"Customers","level":"City"}],"order":[{"by":"Customer Count","direction":"desc"}],"limit":5}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and r['data'][0]['City']=='Lebanon' and r['data'][0]['Customer Count']['value']==108.0 and [d['Customer Count']['value'] for d in r['data']]==sorted([d['Customer Count']['value'] for d in r['data']], reverse=True)"
+
+check "mixed-op multi-filter: descendants_of + in → tuple slicer (iter 320)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Sales Count"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Store","hierarchy":"Stores","level":"Store Country","op":"descendants_of","members":["[Store].[Stores].[USA]"]},{"dimension":"Customer","hierarchy":"Gender","level":"Gender","op":"in","members":["[Customer].[Gender].[F]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Sales Count']['value']==3953.0 and r['data'][1]['Sales Count']['value']==30848.0 and 'WHERE ([Store].[Stores].[USA], [Customer].[Gender].[F])' in r['metadata']['generatedMdx']"
+
+check_skip "NON EMPTY x compound slicer empty on fresh home — saiku#1662" \
+  "filter op=in 2-member set → set-literal slicer (iter 321)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"in","members":["[Time].[Time].[1997].[Q1]","[Time].[Time].[1997].[Q3]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Unit Sales']['value']==12041.0 and r['data'][1]['Unit Sales']['value']==95249.0 and 'WHERE ({[Time].[Time].[1997].[Q1], [Time].[Time].[1997].[Q3]})' in r['metadata']['generatedMdx']"
+
+check "key-form member ref ([Year].&[1997]) executes against Mondrian (iter 322)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Time].[Time].[Year].&[1997]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==1 and r['data'][0]['Year']=='1997' and r['data'][0]['Unit Sales']['value']==266773.0 and '[Time].[Time].[Year].&[1997]' in r['metadata']['generatedMdx']"
+
+check "filter op=not_in with 2 members → Except set slicer (iter 323)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Store","hierarchy":"Stores","level":"Store Country","op":"not_in","members":["[Store].[Stores].[Canada]","[Store].[Stores].[Mexico]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Store Sales']['value']==48836.21 and 'WHERE (Except([Store].[Stores].[Store Country].Members, {[Store].[Stores].[Canada], [Store].[Stores].[Mexico]}))' in r['metadata']['generatedMdx']"
+
+# Scoped to the foodmart connection: fresh homes also seed the bank and
+# flights sample datasources, so asserting on the full /cubes list would
+# couple the suite to whatever else the home happens to contain.
+check "/cubes shape: 6 foodmart cubes, each has the 7-field summary (iter 324)" GET "/rest/saiku/api/ai/cubes" '' \
+  "isinstance(r, list) and (fm:=[c for c in r if c.get('connectionName')=='$FOODMART_CONN']) and len(fm)==6 and set(fm[0].keys())=={'connectionName','catalog','schema','cubeName','cubeCaption','defaultMeasure','measureCount'} and set(c['cubeName'] for c in fm)=={'HR','Sales','Sales 2','Store','Warehouse','Warehouse and Sales'} and any(c['cubeName']=='HR' and c['defaultMeasure']=='Org Salary' and c['measureCount']==5 for c in fm)"
+
+check_skip "Store2 alias missing from launcher seed — saiku#1662" \
+  "Warehouse and Sales virtual cube — Store2 aliased dim resolves (iter 325)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/Warehouse and Sales","measures":[{"name":"Sales Count"}],"rows":[{"dimension":"Store2","hierarchy":"Store Type","level":"Store Type"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and any(d['Store Type']=='Supermarket' and d['Sales Count']['value']==47795.0 for d in r['data']) and sum(d['Sales Count']['value'] for d in r['data'])==86837.0"
+
+check "schema endpoint exposes sampleMembers per level — anti-hallucination contract (iter 326)" GET "/rest/saiku/api/ai/schema/$CUBE" '' \
+  "isinstance(r['dimensions']['product']['hierarchies']['products']['levels']['product family']['sampleMembers'], list) and len(r['dimensions']['product']['hierarchies']['products']['levels']['product family']['sampleMembers'])==3 and any(s['caption']=='Drink' and s['uniqueName']=='[Product].[Products].[Drink]' for s in r['dimensions']['product']['hierarchies']['products']['levels']['product family']['sampleMembers'])"
+
+check "filter op=descendants_of on Time/1997 → compact ancestor slicer (iter 327)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","op":"descendants_of","members":["[Time].[Time].[1997]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Unit Sales']['value']==24597.0 and r['data'][1]['Unit Sales']['value']==191940.0 and 'WHERE ([Time].[Time].[1997])' in r['metadata']['generatedMdx']"
+
+# Same-hier 2-level Hierarchize'd set fed into TopCount:
+#   TopCount(Hierarchize({Family.Members, Category.Members}), 5, Store Sales)
+# The old Mondrian quirk (leaf-only entries, no parent rollups) no longer
+# reproduces — TopCount now ranks rollups and leaves together, and each
+# multi-level row carries one key per level with '' on the levels that
+# don't apply to that member. Top 5 = Food rollup, Non-Consumable rollup,
+# Food|Snack Foods, Drink rollup, Food|Vegetables.
+check "same-hier 2-level + TopCount ranks rollups and leaves together (iter 328, updated)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"},{"dimension":"Product","hierarchy":"Products","level":"Product Category"}],"order":[{"by":"Store Sales","direction":"desc"}],"limit":5}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==5 and r['data'][0]['Product Family']=='Food' and r['data'][0]['Product Category']=='' and r['data'][0]['Store Sales']['value']==409035.59 and r['data'][2]['Product Category']=='Snack Foods' and r['data'][2]['Store Sales']['value']==67609.82 and 'TopCount(Hierarchize(' in r['metadata']['generatedMdx']"
+
+# Updated alongside iter 328: the explicit parent (1997) now surfaces as
+# its own rollup row (Quarter='') ahead of the Q1/Q2 leaf rows.
+check "same-hier 2-level rows with explicit members per level (iter 329, updated)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Time].[Time].[1997]"]},{"dimension":"Time","hierarchy":"Time","level":"Quarter","members":["[Time].[Time].[1997].[Q1]","[Time].[Time].[1997].[Q2]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Quarter']=='' and r['data'][0]['Unit Sales']['value']==266773.0 and r['data'][1]['Quarter']=='Q1' and r['data'][1]['Unit Sales']['value']==66291.0 and r['data'][2]['Quarter']=='Q2' and r['data'][2]['Unit Sales']['value']==62610.0 and 'Hierarchize({{[Time].[Time].[1997]}, {[Time].[Time].[1997].[Q1], [Time].[Time].[1997].[Q2]}})' in r['metadata']['generatedMdx']"
+
+# Updated alongside iter 328: the Drink parent rollup now yields a third
+# column. (Its caption currently renders the level name — "Store Sales |
+# Drink | Quarter" — rather than an empty segment; asserted loosely on
+# purpose so a caption cleanup doesn't break the suite.)
+check "same-hier 2-level COLUMNS axis: CROSSJOIN(measure, Hierarchize(set, set)) (iter 330, updated)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"}],"columns":[{"dimension":"Product","hierarchy":"Products","level":"Product Family","members":["[Product].[Products].[Drink]"]},{"dimension":"Product","hierarchy":"Products","level":"Product Department","members":["[Product].[Products].[Drink].[Alcoholic Beverages]","[Product].[Products].[Drink].[Beverages]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==4 and len(r['metadata']['columns'])==3 and 'Store Sales | Drink | Alcoholic Beverages' in [c['caption'] for c in r['metadata']['columns']] and 'Store Sales | Drink | Beverages' in [c['caption'] for c in r['metadata']['columns']] and r['data'][0]['Store Sales | Drink | Alcoholic Beverages']['value']==3082.0 and 'CROSSJOIN({[Measures].[Store Sales]}, Hierarchize(' in r['metadata']['generatedMdx']"
+
+check "HR parent-child closure hier dropped by schema-time probe (saiku#810 — iter 331)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Number of Employees"}],"rows":[{"dimension":"Employee","hierarchy":"Employee$Manager Id$Parent","level":"Item"}],"limit":5}' \
+  "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='rows[0].hierarchy' and 'Unknown hierarchy' in r.get('error','') and 'Employee\$Manager Id\$Parent' in r.get('error','') and 'Employees' in r.get('available',[]) and 'Employee\$Manager Id\$Parent' not in r.get('available',[])"
+
+# Order-without-limit on HR/Employee/Store Id returns the full
+# 14-store breakdown in correct desc order (control vs saiku#809
+# which only affects limit-bounded TopCount). Sums to 616 emp,
+# the 7th independent path to that total in the suite.
+check "HR Store Id desc — 7th path to 616 (saiku#809 affects ordering — iter 332)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"unknown_foodmart/FoodMart/FoodMart/HR","measures":[{"name":"Number of Employees"}],"rows":[{"dimension":"Employee","hierarchy":"Store Id","level":"Store Id"}],"order":[{"by":"Number of Employees","direction":"desc"}],"limit":30}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==14 and r['data'][0]['Number of Employees']['value']==74.0 and sum(d['Number of Employees']['value'] for d in r['data'])==616.0"
+
+check "3-dim columns crossjoin: Quarter × Gender × Marital Status — 16 cols (iter 333)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Sales Count"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"columns":[{"dimension":"Time","hierarchy":"Time","level":"Quarter"},{"dimension":"Customer","hierarchy":"Gender","level":"Gender"},{"dimension":"Customer","hierarchy":"Marital Status","level":"Marital Status"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and len(r['metadata']['columns'])==16 and 'Sales Count | Q1 | F | M' in [c['caption'] for c in r['metadata']['columns']] and r['data'][0]['Sales Count | Q1 | F | M']['value']==501.0 and r['metadata']['generatedMdx'].count('CROSSJOIN')==3"
+
+check_skip "NON EMPTY x compound slicer empty on fresh home — saiku#1662" \
+  "filter op=between at Month level — MDX range slicer (iter 334)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Month","op":"between","members":["[Time].[Time].[1997].[Q1].[2]","[Time].[Time].[1997].[Q2].[5]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Unit Sales']['value']==8053.0 and r['data'][1]['Unit Sales']['value']==61653.0 and 'WHERE ({[Time].[Time].[1997].[Q1].[2] : [Time].[Time].[1997].[Q2].[5]})' in r['metadata']['generatedMdx']"
+
+check "schema endpoint top-level shape: cubeId, cubeUniqueName, examples, requestSchema (iter 335)" GET "/rest/saiku/api/ai/schema/$CUBE" '' \
+  "r.get('cubeId')=='unknown_foodmart/FoodMart/FoodMart/Sales' and r.get('cubeName')=='Sales' and r.get('cubeUniqueName')=='[unknown_foodmart].[FoodMart].[FoodMart].[Sales]' and isinstance(r.get('examples'), list) and len(r['examples'])==3 and isinstance(r.get('requestSchema'), dict) and r['requestSchema'].get('\$schema') and 'properties' in r['requestSchema']"
+
+# Self-consistency: the schema's prefab example[0] should actually
+# execute. Captured once at write-time as a hardcoded body to avoid
+# cross-query chaining gymnastics.
+check "schema example[0] executes to All-Customers Unit Sales total (iter 336)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":{"connectionName":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","cubeName":"Sales"},"measures":[{"name":"Unit Sales","aggregators":[]}],"rows":[{"dimension":"Customer","hierarchy":"Customers","level":"(All)","members":[]}],"columns":[],"filters":[],"order":[],"limit":0,"visualTotals":false,"nonEmpty":true}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==1 and r['data'][0]['(All)']=='All Customers' and r['data'][0]['Unit Sales']['value']==266773.0"
+
+check "empty body POST → field=cube + lists required top-level fields (iter 337)" POST "/rest/saiku/api/ai/query" '{}' \
+  "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='cube' and 'Missing required field' in r.get('error','') and set(r.get('available',[]))=={'cube','measures'}"
+
+check "cube without measures → field=measures cascade (iter 338)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":{"connectionName":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","cubeName":"Sales"}}' \
+  "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='measures' and 'At least one measure required' in r.get('error','')"
+
+check "partial cube object (only cubeName) → field names missing prop + lists all required (iter 339)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":{"cubeName":"Sales"},"measures":[{"name":"Unit Sales"}]}' \
+  "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='connectionName' and 'Missing required field' in r.get('error','') and 'connectionName' in r.get('available',[]) and 'catalog' in r.get('available',[]) and 'schema' in r.get('available',[]) and 'cubeName' in r.get('available',[])"
+
+check "HR schema has same agent-grounding affordances as Sales (iter 340)" GET "/rest/saiku/api/ai/schema/unknown_foodmart/FoodMart/FoodMart/HR" '' \
+  "r.get('cubeUniqueName')=='[unknown_foodmart].[FoodMart].[FoodMart].[HR]' and isinstance(r.get('examples'), list) and len(r['examples'])==3 and r['examples'][0]['cube']['cubeName']=='HR' and r.get('requestSchema',{}).get('title')=='AiQueryRequest'"
+
+check "/preview accepts cube as path string (polymorphic deserialiser parity, iter 341)" POST "/rest/saiku/api/ai/query/preview" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "r.get('status')=='PREVIEW' and 'NON EMPTY [Product].[Products].[Product Family].Members ON ROWS' in r.get('generatedMdx','') and 'FROM [Sales]' in r.get('generatedMdx','')"
+
+# Contract updated since iter 342 was recorded: negative limits are now
+# rejected up front with a structured 400 instead of being silently
+# treated as "no cap" (0/omit remains the documented no-cap spelling).
+check "negative limit rejected with structured 400 + no-cap guidance (iter 342, updated)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"limit":-1}' \
+  "http==400 and r.get('status')=='VALIDATION_ERROR' and r.get('field')=='limit' and 'limit must be >= 0' in r.get('error','') and 'Got -1' in r.get('error','')"
+
+check "non-empty aggregators field silently accepted (forward-compat placeholder, iter 343)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales","aggregators":["sum","avg","max"]}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Unit Sales']['value']==24597.0 and r['metadata']['generatedMdx']=='SELECT NON EMPTY {[Measures].[Unit Sales]} ON COLUMNS,\nNON EMPTY [Product].[Products].[Product Family].Members ON ROWS\nFROM [Sales]'"
+
+check "unknown filter op → 400 + 5-op available list (iter 344)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","op":"bogus_op","members":["[Time].[Time].[1997]"]}]}' \
+  "http==400 and r.get('field')=='filters[0].op' and 'Unknown filter op' in r.get('error','') and 'bogus_op' in r.get('error','') and set(r.get('available',[]))=={'in','not_in','between','descendants_of','relative'}"
+
+check "rows[].members[] mixed valid+invalid → 400 names the bad ref (iter 345)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Time].[Time].[1997]","[Time].[Time].[NotARealYear]"]}]}' \
+  "http==400 and r.get('field')=='members' and '[Time].[Time].[NotARealYear]' in r.get('error','') and 'members/search' in r.get('error','')"
+
+check "/preview honours relative-time DSL (Ytd) (iter 346)" POST "/rest/saiku/api/ai/query/preview" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"relative","value":"ytd"}]}' \
+  "r.get('status')=='PREVIEW' and 'WHERE (Ytd())' in r.get('generatedMdx','')"
+
+# saiku#811 (FIXED in Phase 1.B of feat/platform-improvements):
+# lowercase cubeName is resolved case-insensitively at schema-match
+# time, and the canonical SaikuCube ref (from the matched cube) is
+# threaded through AiSchemaConverter to Mondrian's native cube
+# lookup. Result: 200 / SUCCESS with same row totals as the
+# canonical-case query. Pre-fix this was 500 / EXECUTION_ERROR
+# "Cannot get native cube [Sales]".
+check "lowercase cubeName resolves to canonical ref end-to-end (saiku#811 — iter 347, fixed)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":{"connectionName":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","cubeName":"sales"},"measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Product Family']=='Drink' and r['data'][0]['Unit Sales']['value']==24597.0 and 'FROM [Sales]' in r['metadata']['generatedMdx']"
+
+check "lowercase dim/hier/level all resolve case-insensitively end-to-end (control for saiku#811, iter 348)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"product","hierarchy":"products","level":"product family"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Product Family']=='Drink' and r['data'][0]['Unit Sales']['value']==24597.0 and '[Product].[Products].[Product Family].Members' in r['metadata']['generatedMdx']"
+
+check "lowercase measure name resolves and rountrips with proper case (iter 349)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"unit sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Unit Sales']['value']==24597.0 and '[Measures].[Unit Sales]' in r['metadata']['generatedMdx']"
+
+# saiku#811 fix also covers connectionName — mixed-case
+# "Unknown_Foodmart" resolves case-insensitively at schema-match
+# time and is replaced with the canonical "unknown_foodmart" in
+# the SaikuCube produced by AiSchemaConverter.toSaikuCube(). Pre-
+# fix this was 500 EXECUTION_ERROR (raw NPE from null connection
+# lookup); post-fix it's 200 SUCCESS like any canonical-cube query.
+check "mixed-case connectionName resolves to canonical ref (saiku#811 — iter 350, fixed)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":{"connectionName":"Unknown_Foodmart","catalog":"FoodMart","schema":"FoodMart","cubeName":"Sales"},"measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Unit Sales']['value']==24597.0"
+
+# Same shape as iter 347 — lowercase catalog is replaced with the
+# canonical "FoodMart" via the matched SaikuCube. Pre-fix this was
+# 500; post-fix it's 200.
+check "lowercase catalog resolves to canonical ref (saiku#811 — iter 351, fixed)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":{"connectionName":"unknown_foodmart","catalog":"foodmart","schema":"FoodMart","cubeName":"Sales"},"measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and r['data'][0]['Unit Sales']['value']==24597.0 and 'FROM [Sales]' in r['metadata']['generatedMdx']"
+
+check "same-dim different-hier rows+filter (saiku#784 scope) — Gender × Marital Status (iter 352)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Customer Count"}],"rows":[{"dimension":"Customer","hierarchy":"Gender","level":"Gender"}],"filters":[{"dimension":"Customer","hierarchy":"Marital Status","level":"Marital Status","op":"in","members":["[Customer].[Marital Status].[M]"]}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and r['data'][0]['Customer Count']['value']==1365.0 and r['data'][1]['Customer Count']['value']==1376.0 and 'WHERE ([Customer].[Marital Status].[M])' in r['metadata']['generatedMdx']"
+
+check "saiku#784 catches same-hier cross-level conflict — Country rows + State filter (iter 353)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Customer Count"}],"rows":[{"dimension":"Customer","hierarchy":"Customers","level":"Country"}],"filters":[{"dimension":"Customer","hierarchy":"Customers","level":"State Province","op":"in","members":["[Customer].[Customers].[USA].[CA]"]}]}' \
+  "http==400 and r.get('field')=='filters[0].hierarchy' and 'already on the rows/columns axis' in r.get('error','') and 'move the filter members onto the axis' in r.get('error','')"
+
+check "visualTotals=true with explicit member subset emits VISUALTOTALS({...}) (iter 354)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family","members":["[Product].[Products].[Drink]","[Product].[Products].[Food]"]}],"visualTotals":true}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==2 and r['data'][0]['Product Family']=='Drink' and r['data'][0]['Store Sales']['value']==48836.21 and r['data'][1]['Product Family']=='Food' and 'VISUALTOTALS({[Product].[Products].[Drink], [Product].[Products].[Food]})' in r['metadata']['generatedMdx']"
+
+# Malformed JSON body returns Jackson plain-text error 400, not the
+# structured AiQueryResponse envelope (iter 355). The `check` helper
+# expects JSON output so this is a one-off inline check.
+{
+  out=$(mktemp)
+  code=$(curl -sS -b "$COOKIES" -X POST "$URL/rest/saiku/api/ai/query" \
+    -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+    --data 'not even json at all{}' \
+    -o "$out" -w '%{http_code}')
+  body=$(cat "$out"); rm -f "$out"
+  if [[ "$code" == "400" ]] && [[ "$body" == *"Unrecognized token 'not'"* ]]; then
+    PASS_COUNT=$((PASS_COUNT+1))
+    echo "pass  malformed JSON body → 400 Jackson plain-text error (iter 355)"
+  else
+    FAIL_COUNT=$((FAIL_COUNT+1))
+    FAILURES+=("malformed JSON body (iter 355)")
+    echo "FAIL  malformed JSON body → 400 Jackson plain-text error (iter 355)"
+    echo "      http=$code body=$body"
+  fi
+}
+
+# Drillthrough with maxrows=0 → no-cap behaviour (iter 356).
+# Mirrors the /query limit<=0 "no cap" contract on the drillthrough
+# side. Asserts rowCount > 100 (well past any default cap that
+# might be silently applied).
+DT3_QID=$(curl -sS -b "$COOKIES" -X POST "$URL/rest/saiku/api/ai/query" \
+  -H 'Content-Type: application/json' -H "X-XSRF-TOKEN: $XSRF" \
+  --data '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"limit":1}' \
+  | python3 -c "import json,sys;print(json.load(sys.stdin).get('queryId',''))")
+if [[ -n "$DT3_QID" ]]; then
+  check "drillthrough maxrows=0 → no-cap (iter 356)" GET "/rest/saiku/api/ai/query/$DT3_QID/drillthrough?maxrows=0" '' \
+    "http==200 and r.get('rowCount',0) > 100 and r.get('rowCount')==len(r['rows'])"
+fi
+
+check "3-hier same-dim CROSSJOIN on rows: Gender × Education × Marital (iter 357)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Customer Count"}],"rows":[{"dimension":"Customer","hierarchy":"Gender","level":"Gender"},{"dimension":"Customer","hierarchy":"Education Level","level":"Education Level"},{"dimension":"Customer","hierarchy":"Marital Status","level":"Marital Status"}],"limit":6}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==6 and r['data'][0]['Gender']=='F' and r['data'][0]['Education Level']=='Bachelors Degree' and r['data'][0]['Marital Status']=='M' and r['data'][0]['Customer Count']['value']==359.0 and r['metadata']['generatedMdx'].count('CROSSJOIN')==2"
+
+check "filter op=in with empty members[] → 400 with helpful message (iter 358)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","op":"in","members":[]}]}' \
+  "http==400 and r.get('field')=='filters[0].members' and 'in' in r.get('error','') and 'at least one member' in r.get('error','')"
+
+check "reversed between range {Q3:Q1} passes through to Mondrian (covers Q1-Q3 — iter 359)" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Unit Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"filters":[{"dimension":"Time","hierarchy":"Time","level":"Quarter","op":"between","members":["[Time].[Time].[1997].[Q3]","[Time].[Time].[1997].[Q1]"]}],"nonEmpty":false}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==3 and sum(d['Unit Sales']['value'] for d in r['data'])==194749.0 and 'WHERE ({[Time].[Time].[1997].[Q3] : [Time].[Time].[1997].[Q1]})' in r['metadata']['generatedMdx']"
+
+check "/preview emits TopCount when order+limit supplied (iter 360)" POST "/rest/saiku/api/ai/query/preview" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}],"order":[{"by":"Store Sales","direction":"desc"}],"limit":2}' \
+  "r.get('status')=='PREVIEW' and 'TopCount([Product].[Products].[Product Family].Members, 2, [Measures].[Store Sales])' in r.get('generatedMdx','')"
+
+# ---- legacy /query/execute coverage ----
+check "legacy /query/execute raw MDX" POST "/rest/saiku/api/query/execute" \
+  '{"name":"live-mdx","cube":{"connection":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","name":"Sales","uniqueName":"[Sales]","caption":"Sales"},"type":"MDX","mdx":"SELECT NON EMPTY {[Measures].[Store Sales]} ON COLUMNS, NON EMPTY [Product].[Products].[Product Family].Members ON ROWS FROM [Sales]"}' \
+  "r.get('error') is None and r.get('height')==4 and r.get('width')==2"
+
+check "legacy /query/execute TopCount(Order(...)) MDX" POST "/rest/saiku/api/query/execute" \
+  '{"name":"live-top5","cube":{"connection":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","name":"Sales","uniqueName":"[Sales]","caption":"Sales"},"type":"MDX","mdx":"SELECT NON EMPTY {[Measures].[Store Sales]} ON COLUMNS, NON EMPTY TopCount(Order([Product].[Products].[Product Category].Members, [Measures].[Store Sales], BDESC), 5, [Measures].[Store Sales]) ON ROWS FROM [Sales]"}' \
+  "r.get('error') is None and r.get('height')==6"
+
+# ---- saiku#818 semantic annotations ----
+check "schema surfaces saiku.semantic fields on annotated measure (Store Sales)" GET "/rest/saiku/api/ai/schema/$CUBE" '' \
+  "r['measures']['store sales'].get('unit')=='USD' and r['measures']['store sales'].get('currency')=='USD' and r['measures']['store sales'].get('aggregationKind')=='sum' and 'revenue' in r['measures']['store sales'].get('synonyms',[])"
+
+check "schema surfaces saiku.semantic fields on annotated level (Quarter)" GET "/rest/saiku/api/ai/schema/$CUBE" '' \
+  "r['dimensions']['time']['hierarchies']['time']['levels']['quarter'].get('grain')=='quarter' and r['dimensions']['time']['hierarchies']['time']['levels']['quarter'].get('cardinality')=='low' and 'quarterly' in r['dimensions']['time']['hierarchies']['time']['levels']['quarter'].get('synonyms',[])"
+
+check "measureAliases register every synonym → canonical (revenue → store sales)" GET "/rest/saiku/api/ai/schema/$CUBE" '' \
+  "r.get('measureAliases',{}).get('revenue')=='store sales' and r.get('measureAliases',{}).get('cogs')=='store cost' and r.get('measureAliases',{}).get('unique customers')=='customer count'"
+
+check "input resolution: measure synonym 'revenue' routes to Store Sales" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"revenue"}],"rows":[{"dimension":"Customer","hierarchy":"Customers","level":"Country"}]}' \
+  "r.get('status')=='SUCCESS' and r['metadata']['measures']==['Store Sales'] and '[Measures].[Store Sales]' in r['metadata']['generatedMdx']"
+
+check "input resolution: level synonym 'quarterly' routes to Quarter" POST "/rest/saiku/api/ai/query" \
+  '{"cube":"'"$CUBE"'","measures":[{"name":"revenue"}],"rows":[{"dimension":"Time","hierarchy":"Time","level":"quarterly"}]}' \
+  "r.get('status')=='SUCCESS' and r.get('totalRows')==4 and '[Time].[Time].[Quarter]' in r['metadata']['generatedMdx']"
+
+# ---- info / version ----
+check "info endpoint 200" GET "/rest/saiku/info" '' "isinstance(r, list)"
+check "mondrian server version" GET "/rest/saiku/statistics/mondrian/server/version" '' \
+  "r.get('majorVersion')==4 and r.get('productName')=='mondrian'"
+
+# ---- dashboards (v1 CRUD) ----
+#
+# Exercises /rest/saiku/api/dashboards against the JCR repo. Uses a
+# uniquely-named test dashboard so reruns don't trip on stale state.
+
+DASH_PATH="/dashboards/test-ai-live-$(date +%s).saikudash"
+DASH_BODY='{"id":"test-1","name":"test-ai-live dashboard","version":1,"layout":{"cols":12,"tiles":[{"id":"tile-a","x":0,"y":0,"w":6,"h":4,"type":"chart","chartType":"bar","cube":{"connectionName":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","cubeName":"Sales"},"query":{"kind":"inline","body":{"cube":{"connectionName":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","cubeName":"Sales"},"measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}}}]},"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Time].[Time].[1997]"]}]}'
+
+# A fresh repository has no /dashboards folder yet, so Acl2.canWrite denies
+# the save (500 "You don't have permission to write to dashboards/...")
+# even for admin — the folder only exists after first UI use on a dev home.
+# Fresh-home repository gap, not an API regression.
+check_skip "fresh repository has no /dashboards folder — write ACL denies save" \
+  "dashboards: POST saves a fresh dashboard" POST "/rest/saiku/api/dashboards${DASH_PATH}" \
+  "$DASH_BODY" \
+  "r.get('status')=='OK' and r.get('path')=='${DASH_PATH}'"
+
+check_skip "fresh repository has no /dashboards folder — nothing was saved" \
+  "dashboards: GET round-trips the body verbatim" GET "/rest/saiku/api/dashboards${DASH_PATH}" '' \
+  "r.get('name')=='test-ai-live dashboard' and len(r['layout']['tiles'])==1 and r['layout']['tiles'][0]['query']['kind']=='inline' and r['filters'][0]['level']=='Year'"
+
+check "dashboards: GET nonexistent path returns 404" GET "/rest/saiku/api/dashboards/no/such/path.saikudash" '' \
+  "http==404 and r.get('status')=='NOT_FOUND'"
+
+# Add a second tile (filter widget) and re-save.
+UPDATED_BODY='{"id":"test-1","name":"test-ai-live dashboard","version":1,"layout":{"cols":12,"tiles":[{"id":"tile-a","x":0,"y":0,"w":6,"h":4,"type":"chart","chartType":"bar","cube":{"connectionName":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","cubeName":"Sales"},"query":{"kind":"inline","body":{"cube":{"connectionName":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","cubeName":"Sales"},"measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}}},{"id":"tile-b","x":0,"y":4,"w":12,"h":1,"type":"filter","widget":"multi-select","cube":{"connectionName":"unknown_foodmart","catalog":"FoodMart","schema":"FoodMart","cubeName":"Sales"},"target":{"dimension":"Time","hierarchy":"Time","level":"Year","members":[]}}]},"filters":[{"dimension":"Time","hierarchy":"Time","level":"Year","members":["[Time].[Time].[1997]"]}]}'
+
+check_skip "fresh repository has no /dashboards folder — write ACL denies save" \
+  "dashboards: POST updates an existing dashboard" POST "/rest/saiku/api/dashboards${DASH_PATH}" \
+  "$UPDATED_BODY" \
+  "r.get('status')=='OK'"
+
+check_skip "fresh repository has no /dashboards folder — nothing was saved" \
+  "dashboards: updated tile count survives the round-trip" GET "/rest/saiku/api/dashboards${DASH_PATH}" '' \
+  "len(r['layout']['tiles'])==2 and r['layout']['tiles'][1]['type']=='filter' and r['layout']['tiles'][1]['target']['level']=='Year'"
+
+check_skip "fresh repository has no /dashboards folder — nothing was saved" \
+  "dashboards: DELETE removes the file" DELETE "/rest/saiku/api/dashboards${DASH_PATH}" '' \
+  "r.get('status')=='OK'"
+
+check "dashboards: GET after delete is 404" GET "/rest/saiku/api/dashboards${DASH_PATH}" '' \
+  "http==404"
+
+# ---- MCP streamable-http endpoint (saiku#878) ----
+#
+# Native /rest/saiku/api/mcp lives inside saiku-api behind the same
+# Spring Security chain as /rest/saiku/api/ai. Auth: HTTP Basic. Each
+# request carries the mcp-session-id minted by initialize. JSON-RPC body
+# captured per call so we can predicate on the result envelope.
+
+MCP_SESSION_FILE=$(mktemp)
+trap 'rm -f "$COOKIES" "$MCP_SESSION_FILE"' EXIT
+
+# mcp_call: 1=label  2=jsonrpc-body  3=predicate-over-result
+# Captures the mcp-session-id response header on initialize so subsequent
+# calls automatically thread it.
+mcp_call() {
+  local label="$1" body="$2" predicate="$3"
+  local out hdr code session
+  out=$(mktemp); hdr=$(mktemp)
+  session=$(cat "$MCP_SESSION_FILE" 2>/dev/null || true)
+  local sid_header=()
+  if [[ -n "$session" ]]; then sid_header=(-H "Mcp-Session-Id: $session"); fi
+
+  code=$(curl -sS -u "$USER:$PASS" "${sid_header[@]}" \
+    -H 'Content-Type: application/json' \
+    -X POST "$URL/rest/saiku/api/mcp" --data "$body" \
+    -D "$hdr" -o "$out" -w '%{http_code}')
+  # Capture session id on response when present (initialize sets it).
+  local new_sid
+  new_sid=$(grep -i '^Mcp-Session-Id:' "$hdr" | tail -1 | sed -E 's/.*:[[:space:]]*(.*)\r?$/\1/' | tr -d '\r')
+  if [[ -n "$new_sid" ]]; then echo "$new_sid" > "$MCP_SESSION_FILE"; fi
+
+  if [[ "$code" == "202" ]]; then
+    # Notification — no body to assert on; bail with pass.
+    PASS_COUNT=$((PASS_COUNT+1))
+    echo "pass  $label (notification ack)"
+    rm -f "$out" "$hdr"
+    return
+  fi
+
+  if ! python3 -c "
+import json, sys
+try:
+    env = json.load(open('$out'))
+except Exception as e:
+    print('json-parse-fail:', e, file=sys.stderr); sys.exit(1)
+http = $code
+r = env.get('result', env)
+if not ($predicate):
+    print('predicate-fail | http={} | response={}'.format(http, json.dumps(env)[:600]), file=sys.stderr)
+    sys.exit(1)
+" 2>"$ERR_OUT"; then
+    FAIL_COUNT=$((FAIL_COUNT+1))
+    FAILURES+=("$label")
+    echo "FAIL  $label"
+    sed 's/^/      /' "$ERR_OUT"
+  else
+    PASS_COUNT=$((PASS_COUNT+1))
+    echo "pass  $label"
+  fi
+  rm -f "$out" "$hdr"
+}
+
+# Unauthenticated must be rejected — no anonymous handshake. Historically
+# this was a 401 Basic challenge; under the current Spring Security posture
+# the CSRF filter can reject the anonymous POST first with 403. Both mean
+# the request never reached the MCP endpoint, so accept either.
+HTTP_NO_AUTH=$(curl -sS -H 'Content-Type: application/json' \
+  -X POST "$URL/rest/saiku/api/mcp" \
+  --data '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{}}' \
+  -o /dev/null -w '%{http_code}')
+if [[ "$HTTP_NO_AUTH" == "401" || "$HTTP_NO_AUTH" == "403" ]]; then
+  PASS_COUNT=$((PASS_COUNT+1)); echo "pass  mcp: anonymous initialize rejected → $HTTP_NO_AUTH"
+else
+  FAIL_COUNT=$((FAIL_COUNT+1))
+  FAILURES+=("mcp: anonymous initialize")
+  echo "FAIL  mcp: anonymous initialize (expected 401/403, got $HTTP_NO_AUTH)"
+fi
+
+mcp_call "mcp: initialize hands back a session id" \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-03-26","capabilities":{},"clientInfo":{"name":"test-ai-live","version":"1"}}}' \
+  "r.get('serverInfo',{}).get('name')=='saiku' and r.get('protocolVersion')"
+
+mcp_call "mcp: notifications/initialized ack" \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  "True"
+
+# The tool surface has grown past the original 6 cube tools (an ossie_*
+# family ships alongside them now, and its presence depends on which
+# model seeds the home carries) — assert the 6 cube tools are present
+# instead of pinning the total count.
+mcp_call "mcp: tools/list includes the 6 cube tools" \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+  "{'list_cubes','describe_cube','search_members','run_query','preview_query','drillthrough'} <= {t['name'] for t in r.get('tools',[])}"
+
+# structuredContent is now an object envelope ({'cubes': [...]}) rather
+# than a bare list.
+mcp_call "mcp: tools/call list_cubes delegates to AI API" \
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"list_cubes","arguments":{}}}' \
+  "isinstance(r.get('structuredContent'), dict) and any(c.get('cubeName')=='Sales' for c in r['structuredContent'].get('cubes',[]))"
+
+mcp_call "mcp: tools/call run_query mirrors AI /query response" \
+  '{"jsonrpc":"2.0","id":4,"method":"tools/call","params":{"name":"run_query","arguments":{"cube":"'"$CUBE"'","measures":[{"name":"Store Sales"}],"rows":[{"dimension":"Product","hierarchy":"Products","level":"Product Family"}]}}}' \
+  "r['structuredContent'].get('status')=='SUCCESS' and r['structuredContent'].get('totalRows')==3"
+
+mcp_call "mcp: tools/call unknown tool → JSON-RPC -32601" \
+  '{"jsonrpc":"2.0","id":5,"method":"tools/call","params":{"name":"no_such_tool","arguments":{}}}' \
+  "env.get('error',{}).get('code')==-32601"
+
+# ---- summary ----
+echo ""
+echo "---"
+echo "PASS: $PASS_COUNT"
+echo "FAIL: $FAIL_COUNT"
+if (( SKIP_COUNT > 0 )); then
+  echo "SKIP: $SKIP_COUNT (fresh-home mode, SKIP_ENRICHMENT_ITERS=1 — see saiku#1662; rerun with the flag unset on a dev home)"
+fi
+if (( FAIL_COUNT > 0 )); then
+  echo "failed:"
+  for f in "${FAILURES[@]}"; do echo "  - $f"; done
+  exit 1
+fi
+echo "all green."

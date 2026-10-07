@@ -1,0 +1,400 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<web-app xmlns="http://xmlns.jcp.org/xml/ns/javaee"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://xmlns.jcp.org/xml/ns/javaee http://xmlns.jcp.org/xml/ns/javaee/web-app_3_1.xsd"
+         version="3.1">
+
+	<display-name>saiku</display-name>
+
+	<context-param>
+		<param-name>encoding</param-name>
+		<param-value>UTF-8</param-value>
+	</context-param>
+    <context-param>
+        <param-name>db.url</param-name>
+        <param-value>jdbc:h2:../../data/saiku;MODE=MySQL</param-value>
+    </context-param>
+    <context-param>
+        <param-name>db.user</param-name>
+        <param-value>sa</param-value>
+    </context-param>
+    <context-param>
+        <param-name>db.password</param-name>
+        <param-value></param-value>
+    </context-param>
+    <context-param>
+        <param-name>db.encryptpassword</param-name>
+        <param-value>true</param-value>
+    </context-param>
+    <context-param>
+        <param-name>foodmart.url</param-name>
+        <param-value>jdbc:h2:../../data/foodmart;MODE=MySQL</param-value>
+    </context-param>
+    <context-param>
+        <param-name>foodmart.user</param-name>
+        <param-value>sa</param-value>
+    </context-param>
+    <context-param>
+        <param-name>foodmart.password</param-name>
+        <param-value></param-value>
+    </context-param>
+    <context-param>
+        <param-name>earthquakes.url</param-name>
+        <param-value>jdbc:h2:../../data/earthquakes;MODE=MySQL</param-value>
+    </context-param>
+    <context-param>
+        <param-name>earthquakes.user</param-name>
+        <param-value>sa</param-value>
+    </context-param>
+    <context-param>
+        <param-name>earthquakes.password</param-name>
+        <param-value></param-value>
+    </context-param>
+    <context-param>
+        <param-name>db.tcpServer</param-name>
+        <param-value>-tcpAllowOthers</param-value>
+    </context-param>
+
+    <context-param>
+     <param-name>contextConfigLocation</param-name>
+     <param-value>/WEB-INF/applicationContext.xml</param-value>
+    </context-param>
+	<session-config>
+		<!-- Session inactivity timeout in minutes. Bumped from 60 to 10080
+		     (7 days) for local-dev UX: avoids the SPA's "Session ended" modal
+		     popping up on a refresh after an idle browser tab. SaikuLauncher
+		     wires a FileSessionDataStore (saiku-home/sessions/) so sessions
+		     also survive across server restarts. -->
+		<session-timeout>10080</session-timeout>
+	</session-config>
+
+    <!-- saiku#1029: demo access gate. Declared BEFORE the Spring Security
+         filterChainProxy so it runs first and stays independent of Spring
+         Security — the verified cookie only unlocks the login form; admin/admin
+         is still required afterwards. Inert (immediate pass-through) unless demo
+         mode is on AND WorkOS is configured. -->
+    <!-- Apply security headers to every API response before Spring Security. -->
+    <filter>
+        <filter-name>securityHeaders</filter-name>
+        <filter-class>org.saiku.web.servlet.SecurityHeadersFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>securityHeaders</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>demoGate</filter-name>
+        <filter-class>org.saiku.web.servlet.DemoGateFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>demoGate</filter-name>
+        <url-pattern>/rest/*</url-pattern>
+    </filter-mapping>
+
+    <filter>
+        <filter-name>org.springframework.security.filterChainProxy</filter-name>
+        <filter-class>org.springframework.web.filter.DelegatingFilterProxy</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>org.springframework.security.filterChainProxy</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+
+    <!-- BEGIN - Hazelcast Filter -->
+    <!--
+    <filter>
+        <filter-name>hazelcast-filter</filter-name>
+        <filter-class>com.hazelcast.web.WebFilter</filter-class>
+        <filter-class>com.hazelcast.web.spring.SpringAwareWebFilter</filter-class>
+
+        <init-param>
+            <param-name>map-name</param-name>
+            <param-value>my-sessions</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>sticky-session</param-name>
+            <param-value>false</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>cookie-name</param-name>
+            <param-value>SAIKU_AUTH_PRINCIPAL</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>cookie-secure</param-name>
+            <param-value>false</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>cookie-http-only</param-name>
+            <param-value>false</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>debug</param-name>
+            <param-value>true</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>use-client</param-name>
+            <param-value>true</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>shutdown-on-destroy</param-name>
+            <param-value>true</param-value>
+        </init-param>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>hazelcast-filter</filter-name>
+        <url-pattern>/*</url-pattern>
+        <dispatcher>FORWARD</dispatcher>
+        <dispatcher>INCLUDE</dispatcher>
+        <dispatcher>REQUEST</dispatcher>
+    </filter-mapping>
+    -->
+    <!-- END - Hazelcast Filter -->
+
+    <!-- BEGIN - Saiku Orbis SSO Filter Definition --> 
+    <!--
+    <filter>
+        <filter-name>hazelcastAuthFilter</filter-name>
+        <filter-class>org.saiku.web.service.HazelcastAuthFilter</filter-class>
+        <init-param>
+            <param-name>orbisAuthCookie</param-name>
+            <param-value>ORBIS_WORKSPACE_USER</param-value>
+        </init-param>
+        <init-param>
+            <param-name>hazelcastMapName</param-name>
+            <param-value>my-sessions</param-value>
+        </init-param>
+        <init-param>
+            <param-name>baseWorkspaceDir</param-name>
+            <param-value>../../repository/data</param-value>
+        </init-param>
+    </filter>
+
+    <filter-mapping>
+        <filter-name>hazelcast-filter</filter-name>
+        <url-pattern>/*</url-pattern>
+        <dispatcher>FORWARD</dispatcher>
+        <dispatcher>INCLUDE</dispatcher>
+        <dispatcher>REQUEST</dispatcher>
+    </filter-mapping>
+    <filter-mapping>
+        <filter-name>hazelcastAuthFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping> 
+    -->
+    <!-- END - Filter Mapping -->
+
+    <listener>
+        <listener-class>org.springframework.web.context.ContextLoaderListener</listener-class>
+    </listener>
+
+    <listener>
+        <listener-class>org.springframework.web.context.request.RequestContextListener</listener-class>
+    </listener>
+
+
+    <!-- ====================================================================== -->
+    <!-- J C R R E M O T I N G S E R V L E T -->
+    <!-- ====================================================================== -->
+   <!-- <servlet>
+        <servlet-name>JCRWebdavServer</servlet-name>
+        <description>
+            The servlet used to remote JCR calls over HTTP.
+        </description>
+        <servlet-class>org.apache.jackrabbit.server.remoting.davex.JcrRemotingServlet</servlet-class>
+        <init-param>
+            <param-name>missing-auth-mapping</param-name>
+            <param-value></param-value>
+        </init-param>
+        <init-param>
+            <param-name>resource-path-prefix</param-name>
+            <param-value>/server</param-value>
+            <description>
+                defines the prefix for spooling resources out of the repository.
+            </description>
+        </init-param>
+        <init-param>
+            <param-name>batchread-config</param-name>
+            <param-value>/WEB-INF/batchread.properties</param-value>
+            <description>JcrRemotingServlet: Optional mapping from node type names to default depth.</description>
+        </init-param>
+         <load-on-startup>5</load-on-startup>
+    </servlet>-->
+    <!-- ====================================================================== -->
+    <!-- R M I B I N D I N G S E R V L E T -->
+    <!-- ====================================================================== -->
+    <!--<servlet>
+        <servlet-name>RMI</servlet-name>
+        <servlet-class>org.apache.jackrabbit.servlet.remote.RemoteBindingServlet</servlet-class>
+    </servlet>-->
+    <!-- ====================================================================== -->
+    <!-- S E R V L E T M A P P I N G -->
+    <!-- ====================================================================== -->
+  <!--  <servlet-mapping>
+        <servlet-name>JCRWebdavServer</servlet-name>
+        <url-pattern>/server/*</url-pattern>
+    </servlet-mapping>-->
+    <!--<servlet-mapping>
+        <servlet-name>RMI</servlet-name>
+        <url-pattern>/rmi</url-pattern>
+    </servlet-mapping>-->
+
+
+	<servlet>
+    	<servlet-name>jersey2</servlet-name>
+    	<servlet-class>org.glassfish.jersey.servlet.ServletContainer</servlet-class>
+    	<init-param>
+      		<param-name>jakarta.ws.rs.Application</param-name>
+      		<param-value>org.saiku.web.rest.SaikuJerseyApplication</param-value>
+    	</init-param>
+    	<load-on-startup>1</load-on-startup>
+    	<!-- saiku#1165 audit-3: global upload backstop on the REST surface.
+    	     Individual endpoints may impose tighter caps; these are the outer
+    	     limits the container enforces before a request reaches Jersey, so a
+    	     hostile multipart body can't exhaust memory/disk. 50 MB per file,
+    	     50 MB per request, with a 256 KB in-memory threshold (larger parts
+    	     spill to a temp file). -->
+    	<multipart-config>
+    		<max-file-size>52428800</max-file-size>
+    		<max-request-size>52428800</max-request-size>
+    		<file-size-threshold>262144</file-size-threshold>
+    	</multipart-config>
+  	</servlet>
+
+	  <servlet-mapping>
+	    <servlet-name>jersey2</servlet-name>
+	    <url-pattern>/rest/*</url-pattern>
+	  </servlet-mapping>
+
+  <!--<servlet-mapping>
+    <servlet-name>jersey2</servlet-name>
+    <url-pattern>/rest/saiku/session</url-pattern>
+  </servlet-mapping>-->
+    <servlet>
+        <servlet-name>xmla</servlet-name>
+        <servlet-class>org.saiku.olap.util.SaikuXmlaServlet</servlet-class>
+
+        <init-param>
+            <param-name>OlapDriverUsePreConfiguredDiscoverDatasourcesResponse</param-name>
+            <param-value>true</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverDiscoverDatasources.dataSourceName</param-name>
+            <param-value>[XMLA olap4ld]</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverDiscoverDatasources.dataSourceInfo</param-name>
+            <param-value>[LdCatalogSchema]</param-value>
+        </init-param>
+        <init-param>
+            <param-name>OlapDriverDiscoverDatasources.url</param-name>
+            <param-value>@datasourceUrl@</param-value>
+        </init-param>
+        <init-param>
+            <param-name>OlapDriverDiscoverDatasources.providerType</param-name>
+            <param-value>TDP</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverDiscoverDatasources.authenticationMode</param-name>
+            <param-value>Unauthenticated</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverMaxNumConnectionsPerUser</param-name>
+            <param-value>15</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverClassName</param-name>
+            <param-value>org.olap4j.driver.olap4ld.Olap4ldDriver</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionString</param-name>
+            <param-value>jdbc:ld://olap4ld;Catalog=LdCatalog;JdbcDrivers=com.mysql.jdbc.Driver;Server=http://;Database=EMBEDDEDSESAME;Datastructuredefinitions=;Datasets=;</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionProperty.Prefix</param-name>
+            <param-value>@connectionPrefix@</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionProperty.FetchLevelProperties</param-name>
+            <param-value>false</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionProperty.FetchMemberProperties</param-name>
+            <param-value>false</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionProperty.FetchMembers</param-name>
+            <param-value>true</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionProperty.QueryTimeoutMs</param-name>
+            <param-value>@queryTimeout@</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionProperty.AuthenticationProvider</param-name>
+            <param-value>com.someotherclass.XmlaAuthenticationProvider</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionProperty.ConnectionTimeoutMs</param-name>
+            <param-value>@connectionTimeout@</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionProperty.TotalCellLimit</param-name>
+            <param-value>@totalCellLimit@</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionProperty.PerPivotCellLimit</param-name>
+            <param-value>@perPivotCellLimit@</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>OlapDriverConnectionProperty.Source</param-name>
+            <param-value>Excel</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>IdleConnectionsTimeoutMinutes</param-name>
+            <param-value>@idleConnectionCleanupTimeout@</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>EnableConnectionReuse</param-name>
+            <param-value>@enableConnectionsReuse@</param-value>
+        </init-param>
+
+        <init-param>
+            <param-name>EnableCubesMetadataPrefetch</param-name>
+            <param-value>@enableCubesMetadataPrefetch@</param-value>
+        </init-param>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>xmla</servlet-name>
+        <url-pattern>/xmla/*</url-pattern>
+    </servlet-mapping>
+</web-app>
+
+

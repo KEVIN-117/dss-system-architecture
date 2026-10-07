@@ -1,0 +1,443 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>org.saikuanalytics</groupId>
+    <artifactId>saiku</artifactId>
+    <packaging>pom</packaging>
+    <version>4.8.0</version>
+    <name>Saiku Module Project</name>
+    <scm>
+        <developerConnection>
+            scm:git:git@github.com:OSBI/saiku.git
+        </developerConnection>
+        <tag>saiku-3.9-SNAPSHOT</tag>
+    </scm>
+    <modules>
+        <module>saiku-bom</module>
+        <module>saiku-core</module>
+        <module>saiku-api</module>
+        <module>saiku-launcher</module>
+        <!-- Hegel property tests against Saiku code. Test-only, never published.
+             Requires JDK 22+ (Hegel's FFM native engine), which is why the reactor
+             build now needs JDK 22 even though main artifacts still target release 21. -->
+        <module>saiku-proptest</module>
+    </modules>
+    <properties>
+        <maven.compiler.source>21</maven.compiler.source>
+        <maven.compiler.target>21</maven.compiler.target>
+        <!-- saiku#1036: silence the 9x "Using platform encoding" resource-filtering
+             warnings and make builds byte-identical across locales — children inherit
+             this (saiku-bom sets it too, but bom properties don't flow to siblings). -->
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <!-- These properties are shadowed at module level by saiku-bom's
+             dependencyManagement, but a child not importing the BOM would
+             otherwise inherit the stale 4.3.30/1.19 values — kept in sync
+             with saiku-bom/pom.xml to remove the footgun. -->
+        <spring.version>6.2.19</spring.version>
+        <spring.security.version>6.5.11</spring.security.version>
+        <slf4j.version>2.0.16</slf4j.version>
+        <jersey.version>3.1.9</jersey.version>
+        <maven.build.timestamp.format>yyyyMMdd-HHmm</maven.build.timestamp.format>
+        <saiku-query.version>0.4-SNAPSHOT</saiku-query.version>
+        <jackson.version>2.22.2</jackson.version>
+        <!-- bi.saiku.ossie:ossie-core — external Ossie/OSI parser library
+             (spiculedata/ossie). Track its releases and bump here. -->
+        <ossie.version>0.1.0</ossie.version>
+        <!-- CycloneDX SBOM plugin (saiku#1990). Pinned so a plugin auto-update
+             can't silently change the SBOM shape / schema version under us.
+             Bumped by the maven dependabot group like every other plugin. -->
+        <cyclonedx-maven-plugin.version>2.9.1</cyclonedx-maven-plugin.version>
+        <!-- saiku#2011: JaCoCo's prepare-agent sets this to its -javaagent flag;
+             module surefire configs prepend it as @{argLine}. The empty default
+             keeps @{argLine} resolvable when JaCoCo is skipped (-Djacoco.skip). -->
+        <argLine></argLine>
+    </properties>
+    <repositories>
+        <!-- In-tree Maven file-repo for vendored deps that aren't reachable on
+             any public/private remote. Currently houses miredot-annotations
+             1.3.1 (Bintray-only, shut down 2021). Same pattern as
+             mondrian-saiku/lib/repo.
+             ${maven.multiModuleProjectDirectory} (NOT ${project.basedir}) so
+             child modules inherit a URL pointing at the reactor root, not at
+             their own pom dir. -->
+        <repository>
+            <id>project-lib</id>
+            <name>In-tree vendored deps</name>
+            <url>file://${maven.multiModuleProjectDirectory}/lib/repo</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+        <repository>
+            <id>apache</id>
+            <name>Apache repo</name>
+            <layout>default</layout>
+            <url>https://repository.apache.org/content/repositories/snapshots/</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+
+        <repository>
+            <id>atlassian</id>
+            <name>Atlassian Public</name>
+            <layout>default</layout>
+            <url>https://maven.atlassian.com/content/repositories/atlassian-public</url>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+        </repository>
+
+        <!-- Spicule-published Maven artifacts on GitHub Packages. GH Packages
+             requires authentication for downloads even when the package is public;
+             each <id> below needs a matching <server> entry in ~/.m2/settings.xml
+             (GitHub username + PAT with read:packages). One PAT can authenticate
+             all three repos. -->
+        <repository>
+            <id>github-mondrian-saiku</id>
+            <name>GitHub Packages - spiculedata/mondrian-saiku</name>
+            <url>https://maven.pkg.github.com/spiculedata/mondrian-saiku</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+        <repository>
+            <id>github-olap4j</id>
+            <name>GitHub Packages - spiculedata/olap4j</name>
+            <url>https://maven.pkg.github.com/spiculedata/olap4j</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+        <repository>
+            <id>github-olap4j-xmlaserver</id>
+            <name>GitHub Packages - spiculedata/olap4j-xmlaserver</name>
+            <url>https://maven.pkg.github.com/spiculedata/olap4j-xmlaserver</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>false</enabled></snapshots>
+        </repository>
+        <repository>
+            <id>github-saiku-query</id>
+            <name>GitHub Packages - spiculedata/saiku-query</name>
+            <url>https://maven.pkg.github.com/spiculedata/saiku-query</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>true</enabled></snapshots>
+        </repository>
+        <!-- Where bi.saiku.ossie:ossie-core comes from. Snapshots are
+             published from spiculedata/ossie main; releases (post-1.0) will
+             land on Maven Central and this entry becomes unnecessary. Same
+             PAT + read:packages scope as the other github-* repos. -->
+        <repository>
+            <id>github-ossie</id>
+            <name>GitHub Packages - spiculedata/ossie</name>
+            <url>https://maven.pkg.github.com/spiculedata/ossie</url>
+            <releases><enabled>true</enabled></releases>
+            <snapshots><enabled>true</enabled></snapshots>
+        </repository>
+    </repositories>
+
+    <!-- Where mvn deploy publishes saiku's own module jars (saiku-bom,
+         saiku-core/*, saiku-api). The release workflow's settings.xml
+         supplies the GITHUB_TOKEN-backed credentials under server id
+         `github-saiku-self`. The fat-jar saiku-launcher and saiku-api runtime
+         WAR set <skip>true</skip> on maven-deploy-plugin in their POMs — only sensibly-sized artifacts
+         land in GH Packages. -->
+    <distributionManagement>
+        <repository>
+            <id>github-saiku-self</id>
+            <name>GitHub Packages - spiculedata/saiku</name>
+            <url>https://maven.pkg.github.com/spiculedata/saiku</url>
+        </repository>
+        <snapshotRepository>
+            <id>github-saiku-self</id>
+            <name>GitHub Packages - spiculedata/saiku (snapshots)</name>
+            <url>https://maven.pkg.github.com/spiculedata/saiku</url>
+        </snapshotRepository>
+    </distributionManagement>
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.diffplug.spotless</groupId>
+                <artifactId>spotless-maven-plugin</artifactId>
+                <version>3.9.0</version>
+                <configuration>
+                    <java>
+                        <includes>
+                            <include>src/main/java/**/*.java</include>
+                            <include>src/test/java/**/*.java</include>
+                        </includes>
+                        <palantirJavaFormat>
+                            <version>2.55.0</version>
+                        </palantirJavaFormat>
+                        <removeUnusedImports/>
+                        <trimTrailingWhitespace/>
+                        <endWithNewline/>
+                    </java>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>spotless-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <!-- saiku#2011: line coverage per module, written to
+                     target/site/jacoco/jacoco.csv. CI gates it against
+                     .coverage-thresholds.json via scripts/check-coverage.sh. -->
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>0.8.15</version>
+                <executions>
+                    <execution>
+                        <id>jacoco-prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>jacoco-report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
+                        </goals>
+                        <configuration>
+                            <!-- saiku-launcher's target/classes embeds api/saiku-api.war;
+                                 analysing its multi-release jars fails on duplicate
+                                 class names. Report on the module's own classes only. -->
+                            <excludes>
+                                <exclude>**/*.war</exclude>
+                                <exclude>**/*.jar</exclude>
+                            </excludes>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+                <!-- saiku#1036: pin so a breaking auto-update can't surprise CI
+                     (an unpinned plugin resolves to LATEST at build time). -->
+                <version>2.4.0</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.rat</groupId>
+                <artifactId>apache-rat-plugin</artifactId>
+                <version>0.11</version>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-source-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>attach-sources</id>
+                        <!-- Bound to `package` (not `verify`) so reactor
+                             invocations that stop at package — like the
+                             release.yml bundle job's
+                             `mvn -pl saiku-launcher -am package` — still
+                             see the source jars. saiku-api's
+                             dependency-plugin:copy step references
+                             {sibling}:jar:sources at process-resources,
+                             which is downstream of package within a
+                             reactor build. -->
+                        <phase>package</phase>
+                        <goals>
+                            <goal>jar-no-fork</goal>
+                            <goal>test-jar-no-fork</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>external.atlassian.jgitflow</groupId>
+                <artifactId>jgitflow-maven-plugin</artifactId>
+                <version>1.0-m4.3</version>
+                <configuration>
+                    <flowInitContext>
+                        <masterBranchName>master</masterBranchName>
+                        <developBranchName>development</developBranchName>
+                        <featureBranchPrefix>feature-</featureBranchPrefix>
+                        <releaseBranchPrefix>release-</releaseBranchPrefix>
+                        <hotfixBranchPrefix>hotfix-</hotfixBranchPrefix>
+                        <versionTagPrefix>t the-</versionTagPrefix>
+                    </flowInitContext>
+                    <allowSnapshots>true</allowSnapshots>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                    <pushReleases>true</pushReleases>
+                </configuration>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <configuration>
+                    <source>1.6</source>
+                    <target>1.6</target>
+                </configuration>
+            </plugin>
+            <!-- saiku#1916: Hive/Hadoop are opt-in (drop a Hive JDBC driver into
+                 saiku-home/plugins/). Bundling them dragged ~150 server jars
+                 into the WAR — YARN ResourceManager, LLAP, ZooKeeper 3.4,
+                 Jetty 9.4, a test jar — plus log4j-1.2.x alongside the
+                 log4j-1.2-api bridge (same org.apache.log4j package, so class
+                 resolution depended on jar order) and extra slf4j bindings.
+                 Fail the build if any of that comes back. Hadoop/Hive are
+                 banned in every scope; the logging jars only where they would
+                 ship (compile/runtime). -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <version>3.5.0</version>
+                <executions>
+                    <execution>
+                        <id>ban-hadoop-and-log4j1</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <bannedDependencies>
+                                    <excludes>
+                                        <exclude>org.apache.hive</exclude>
+                                        <exclude>org.apache.hive.shims</exclude>
+                                        <exclude>org.apache.hadoop</exclude>
+                                        <exclude>org.apache.hadoop.thirdparty</exclude>
+                                        <exclude>org.apache.zookeeper</exclude>
+                                        <exclude>log4j:log4j:*:*:compile</exclude>
+                                        <exclude>log4j:log4j:*:*:runtime</exclude>
+                                        <exclude>ch.qos.reload4j:*:*:*:compile</exclude>
+                                        <exclude>ch.qos.reload4j:*:*:*:runtime</exclude>
+                                        <exclude>org.slf4j:slf4j-log4j12:*:*:compile</exclude>
+                                        <exclude>org.slf4j:slf4j-log4j12:*:*:runtime</exclude>
+                                        <exclude>org.slf4j:slf4j-reload4j:*:*:compile</exclude>
+                                        <exclude>org.slf4j:slf4j-reload4j:*:*:runtime</exclude>
+                                    </excludes>
+                                    <message>saiku#1916: Hive/Hadoop/ZooKeeper and log4j 1.x (and its slf4j bindings) must not ship in Saiku. Hive users drop the driver into saiku-home/plugins/; code on org.apache.log4j uses the log4j-1.2-api bridge. Exclude the artifact from the dependency that pulls it in.</message>
+                                </bannedDependencies>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <!-- saiku#1990: CycloneDX SBOM. `makeAggregateBom` is an aggregator
+                 goal — declared here in the reactor root it runs ONCE at the end
+                 of the build (not per-module) and walks every module in the
+                 current reactor, so the emitted SBOM reflects the flattened
+                 dependency set that the shaded saiku-launcher fat JAR actually
+                 ships. Bound to `package` so `mvn package` (and the release
+                 job's `mvn -pl saiku-launcher -am package`) produce it without
+                 an extra invocation. Output: target/saiku-sbom.json (root
+                 module target/) in CycloneDX 1.6 JSON. Test scope is excluded —
+                 the SBOM describes what ships, not the build/test harness. -->
+            <plugin>
+                <groupId>org.cyclonedx</groupId>
+                <artifactId>cyclonedx-maven-plugin</artifactId>
+                <version>${cyclonedx-maven-plugin.version}</version>
+                <executions>
+                    <execution>
+                        <id>make-aggregate-sbom</id>
+                        <phase>package</phase>
+                        <goals>
+                            <goal>makeAggregateBom</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <projectType>application</projectType>
+                    <schemaVersion>1.6</schemaVersion>
+                    <outputFormat>json</outputFormat>
+                    <outputName>saiku-sbom</outputName>
+                    <includeBomSerialNumber>true</includeBomSerialNumber>
+                    <includeCompileScope>true</includeCompileScope>
+                    <includeProvidedScope>true</includeProvidedScope>
+                    <includeRuntimeScope>true</includeRuntimeScope>
+                    <includeSystemScope>true</includeSystemScope>
+                    <includeTestScope>false</includeTestScope>
+                    <includeLicenseText>false</includeLicenseText>
+                    <!-- Emit ONLY the single aggregate BOM at the top of the
+                         reactor, not a per-module BOM in every target/. One
+                         deterministic file (target/saiku-sbom.json) is what the
+                         release job publishes; `find -name saiku-sbom.json` then
+                         resolves unambiguously. -->
+                    <outputReactorProjects>false</outputReactorProjects>
+                    <!-- Do NOT attach the BOM as a Maven artifact. The file is
+                         still written to target/ (that's all the release job
+                         needs), but attaching would make `mvn deploy` push an
+                         UNSIGNED *-cyclonedx.json to GH Packages alongside the
+                         module jars. The SBOM we stand behind is the release
+                         asset — signed by attest-build-provenance — not an
+                         unattested copy in the package registry (SEC N5). -->
+                    <skipAttach>true</skipAttach>
+                </configuration>
+            </plugin>
+
+        </plugins>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-source-plugin</artifactId>
+                    <version>2.3</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+                    <version>3.1</version>
+                </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-checkstyle-plugin</artifactId>
+                    <version>3.6.0</version>
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+    <issueManagement>
+        <system>JIRA</system>
+        <url>http://jira.meteorite.bi/browse/SKU</url>
+    </issueManagement>
+    <profiles>
+        <!-- Phase 0 note: the legacy "ci" profile (which used to exclude the
+             Pentaho plugin from the reactor) has been removed; its membership
+             is now the default top-level <modules> list. -->
+
+        <profile>
+            <id>security</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.owasp</groupId>
+                        <artifactId>dependency-check-maven</artifactId>
+                        <version>13.0.0</version>
+                        <executions>
+                            <execution>
+                                <goals><goal>check</goal></goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+    <dependencies>
+        <dependency>
+            <groupId>junit</groupId>
+            <artifactId>junit</artifactId>
+            <version>4.13.2</version>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
+    <dependencyManagement>
+        <dependencies>
+            <dependency>
+                <groupId>org.saikuanalytics</groupId>
+                <artifactId>saiku-bom</artifactId>
+                <version>${project.version}</version>
+                <type>pom</type>
+                <scope>import</scope>
+            </dependency>
+        </dependencies>
+    </dependencyManagement>
+
+</project>
