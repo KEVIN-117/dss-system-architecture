@@ -7,12 +7,15 @@ DW-003 establece los esquemas y controles de acceso de la base analítica. DW-00
 ```mermaid
 flowchart LR
     OLTP[Jachasun OLTP] --> HOP[Apache Hop]
-    HOP --> DWH[dw: dimensiones y hechos]
+    HOP --> WORK[etl_work: buffer privado por run_id]
+    WORK --> PUB[Publisher PostgreSQL: publicación atómica]
+    PUB --> DWH[dw: dimensiones y hechos]
     CTRL[etl_control: cierres y auditoría] -. gobierna .-> HOP
     HOP -. registra evidencia .-> CTRL
+    PUB -. valida lock y registra resultado .-> CTRL
 ```
 
-El diagrama representa la arquitectura objetivo del MVP, no una carga ya implementada. Hop extrae, valida y transforma los datos antes de publicar en `dw`; `etl_control` registra autorización y evidencia, sin ser almacenamiento intermedio de negocio. `staging`, `etl_work` y `ml_workspace` ya existen por `0002`, pero no son etapas activas de este flujo y no se eliminan.
+El diagrama representa la ruta directa del MVP. Hop extrae, valida y transforma; guarda el lote preparado por `run_id` en `etl_work`, que funciona únicamente como buffer privado del publisher, no como staging de extracción ni como almacenamiento de negocio consumible. El publisher aplica el lote en `dw` de forma atómica. `etl_control` registra autorización, locks y evidencia. Las pipelines cuentan con pruebas sintéticas; la validación con Jachasun real sigue pendiente. El esquema `staging` de la integración Go/RAW está pausado; `staging`, `etl_work` y `ml_workspace` se conservan físicamente y no se eliminan.
 
 ## Roles de grupo
 

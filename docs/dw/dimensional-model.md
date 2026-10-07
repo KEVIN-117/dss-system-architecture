@@ -4,7 +4,7 @@
 
 Este documento define el modelo lógico del primer Data Warehouse relacional de Jachasun: una constelación de hechos para admisión, cursado y retención/deserción. El DDL correspondiente está en la migración `0009`; aquí se fijan significados, granos y agregaciones para las cargas posteriores.
 
-Este documento no ejecuta DDL ni cargas. DW-006 ya materializa las dimensiones y sus miembros técnicos en [conformed-dimensions.md](conformed-dimensions.md); DW-007 documenta la política SCD, aún pendiente de implementación física. La issue #133 adopta Jachasun → Apache Hop → `dw`, sin dependencia de Go/Staging. Las fuentes continúan siendo de solo lectura y DW-001 es la referencia de campos y filtros autorizados.
+Este documento no ejecuta DDL ni cargas. DW-006 ya materializa las dimensiones y sus miembros técnicos en [conformed-dimensions.md](conformed-dimensions.md); DW-007 documenta la política SCD, aún pendiente de implementación física. La issue #133 adopta Jachasun → Apache Hop → `dw`, sin dependencia del Load Manager en Go ni de su staging RAW. Se conserva el buffer privado `etl_work` usado por el publisher atómico de Hop. Las fuentes continúan siendo de solo lectura y DW-001 es la referencia de campos y filtros autorizados.
 
 ### Alcance consolidado del MVP
 

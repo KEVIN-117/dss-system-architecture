@@ -1,6 +1,6 @@
 # DW-001 — Catálogo de contratos de extracción Jachasun
 
-Este directorio define los campos, claves, tipos y filtros autorizados para extraer Jachasun (OLTP). Para el MVP de la issue #133, **Apache Hop consultará directamente Jachasun** con una cuenta de solo lectura, validará y transformará los datos y publicará en `dw`. La [base consolidada](../mvp-direct-hop.md) sustituye la dependencia obligatoria de Go/Staging; Load Manager y su evidencia histórica se conservan como implementación futura.
+Este directorio define los campos, claves, tipos y filtros autorizados para extraer Jachasun (OLTP). Para el MVP de la issue #133, **Apache Hop consultará directamente Jachasun** con una cuenta de solo lectura y validará y transformará los datos. Las filas preparadas pasan por el buffer privado `etl_work` requerido por el publisher atómico antes de publicarse en `dw`; este buffer no es staging RAW ni sustituye la consulta directa a OLTP. La [base consolidada](../mvp-direct-hop.md) pausa la dependencia del Load Manager en Go y de su staging de extracción, conservando el servicio y su evidencia histórica para el futuro.
 
 ## Política de extracción
 
@@ -33,7 +33,7 @@ El orquestador asigna un UUID `run_id` y entrega `snapshot_gestion`, `snapshot_p
 
 Por cada fuente, el manifiesto debe almacenar nombre de contrato y versión, checksum de consulta, orden estable, corte, tiempos, conteo leído, SHA-256 del esquema y estado. El flujo directo no exige artefactos RAW. Hop debe certificar el conjunto de nueve manifiestos y la calidad antes de publicar. No se corrigen referencias huérfanas en origen: se registran incidencias saneadas y se aplica la política aprobada de bloqueo o miembro técnico. Una clave obligatoria nula, duplicada o conflictiva no se omite silenciosamente.
 
-Las referencias a RAW y a la consulta canónica del extractor DW-011 describen compatibilidad histórica del servicio pausado. No obligan al MVP a generar archivos ni escribir `staging.raw_uatf_datos`. La adaptación de placeholders a JDBC debe conservar columnas/filtros y registrar su versión/hash; no se reutiliza un hash si cambió el SQL.
+Las referencias a RAW y a la consulta canónica del extractor DW-011 describen compatibilidad histórica del servicio Go pausado. No obligan al MVP a generar archivos ni escribir `staging.raw_uatf_datos`. El uso de `etl_work` por el publisher de Hop es independiente de ese staging de extracción. La adaptación de placeholders a JDBC debe conservar columnas/filtros y registrar su versión/hash; no se reutiliza un hash si cambió el SQL.
 
 ## Acceso y aprobación
 
