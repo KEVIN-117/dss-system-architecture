@@ -54,6 +54,7 @@ import org.saiku.web.rest.objects.MdxQueryObject;
 import org.saiku.web.rest.objects.SavedQuery;
 import org.saiku.web.rest.objects.SelectionRestObject;
 import org.saiku.web.rest.objects.resultset.QueryResult;
+import org.saiku.web.rest.util.RestErrorResponses;
 import org.saiku.web.rest.util.RestUtil;
 import org.saiku.web.rest.util.ServletUtil;
 import org.saiku.web.svg.PdfReport;
@@ -72,15 +73,6 @@ import org.slf4j.LoggerFactory;
 public class QueryResource {
 
     private static final Logger log = LoggerFactory.getLogger(QueryResource.class);
-
-    /**
-     * saiku#1165 (audit-3): generic, information-free body for error responses.
-     * The full exception is logged server-side via {@code log.error(..., e)};
-     * the wire only ever sees this string so we never leak Mondrian/SQL/path/
-     * class internals (previously this resource returned {@code entity(e)} and
-     * {@code ExceptionUtils.getRootCauseMessage(e)} straight to the client).
-     */
-    private static final String GENERIC_ERROR = "Internal error";
 
     private OlapQueryService olapQueryService;
     private ISaikuRepository repository;
@@ -129,17 +121,16 @@ public class QueryResource {
      */
     @DELETE
     @Path("/{queryname}")
-    public Status deleteQuery(@PathParam("queryname") String queryName) {
+    public Response deleteQuery(@PathParam("queryname") String queryName) {
         if (log.isDebugEnabled()) {
             log.debug("TRACK\t" + "\t/query/" + queryName + "\tDELETE");
         }
         try {
             olapQueryService.deleteQuery(queryName);
-            return (Status.GONE);
+            return Response.status(Status.GONE).build();
         } catch (Exception e) {
             log.error("Cannot delete query (" + queryName + ")", e);
-            throw new WebApplicationException(
-                    Response.serverError().entity(GENERIC_ERROR).build());
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -190,7 +181,7 @@ public class QueryResource {
             }
             return olapQueryService.createNewOlapQuery(queryName, cube);
         } catch (Exception e) {
-            throw new WebApplicationException(e);
+            throw new WebApplicationException(RestErrorResponses.jsonFailure(e));
         }
     }
 
@@ -326,7 +317,7 @@ public class QueryResource {
                     .build();
         } catch (Exception e) {
             log.error("Cannot get excel for query (" + queryName + ")", e);
-            return Response.serverError().build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -356,7 +347,7 @@ public class QueryResource {
                     .build();
         } catch (Exception e) {
             log.error("Cannot get csv for query (" + queryName + ")", e);
-            return Response.serverError().build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -407,10 +398,7 @@ public class QueryResource {
                     .build();
         } catch (Exception e) {
             log.error("Error exporting query to  PDF", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -452,10 +440,7 @@ public class QueryResource {
             return Response.ok(html).build();
         } catch (Exception e) {
             log.error("Error exporting query to HTML", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -478,7 +463,7 @@ public class QueryResource {
     @GET
     @Produces({"application/json"})
     @Path("/{queryname}/result")
-    public QueryResult execute(
+    public Response execute(
             @PathParam("queryname") String queryName, @QueryParam("limit") @DefaultValue("0") int limit) {
         if (log.isDebugEnabled()) {
             log.debug("TRACK\t" + "\t/query/" + queryName + "/result\tGET");
@@ -486,19 +471,19 @@ public class QueryResource {
         try {
 
             CellDataSet cs = olapQueryService.execute(queryName);
-            return RestUtil.convert(cs, limit);
+            return Response.ok(RestUtil.convert(cs, limit))
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
         } catch (Exception e) {
             log.error("Cannot execute query (" + queryName + ")", e);
-            // saiku#1165: detail is logged server-side above; return a generic
-            // message so Mondrian/SQL internals don't leak in QueryResult.error.
-            return new QueryResult(GENERIC_ERROR);
+            return RestErrorResponses.queryFailure(e);
         }
     }
 
     @POST
     @Produces({"application/json"})
     @Path("/{queryname}/result/{format}")
-    public QueryResult executeMdx(
+    public Response executeMdx(
             @PathParam("queryname") String queryName,
             @PathParam("format") String formatter,
             @FormParam("mdx") String mdx,
@@ -532,22 +517,22 @@ public class QueryResource {
                 QueryResult rsc = RestUtil.convert(rs);
                 Long runtime = (new Date()).getTime() - start;
                 rsc.setRuntime(runtime.intValue());
-                return rsc;
+                return Response.ok(rsc).type(MediaType.APPLICATION_JSON).build();
             }
             CellDataSet cs = olapQueryService.executeMdx(queryName, mdx, icf);
-            return RestUtil.convert(cs, limit);
+            return Response.ok(RestUtil.convert(cs, limit))
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
         } catch (Exception e) {
             log.error("Cannot execute query (" + queryName + ") using mdx:\n" + mdx, e);
-            // saiku#1165: detail is logged server-side above; return a generic
-            // message so Mondrian/SQL internals don't leak in QueryResult.error.
-            return new QueryResult(GENERIC_ERROR);
+            return RestErrorResponses.queryFailure(e);
         }
     }
 
     @POST
     @Produces({"application/json"})
     @Path("/{queryname}/result")
-    public QueryResult executeMdx(
+    public Response executeMdx(
             @PathParam("queryname") String queryName,
             @FormParam("mdx") String mdx,
             @FormParam("limit") @DefaultValue("0") int limit) {
@@ -558,9 +543,7 @@ public class QueryResource {
             return executeMdx(queryName, null, mdx, limit);
         } catch (Exception e) {
             log.error("Cannot execute query (" + queryName + ") using mdx:\n" + mdx, e);
-            // saiku#1165: detail is logged server-side above; return a generic
-            // message so Mondrian/SQL internals don't leak in QueryResult.error.
-            return new QueryResult(GENERIC_ERROR);
+            return RestErrorResponses.queryFailure(e);
         }
     }
 
@@ -585,31 +568,32 @@ public class QueryResource {
                     queryName, result, dimensionName, hierarchyName, levelName, searchString, searchLimit);
         } catch (Exception e) {
             log.error("Cannot execute query (" + queryName + ")", e);
-            throw new WebApplicationException(
-                    Response.serverError().entity(GENERIC_ERROR).build());
+            throw new WebApplicationException(RestErrorResponses.jsonFailure(e));
         }
     }
 
     @POST
     @Produces({"application/json"})
     @Path("/{queryname}/qm2mdx")
-    public SaikuQuery transformQm2Mdx(@PathParam("queryname") String queryName) {
+    public Response transformQm2Mdx(@PathParam("queryname") String queryName) {
         if (log.isDebugEnabled()) {
             log.debug("TRACK\t" + "\t/query/" + queryName + "/qm2mdx\tPOST\t");
         }
         try {
             olapQueryService.qm2mdx(queryName);
-            return olapQueryService.getQuery(queryName);
+            return Response.ok(olapQueryService.getQuery(queryName))
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
         } catch (Exception e) {
             log.error("Cannot transform Qm2Mdx query (" + queryName + ")", e);
+            return RestErrorResponses.queryFailure(e);
         }
-        return null;
     }
 
     @GET
     @Produces({"application/json"})
     @Path("/{queryname}/explain")
-    public QueryResult getExplainPlan(@PathParam("queryname") String queryName) {
+    public Response getExplainPlan(@PathParam("queryname") String queryName) {
         if (log.isDebugEnabled()) {
             log.debug("TRACK\t" + "\t/query/" + queryName + "/explain\tGET");
         }
@@ -625,16 +609,16 @@ public class QueryResource {
         } catch (Exception e) {
             log.error("Cannot get explain plan for query (" + queryName + ")", e);
             // saiku#1165: detail logged server-side above; generic to the client.
-            rsc = new QueryResult(GENERIC_ERROR);
+            return RestErrorResponses.queryFailure(e);
         }
         // no need to close resultset, its an EmptyResultset
-        return rsc;
+        return Response.ok(rsc).type(MediaType.APPLICATION_JSON).build();
     }
 
     @GET
     @Produces({"application/json"})
     @Path("/{queryname}/drillthrough")
-    public QueryResult drillthrough(
+    public Response drillthrough(
             @PathParam("queryname") String queryName,
             @QueryParam("maxrows") @DefaultValue("100") Integer maxrows,
             @QueryParam("position") String position,
@@ -666,7 +650,7 @@ public class QueryResource {
         } catch (Exception e) {
             log.error("Cannot execute query (" + queryName + ")", e);
             // saiku#1165: detail logged server-side above; generic to the client.
-            rsc = new QueryResult(GENERIC_ERROR);
+            return RestErrorResponses.queryFailure(e);
 
         } finally {
             if (rs != null) {
@@ -690,13 +674,13 @@ public class QueryResource {
                 }
             }
         }
-        return rsc;
+        return Response.ok(rsc).type(MediaType.APPLICATION_JSON).build();
     }
 
     @POST
     @Produces({"application/json"})
     @Path("/{queryname}/drillacross")
-    public SaikuQuery drillacross(
+    public Response drillacross(
             @PathParam("queryname") String queryName,
             @FormParam("position") String position,
             @FormParam("drill") String returns) {
@@ -717,11 +701,12 @@ public class QueryResource {
             Map<String, List<String>> levels =
                     mapper.readValue(returns, mapper.getTypeFactory().constructMapType(Map.class, st, ct));
 
-            return olapQueryService.drillacross(queryName, cellPosition, levels);
+            return Response.ok(olapQueryService.drillacross(queryName, cellPosition, levels))
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
         } catch (Exception e) {
             log.error("Cannot execute query (" + queryName + ")", e);
-            throw new WebApplicationException(
-                    Response.serverError().entity(GENERIC_ERROR).build());
+            return RestErrorResponses.queryFailure(e);
         }
     }
 
@@ -762,7 +747,7 @@ public class QueryResource {
 
         } catch (Exception e) {
             log.error("Cannot export drillthrough query (" + queryName + ")", e);
-            return Response.serverError().build();
+            return RestErrorResponses.jsonFailure(e);
         } finally {
             if (rs != null) {
                 try {
@@ -781,7 +766,7 @@ public class QueryResource {
     @GET
     @Produces({"application/json"})
     @Path("/{queryname}/result/{format}")
-    public QueryResult execute(
+    public Response execute(
             @PathParam("queryname") String queryName,
             @PathParam("format") String formatter,
             @QueryParam("limit") @DefaultValue("0") int limit) {
@@ -790,12 +775,12 @@ public class QueryResource {
         }
         try {
             CellDataSet cs = olapQueryService.execute(queryName, formatter);
-            return RestUtil.convert(cs, limit);
+            return Response.ok(RestUtil.convert(cs, limit))
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
         } catch (Exception e) {
             log.error("Cannot execute query (" + queryName + ")", e);
-            // saiku#1165: detail is logged server-side above; return a generic
-            // message so Mondrian/SQL internals don't leak in QueryResult.error.
-            return new QueryResult(GENERIC_ERROR);
+            return RestErrorResponses.queryFailure(e);
         }
     }
 
@@ -842,10 +827,7 @@ public class QueryResource {
             throw new Exception("Clear Axis: Axis name cannot be null");
         } catch (Exception e) {
             log.error("Cannot clear axis for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -948,10 +930,7 @@ public class QueryResource {
             return Response.ok().build();
         } catch (Exception e) {
             log.error("Cannot move dimension " + dimensionName + " for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -974,10 +953,7 @@ public class QueryResource {
             return Response.ok().build();
         } catch (Exception e) {
             log.error("Cannot remove dimension " + dimensionName + " for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1014,7 +990,7 @@ public class QueryResource {
 
         } catch (Exception e) {
             log.error("Cannot updates selections for query (" + queryName + ")", e);
-            throw new WebApplicationException(e);
+            throw new WebApplicationException(RestErrorResponses.jsonFailure(e));
         }
     }
 
@@ -1093,10 +1069,7 @@ public class QueryResource {
             throw new Exception("Form did not contain 'selections' parameter");
         } catch (Exception e) {
             log.error("Cannot updates selections for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1128,10 +1101,7 @@ public class QueryResource {
             throw new Exception("Form did not contain 'selections' parameter");
         } catch (Exception e) {
             log.error("Cannot updates selections for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
     /**
@@ -1164,10 +1134,7 @@ public class QueryResource {
             }
         } catch (Exception e) {
             log.error("Cannot include member " + dimensionName + " for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1198,10 +1165,7 @@ public class QueryResource {
             }
         } catch (Exception e) {
             log.error("Cannot remove member " + dimensionName + " for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1227,10 +1191,7 @@ public class QueryResource {
             }
         } catch (Exception e) {
             log.error("Cannot include children for " + dimensionName + " for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1254,10 +1215,7 @@ public class QueryResource {
             }
         } catch (Exception e) {
             log.error("Cannot remove children for " + dimensionName + " for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1285,10 +1243,7 @@ public class QueryResource {
             }
         } catch (Exception e) {
             log.error("Cannot include level of hierarchy " + uniqueHierarchyName + " for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1321,10 +1276,7 @@ public class QueryResource {
                     + uniqueHierarchyName + " for query (" + queryName + ")");
         } catch (Exception e) {
             log.error("Cannot include level of hierarchy " + uniqueHierarchyName + " for query (" + queryName + ")", e);
-            return Response.serverError()
-                    .entity(GENERIC_ERROR)
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1380,7 +1332,7 @@ public class QueryResource {
             return Response.ok(t).build();
         } catch (Exception e) {
             log.error("Cannot get filter for query (" + queryName + ")", e);
-            return Response.serverError().entity(GENERIC_ERROR).build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1399,7 +1351,7 @@ public class QueryResource {
             return Response.ok(sq).build();
         } catch (Exception e) {
             log.error("Cannot activate filter for query (" + queryName + "), json:" + filterJSON, e);
-            return Response.serverError().entity(GENERIC_ERROR).build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1415,7 +1367,7 @@ public class QueryResource {
             return Response.ok(sq).build();
         } catch (Exception e) {
             log.error("Cannot remove filter for query (" + queryName + ")", e);
-            return Response.serverError().entity(GENERIC_ERROR).build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 

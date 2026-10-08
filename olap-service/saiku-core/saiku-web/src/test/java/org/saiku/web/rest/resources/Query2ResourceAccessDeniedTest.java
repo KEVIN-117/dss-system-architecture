@@ -11,6 +11,7 @@ import static org.junit.Assert.assertTrue;
 
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
+import java.util.Map;
 import org.junit.Test;
 import org.saiku.olap.dto.resultset.CellDataSet;
 import org.saiku.olap.query2.ThinQuery;
@@ -133,11 +134,12 @@ public class Query2ResourceAccessDeniedTest {
         Response resp = resource.executeAsync(thinQuery());
 
         assertEquals(403, resp.getStatus());
-        QueryResult qr = (QueryResult) resp.getEntity();
-        assertFalse("datasource name leaked: " + qr.getError(), qr.getError().contains("sales_prod"));
+        Map<?, ?> body = (Map<?, ?>) resp.getEntity();
+        assertEquals("ACCESS_DENIED", body.get("code"));
+        assertFalse("datasource name leaked: " + body, body.toString().contains("sales_prod"));
     }
 
-    /** Nothing else moved: an unresolvable reference is still a 400 with a helpful message. */
+    /** Unresolvable references are 400, with a stable message that cannot expose backend detail. */
     @Test
     public void anUnresolvableReferenceIsStillABadRequest() {
         Response resp = resource(new SaikuServiceException(
@@ -146,9 +148,8 @@ public class Query2ResourceAccessDeniedTest {
 
         assertEquals(400, resp.getStatus());
         QueryResult qr = (QueryResult) resp.getEntity();
-        assertTrue(
-                "client-fixable errors must keep their message: " + qr.getError(),
-                qr.getError().contains("nope"));
+        assertEquals("INVALID_QUERY", qr.getCode());
+        assertEquals("Invalid OLAP query", qr.getError());
     }
 
     /** ...and a genuine internal fault is still a 500. */

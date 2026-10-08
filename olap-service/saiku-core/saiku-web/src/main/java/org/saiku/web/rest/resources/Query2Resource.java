@@ -38,14 +38,9 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
-import mondrian.olap.MondrianException;
-import mondrian.olap.ResourceLimitExceededException;
-import mondrian.olap.ResultLimitExceededException;
 import org.apache.commons.io.IOUtils;
 import org.apache.commons.lang3.StringUtils;
-import org.apache.commons.lang3.exception.ExceptionUtils;
 import org.olap4j.CellSet;
-import org.olap4j.OlapException;
 import org.saiku.olap.dto.SimpleCubeElement;
 import org.saiku.olap.dto.resultset.AbstractBaseCell;
 import org.saiku.olap.dto.resultset.CellDataSet;
@@ -54,16 +49,15 @@ import org.saiku.olap.query2.ThinQuery;
 import org.saiku.olap.result.ArrowCellsetWriter;
 import org.saiku.olap.result.ArrowDrillthroughWriter;
 import org.saiku.olap.util.SaikuProperties;
-import org.saiku.olap.util.exception.SaikuOlapException;
 import org.saiku.service.async.AsyncQueryHandle;
 import org.saiku.service.async.AsyncQueryService;
 import org.saiku.service.olap.ThinQueryService;
 import org.saiku.service.olap.drillthrough.DrillThroughResult;
-import org.saiku.service.util.exception.SaikuAccessDeniedException;
 import org.saiku.service.util.exception.SaikuServiceException;
 import org.saiku.web.export.JSConverter;
 import org.saiku.web.export.PdfReport;
 import org.saiku.web.rest.objects.resultset.QueryResult;
+import org.saiku.web.rest.util.RestErrorResponses;
 import org.saiku.web.rest.util.RestUtil;
 import org.saiku.web.util.JdbcCleanup;
 import org.slf4j.Logger;
@@ -265,11 +259,7 @@ public class Query2Resource {
             return Response.ok(body).type("application/json").build();
         } catch (Exception e) {
             log.error("Cannot preview Ossie SQL", e);
-            String msg = e.getMessage() == null ? "internal error" : e.getMessage();
-            return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity("{\"error\":" + jacksonJsonString(msg) + "}")
-                    .type("application/json")
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -350,105 +340,9 @@ public class Query2Resource {
         }
     }
 
-    /**
-     * Turn a query failure into a response carrying the right HTTP status.
-     *
-     * <p>saiku#1865: every failure used to come back as {@code 200 OK} with the message tucked in
-     * the envelope's {@code error} field. That is invisible to anything that reasons about
-     * transport — proxies, retry middleware, monitoring, and any API client that (reasonably)
-     * treats 2xx as success. The body shape is deliberately UNCHANGED: it is still a
-     * {@link QueryResult} with {@code error} populated, because that is what the UI renders inline
-     * where the grid would be, and what existing clients parse.
-     *
-     * <p>Classification is by exception type, not by sniffing messages. A {@link SaikuOlapException}
-     * anywhere in the cause chain means the request named something that could not be resolved — an
-     * unknown connection, cube, or member — which the caller can fix, so 400. Anything else is ours
-     * and reports 500.
-     *
-     * <p>saiku#1973: a {@link SaikuAccessDeniedException} anywhere in the chain is neither — the
-     * caller is authenticated but not authorised for this datasource (the #1968 fail-closed denial)
-     * — so it reports <b>403</b> with a fixed message. The denial message names the datasource, and
-     * the whole point of the denial path is that the caller learns nothing from it.
-     */
+    /** Keep the established query response envelope while sharing the API error contract. */
     private Response queryFailure(Exception e) {
-        if (isAccessDenied(e)) {
-            return accessDenied();
-        }
-        String error = ExceptionUtils.getRootCauseMessage(e);
-        Status status = isClientError(e) ? Status.BAD_REQUEST : Status.INTERNAL_SERVER_ERROR;
-        return Response.status(status)
-                .entity(new QueryResult(error))
-                .type(MediaType.APPLICATION_JSON)
-                .build();
-    }
-
-    /**
-     * saiku#1973 — the uniform access-denied response: 403 with a fixed, information-free message.
-     *
-     * <p>Shared by {@link #queryFailure(Exception)} and the async submit path so a denial reads the
-     * same whichever door the caller came through — the issue this closes was specifically about
-     * that door-to-door inconsistency.
-     */
-    private static Response accessDenied() {
-        return Response.status(Status.FORBIDDEN)
-                .entity(new QueryResult("Access denied"))
-                .type(MediaType.APPLICATION_JSON)
-                .build();
-    }
-
-    /**
-     * True when a {@link SaikuAccessDeniedException} is anywhere in the cause chain — the saiku#1968
-     * fail-closed datasource denial. By exception TYPE only; the message is never inspected, since
-     * the message is precisely what must not reach the caller.
-     */
-    private static boolean isAccessDenied(Throwable t) {
-        for (Throwable c = t; c != null; c = c.getCause() == c ? null : c.getCause()) {
-            if (c instanceof SaikuAccessDeniedException) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    /**
-     * True when the cause chain describes something the CALLER got wrong, rather than something
-     * that went wrong on our side.
-     *
-     * <p>Three signals, all by exception type — deliberately not by message text, which is
-     * localised, version-dependent and the first thing to drift:
-     *
-     * <ul>
-     *   <li>{@link SaikuOlapException} — Saiku could not resolve a connection or a cube.
-     *   <li>A {@link MondrianException} with no {@link SQLException} beneath it — the query failed
-     *       to parse or resolve, so it never reached the database. A typo'd measure lands here, and
-     *       it is by far the most common query failure there is.
-     *   <li>…except the resource-limit and cancellation subclasses, which mean the query was
-     *       perfectly valid and we could not finish it. Those are ours.
-     * </ul>
-     *
-     * <p>{@link OlapException} extends {@link SQLException}, so it is excluded from the
-     * reached-the-database test — otherwise every olap4j wrapper would look like a backend fault.
-     */
-    private static boolean isClientError(Throwable t) {
-        boolean sawMondrianFailure = false;
-        for (Throwable c = t; c != null; c = c.getCause() == c ? null : c.getCause()) {
-            if (c instanceof SaikuOlapException) {
-                return true;
-            }
-            // ResultLimitExceededException is the abstract base of the whole family —
-            // MemoryLimitExceededException, QueryTimeoutException and QueryCanceledException all
-            // extend it — so one check covers them.
-            if (c instanceof ResultLimitExceededException || c instanceof ResourceLimitExceededException) {
-                return false;
-            }
-            if (c instanceof SQLException && !(c instanceof OlapException)) {
-                return false; // the query reached the warehouse and the warehouse failed
-            }
-            if (c instanceof MondrianException) {
-                sawMondrianFailure = true;
-            }
-        }
-        return sawMondrianFailure;
+        return RestErrorResponses.queryFailure(e);
     }
 
     private boolean clientPrefersArrow(HttpHeaders headers) {
@@ -531,12 +425,7 @@ public class Query2Resource {
             log.error("Cannot submit async query", e);
             // saiku#1973 — a denied datasource is a 403 with a generic body, not a 500 that
             // echoes the root cause message (which names the datasource).
-            if (isAccessDenied(e)) {
-                return accessDenied();
-            }
-            return Response.serverError()
-                    .entity(ExceptionUtils.getRootCauseMessage(e))
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -563,7 +452,9 @@ public class Query2Resource {
         body.put("id", h.getId());
         body.put("status", h.getStatus().name());
         if (h.getErrorMessage() != null) {
-            body.put("errorMessage", h.getErrorMessage());
+            // AsyncQueryService retains the original exception message for diagnostics;
+            // never expose that message, which can contain SQL or datasource details.
+            body.put("errorMessage", "Query execution failed");
         }
         return Response.ok(body).type(MediaType.APPLICATION_JSON).build();
     }
@@ -588,10 +479,7 @@ public class Query2Resource {
             return Response.status(Status.NOT_FOUND).build();
         }
         if (h.getStatus() == AsyncQueryHandle.Status.FAILED) {
-            return Response.status(Status.INTERNAL_SERVER_ERROR)
-                    .entity(new QueryResult(h.getErrorMessage() == null ? "failed" : h.getErrorMessage()))
-                    .type(MediaType.APPLICATION_JSON)
-                    .build();
+            return RestErrorResponses.queryFailure(new IllegalStateException("Async query failed"));
         }
         if (h.getStatus() != AsyncQueryHandle.Status.DONE) {
             // PENDING, RUNNING, CANCELLED — not ready.
@@ -658,9 +546,7 @@ public class Query2Resource {
             return Response.ok(Status.GONE).build();
         } catch (Exception e) {
             log.error("Cannot cancel query (" + queryName + ")", e);
-            String error = ExceptionUtils.getRootCauseMessage(e);
-            throw new WebApplicationException(
-                    Response.serverError().entity(error).build());
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -673,14 +559,14 @@ public class Query2Resource {
     @POST
     @Consumes({"application/json"})
     @Path("/enrich")
-    public ThinQuery enrich(ThinQuery tq) {
+    public Response enrich(ThinQuery tq) {
         try {
-            return thinQueryService.updateQuery(tq);
+            return Response.ok(thinQueryService.updateQuery(tq))
+                    .type(MediaType.APPLICATION_JSON)
+                    .build();
         } catch (Exception e) {
             log.error("Cannot enrich query (" + tq + ")", e);
-            String error = ExceptionUtils.getRootCauseMessage(e);
-            throw new WebApplicationException(
-                    Response.serverError().entity(error).build());
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -736,9 +622,7 @@ public class Query2Resource {
             return Response.ok(members).type(MediaType.APPLICATION_JSON).build();
         } catch (Exception e) {
             log.error("Cannot execute query (" + queryName + ")", e);
-            String error = ExceptionUtils.getRootCauseMessage(e);
-            throw new WebApplicationException(
-                    Response.serverError().entity(error).build());
+            throw new WebApplicationException(RestErrorResponses.jsonFailure(e));
         }
     }
 
@@ -787,9 +671,7 @@ public class Query2Resource {
                     .build();
         } catch (Exception e) {
             log.error("Cannot get excel for query (" + queryName + ")", e);
-            String error = ExceptionUtils.getRootCauseMessage(e);
-            throw new WebApplicationException(
-                    Response.serverError().entity(error).build());
+            throw new WebApplicationException(RestErrorResponses.jsonFailure(e));
         }
     }
 
@@ -839,9 +721,7 @@ public class Query2Resource {
                     .build();
         } catch (Exception e) {
             log.error("Cannot get csv for query (" + queryName + ")", e);
-            String error = ExceptionUtils.getRootCauseMessage(e);
-            throw new WebApplicationException(
-                    Response.serverError().entity(error).build());
+            throw new WebApplicationException(RestErrorResponses.jsonFailure(e));
         }
     }
 
@@ -986,20 +866,7 @@ public class Query2Resource {
             return Response.ok(body).type(MediaType.APPLICATION_JSON).build();
         } catch (Exception e) {
             log.error("Cannot discover drillthrough columns (" + queryName + ")", e);
-            // saiku#1973 — same uniform 403 as every other denial path.
-            if (isAccessDenied(e)) {
-                return accessDenied();
-            }
-            // Unlike queryFailure(e), never echo the root cause: the underlying failure can be
-            // a JDBC/olap4j exception whose message embeds the datasource URL, including
-            // embedded credentials (e.g. "jdbc:postgresql://host/db?user=x&password=y"). The
-            // full exception is already logged above for operators; the caller only needs the
-            // status code.
-            Status status = isClientError(e) ? Status.BAD_REQUEST : Status.INTERNAL_SERVER_ERROR;
-            return Response.status(status)
-                    .entity(new QueryResult("Cannot discover drillthrough columns for query: " + queryName))
-                    .type(MediaType.APPLICATION_JSON)
-                    .build();
+            return RestErrorResponses.queryFailure(e);
         }
     }
 
@@ -1188,10 +1055,7 @@ public class Query2Resource {
                     .build();
         } catch (Exception e) {
             log.error("Error exporting query to  PDF", e);
-            return Response.serverError()
-                    .entity(e.getMessage())
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1270,10 +1134,7 @@ public class Query2Resource {
             return Response.ok(html).build();
         } catch (Exception e) {
             log.error("Error exporting query to  HTML", e);
-            return Response.serverError()
-                    .entity(e.getMessage())
-                    .status(Status.INTERNAL_SERVER_ERROR)
-                    .build();
+            return RestErrorResponses.jsonFailure(e);
         }
     }
 
@@ -1312,9 +1173,7 @@ public class Query2Resource {
 
         } catch (Exception e) {
             log.error("Cannot execute query (" + queryName + ")", e);
-            String error = ExceptionUtils.getRootCauseMessage(e);
-            throw new WebApplicationException(
-                    Response.serverError().entity(error).build());
+            throw new WebApplicationException(RestErrorResponses.jsonFailure(e));
         }
     }
 
