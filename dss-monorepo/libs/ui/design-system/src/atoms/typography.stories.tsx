@@ -30,7 +30,7 @@ export const Headings: Story = {
 
 export const CyberpunkNeon: Story = {
   render: () => (
-    <div className="flex flex-col gap-6 bg-black p-8 rounded-lg border border-primary/20">
+    <div className="flex flex-col gap-6 bg-background p-8 rounded-lg border border-primary/20">
       <Typography variant="neon">System Online</Typography>
       <Typography variant="p" className="text-muted-foreground">
         Authentication sequence accepted. Welcome to the mainframe.

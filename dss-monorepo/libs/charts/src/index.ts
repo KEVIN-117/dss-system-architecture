@@ -15,4 +15,7 @@ export * from './lib/components/sunburst-chart';
 export * from './lib/components/sankey-chart';
 
 export * from './lib/components/base-chart';
+export * from './lib/components/saiku-chart';
+export * from './lib/saiku/build';
+export * from './lib/saiku/chart-types';
 export type * from './lib/core/types';

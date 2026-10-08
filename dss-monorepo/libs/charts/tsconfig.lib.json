@@ -11,6 +11,7 @@
     ],
     "rootDir": "src",
     "jsx": "react-jsx",
+    "resolveJsonModule": true,
     "tsBuildInfoFile": "dist/tsconfig.lib.tsbuildinfo"
   },
   "exclude": [
@@ -44,8 +45,11 @@
     "**/*.stories.jsx",
     "**/*.stories.tsx"
   ],
-  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx"],
+  "include": ["src/**/*.js", "src/**/*.jsx", "src/**/*.ts", "src/**/*.tsx", "src/**/*.json"],
   "references": [
+    {
+      "path": "../shared/olap-models/tsconfig.lib.json"
+    },
     {
       "path": "../ui/design-system/tsconfig.lib.json"
     }

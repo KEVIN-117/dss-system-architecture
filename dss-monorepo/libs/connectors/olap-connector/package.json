@@ -22,6 +22,8 @@
     ]
   },
   "dependencies": {
+    "@dss-monorepo/olap-models": "workspace:*",
+    "apache-arrow": "^21.2.0",
     "tslib": "^2.3.0"
   }
 }

@@ -1,0 +1,60 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "noEmit": true,
+    "emitDeclarationOnly": false,
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "allowSyntheticDefaultImports": true,
+    "forceConsistentCasingInFileNames": true,
+    "incremental": true,
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@dss-monorepo/charts": ["../../libs/charts/src/index.ts"],
+      "@dss-monorepo/olap-connector": [
+        "../../libs/connectors/olap-connector/src/index.ts"
+      ],
+      "@dss-monorepo/olap-models": [
+        "../../libs/shared/olap-models/src/index.ts"
+      ],
+      "@dss-monorepo/olap-data-access": [
+        "../../libs/shared/olap-data-access/src/index.ts"
+      ]
+    },
+    "types": ["node"],
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
+  },
+  "include": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "index.d.ts",
+    "next-env.d.ts",
+    ".next/types/**/*.ts"
+  ],
+  "exclude": ["node_modules", "dist", ".next"],
+  "references": [
+    {
+      "path": "../../libs/shared/olap-data-access"
+    },
+    {
+      "path": "../../libs/connectors/olap-connector"
+    },
+    {
+      "path": "../../libs/shared/olap-models"
+    },
+    {
+      "path": "../../libs/charts"
+    },
+    {
+      "path": "../../libs/ui/design-system"
+    },
+    {
+      "path": "../../libs/auth"
+    }
+  ]
+}

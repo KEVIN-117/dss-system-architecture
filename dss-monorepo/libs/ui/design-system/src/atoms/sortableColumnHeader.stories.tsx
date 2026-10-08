@@ -317,9 +317,9 @@ const DSS_ROWS = [
 ];
 
 const riskColor: Record<string, string> = {
-  BAJO: 'text-emerald-400',
-  MEDIO: 'text-amber-400',
-  ALTO: 'text-rose-500',
+  BAJO: 'text-success',
+  MEDIO: 'text-warning',
+  ALTO: 'text-destructive',
 };
 
 const CyberpunkUi = () => {
@@ -345,7 +345,7 @@ const CyberpunkUi = () => {
   });
 
   return (
-    <div className="w-full max-w-2xl rounded-lg border border-primary/30 bg-black/80 shadow-[0_0_20px_rgba(0,255,200,0.08)] font-mono text-xs overflow-hidden">
+    <div className="w-full max-w-2xl rounded-lg border border-primary/30 bg-background/80 shadow-md font-mono text-xs overflow-hidden">
       {/* Header bar */}
       <div className="flex items-center justify-between px-4 py-2 border-b border-primary/20 bg-primary/5">
         <span className="font-bold text-primary tracking-widest text-[11px]">
@@ -358,7 +358,7 @@ const CyberpunkUi = () => {
 
       {/* Table */}
       <table className="w-full">
-        <thead className="bg-white/5">
+        <thead className="bg-foreground/5">
           <tr>
             {DSS_COLS.map(({ key, label }) => (
               <th
@@ -382,8 +382,8 @@ const CyberpunkUi = () => {
             <tr
               key={row.estudiante}
               className={[
-                'border-t border-white/5 transition-colors',
-                i % 2 === 0 ? 'bg-transparent' : 'bg-white/[0.02]',
+                'border-t border-foreground/5 transition-colors',
+                i % 2 === 0 ? 'bg-transparent' : 'bg-card/[0.02]',
               ].join(' ')}
             >
               <td className="px-4 py-2 text-foreground">{row.estudiante}</td>

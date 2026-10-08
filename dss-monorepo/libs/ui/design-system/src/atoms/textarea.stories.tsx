@@ -20,6 +20,11 @@ const meta: Meta<typeof Textarea> = {
       control: 'number',
       description: 'Number of visible text lines',
     },
+    tone: {
+      control: 'select',
+      options: ['default', 'destructive'],
+      description: 'Visual state for validation feedback.',
+    },
   },
 };
 
@@ -42,6 +47,22 @@ export const WithLabel: Story = {
       />
       <p className="text-xs text-muted-foreground">
         Los comentarios se sincronizarán con el perfil del estudiante.
+      </p>
+    </div>
+  ),
+};
+
+export const Destructive: Story = {
+  args: {
+    tone: 'destructive',
+    defaultValue: 'This text needs correction.',
+    'aria-describedby': 'textarea-error-message',
+  },
+  render: (args) => (
+    <div className="grid w-full max-w-sm gap-2">
+      <Textarea {...args} />
+      <p id="textarea-error-message" className="text-xs text-destructive">
+        Check the content and try again.
       </p>
     </div>
   ),
@@ -84,12 +105,12 @@ export const Variations: Story = {
 
 export const Cyberpunk: Story = {
   render: () => (
-    <div className="w-[440px] p-5 rounded-lg border border-primary/30 bg-black/70 shadow-[0_0_20px_rgba(0,255,200,0.12)] font-mono text-xs">
+    <div className="w-[440px] p-5 rounded-lg border border-primary/30 bg-background/70 shadow-md font-mono text-xs">
       <div className="flex items-center justify-between pb-2 mb-3 border-b border-primary/20">
         <span className="text-primary font-bold tracking-wider">
           {'// CIPHER_PAYLOAD_INJECTOR'}
         </span>
-        <span className="text-[10px] text-emerald-400 font-semibold animate-pulse">
+        <span className="text-[10px] text-success font-semibold animate-pulse">
           TERMINAL: ACTIVE
         </span>
       </div>
@@ -99,7 +120,7 @@ export const Cyberpunk: Story = {
           ENTER GRAPH CYPHER / RAW SQL QUERY FOR DSS ENGINE:
         </div>
         <Textarea
-          className="font-mono text-xs bg-black/50 border-primary/40 focus-visible:ring-primary/60 text-primary min-h-24 resize-none"
+          className="font-mono text-xs bg-background/50 border-primary/40 focus-visible:ring-primary/60 text-primary min-h-24 resize-none"
           defaultValue={`MATCH (s:Student)-[r:ENROLLED_IN]->(c:Course)\nWHERE s.risk_score > 0.75\nRETURN s.id, s.name, c.code, r.attendance_rate;`}
         />
         <div className="flex items-center justify-between pt-1">

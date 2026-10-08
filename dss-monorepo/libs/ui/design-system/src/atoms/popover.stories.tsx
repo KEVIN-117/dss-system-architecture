@@ -18,7 +18,7 @@ import {
 } from 'lucide-react';
 
 const meta: Meta<typeof Popover> = {
-  title: 'Atoms/Popover',
+  title: 'Atoms/Popover primitives',
   component: Popover,
   tags: ['autodocs'],
 };
@@ -165,20 +165,20 @@ export const Cyberpunk: Story = {
         <PopoverTrigger asChild>
           <Button
             variant="outline"
-            className="border-primary/50 text-cyan-400 hover:text-cyan-300 hover:bg-primary/10 font-mono text-xs gap-2 shadow-[0_0_10px_rgba(59,130,246,0.2)]"
+            className="border-primary/50 text-primary hover:text-primary hover:bg-primary/10 font-mono text-xs gap-2 shadow-md"
           >
-            <CpuIcon className="size-4 text-cyan-400" />
+            <CpuIcon className="size-4 text-primary" />
             <span>NODE_TELEMETRY_STATUS</span>
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-80 bg-black/95 border-primary/40 text-cyan-100 font-mono shadow-[0_0_20px_rgba(59,130,246,0.25)] backdrop-blur-md">
+        <PopoverContent className="w-80 bg-background/95 border-primary/40 text-foreground font-mono shadow-md backdrop-blur-md">
           <PopoverHeader className="border-b border-primary/20 pb-2">
             <div className="flex items-center justify-between">
-              <PopoverTitle className="text-cyan-400 text-xs font-bold flex items-center gap-1.5">
-                <ActivityIcon className="size-3.5 text-emerald-400 animate-pulse" />
+              <PopoverTitle className="text-primary text-xs font-bold flex items-center gap-1.5">
+                <ActivityIcon className="size-3.5 text-success animate-pulse" />
                 NEURAL_CLUSTER_01
               </PopoverTitle>
-              <span className="text-[10px] text-emerald-400 font-bold">
+              <span className="text-[10px] text-success font-bold">
                 ONLINE
               </span>
             </div>
@@ -189,22 +189,22 @@ export const Cyberpunk: Story = {
           <div className="py-2 text-xs space-y-2">
             <div className="flex justify-between items-center text-[11px]">
               <span className="text-muted-foreground">LATENCY:</span>
-              <span className="text-cyan-300 font-bold">14.2 ms</span>
+              <span className="text-primary font-bold">14.2 ms</span>
             </div>
             <div className="flex justify-between items-center text-[11px]">
               <span className="text-muted-foreground">VRAM UTILIZATION:</span>
-              <span className="text-amber-400 font-bold">4.8 GB / 16 GB</span>
+              <span className="text-warning font-bold">4.8 GB / 16 GB</span>
             </div>
             <div className="flex justify-between items-center text-[11px]">
               <span className="text-muted-foreground">ACTIVE GOROUTINES:</span>
-              <span className="text-emerald-400 font-bold">128</span>
+              <span className="text-success font-bold">128</span>
             </div>
           </div>
           <div className="pt-2 border-t border-primary/20 flex justify-end">
             <Button
               size="xs"
               variant="destructive"
-              className="font-mono text-[10px] shadow-[0_0_8px_rgba(239,68,68,0.3)]"
+              className="font-mono text-[10px] shadow-md"
             >
               PURGE BUFFER CACHE
             </Button>

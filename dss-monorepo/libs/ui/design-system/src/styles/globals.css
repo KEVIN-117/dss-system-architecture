@@ -45,6 +45,10 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-scrim: var(--scrim);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -102,6 +106,10 @@
   --accent: #dff8fd;
   --accent-foreground: #0b1a38;
   --destructive: var(--dss-red-500);
+  --success: var(--dss-cyan-600);
+  --warning: var(--dss-gold-700);
+  --info: var(--dss-blue-700);
+  --scrim: var(--dss-navy-950);
   --border: #cbd9eb;
   --input: #cbd9eb;
   --ring: var(--dss-cyan-500);
@@ -136,6 +144,10 @@
   --accent: #12385e;
   --accent-foreground: #e5fbff;
   --destructive: #f87171;
+  --success: var(--dss-cyan-400);
+  --warning: var(--dss-gold-400);
+  --info: var(--dss-blue-500);
+  --scrim: var(--dss-navy-950);
   --border: #24416d;
   --input: #24416d;
   --ring: var(--dss-cyan-400);
@@ -261,4 +273,22 @@
   html {
     @apply font-sans;
   }
+}
+
+/* React Flow's default controls use fixed light colors. Keep the canvas controls
+   legible in every design-system theme, including dark mode. */
+.cube-designer-controls .react-flow__controls-button {
+  color: var(--foreground);
+  background: var(--card);
+  border-color: var(--border);
+}
+
+.cube-designer-controls .react-flow__controls-button:hover {
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+
+.cube-designer-controls .react-flow__controls-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
 }

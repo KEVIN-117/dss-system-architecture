@@ -23,6 +23,24 @@ export function Rendimiento() {
 
 Las entradas interactivas incluyen `'use client'` en el resultado compilado. Para builders, tipos y temas que no necesitan React, importa `@dss-monorepo/charts/core`.
 
+## Gráficos OLAP de Saiku
+
+`SaikuChart` adapta el builder compartido de Saiku al ciclo de vida React de `BaseChart`. El builder es puro y acepta una proyección común de categorías y matriz; el wrapper resuelve los tokens del Design System, aplica opciones, eventos y carga del mapa geográfico cuando se solicita.
+
+```tsx
+import { SaikuChart, type ChartProjection } from '@dss-monorepo/charts';
+
+const projection: ChartProjection = {
+  rowCategories: ['2024', '2025'],
+  columnCategories: ['Ventas'],
+  matrix: [[120], [155]],
+};
+
+<SaikuChart chartType="bar" projection={projection} title="Ventas por año" />;
+```
+
+Los `ChartOptions` y tipos `ChartType` migrados de Saiku se exportan desde el paquete. Para datos de cellset, la proyección debe prepararse antes de renderizar; `SaikuChart` no interpreta respuestas del backend ni aplica reglas de interacción OLAP.
+
 ## API común
 
 Todos los componentes aceptan `title`, `loading`, `className`, `style`, `height`, `ariaLabel`, `emptyMessage`, `themeTokens` y `onChartClick`.

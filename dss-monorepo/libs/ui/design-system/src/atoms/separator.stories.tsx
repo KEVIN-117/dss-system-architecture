@@ -67,12 +67,12 @@ export const Vertical: Story = {
 
 export const Cyberpunk: Story = {
   render: () => (
-    <div className="p-6 bg-black rounded-lg border border-primary/30 font-mono text-sm max-w-md space-y-4">
+    <div className="p-6 bg-background rounded-lg border border-primary/30 font-mono text-sm max-w-md space-y-4">
       <div className="flex justify-between items-center text-xs text-primary">
         <span>SECURITY SUBSYSTEM</span>
-        <span className="text-emerald-400">ONLINE</span>
+        <span className="text-success">ONLINE</span>
       </div>
-      <Separator className="bg-primary/40 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+      <Separator className="bg-primary/40 shadow-md" />
       <div className="flex h-5 items-center space-x-4 text-xs text-muted-foreground">
         <span className="text-foreground">AUTH: JWT</span>
         <Separator orientation="vertical" className="bg-primary/30" />
@@ -80,7 +80,7 @@ export const Cyberpunk: Story = {
         <Separator orientation="vertical" className="bg-primary/30" />
         <span className="text-foreground">PORT: 8080</span>
       </div>
-      <Separator className="bg-primary/40 shadow-[0_0_8px_rgba(59,130,246,0.5)]" />
+      <Separator className="bg-primary/40 shadow-md" />
       <div className="text-xs text-muted-foreground">
         BUFFER: 1024 KB // STATUS: HEALTHY
       </div>

@@ -1,0 +1,17 @@
+{
+  "name": "@dss-monorepo/olap-workspace",
+  "version": "0.0.1",
+  "private": true,
+  "dependencies": {
+    "@dss-monorepo/auth": "workspace:*",
+    "@dss-monorepo/charts": "workspace:*",
+    "@dss-monorepo/design-system": "workspace:*",
+    "@dss-monorepo/olap-connector": "workspace:*",
+    "@dss-monorepo/olap-data-access": "workspace:*",
+    "@dss-monorepo/olap-models": "workspace:*",
+    "lucide-react": "^1.43.0",
+    "next": "~16.1.6",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

@@ -192,7 +192,7 @@ const clusterNodes = [
 
 export const CyberpunkTerminal: Story = {
   render: () => (
-    <div className="p-6 bg-black/95 rounded-xl border border-primary/30 shadow-[0_0_30px_rgba(0,255,200,0.1)] max-w-4xl font-mono">
+    <div className="p-6 bg-background/95 rounded-xl border border-primary/30 shadow-md max-w-4xl font-mono">
       <div className="flex items-center justify-between border-b border-primary/20 pb-3 mb-4">
         <div className="flex items-center gap-2 text-primary">
           <Terminal className="size-4 animate-pulse" />
@@ -206,7 +206,7 @@ export const CyberpunkTerminal: Story = {
           </span>
           <Badge
             variant="outline"
-            className="border-primary/40 text-primary text-[10px] shadow-[0_0_8px_rgba(59,130,246,0.3)]"
+            className="border-primary/40 text-primary text-[10px] shadow-md"
           >
             POLLING: 1000ms
           </Badge>
@@ -214,7 +214,7 @@ export const CyberpunkTerminal: Story = {
       </div>
 
       <Table className="border-0">
-        <TableHeader className="bg-black/60 border-b border-primary/30">
+        <TableHeader className="bg-background/60 border-b border-primary/30">
           <TableRow className="border-primary/20 hover:bg-transparent">
             <TableHead className="text-primary text-xs font-mono">
               NODE_IDENTIFIER
@@ -260,7 +260,7 @@ export const CyberpunkTerminal: Story = {
               <TableCell className="font-mono text-xs text-right text-muted-foreground">
                 {node.iops}
               </TableCell>
-              <TableCell className="font-mono text-xs text-right text-emerald-400">
+              <TableCell className="font-mono text-xs text-right text-success">
                 {node.latency}
               </TableCell>
               <TableCell className="text-center">
@@ -277,9 +277,9 @@ export const CyberpunkTerminal: Story = {
                   <span
                     className={`size-1.5 rounded-full inline-block mr-1.5 ${
                       node.status === 'ONLINE'
-                        ? 'bg-emerald-400 animate-pulse'
+                        ? 'bg-success animate-pulse'
                         : node.status === 'BUSY'
-                          ? 'bg-amber-400 animate-ping'
+                          ? 'bg-warning animate-ping'
                           : 'bg-muted-foreground'
                     }`}
                   />
@@ -289,7 +289,7 @@ export const CyberpunkTerminal: Story = {
             </TableRow>
           ))}
         </TableBody>
-        <TableFooter className="bg-black/60 border-t border-primary/30">
+        <TableFooter className="bg-background/60 border-t border-primary/30">
           <TableRow className="border-0 hover:bg-transparent">
             <TableCell
               colSpan={2}
@@ -306,10 +306,10 @@ export const CyberpunkTerminal: Story = {
             <TableCell className="text-right font-mono text-xs text-primary font-bold">
               32.4k
             </TableCell>
-            <TableCell className="text-right font-mono text-xs text-emerald-400 font-bold">
+            <TableCell className="text-right font-mono text-xs text-success font-bold">
               8.5ms
             </TableCell>
-            <TableCell className="text-center font-mono text-[10px] text-emerald-400">
+            <TableCell className="text-center font-mono text-[10px] text-success">
               HEALTHY
             </TableCell>
           </TableRow>
@@ -405,8 +405,8 @@ export const StudentRiskPrediction: Story = {
                     row.riskScore > 75
                       ? 'text-destructive'
                       : row.riskScore > 50
-                        ? 'text-amber-500'
-                        : 'text-emerald-500'
+                        ? 'text-warning'
+                        : 'text-success'
                   }
                 >
                   {row.riskScore.toFixed(1)}%

@@ -86,7 +86,7 @@ export const Variations: Story = {
         <div className="flex flex-wrap gap-4">
           <Attachment state="done">
             <AttachmentMedia>
-              <FileCode2Icon className="size-5 text-emerald-500" />
+              <FileCode2Icon className="size-5 text-success" />
             </AttachmentMedia>
             <AttachmentContent>
               <AttachmentTitle>etl_pipeline_config.json</AttachmentTitle>
@@ -111,7 +111,7 @@ export const Variations: Story = {
 
           <Attachment state="processing">
             <AttachmentMedia>
-              <DatabaseIcon className="size-5 text-amber-500 animate-pulse" />
+              <DatabaseIcon className="size-5 text-warning animate-pulse" />
             </AttachmentMedia>
             <AttachmentContent>
               <AttachmentTitle>dw_star_schema_dump.sql</AttachmentTitle>
@@ -212,7 +212,7 @@ export const Variations: Story = {
           </Attachment>
           <Attachment orientation="vertical" size="default" state="processing">
             <AttachmentMedia>
-              <RefreshCwIcon className="size-6 text-amber-500 animate-spin" />
+              <RefreshCwIcon className="size-6 text-warning animate-spin" />
             </AttachmentMedia>
             <AttachmentContent>
               <AttachmentTitle>schema_v3.ts</AttachmentTitle>
@@ -227,22 +227,22 @@ export const Variations: Story = {
 
 export const Cyberpunk: Story = {
   render: () => (
-    <div className="p-6 bg-black rounded-lg border border-primary/30 font-mono space-y-4">
+    <div className="p-6 bg-background rounded-lg border border-primary/30 font-mono space-y-4">
       <div className="text-xs text-primary/70 tracking-widest flex items-center justify-between">
         <span> NEURAL_PAYLOAD_MANIFEST</span>
-        <span className="text-emerald-400">STATUS: SECURE</span>
+        <span className="text-success">STATUS: SECURE</span>
       </div>
 
       <div className="flex flex-wrap gap-4">
         <Attachment
           state="done"
-          className="border-primary/40 bg-card/40 backdrop-blur-sm shadow-[0_0_12px_rgba(59,130,246,0.15)]"
+          className="border-primary/40 bg-card/40 backdrop-blur-sm shadow-md"
         >
           <AttachmentMedia className="bg-primary/10 border border-primary/30">
-            <DatabaseIcon className="size-5 text-cyan-400" />
+            <DatabaseIcon className="size-5 text-primary" />
           </AttachmentMedia>
           <AttachmentContent>
-            <AttachmentTitle className="text-cyan-300 font-mono">
+            <AttachmentTitle className="text-primary font-mono">
               weights_v2_academic_risk.safetensors
             </AttachmentTitle>
             <AttachmentDescription className="text-muted-foreground font-mono text-xs">
@@ -252,7 +252,7 @@ export const Cyberpunk: Story = {
           <AttachmentActions>
             <AttachmentAction
               title="Download Artifact"
-              className="text-cyan-400 hover:text-cyan-200 hover:bg-primary/20"
+              className="text-primary hover:text-foreground hover:bg-primary/20"
             >
               <DownloadIcon className="size-3.5" />
             </AttachmentAction>
@@ -261,16 +261,16 @@ export const Cyberpunk: Story = {
 
         <Attachment
           state="uploading"
-          className="border-amber-500/40 bg-card/40 backdrop-blur-sm shadow-[0_0_12px_rgba(245,158,11,0.15)]"
+          className="border-warning/40 bg-card/40 backdrop-blur-sm shadow-md"
         >
-          <AttachmentMedia className="bg-amber-500/10 border border-amber-500/30">
-            <RefreshCwIcon className="size-5 text-amber-400 animate-spin" />
+          <AttachmentMedia className="bg-warning/10 border border-warning/30">
+            <RefreshCwIcon className="size-5 text-warning animate-spin" />
           </AttachmentMedia>
           <AttachmentContent>
-            <AttachmentTitle className="text-amber-300 font-mono">
+            <AttachmentTitle className="text-warning font-mono">
               telemetry_quantum_stream.bin
             </AttachmentTitle>
-            <AttachmentDescription className="text-amber-400/70 font-mono text-xs">
+            <AttachmentDescription className="text-warning/70 font-mono text-xs">
               STREAMING // 842.1 MB / 1.0 GB
             </AttachmentDescription>
           </AttachmentContent>

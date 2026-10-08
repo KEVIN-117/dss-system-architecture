@@ -57,8 +57,8 @@ export const Variations: Story = {
         <Spinner className="text-destructive size-5" />
         <span className="text-sm">Destructive</span>
       </div>
-      <div className="flex items-center gap-2 text-emerald-500">
-        <Spinner className="text-emerald-500 size-5" />
+      <div className="flex items-center gap-2 text-success">
+        <Spinner className="text-success size-5" />
         <span className="text-sm">Success</span>
       </div>
       <div className="flex items-center gap-2 text-muted-foreground">
@@ -75,11 +75,11 @@ export const Variations: Story = {
 
 export const Cyberpunk: Story = {
   render: () => (
-    <div className="p-6 bg-black rounded-lg border border-primary/30 max-w-sm space-y-4 font-mono text-center">
+    <div className="p-6 bg-background rounded-lg border border-primary/30 max-w-sm space-y-4 font-mono text-center">
       <div className="flex flex-col items-center justify-center gap-3 py-4">
         <div className="relative flex items-center justify-center">
-          <Spinner className="size-10 text-primary drop-shadow-[0_0_12px_rgba(59,130,246,0.8)]" />
-          <span className="absolute size-2 rounded-full bg-cyan-400 animate-ping" />
+          <Spinner className="size-10 text-primary drop-shadow-md" />
+          <span className="absolute size-2 rounded-full bg-primary animate-ping" />
         </div>
         <div className="space-y-1">
           <p className="text-xs font-bold text-primary tracking-widest uppercase">

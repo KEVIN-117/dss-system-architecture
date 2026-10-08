@@ -6,3 +6,6 @@ export * from './metric-indicator';
 export * from './tabs';
 export * from './accordion';
 export * from './table';
+export * from './dropdown-menu';
+export * from './popover';
+export * from './tooltip';

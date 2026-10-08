@@ -9,7 +9,7 @@ import { Button } from './button';
 import { TerminalIcon } from 'lucide-react';
 
 const meta: Meta<typeof Tooltip> = {
-  title: 'Atoms/Tooltip',
+  title: 'Atoms/Tooltip primitives',
   component: Tooltip,
   tags: ['autodocs'],
 };
@@ -87,18 +87,18 @@ export const Positions: Story = {
 export const Cyberpunk: Story = {
   render: () => (
     <TooltipProvider>
-      <div className="flex items-center justify-center p-10 bg-black/50 border border-primary/20 rounded-lg max-w-md">
+      <div className="flex items-center justify-center p-10 bg-background/50 border border-primary/20 rounded-lg max-w-md">
         <Tooltip>
           <TooltipTrigger asChild>
             <button className="flex items-center gap-2 px-3 py-1.5 rounded bg-primary/10 border border-primary/40 text-primary font-mono text-xs hover:bg-primary/20 transition-colors cursor-pointer">
               <TerminalIcon className="size-3.5" />
               <span>NODE://UATF_GATEWAY</span>
-              <span className="size-2 rounded-full bg-emerald-400 animate-ping" />
+              <span className="size-2 rounded-full bg-success animate-ping" />
             </button>
           </TooltipTrigger>
           <TooltipContent
             side="top"
-            className="font-mono text-xs bg-black/90 border border-primary/50 text-foreground shadow-[0_0_15px_rgba(0,255,200,0.2)]"
+            className="font-mono text-xs bg-background/90 border border-primary/50 text-foreground shadow-md"
           >
             <div className="flex flex-col gap-1">
               <span className="text-primary font-bold">
@@ -107,7 +107,7 @@ export const Cyberpunk: Story = {
               <span className="text-[11px] text-muted-foreground">
                 LATENCY: 14ms | TLS 1.3 AES-256
               </span>
-              <span className="text-[10px] text-emerald-400">
+              <span className="text-[10px] text-success">
                 STATUS: 0 PACKET LOSS
               </span>
             </div>

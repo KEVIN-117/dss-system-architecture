@@ -44,7 +44,11 @@ export default [
             },
             {
               sourceTag: 'type:data-access',
-              onlyDependOnLibsWithTags: ['type:domain', 'type:util'],
+              onlyDependOnLibsWithTags: [
+                'type:connector',
+                'type:domain',
+                'type:util',
+              ],
             },
             {
               sourceTag: 'type:domain',
@@ -90,6 +94,14 @@ export default [
             {
               sourceTag: 'scope:director',
               onlyDependOnLibsWithTags: ['scope:shared', 'scope:director'],
+            },
+            {
+              sourceTag: 'scope:olap',
+              onlyDependOnLibsWithTags: [
+                'scope:shared',
+                'scope:olap',
+                'scope:infrastructure',
+              ],
             },
             {
               sourceTag: 'scope:shared',
