@@ -63,6 +63,8 @@ sequenceDiagram
 
 La API expone operaciones administrativas de listado, alta, modificación, borrado, carga/actualización de esquema y refresh. El endpoint de refresh implementado es `GET /rest/saiku/admin/datasources/{id}/refresh`. El límite de seguridad de `/rest/saiku/admin/**` se aplica antes de llegar al recurso.
 
+Para una conexión JDBC real al DW, guarda las credenciales fuera del repositorio. Saiku ya puede leer `datasource.<propertykey>.*` desde `<saiku-home>/conf/datasources.properties`; la definición `.sds` contiene el `propertykey`, mientras el archivo externo aporta driver, ubicación y usuario/contraseña. En despliegue, monta ese archivo desde el gestor de secretos y limita sus permisos. Guía operativa, timeouts y presupuesto de conexiones: [Conexiones DW y concurrencia (OLAP-002)](./conexiones-dw-concurrencia.md).
+
 ## 3. Descubrimiento de conexiones y metadatos
 
 ```mermaid
