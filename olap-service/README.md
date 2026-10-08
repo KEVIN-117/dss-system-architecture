@@ -3,9 +3,9 @@
 <h1 align="center"><a href="https://saiku.bi">Saiku Analytics</a></h1>
 
 <p align="center">
-  Open-source Semantic Layer analytics for cubes — drag-and-drop in the
-  browser, SQL through Mondrian + Calcite, and a typed REST surface so AI
-  agents can query without ever seeing MDX.
+  Open-source Semantic Layer API for cubes — SQL through Mondrian + Calcite,
+  REST and XMLA interfaces, and a typed query surface for applications and AI
+  agents.
 </p>
 
 <p align="center">
@@ -22,11 +22,6 @@
 </p>
 
 ***
-
-<picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/images/dashboard-dark.png">
-  <img alt="A Saiku dashboard: KPI tiles, a sales-by-product-family bar chart, and pie charts built from a FoodMart cube" src="docs/images/dashboard-light.png">
-</picture>
 
 ## Try it in 30 seconds
 
@@ -98,8 +93,8 @@ config:
 }
 ```
 
-See [`docs/AI-QUERY-API.md`](docs/AI-QUERY-API.md) and
-[`docs/schema-annotations.md`](docs/schema-annotations.md) for the typed
+See [`../docs/olap/reference/AI-QUERY-API.md`](../docs/olap/reference/AI-QUERY-API.md) and
+[`../docs/olap/reference/schema-annotations.md`](../docs/olap/reference/schema-annotations.md) for the typed
 contract and the `saiku.semantic.*` annotation namespace cubes use to
 describe themselves to agents.
 
@@ -116,17 +111,14 @@ Admins can extend the AI surface without code:
   `POST /ai/spaces/{id}/ask` enforces the persona server-side, so a cube outside
   the allowlist is a 403 the user can't override.
 
-See [`docs/SKILLS-SPEC.md`](docs/SKILLS-SPEC.md) and
-[`docs/AGENT-SPACES-SPEC.md`](docs/AGENT-SPACES-SPEC.md).
+See [`../docs/olap/reference/SKILLS-SPEC.md`](../docs/olap/reference/SKILLS-SPEC.md) and
+[`../docs/olap/reference/AGENT-SPACES-SPEC.md`](../docs/olap/reference/AGENT-SPACES-SPEC.md).
 
-## Dashboards
+## Dashboard API
 
-Build shareable dashboards of chart / table / KPI / text / image tiles over your
-cubes — with cross-tile filters, click- and brush-cross-filtering,
-drill-down/through, conditional formatting, combo charts, anomaly/forecast
-overlays, auto-refresh, PDF/PNG export and read-only share links. See the
-[`docs/dashboards-user-guide.md`](docs/dashboards-user-guide.md) for the full
-walkthrough. The service exposes the dashboard and sharing APIs; deploy a separate client to provide the user interface.
+The service exposes REST endpoints for storing and sharing dashboard
+definitions. Deploy a separate client to create and render dashboards; this
+repository no longer ships the browser UI.
 
 ## Observability
 
@@ -145,7 +137,7 @@ docker run -d -p 8080:8080 \
 ```
 
 Without the endpoint env var the agent is never loaded. See
-[`docs/observability.md`](docs/observability.md) for the full env-var
+[`../docs/olap/reference/observability.md`](../docs/olap/reference/observability.md) for the full env-var
 reference, sampling guidance, and what's not yet covered (Tier 2
 custom spans for `ThinQueryService` etc.).
 
@@ -156,11 +148,14 @@ Quality signals — per-module test-count and line-coverage floors — are decla
 A separate weekly run, `.github/workflows/quality-report.yml`, renders the same
 signals as one Markdown **quality dashboard** in its job summary: where each
 module stands, and by how much headroom. That run is read-only and is not a
-gate — the gates stay in CI. See [`docs/quality.md`](docs/quality.md).
+gate — the gates stay in CI. See [`../docs/olap/reference/quality.md`](../docs/olap/reference/quality.md).
 
 ## Build from source
 
-JDK 21 + Maven 3.9+ required.
+Maven 3.9+ is required. Use **JDK 22** for the full `mvn verify` reactor because
+`saiku-proptest` uses the JDK 22 Foreign Function & Memory API. The packaged
+Saiku artifacts target **Java 21**; the launcher-only package command below can
+be built and run with JDK 21.
 
 **Set up GitHub Packages auth first, or the build fails before it compiles.** Saiku's Mondrian fork, olap4j,
 saiku-query and Ossie artifacts are published to GitHub Packages, which requires an authenticated token **even
@@ -198,6 +193,13 @@ against the seeded FoodMart H2 datasource):
 mvn verify -P integration
 ```
 
+To run only the launcher smoke test for `/rest/saiku/info`, Swagger UI, and
+both OpenAPI documents:
+
+```sh
+mvn -pl saiku-launcher -am -DskipITs=false -Dit.test=InfoEndpointIT verify
+```
+
 See [`CLAUDE.md`](CLAUDE.md) for the full layout, the dependency catalog
 (`saiku-bom`), and the GitHub Packages auth gotcha for local builds.
 
@@ -206,7 +208,7 @@ See [`CLAUDE.md`](CLAUDE.md) for the full layout, the dependency catalog
 The fat JAR, dist zip, SBOM and container image carry
 keyless [Sigstore](https://www.sigstore.dev/)-signed SLSA build provenance,
 and each release ships a `SHA256SUMS` file. See
-[Verifying release artifacts](docs/releasing.md#verifying-release-artifacts)
+[Verifying release artifacts](../docs/olap/reference/releasing.md#verifying-release-artifacts)
 for the commands per artifact type (`gh attestation verify`,
 `cosign verify-attestation` and `sha256sum -c`).
 

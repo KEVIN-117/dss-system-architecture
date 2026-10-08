@@ -291,7 +291,7 @@ public class AiQueryResource {
      *
      * <p>Used by the dashboard layer to support
      * {@code TileQuery.kind == "reference"} — see
-     * {@code docs/plans/2026-05-16-dashboards-design.md}. Saved
+     * {@code ../docs/olap/reference/plans/2026-05-16-dashboards-design.md}. Saved
      * queries are stored as serialised {@link ThinQuery} JSON; this
      * endpoint is the bridge to the AI response surface.
      */

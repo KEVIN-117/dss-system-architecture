@@ -1,7 +1,7 @@
 # Observability adaptor bundles
 
 Pre-baked configurations for pointing Saiku's OpenTelemetry instrumentation
-at named observability providers. Saiku's [OTel plumbing](../docs/observability.md)
+at named observability providers. Saiku's [OTel plumbing](../../docs/olap/reference/observability.md)
 is provider-neutral — every bundle here is a thin envelope around the same
 `OTEL_EXPORTER_OTLP_*` environment variables the OTel SDK reads directly.
 
@@ -13,7 +13,7 @@ is provider-neutral — every bundle here is a thin envelope around the same
 | **Grafana Cloud**     | [grafana-cloud/](grafana-cloud/)   | Direct OTLP → Grafana Cloud                                                 | Instance token |
 | **New Relic**         | [new-relic/](new-relic/)           | Direct OTLP → New Relic                                                     | License key |
 | **AWS CloudWatch**    | [cloudwatch/](cloudwatch/)         | ADOT collector → CloudWatch Metrics + X-Ray traces + CloudWatch Logs        | IAM role    |
-| **Self-hosted OTel Collector** | (see [docs/observability.md](../docs/observability.md)) | Any of the above via the standard OpenTelemetry Collector | Depends on downstream |
+| **Self-hosted OTel Collector** | (see [../../docs/olap/reference/observability.md](../../docs/olap/reference/observability.md)) | Any of the above via the standard OpenTelemetry Collector | Depends on downstream |
 
 Each subdirectory has a `README.md` with a copy-paste quickstart and a
 `docker-compose.yml` (or `env.example`) that boots the pipeline.
@@ -35,7 +35,7 @@ Each subdirectory has a `README.md` with a copy-paste quickstart and a
   bundle. ADOT emits into CloudWatch Metrics + X-Ray natively.
 - **You run your own Prometheus / Tempo / Loki stack** — you don't need
   a bundle. Point `OTEL_EXPORTER_OTLP_ENDPOINT` at your existing OTel
-  Collector and follow [docs/observability.md](../docs/observability.md).
+  Collector and follow [../../docs/olap/reference/observability.md](../../docs/olap/reference/observability.md).
 - **You just want to poke around locally** — the parent doc has a
   ten-second `docker run otel/opentelemetry-collector` snippet that
   logs received spans to stdout. No account required.

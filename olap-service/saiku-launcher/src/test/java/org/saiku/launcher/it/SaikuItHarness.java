@@ -234,10 +234,15 @@ public final class SaikuItHarness {
 
     /** Issue a GET against {@code path} without auth — used for testing the 401 path. */
     public HttpResponse<String> getAnon(String path) throws Exception {
+        return getAnon(path, "application/json");
+    }
+
+    /** Issue an unauthenticated GET with an explicit Accept header. */
+    public HttpResponse<String> getAnon(String path, String accept) throws Exception {
         return http.send(
                 HttpRequest.newBuilder(URI.create(baseUrl + path))
                         .timeout(HTTP_TIMEOUT)
-                        .header("Accept", "application/json")
+                        .header("Accept", accept)
                         .GET()
                         .build(),
                 HttpResponse.BodyHandlers.ofString());

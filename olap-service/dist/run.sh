@@ -17,7 +17,7 @@ fi
 
 # Optional OpenTelemetry: drop opentelemetry-javaagent.jar next to this
 # script and set OTEL_EXPORTER_OTLP_ENDPOINT to enable. See
-# docs/observability.md for the download command and config reference.
+# ../../docs/olap/reference/observability.md for the download command and config reference.
 JAVA_OPTS=()
 OTEL_AGENT_JAR="$SCRIPT_DIR/opentelemetry-javaagent.jar"
 if [[ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" && -f "$OTEL_AGENT_JAR" ]]; then

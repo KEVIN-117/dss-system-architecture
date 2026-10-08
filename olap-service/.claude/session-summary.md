@@ -49,7 +49,7 @@ Rules that keep the file useful rather than a wall of text:
   `git checkout -b` has silently corrupted work before; don't be the one that
   causes it again.
 - **Keep it short.** Four lines is a good entry. If an entry needs more, the
-  detail belongs in a plan under `docs/plans/`, an issue, or a PR description —
+  detail belongs in a plan under `../../docs/olap/reference/plans/`, an issue, or a PR description —
   link it instead of inlining it.
 - **Cap the log at the last ~10 entries** and delete the oldest. A session
   summary is a hand-off note, not a history; anything that still matters a
@@ -75,6 +75,17 @@ pushed down; normal sessions append and the history stays useful.
 
 ## Log
 
+## 2026-10-07 — cleanup — corrected API startup URLs
+**Was doing:** removed obsolete Workspace/Admin UI links from the launcher startup banner; it now advertises REST, Swagger UI, OpenAPI JSON, and the health endpoint.
+**Now:** no further launcher work from this correction; rebuild to see the updated banner.
+**Refs:** `saiku-launcher/src/main/java/org/saiku/launcher/SaikuLauncher.java`
+
+## 2026-10-07 — cleanup — removed standalone Enigma app
+**Was doing:** deleted `enigma/`; it was an independent SvelteKit client and had no references from the Maven reactor, launcher, API WAR, or Docker build. Its removal does not change the OLAP runtime.
+**Now:** continue the OLAP milestone review; refresh Graphify output if the user wants the repository map to exclude Enigma.
+**Watch out:** historical Enigma plans and Graphify-generated output may still mention the app; they were left untouched in this scoped removal.
+**Refs:** `enigma/`
+
 ## 2026-10-07 — feature/OLAP-001 — replaced the OLAP gitlink with tracked source
 **Was doing:** converted `olap-service` from a gitlink to ordinary tracked files; build outputs, IDE files, local `saiku-home` data and keys remain excluded by its `.gitignore`. The change is committed and pushed; PR #137 is open from the lowercase branch.
 **Now:** review checks and merge PR #137; keep `feature/OLAP-001` as the sole OLAP branch.
@@ -85,7 +96,7 @@ pushed down; normal sessions append and the history stays useful.
 **Was doing:** documented C4 context/containers/components/deployment, launcher and datasource refresh, Keycloak JWT role propagation, Mondrian schema generation with state/class/entity models, cube designer, discovery, MDX/OSSIE and asynchronous query execution under `docs/olap/`. Added editable Mermaid sources. The parent workspace treats `olap-service` as a submodule, so its nested Git status was not available from this checkout.
 **Now:** continue with the endpoint inventory/issues-to-requirements assessment using these diagrams as the runtime-flow reference.
 **Watch out:** the DW entity diagram represents JDBC metadata and an inferred Mondrian draft, not the actual UATF physical schema. A saved XML schema must still be wired to the datasource catalog and refreshed/queried before claiming activation.
-**Refs:** `docs/olap/README.md`
+**Refs:** `../../docs/olap/README.md`
 
 ## 2026-10-05 — development — removed generated Graphify cache noise
 **Was doing:** deleted 1,227 regenerable AST cache files and ignored Graphify's cache/local state; retained the graph, report, and architecture map. Git status fell from 2,075 to 847 paths.
@@ -95,9 +106,9 @@ pushed down; normal sessions append and the history stays useful.
 
 ## 2026-10-05 — development — added Keycloak Bearer Resource Server integration
 **Was doing:** added JWT validation, issuer/audience checks, request-local Saiku identity adaptation, and OLAP role aliases (`OLAP_ADMIN` → `ROLE_ADMIN`, `OLAP_USER` → `ROLE_USER`). Realm export now defines both client roles and the `dss-bff` audience mapper. Added focused JWT, role-conversion, and session-identity tests; the 4 converter tests and Spotless check pass.
-**Now:** apply/assign the roles in the already-running Keycloak realm and smoke-test protected routes with fresh tokens; local users and Basic auth remain for migration compatibility. See `docs/keycloak-resource-server.md`.
+**Now:** apply/assign the roles in the already-running Keycloak realm and smoke-test protected routes with fresh tokens; local users and Basic auth remain for migration compatibility. See `../../docs/olap/reference/keycloak-resource-server.md`.
 **Watch out:** use `sub` for ACL/home identity; existing Saiku content owned by local usernames needs owner/ACL migration. Spring Security XML uses `<jwt decoder-ref="...">`.
-**Refs:** `docs/keycloak-resource-server.md`
+**Refs:** `../../docs/olap/reference/keycloak-resource-server.md`
 
 ## 2026-09-28 — feature/2101-session-summary-artifact — added this file
 **Was doing:** created the session-summary artifact for saiku#2101 (ACMM L3
@@ -110,3 +121,17 @@ written from the conversation rather than from `git status` / `git log`, records
 what the agent remembers doing instead of what the tree actually contains. Check
 the tree first.
 **Refs:** #2101
+
+## 2026-10-07 — development — pruned API-only documentation
+**Was doing:** removed the dashboard UI guide/screenshots, Enigma app plans, and obsolete Svelte frontend/cube-designer plans; updated README and AGENTS.md to describe the API-only repository and retain active backend planning docs.
+**Now:** regenerate `graphify-out/` so its cached nodes no longer refer to removed documentation; review remaining `../../docs/olap/reference/plans/` for historical plans whose backend/API parts still apply.
+**Watch out:** `../../docs/olap/reference/embed/quickstart.md` is a deliberate notice that the embedded client was removed; dashboard REST endpoints remain, but clients must be deployed separately. Existing unrelated changes in the worktree were left untouched.
+**Refs:** `README.md`, `AGENTS.md`, `docs/`
+
+
+
+## 2026-10-07 — development — consolidated OLAP documentation in monorepo
+**Was doing:** moved the 50 remaining Saiku reference files from `olap-service/docs` to `docs/olap/reference`; left `olap-service/docs/README.md` as a pointer; added an index under the monorepo OLAP docs; updated links in READMEs, contributor guidance, observability files, examples, and source comments.
+**Now:** refresh Graphify's generated graph when its corpus manifest is available; current `graphify-out/` still records the previous `olap-service/docs` paths.
+**Watch out:** docs link scan found one unrelated pre-existing broken link: `GOVERNANCE.md` points to missing `MAINTAINERS.md`. No build or tests were run; this change relocates documentation only.
+**Refs:** `../docs/olap/README.md`, `../docs/olap/reference/README.md`

@@ -71,4 +71,4 @@ export OTEL_TRACES_SAMPLER_ARG=0.05   # 5% root traces
 ## Reference
 
 - [Grafana Cloud OTLP endpoint docs](https://grafana.com/docs/grafana-cloud/send-data/otlp/)
-- [Saiku observability overview](../../docs/observability.md)
+- [Saiku observability overview](../../../docs/olap/reference/observability.md)

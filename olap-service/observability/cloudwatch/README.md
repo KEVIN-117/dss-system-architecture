@@ -103,4 +103,4 @@ You want to see `CloudWatchLogsExporter`, `AWSXRayExporter`, and
 
 - [AWS Distro for OpenTelemetry](https://aws-otel.github.io/)
 - [ADOT collector config reference](https://aws-otel.github.io/docs/setup/build-collector-with-scripts)
-- [Saiku observability overview](../../docs/observability.md)
+- [Saiku observability overview](../../../docs/olap/reference/observability.md)

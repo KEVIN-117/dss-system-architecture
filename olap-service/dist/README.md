@@ -113,7 +113,7 @@ java -jar saiku-<version>.jar <command> --help
 |---------|---------|
 | `serve` | Start the Saiku web server (see CLI options above). |
 | `sql-serve` | Serve an Ossie/SQL semantic model without the full OLAP stack. |
-| `eval` | Run the agent-eval accuracy suites against a running server and report pass-rate. Exit `0` = all passed, `1` = a suite regressed, `2` = transport/config error. See `docs/EVAL-SPEC.md`. |
+| `eval` | Run the agent-eval accuracy suites against a running server and report pass-rate. Exit `0` = all passed, `1` = a suite regressed, `2` = transport/config error. See `../docs/olap/reference/EVAL-SPEC.md`. |
 
 `eval` is the CI/cron entry point for the AI accuracy monitor. It POSTs to
 `/rest/saiku/admin/ai-evals/run` (admin Basic auth) and blocks until the sweep
@@ -176,7 +176,7 @@ export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 
 When `OTEL_EXPORTER_OTLP_ENDPOINT` is unset, the agent is never loaded
 — zero overhead, zero observability. See
-[docs/observability.md](../docs/observability.md) for the full
+[../../docs/olap/reference/observability.md](../../docs/olap/reference/observability.md) for the full
 configuration reference, what gets auto-instrumented, and sampling
 guidance.
 

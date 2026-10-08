@@ -14,7 +14,7 @@ import java.util.List;
  *
  * <p>The shape is intentionally small — dashboards are a layout layer on
  * top of the AI Query API, not a new query engine. See
- * {@code docs/plans/2026-05-16-dashboards-design.md}.
+ * {@code ../docs/olap/reference/plans/2026-05-16-dashboards-design.md}.
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 public class Dashboard {

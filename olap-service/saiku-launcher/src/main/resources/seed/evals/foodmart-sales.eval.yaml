@@ -1,7 +1,7 @@
 # Ground-truth eval cases for the FoodMart Sales cube (saiku#1424).
 #
 # Runs against the AI ask layer to catch regressions when the LLM provider,
-# model, prompt, or schema changes. See docs/EVAL-SPEC.md for the format.
+# model, prompt, or schema changes. See ../docs/olap/reference/EVAL-SPEC.md for the format.
 #
 # QUERY cases use `referenceQuery` (drift-proof): the NL-generated query is
 # diffed against a trusted reference query's result-set at the SAME moment, so
@@ -11,7 +11,7 @@
 # NOTE: INSIGHT-intent cases aren't included — INSIGHT routing needs a cellset
 # digest (the on-screen data to analyse), which the eval harness doesn't supply
 # yet; without it the model routes an "analyse this" question to QUERY. Adding a
-# per-case cellsetDigest to EvalCase is a follow-up (see docs/EVAL-SPEC.md).
+# per-case cellsetDigest to EvalCase is a follow-up (see ../docs/olap/reference/EVAL-SPEC.md).
 
 name: foodmart-sales-evals
 description: >

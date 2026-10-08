@@ -21,6 +21,12 @@ Los fuentes Mermaid editables están en [`diagrams/`](diagrams/). Cada página i
 
 ## Inventario de arquitectura y evidencias
 
+La documentación de referencia trasladada desde el repositorio Saiku está en
+[`reference/README.md`](reference/README.md). Allí están los contratos REST,
+GraphQL y MCP, la integración Keycloak, observabilidad, ejemplos y planes de
+implementación. Los diagramas y flujos específicos de la arquitectura OLAP de
+este monorepo permanecen en esta carpeta.
+
 | Elemento | Responsabilidad | Evidencia principal |
 |---|---|---|
 | Launcher + Jetty | Inicia el WAR `saiku-api` dentro de Jetty EE10 y expone REST en `/rest/*`. | `saiku-launcher/src/main/java/org/saiku/launcher/SaikuLauncher.java`, `saiku-api/src/main/webapp/WEB-INF/web.xml` |

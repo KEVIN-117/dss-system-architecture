@@ -24,7 +24,7 @@ import org.saiku.service.schema.generate.model.DbTable;
  * Because no such calendar table exists in the source database, Mondrian accepted the XML but
  * couldn't query the dim. The writer bug is fixed by colocating the dim on the fact table and
  * deriving Y/Q/M/D levels via SQL expressions ({@code YEAR}/{@code QUARTER}/{@code MONTH}/
- * {@code DAY}) — see {@code docs/plans/2026-04-19-schema-autogeneration-design.md} "Time
+ * {@code DAY}) — see {@code ../docs/olap/reference/plans/2026-04-19-schema-autogeneration-design.md} "Time
  * dimensions (degenerate)".
  *
  * <p>One {@link DraftDimension} per {@code DATE}/{@code TIMESTAMP}/{@code TIMESTAMP_WITH_TIMEZONE}

@@ -35,7 +35,7 @@ import org.slf4j.LoggerFactory;
  * {@code /rest/saiku/api/ai/query} unchanged. The dashboard layer is a
  * layout-only thing on the backend; the frontend computes effective
  * filters and re-issues queries per tile. See
- * {@code docs/plans/2026-05-16-dashboards-design.md}.
+ * {@code ../docs/olap/reference/plans/2026-05-16-dashboards-design.md}.
  */
 @Tag(name = "Dashboards")
 @Path("/saiku/api/dashboards")

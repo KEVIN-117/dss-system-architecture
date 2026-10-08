@@ -3,7 +3,7 @@
 > **This document is a frozen Phase-1 design snapshot.** The shipped contract
 > has diverged from it across the v2 (records + typed cells + ops + sort)
 > and v3 (relative-time filters, typed sample members) reshapes. **Always
-> treat `docs/AI-QUERY-API.md` as the authoritative current contract.**
+> treat `../docs/olap/reference/AI-QUERY-API.md` as the authoritative current contract.**
 >
 > ### Major drifts from this plan
 >

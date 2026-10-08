@@ -45,7 +45,7 @@ RUN chmod +x /usr/local/bin/saiku-entrypoint
 # OpenTelemetry Java agent — side-loaded, only attached at runtime when
 # OTEL_EXPORTER_OTLP_ENDPOINT is set (see saiku-entrypoint). Pinned by
 # checksum so a tampered Maven Central response can't slip in a different
-# binary. See docs/observability.md for the runtime activation contract.
+# binary. See ../docs/olap/reference/observability.md for the runtime activation contract.
 RUN set -eux; \
     mkdir -p /opt/saiku/otel; \
     curl -fsSL -o /opt/saiku/otel/opentelemetry-javaagent.jar \

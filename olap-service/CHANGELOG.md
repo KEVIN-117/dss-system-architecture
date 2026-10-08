@@ -91,7 +91,7 @@ All notable changes to Saiku are documented here. This project follows
   `X-Frame-Options` is then omitted (it cannot express a list) and the CSP
   `frame-ancestors` directive carries the list. `-Dsaiku.security.frameAncestors=off`
   restores the old, fully framable behaviour. The web-component embed
-  (`docs/embed/quickstart.md`) is unaffected. To enforce the CSP instead of
+  (`../docs/olap/reference/embed/quickstart.md`) is unaffected. To enforce the CSP instead of
   reporting it, set `-Dsaiku.security.csp` to the policy above; to silence the
   report-only header, set `-Dsaiku.security.cspReportOnly=off`.
 

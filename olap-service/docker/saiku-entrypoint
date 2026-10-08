@@ -84,7 +84,7 @@ case "${1:-serve}" in
     # defaults to "saiku" so traces are attributed correctly without
     # forcing every deployer to set it. All other OTEL_* env vars
     # (sampler, headers, resource attrs) pass through to the agent
-    # untouched — see docs/observability.md.
+    # untouched — see ../../docs/olap/reference/observability.md.
     OTEL_AGENT_JAR=/opt/saiku/otel/opentelemetry-javaagent.jar
     if [[ -n "${OTEL_EXPORTER_OTLP_ENDPOINT:-}" && -f "$OTEL_AGENT_JAR" ]]; then
       JAVA_OPTS+=("-javaagent:${OTEL_AGENT_JAR}")

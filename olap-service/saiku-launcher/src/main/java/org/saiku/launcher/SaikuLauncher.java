@@ -99,11 +99,11 @@ public class SaikuLauncher implements Callable<Integer> {
             int actualPort = ((ServerConnector) server.getConnectors()[0]).getLocalPort();
             String base = "http://" + host + ":" + actualPort + contextPath;
             if (!base.endsWith("/")) base = base + "/";
-            System.out.println("Saiku ready:");
-            System.out.println("  Workspace : " + base + "ui/");
-            System.out.println("  Admin     : " + base + "ui/admin");
+            System.out.println("Saiku API ready:");
             System.out.println("  REST API  : " + base + "rest/saiku/");
-            System.out.println("  Swagger  : " + base + "swagger-ui.html");
+            System.out.println("  Swagger UI: " + base + "swagger-ui.html");
+            System.out.println("  OpenAPI   : " + base + "rest/openapi.json");
+            System.out.println("  Health    : " + base + "rest/saiku/info");
             printDefaultCredentialWarning();
             server.join();
             return 0;

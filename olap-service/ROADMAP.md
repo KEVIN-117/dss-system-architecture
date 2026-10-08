@@ -26,12 +26,12 @@ GitHub issue where one exists.
   library.
 - **AI Query API for both OLAP and Ossie surfaces.** Records +
   matrix formats, async execute, anomaly detection, forecasting,
-  natural-language ask. See [`docs/AI-QUERY-API.md`](./docs/AI-QUERY-API.md)
-  and [`docs/AI-OSSIE-API.md`](./docs/AI-OSSIE-API.md).
+  natural-language ask. See [`../docs/olap/reference/AI-QUERY-API.md`](./../docs/olap/reference/AI-QUERY-API.md)
+  and [`../docs/olap/reference/AI-OSSIE-API.md`](./../docs/olap/reference/AI-OSSIE-API.md).
 - **dbt / MetricFlow integration.** dbt Core 1.12's
   `target/osi_document.json` is consumed directly. Older dbt
   versions use the MetricFlow-to-Ossie converter in
-  [`docs/dbt-hookup/`](./docs/dbt-hookup/).
+  [`docs/dbt-hookup/`](../docs/olap/reference/dbt-hookup/).
 - **Synonym resolution, custom_extensions passthrough, ontology
   block.** Every OSI spec surface the flights + tpcds reference
   examples exercise now round-trips through Saiku

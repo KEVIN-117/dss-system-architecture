@@ -65,4 +65,4 @@ export OTEL_TRACES_SAMPLER_ARG=0.05
 ## Reference
 
 - [New Relic: OpenTelemetry OTLP configuration](https://docs.newrelic.com/docs/opentelemetry/best-practices/opentelemetry-otlp/)
-- [Saiku observability overview](../../docs/observability.md)
+- [Saiku observability overview](../../../docs/olap/reference/observability.md)

@@ -167,7 +167,7 @@ curl -u admin:admin -H "Content-Type: application/json" \
 Typed cells straight off Delta — e.g. `AFRICA → Total Price 445,136,670.46,
 Order Count 3,115` — which means Claude Desktop / any MCP agent can query your
 Delta lakehouse through the same 12 tools documented in
-[`docs/mcp/`](../../docs/mcp/README.md). (Note the connection name is
+[`docs/mcp/`](../../../docs/olap/reference/mcp/README.md). (Note the connection name is
 `unknown_delta` here, vs `unknown_lakehouse` in the Iceberg demo.)
 
 ## Run it with your own data

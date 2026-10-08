@@ -6,7 +6,7 @@ package org.saiku.service.olap.ai;
 
 /**
  * Minimal in-process FoodMart-shaped {@link AiSchema} for testing
- * {@code docs/AI-QUERY-API.md} examples. Only includes the dims /
+ * {@code ../docs/olap/reference/AI-QUERY-API.md} examples. Only includes the dims /
  * hierarchies / measures the doc examples reference — not a full FoodMart
  * mirror. Extend it as new examples are added to the doc.
  *

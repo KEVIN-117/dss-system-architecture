@@ -14,7 +14,7 @@ import org.saiku.olap.query2.ThinQuery;
 
 /**
  * Self-executing doc examples (Phase 4 / saiku#10). Each test pins one
- * example body from {@code docs/AI-QUERY-API.md} — when the converter
+ * example body from {@code ../docs/olap/reference/AI-QUERY-API.md} — when the converter
  * drifts away from a documented {@code generatedMdx} string, this test
  * fails and forces the doc to update in lockstep.
  *

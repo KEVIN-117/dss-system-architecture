@@ -76,7 +76,7 @@ You want to see the OTLP receiver bound on `:4317` and `:4318`.
 ## Reference
 
 - [Datadog: OpenTelemetry with the Datadog Agent](https://docs.datadoghq.com/opentelemetry/collector_exporter/otlp_receiver/)
-- [Saiku observability overview](../../docs/observability.md)
+- [Saiku observability overview](../../../docs/olap/reference/observability.md)
 - [Grafana starter dashboard](../dashboards/grafana/saiku-overview.json)
   — the same metrics render in Datadog too; the dashboard JSON is a
   reference for which series to build widgets from.

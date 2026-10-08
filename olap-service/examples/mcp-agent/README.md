@@ -3,7 +3,7 @@
 Two minimal, dependency-light agents (Python and TypeScript) that connect to
 Saiku's **native MCP server** and query cubes without writing a line of MDX.
 They are the programmatic sibling of the Claude Desktop quickstart in
-[`docs/mcp/README.md`](../../docs/mcp/README.md) — use them as the starting
+[`docs/mcp/README.md`](../../../docs/olap/reference/mcp/README.md) — use them as the starting
 point for your own agent, a cron job, or a CI smoke test.
 
 Each agent runs in one of two modes:
@@ -67,7 +67,7 @@ The MCP surface adds **no new privileges** — every tool call runs as the
 authenticated Saiku user, with Mondrian role propagation, k-anonymity
 small-cell suppression, and the `ai.policy` data-egress gate applied
 server-side. There is no raw MDX/SQL entry point. The full isolation model
-is documented in [`docs/mcp/README.md`](../../docs/mcp/README.md#permissions-and-data-isolation--what-an-agent-can-and-cannot-see).
+is documented in [`docs/mcp/README.md`](../../../docs/olap/reference/mcp/README.md#permissions-and-data-isolation--what-an-agent-can-and-cannot-see).
 
 ## Adapting to your own agent
 

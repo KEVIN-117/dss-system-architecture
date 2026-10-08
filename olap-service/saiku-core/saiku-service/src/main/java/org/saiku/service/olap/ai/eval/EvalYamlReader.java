@@ -22,7 +22,7 @@ import org.saiku.service.olap.ai.AiQueryRequest;
  * EvalParseException#code()} so the report generator can distinguish "author wrote a broken YAML"
  * from "the ask surface produced a wrong answer" — the two shouldn't be conflated in CI.
  *
- * <p>On-disk shape (spec lives at {@code docs/EVAL-SPEC.md}):
+ * <p>On-disk shape (spec lives at {@code ../docs/olap/reference/EVAL-SPEC.md}):
  *
  * <pre>{@code
  * name: foodmart-sales-evals

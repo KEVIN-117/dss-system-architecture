@@ -163,7 +163,7 @@ curl -u admin:admin -H "Content-Type: application/json" \
 
 Typed cells straight off Iceberg — which means Claude Desktop / any MCP
 agent can query your lakehouse through the same 12 tools documented in
-[`docs/mcp/`](../../docs/mcp/README.md).
+[`docs/mcp/`](../../../docs/olap/reference/mcp/README.md).
 
 ## Run it with your own data
 
