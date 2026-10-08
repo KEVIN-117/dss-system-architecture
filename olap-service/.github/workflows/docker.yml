@@ -1,0 +1,171 @@
+name: docker
+
+# Rolling demo image. Fires on every push to development (and on
+# workflow_dispatch). Tagged releases are handled by release.yml,
+# which produces stable semver tags + :latest; this workflow gives
+# users a way to pull "current development tip" without waiting for
+# a release.
+on:
+  push:
+    branches: [development, main]
+  workflow_dispatch:
+
+# Least-privilege default: read-only for the whole workflow. Each job below
+# elevates ONLY the scope it needs (see per-job `permissions:` blocks), so the
+# Maven + frontend lifecycle runs with no forge/signing capability (SEC S2/N1).
+permissions:
+  contents: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build:
+    # Build the API runtime and launcher without credentials or signing permissions.
+    # packages/id-token/attestations — a compromised build plugin
+    # here can neither push to GHCR nor mint a Sigstore identity (SEC S2). It
+    # hands the built fat JAR to the push job as an artifact.
+    name: Build launcher fat JAR
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read # checkout only
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up JDK 22
+        uses: actions/setup-java@de7274f081f381c8f8158605e0321c36c376e2e6 # v6.0.1
+        with:
+          distribution: temurin
+          java-version: "22"
+          cache: maven
+
+      # Same multi-server settings.xml as ci.yml / release.yml — the
+      # build needs to pull mondrian, olap4j, olap4j-xmlaserver, and
+      # saiku-query from spiculedata's GitHub Packages registries.
+      - name: Configure Maven settings.xml
+        env:
+          GH_PACKAGES_USER: ${{ github.actor }}
+          GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
+        run: |
+          mkdir -p ~/.m2
+          cat > ~/.m2/settings.xml <<EOF
+          <settings xmlns="http://maven.apache.org/SETTINGS/1.0.0">
+            <servers>
+              <server><id>github-mondrian-saiku</id><username>${GH_PACKAGES_USER}</username><password>${GH_PACKAGES_TOKEN}</password></server>
+              <server><id>github-olap4j</id><username>${GH_PACKAGES_USER}</username><password>${GH_PACKAGES_TOKEN}</password></server>
+              <server><id>github-olap4j-xmlaserver</id><username>${GH_PACKAGES_USER}</username><password>${GH_PACKAGES_TOKEN}</password></server>
+              <server><id>github-saiku-query</id><username>${GH_PACKAGES_USER}</username><password>${GH_PACKAGES_TOKEN}</password></server>
+            </servers>
+          </settings>
+          EOF
+
+      - name: Resolve project version
+        id: ver
+        run: |
+          VERSION=$(mvn -B -ntp -q -DforceStdout help:evaluate -Dexpression=project.version)
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "saiku version: $VERSION"
+
+      - name: Build launcher fat JAR
+        run: mvn -B -ntp -DskipTests -pl saiku-launcher -am package
+
+      - name: Stage JAR for Docker build context
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          set -euo pipefail
+          mkdir -p build-context
+          # Dockerfile's default ARG JAR_PATH=build-context/saiku.jar — the push
+          # job restores this exact path from the artifact below.
+          cp "saiku-launcher/target/saiku-${VERSION}.jar" build-context/saiku.jar
+          ls -la build-context/
+
+      - name: Upload launcher JAR
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: saiku-jar
+          path: build-context/saiku.jar
+          retention-days: 7
+
+  push:
+    # Push + attest ONLY. Holds packages:write (push image + attestations to
+    # GHCR) + id-token:write/attestations:write (keyless Sigstore provenance).
+    # It runs NO Maven lifecycle: it only checks out the Docker context
+    # (Dockerfile + docker/), restores the prebuilt JAR, and builds/pushes the
+    # image — so the elevated identity never touches arbitrary build code
+    # (SEC S2). Permissions are JOB-level, not workflow-level (SEC N1).
+    name: Push & attest image
+    runs-on: ubuntu-latest
+    needs: [build]
+    permissions:
+      contents: read # checkout the Docker build context
+      packages: write # push the image AND its attestations to GHCR
+      id-token: write # keyless Sigstore signing for build provenance (saiku#1992)
+      attestations: write # record the SLSA provenance attestation on the repo
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      # The Dockerfile COPYs a prebuilt build-context/saiku.jar (no Maven runs
+      # at image build). Restore exactly that from the build job's artifact.
+      - name: Download launcher JAR
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: saiku-jar
+          path: build-context
+      - name: Confirm build context
+        run: ls -la build-context/
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Log in to GHCR
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image metadata
+        id: meta
+        uses: docker/metadata-action@dc802804100637a589fabce1cb79ff13a1411302 # v6.2.0
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          # Push:
+          #   ghcr.io/spiculedata/saiku:development  (rolling tip)
+          #   ghcr.io/spiculedata/saiku:main         (rolling tip of main)
+          #   ghcr.io/spiculedata/saiku:sha-abc1234  (immutable, pinnable)
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-,format=short
+
+      - name: Build & push
+        id: build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          file: Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          # buildx cache via GitHub's built-in Action cache, so iterative
+          # pushes only rebuild the changed layer (mostly the COPY of
+          # the freshly-built JARs).
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          # saiku#1990 + #1992: the rolling development image is the primary
+          # image push on `development`, so it carries the same SBOM + SLSA
+          # provenance attestations as the released image. This is where the
+          # container supply-chain wiring is proven ahead of a tagged release.
+          sbom: true
+          provenance: mode=max
+
+      - name: Attest image build provenance
+        # saiku#1992: keyless Sigstore provenance for the rolling image, logged
+        # to Rekor and pushed to GHCR as a referring attestation. subject-digest
+        # is the image index digest emitted by the build step above.
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true

@@ -1,0 +1,22 @@
+sequenceDiagram
+    autonumber
+    actor User
+    participant BFF
+    participant KC as Keycloak
+    participant API as OLAP REST
+    participant Decoder as JWT Decoder
+    participant Converter as Role Converter
+    participant Jax as Jersey SecurityContext
+    User->>BFF: inicia sesión DSS
+    BFF->>KC: OIDC
+    KC-->>BFF: access token
+    BFF->>API: petición + Bearer
+    API->>Decoder: validar firma, iss, tiempo, aud
+    Decoder->>KC: JWKS si no está cacheado
+    KC-->>Decoder: claves públicas
+    Decoder-->>API: JWT validado
+    API->>Converter: convertir resource_access.olap-service.roles
+    Converter-->>API: ROLE_ADMIN / ROLE_USER
+    API->>Jax: propagar principal/authorities
+    Jax-->>API: recurso con SecurityContext
+    API-->>BFF: resultado o 401/403

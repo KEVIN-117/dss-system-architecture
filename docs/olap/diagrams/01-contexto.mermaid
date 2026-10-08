@@ -1,0 +1,14 @@
+C4Context
+    title Contexto del sistema OLAP Saiku
+    Person(user, "Usuario DSS", "Usa análisis multidimensional desde un cliente autenticado")
+    System_Boundary(dss, "Plataforma DSS") {
+        System(bff, "DSS BFF / frontend", "Conserva la sesión del usuario y llama a servicios")
+        System(olap, "OLAP Service (Saiku)", "Descubrimiento, autoría de esquema y ejecución de consultas")
+        System(auth, "Keycloak", "Emite access tokens OIDC")
+        System_Ext(dw, "Data Warehouse", "Fuente relacional externa consultada por JDBC")
+    }
+    Rel(user, bff, "Solicita análisis")
+    Rel(bff, auth, "OIDC: inicio de sesión / access token")
+    Rel(bff, olap, "REST + Bearer token")
+    Rel(olap, auth, "JWKS / validación issuer y audience")
+    Rel(olap, dw, "JDBC / Mondrian / olap4j")

@@ -1,0 +1,75 @@
+/*
+ *   Copyright 2026 Spicule Ltd
+ *   Apache License, Version 2.0.
+ */
+package org.saiku.web.email;
+
+import static org.junit.Assert.*;
+
+import jakarta.ws.rs.core.Response;
+import java.util.Map;
+import org.junit.Test;
+import org.saiku.service.mail.MailConfig;
+import org.saiku.service.mail.MailMessage;
+import org.saiku.service.mail.MailSender;
+
+public class EmailResourceHealthTest {
+
+    private static MailSender sender(final boolean configured) {
+        return new MailSender() {
+            public boolean isConfigured() {
+                return configured;
+            }
+
+            public void send(MailMessage m) {}
+        };
+    }
+
+    private static MailConfig config(String selfTo) {
+        return new MailConfig("smtp.example.com", 587, "user", "pass", "saiku@example.com", true, false, selfTo);
+    }
+
+    @Test
+    public void health_reportsConfiguredTrue_whenSenderConfigured() {
+        EmailResource r = new EmailResource();
+        r.setMailSender(sender(true));
+        Response resp = r.health();
+        assertEquals(200, resp.getStatus());
+        assertEquals(Boolean.TRUE, ((Map<?, ?>) resp.getEntity()).get("configured"));
+    }
+
+    @Test
+    public void health_reportsConfiguredFalse_whenNoop_orNull() {
+        EmailResource r = new EmailResource();
+        r.setMailSender(sender(false));
+        assertEquals(Boolean.FALSE, ((Map<?, ?>) r.health().getEntity()).get("configured"));
+        EmailResource r2 = new EmailResource(); // mailSender left null
+        assertEquals(Boolean.FALSE, ((Map<?, ?>) r2.health().getEntity()).get("configured"));
+    }
+
+    @Test
+    public void health_reportsSelfConfigured_andEchoesRecipient_whenSelfToSet() {
+        EmailResource r = new EmailResource();
+        r.setMailSender(sender(true));
+        r.setMailConfig(config("ops@example.com"));
+        Map<?, ?> body = (Map<?, ?>) r.health().getEntity();
+        assertEquals(Boolean.TRUE, body.get("selfConfigured"));
+        assertEquals("ops@example.com", body.get("to"));
+    }
+
+    @Test
+    public void health_reportsSelfNotConfigured_andNullRecipient_whenSelfToBlank() {
+        EmailResource r = new EmailResource();
+        r.setMailSender(sender(true));
+        r.setMailConfig(config(null));
+        Map<?, ?> body = (Map<?, ?>) r.health().getEntity();
+        assertEquals(Boolean.FALSE, body.get("selfConfigured"));
+        assertNull(body.get("to"));
+        // mailConfig never set at all → also self-not-configured, null recipient.
+        EmailResource r2 = new EmailResource();
+        r2.setMailSender(sender(true));
+        Map<?, ?> body2 = (Map<?, ?>) r2.health().getEntity();
+        assertEquals(Boolean.FALSE, body2.get("selfConfigured"));
+        assertNull(body2.get("to"));
+    }
+}

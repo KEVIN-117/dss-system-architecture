@@ -1,0 +1,285 @@
+/*
+ *   Copyright 2026 Spicule Ltd
+ *   Apache License, Version 2.0.
+ */
+package org.saiku.service.olap.ai.ask;
+
+import java.time.Duration;
+import java.util.function.Function;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Config-driven {@link NlAskProvider} selector used by Spring wiring.
+ *
+ * <p>Given a provider name + optional credentials + model, returns the matching provider
+ * implementation. Unknown / blank names, missing API keys, and unresolved {@code ${...}} property
+ * placeholders all fall back to {@link NoopNlAskProvider} with a WARN log rather than throwing —
+ * the workspace must boot even when the AI ask layer is misconfigured.
+ *
+ * <p>Supported providers:
+ *
+ * <ul>
+ *   <li>{@code noop} (default) — {@link NoopNlAskProvider}; renders a clear "not configured" 503.
+ *   <li>{@code anthropic} — {@link AnthropicNlAskProvider}; API key from {@code apiKey} arg or the
+ *       {@code ANTHROPIC_API_KEY} env var.
+ *   <li>{@code openai} — {@link OpenAINlAskProvider}; API key from {@code apiKey} arg or the
+ *       {@code OPENAI_API_KEY} env var.
+ *   <li>{@code azure-openai} — {@link AzureOpenAiNlAskProvider} (saiku#1431); API key from
+ *       {@code apiKey} arg or the {@code AZURE_OPENAI_API_KEY} env var. Requires
+ *       {@code endpoint} pointing at the deployment URL
+ *       ({@code https://<resource>.openai.azure.com/openai/deployments/<deployment>/chat/completions?api-version=<version>}).
+ *   <li>{@code ollama} (saiku#904) — an {@link OpenAINlAskProvider} pointed at a local/self-hosted
+ *       Ollama instance's OpenAI-compatible endpoint. Unlike {@code openai}/{@code azure-openai},
+ *       NO API key is required: Ollama's OpenAI-compat shim doesn't check one, so a missing key
+ *       resolves to a harmless placeholder rather than falling back to {@link NoopNlAskProvider}.
+ *       An explicit {@code apiKey} arg or {@code OLLAMA_API_KEY} env var is still honoured, for
+ *       operators who put an authenticating proxy in front of Ollama. Defaults: endpoint {@code
+ *       http://localhost:11434/v1/chat/completions}, model {@value #DEFAULT_OLLAMA_MODEL}.
+ * </ul>
+ *
+ * <p>API keys are never logged. When a non-noop provider is selected, a single INFO line records
+ * {@code provider=..., model=...} at construction time.
+ */
+public final class NlAskProviderFactory {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(NlAskProviderFactory.class);
+
+    public static final String PROVIDER_NOOP = "noop";
+    public static final String PROVIDER_ANTHROPIC = "anthropic";
+    public static final String PROVIDER_OPENAI = "openai";
+    /** saiku#1431 — the Azure OpenAI Service. */
+    public static final String PROVIDER_AZURE_OPENAI = "azure-openai";
+    /** saiku#904 — local/self-hosted Ollama via its OpenAI-compatible endpoint. */
+    public static final String PROVIDER_OLLAMA = "ollama";
+
+    public static final String ENV_ANTHROPIC_API_KEY = "ANTHROPIC_API_KEY";
+    public static final String ENV_OPENAI_API_KEY = "OPENAI_API_KEY";
+    public static final String ENV_AZURE_OPENAI_API_KEY = "AZURE_OPENAI_API_KEY";
+    /** saiku#904 — optional; Ollama itself never checks this, only an authenticating proxy would. */
+    public static final String ENV_OLLAMA_API_KEY = "OLLAMA_API_KEY";
+
+    /** saiku#904 — default Ollama OpenAI-compat endpoint (local daemon, default port). */
+    public static final String DEFAULT_OLLAMA_ENDPOINT = "http://localhost:11434/v1/chat/completions";
+    /** saiku#904 — a broadly-available default tag; operators override via {@code model}. */
+    public static final String DEFAULT_OLLAMA_MODEL = "llama3.1";
+    /**
+     * saiku#904 — placeholder sent as the bearer token when no key is configured. Ollama's
+     * OpenAI-compat shim ignores the Authorization header entirely, but {@link OpenAINlAskProvider}
+     * requires a non-blank {@code apiKey} to construct, so we hand it an inert literal rather than
+     * relaxing that invariant for every provider built on top of it.
+     */
+    public static final String OLLAMA_KEYLESS_PLACEHOLDER = "ollama";
+
+    private final String providerName;
+    private final String apiKey;
+    private final String model;
+    private final String endpoint;
+    private final Function<String, String> envLookup;
+
+    /** Production constructor — uses {@link System#getenv(String)} for env-var lookups. */
+    public NlAskProviderFactory(String providerName, String apiKey, String model, String endpoint) {
+        this(providerName, apiKey, model, endpoint, System::getenv);
+    }
+
+    /** Package-visible constructor for tests — env lookup is injectable. */
+    public NlAskProviderFactory(
+            String providerName, String apiKey, String model, String endpoint, Function<String, String> envLookup) {
+        this.providerName = providerName;
+        this.apiKey = apiKey;
+        this.model = model;
+        this.endpoint = endpoint;
+        this.envLookup = envLookup == null ? name -> null : envLookup;
+    }
+
+    /** Build the configured {@link NlAskProvider}. Never returns null. */
+    public NlAskProvider build() {
+        String name = normalise(providerName);
+        if (name == null || name.isEmpty() || PROVIDER_NOOP.equalsIgnoreCase(name)) {
+            LOGGER.info("AI ask provider: noop (not configured)");
+            return new NoopNlAskProvider();
+        }
+        if (PROVIDER_ANTHROPIC.equalsIgnoreCase(name)) {
+            String resolvedKey = resolveApiKey(ENV_ANTHROPIC_API_KEY);
+            if (resolvedKey == null) {
+                LOGGER.warn(
+                        "AI ask provider set to 'anthropic' but no API key configured "
+                                + "(neither saiku.ai.ask.apiKey nor {} is set); falling back to NoopProvider.",
+                        ENV_ANTHROPIC_API_KEY);
+                return new NoopNlAskProvider();
+            }
+            String resolvedModel = normalise(model);
+            String effectiveModel = resolvedModel == null ? AnthropicNlAskProvider.DEFAULT_MODEL : resolvedModel;
+            LOGGER.info("AI ask provider: anthropic (model={})", effectiveModel);
+            // Omit temperature by default: the Claude-5 family rejects it, and tool_choice already
+            // forces the structured tool call so determinism doesn't depend on temperature=0.
+            return new AnthropicNlAskProvider(new AnthropicNlAskProvider.Config(
+                    resolvedKey, effectiveModel, AnthropicNlAskProvider.OMIT_TEMPERATURE, 4096, askRequestTimeout()));
+        }
+        if (PROVIDER_OPENAI.equalsIgnoreCase(name)) {
+            String resolvedKey = resolveApiKey(ENV_OPENAI_API_KEY);
+            if (resolvedKey == null) {
+                LOGGER.warn(
+                        "AI ask provider set to 'openai' but no API key configured "
+                                + "(neither saiku.ai.ask.apiKey nor {} is set); falling back to NoopProvider.",
+                        ENV_OPENAI_API_KEY);
+                return new NoopNlAskProvider();
+            }
+            String resolvedModel = normalise(model);
+            String effectiveModel = resolvedModel == null ? OpenAINlAskProvider.DEFAULT_MODEL : resolvedModel;
+            String resolvedEndpoint = normalise(endpoint);
+            String effectiveEndpoint =
+                    resolvedEndpoint == null ? OpenAINlAskProvider.DEFAULT_ENDPOINT : resolvedEndpoint;
+            LOGGER.info("AI ask provider: openai (model={}, endpoint={})", effectiveModel, effectiveEndpoint);
+            // Omit temperature by default: gpt-5 / o-series reject a custom value, and the forced
+            // function call already pins the structured output so determinism doesn't need it.
+            return new OpenAINlAskProvider(new OpenAINlAskProvider.Config(
+                    resolvedKey,
+                    effectiveModel,
+                    effectiveEndpoint,
+                    OpenAINlAskProvider.OMIT_TEMPERATURE,
+                    4096,
+                    askRequestTimeout()));
+        }
+        if (PROVIDER_AZURE_OPENAI.equalsIgnoreCase(name)) {
+            String resolvedKey = resolveApiKey(ENV_AZURE_OPENAI_API_KEY);
+            if (resolvedKey == null) {
+                LOGGER.warn(
+                        "AI ask provider set to 'azure-openai' but no API key configured "
+                                + "(neither saiku.ai.ask.apiKey nor {} is set); falling back to NoopProvider.",
+                        ENV_AZURE_OPENAI_API_KEY);
+                return new NoopNlAskProvider();
+            }
+            String resolvedEndpoint = normalise(endpoint);
+            if (resolvedEndpoint == null) {
+                // Azure has no default endpoint — the deployment URL is per-resource and
+                // per-deployment, so we can't invent one. Refuse to construct rather than
+                // silently emitting to OpenAI's default host on the wrong auth header.
+                LOGGER.warn("AI ask provider set to 'azure-openai' but saiku.ai.ask.endpoint is unset. "
+                        + "Configure it to your deployment URL "
+                        + "(https://<resource>.openai.azure.com/openai/deployments/<deployment>/chat/completions?api-version=<version>). "
+                        + "Falling back to NoopProvider.");
+                return new NoopNlAskProvider();
+            }
+            String resolvedModel = normalise(model);
+            String effectiveModel =
+                    resolvedModel == null ? AzureOpenAiNlAskProvider.DEFAULT_AZURE_MODEL : resolvedModel;
+            LOGGER.info(
+                    "AI ask provider: azure-openai (deployment/model={}, endpoint={})",
+                    effectiveModel,
+                    resolvedEndpoint);
+            return new AzureOpenAiNlAskProvider(new OpenAINlAskProvider.Config(
+                    resolvedKey,
+                    effectiveModel,
+                    resolvedEndpoint,
+                    OpenAINlAskProvider.OMIT_TEMPERATURE,
+                    4096,
+                    askRequestTimeout()));
+        }
+        if (PROVIDER_OLLAMA.equalsIgnoreCase(name)) {
+            // saiku#904: unlike openai/anthropic/azure-openai, Ollama itself never validates a key —
+            // a local/self-hosted instance is the whole point. Resolve explicit apiKey -> env var ->
+            // an inert placeholder, so this provider is usable with zero credentials configured.
+            String resolvedKey = resolveApiKey(ENV_OLLAMA_API_KEY);
+            String effectiveKey = resolvedKey == null ? OLLAMA_KEYLESS_PLACEHOLDER : resolvedKey;
+            String resolvedModel = normalise(model);
+            String effectiveModel = resolvedModel == null ? DEFAULT_OLLAMA_MODEL : resolvedModel;
+            String resolvedEndpoint = normalise(endpoint);
+            String effectiveEndpoint = resolvedEndpoint == null ? DEFAULT_OLLAMA_ENDPOINT : resolvedEndpoint;
+            LOGGER.info("AI ask provider: ollama (model={}, endpoint={})", effectiveModel, effectiveEndpoint);
+            return new OpenAINlAskProvider(new OpenAINlAskProvider.Config(
+                    effectiveKey,
+                    effectiveModel,
+                    effectiveEndpoint,
+                    OpenAINlAskProvider.OMIT_TEMPERATURE,
+                    4096,
+                    askRequestTimeout()));
+        }
+        LOGGER.warn("Unknown AI ask provider '{}'; falling back to NoopProvider.", providerName);
+        return new NoopNlAskProvider();
+    }
+
+    /**
+     * Config summary for the {@code /saiku/info/diagnostics} surface (saiku#904) — the same provider
+     * selection {@link #build()} performs, but without constructing an HTTP client or making any
+     * network call. {@code configured} is {@code false} whenever {@link #build()} would fall back to
+     * {@link NoopNlAskProvider} (unknown provider, or a hosted provider missing its API key);
+     * {@code ollama} is always {@code true} once selected, since it never requires a key.
+     */
+    public record Descriptor(String provider, String model, String endpoint, boolean configured) {}
+
+    /** Describe the configured provider without building it. Never returns null. */
+    public Descriptor describe() {
+        String name = normalise(providerName);
+        if (name == null || name.isEmpty() || PROVIDER_NOOP.equalsIgnoreCase(name)) {
+            return new Descriptor(PROVIDER_NOOP, null, null, false);
+        }
+        if (PROVIDER_ANTHROPIC.equalsIgnoreCase(name)) {
+            boolean configured = resolveApiKey(ENV_ANTHROPIC_API_KEY) != null;
+            String effectiveModel = normalise(model) == null ? AnthropicNlAskProvider.DEFAULT_MODEL : normalise(model);
+            return new Descriptor(PROVIDER_ANTHROPIC, effectiveModel, null, configured);
+        }
+        if (PROVIDER_OPENAI.equalsIgnoreCase(name)) {
+            boolean configured = resolveApiKey(ENV_OPENAI_API_KEY) != null;
+            String effectiveModel = normalise(model) == null ? OpenAINlAskProvider.DEFAULT_MODEL : normalise(model);
+            String effectiveEndpoint =
+                    normalise(endpoint) == null ? OpenAINlAskProvider.DEFAULT_ENDPOINT : normalise(endpoint);
+            return new Descriptor(PROVIDER_OPENAI, effectiveModel, effectiveEndpoint, configured);
+        }
+        if (PROVIDER_AZURE_OPENAI.equalsIgnoreCase(name)) {
+            boolean configured = resolveApiKey(ENV_AZURE_OPENAI_API_KEY) != null && normalise(endpoint) != null;
+            String effectiveModel =
+                    normalise(model) == null ? AzureOpenAiNlAskProvider.DEFAULT_AZURE_MODEL : normalise(model);
+            return new Descriptor(PROVIDER_AZURE_OPENAI, effectiveModel, normalise(endpoint), configured);
+        }
+        if (PROVIDER_OLLAMA.equalsIgnoreCase(name)) {
+            String effectiveModel = normalise(model) == null ? DEFAULT_OLLAMA_MODEL : normalise(model);
+            String effectiveEndpoint = normalise(endpoint) == null ? DEFAULT_OLLAMA_ENDPOINT : normalise(endpoint);
+            return new Descriptor(PROVIDER_OLLAMA, effectiveModel, effectiveEndpoint, true);
+        }
+        return new Descriptor(providerName, null, null, false);
+    }
+
+    /**
+     * Per-request HTTP timeout to the LLM provider, in seconds. Configurable because local/
+     * self-hosted models (e.g. Ollama) can take far longer than a hosted API to evaluate a large
+     * prompt. Env {@code SAIKU_AI_ASK_TIMEOUT_SECONDS}, else system property {@code
+     * saiku.ai.ask.timeoutSeconds}, else 60. Clamped to [5, 900].
+     */
+    static Duration askRequestTimeout() {
+        String v = System.getenv("SAIKU_AI_ASK_TIMEOUT_SECONDS");
+        if (v == null || v.isBlank()) v = System.getProperty("saiku.ai.ask.timeoutSeconds");
+        long secs = 60;
+        if (v != null && !v.isBlank()) {
+            try {
+                secs = Long.parseLong(v.trim());
+            } catch (NumberFormatException ignore) {
+                // fall through to the default
+            }
+        }
+        secs = Math.max(5, Math.min(900, secs));
+        return Duration.ofSeconds(secs);
+    }
+
+    private String resolveApiKey(String envKey) {
+        String explicit = normalise(apiKey);
+        if (explicit != null) {
+            return explicit;
+        }
+        return normalise(envLookup.apply(envKey));
+    }
+
+    private static String normalise(String s) {
+        if (s == null) {
+            return null;
+        }
+        String t = s.trim();
+        if (t.isEmpty()) {
+            return null;
+        }
+        if (t.startsWith("${") && t.endsWith("}")) {
+            return null;
+        }
+        return t;
+    }
+}

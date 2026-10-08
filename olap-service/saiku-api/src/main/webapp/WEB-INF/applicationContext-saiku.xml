@@ -1,0 +1,306 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<beans xmlns="http://www.springframework.org/schema/beans"
+     xmlns:security="http://www.springframework.org/schema/security"
+	xmlns:context="http://www.springframework.org/schema/context"
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="
+              http://www.springframework.org/schema/security http://www.springframework.org/schema/security/spring-security.xsd
+			   http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context.xsd
+			   http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans.xsd">
+
+
+	<context:annotation-config />
+
+	<security:global-method-security secured-annotations="enabled">
+	</security:global-method-security>
+
+  <!--
+  Saiku currently ships with basic authentication working out of the box, below is also the code for Digest authentication,
+  should you want digest authentication for you application comment out the basic authentication block and enable digest authentication.
+  We are also working on other authentication methods, namely OAuth and Remember me token based policies.
+
+  To add and remove users you currently have to edit WEB-INF/users.properties, this will be replaced with an admin console in due course and
+  you can also swap this out for JDBC backed security lists and (although untested) technically LDAP etc.
+
+  If you modify these files in anyway it would be very useful if you sent us patches for any useful changes you make.
+   -->
+
+  <!-- BASIC AUTHENTICATION -->
+    <!-- saiku#1905 (CWE-611 + broken access control): dedicated auth gate for the
+         XMLA SOAP endpoint. It is prefix-mapped /xmla/* (web.xml -> SaikuXmlaServlet),
+         and the security="none" chains below matched MVC-style (servlet-path-RELATIVE)
+         [NOTE: saiku#1951 has since added request-matcher="ant" to every none chain, so they
+         match the ABSOLUTE path and can no longer claim a servlet's pathInfo — but this
+         chain is kept as an independent, belt-and-braces gate over the whole /xmla surface]:
+         a bare POST /xmla/ has pathInfo "/", which the pattern="/" none chain matches,
+         and POST /xmla/<seg> (pathInfo "/<seg>") could be matched by e.g. the
+         pattern="/assets/**" security chain — either way the request was claimed by a
+         no-filter (security="none") chain and the XMLA servlet was served
+         ANONYMOUSLY (leaking DISCOVER_DATASOURCES / datasource names; and, before the
+         parser hardening, an unauthenticated XXE). QA IT XmlaAuthIT proved the
+         /xmla/ shape slipped every intercept-url in the main chain because the
+         request never reached that chain.
+
+         Declaring this ant-matched secured chain FIRST claims EVERY /xmla shape
+         (bare /xmla, /xmla/, /xmla/<seg>, /xmla/<seg>/<seg>) via request-matcher="ant"
+         on the absolute request path, before any none chain can. Full authentication
+         is required (XMLA is a legitimate authenticated OLAP protocol — Excel and
+         olap4j speak it over HTTP Basic — so isFullyAuthenticated(), NOT admin-only).
+         CSRF is disabled on this chain: XMLA is a stateless machine protocol
+         authenticated per-request via HTTP Basic, with no ambient browser cookie for a
+         forged request to ride (the main chain likewise never CSRF-checks /xmla —
+         SaikuCsrfRequestMatcher only guards /rest/**). basicAuth401NoChallenge returns
+         a bare 401 (no WWW-Authenticate) so anonymous clients get 401, not a browser
+         auth-dialog challenge — that reasoning is correct for clients but WRONG for XMLA,
+         see saiku#1950 below.
+
+         create-session="stateless": XMLA clients authenticate per-request with HTTP
+         Basic and carry no cookie, so this chain never persists a SecurityContext and
+         never mints a Jetty FileSessionDataStore session file per request.
+
+         saiku#1950: entry-point-ref is xmlaBasicAuthChallenge, NOT basicAuth401NoChallenge.
+         The /xmla chain gets a REAL `WWW-Authenticate: Basic realm="Saiku XMLA"` challenge so
+         challenge-driven clients (Excel/MSOLAP over WinHTTP) can negotiate; the main SPA chain
+         below deliberately keeps the bare-401 no-challenge entry point (saiku#878) so the
+         browser never pops a native auth dialog over the SPA's XHR 401s. One shared entry point
+         would trade one client-compat problem for the other, so the two chains pick per surface.
+         Auth policy itself is UNCHANGED by this: still isFullyAuthenticated(), still CSRF-off,
+         still the shared per-IP loginRateLimitFilter, still stateless. Only the 401's headers
+         differ. Locked by XmlaAuthIT#anonymousPostToXmlaAdvertisesBasicChallenge and its
+         counterweight #spaChainStillOmitsBasicChallenge.
+
+         loginRateLimitFilter (BEFORE BASIC_AUTH_FILTER): the SAME per-IP brute-force
+         lockout the main chain uses — without it, /xmla would be an un-throttled
+         credential-guessing surface (an attacker locked out on /rest could just move
+         to /xmla). The shared loginRateLimiter bean returns a 429 short-circuit once
+         the IP exceeds the failure budget, before the AuthenticationProvider runs. -->
+    <security:http pattern="/xmla/**" request-matcher="ant" use-expressions="true"
+                   create-session="stateless" entry-point-ref="xmlaBasicAuthChallenge">
+      <security:csrf disabled="true"/>
+      <security:intercept-url pattern="/**" access="isFullyAuthenticated()" />
+      <security:http-basic entry-point-ref="xmlaBasicAuthChallenge"/>
+      <security:oauth2-resource-server entry-point-ref="xmlaBasicAuthChallenge">
+        <security:jwt decoder-ref="saikuKeycloakJwtDecoder"
+                       jwt-authentication-converter-ref="saikuKeycloakJwtAuthenticationConverter" />
+      </security:oauth2-resource-server>
+      <security:custom-filter ref="loginRateLimitFilter" before="BASIC_AUTH_FILTER"/>
+      <security:anonymous/>
+    </security:http>
+
+    <!-- request-matcher="ant" forces the legacy AntPathMatcher semantics
+         for intercept-url patterns. Spring Security 6 defaults to
+         "mvc"/PathPattern matching which subtly changed `*` behaviour and
+         broke the existing `/rest/saiku/session*` rule, sending the SPA's
+         anonymous login POST to the catch-all `/rest/**` =
+         isFullyAuthenticated() rule and 302-redirecting to /login. -->
+    <security:http auto-config='true' use-expressions="true" request-matcher="ant">
+      <!--access-denied-page="/login.jsp"-->
+      <!--
+        CSRF: enforced on state-changing /rest/** methods.
+        - Token is stored in a non-HttpOnly XSRF-TOKEN cookie so the SPA can read it
+          and echo it as X-XSRF-TOKEN on non-GET requests.
+        - The /rest/saiku/session login endpoint is exempt (bootstrap): there's no
+          session yet at login time, so no cookie to echo. HTTP Basic is also exempt
+          (stateless, no browser form).
+      -->
+      <!-- CSRF enforced on state-changing /rest/** methods (saiku#1150).
+           - Token stored in a non-HttpOnly XSRF-TOKEN cookie so the SPA can
+             read it via document.cookie and echo as X-XSRF-TOKEN.
+           - request-handler-ref is the PLAIN (non-XOR) handler. The XSD
+             documents the default as the plain handler, but CsrfFilter's
+             field default is actually XorCsrfTokenRequestAttributeHandler
+             which XOR-masks the token: the SPA-echo'd cookie value would
+             then fail to validate. The plain handler stores and validates
+             the same value, which is what the cookie-read pattern needs.
+           - SaikuCsrfRequestMatcher exempts the login bootstrap path
+             (/rest/saiku/session) and stateless Authorization-header auth
+             (HTTP Basic, used by every IT harness and the MCP endpoint).
+           - CsrfCookieMaterializerFilter (wired below) forces the deferred
+             token to resolve on every request so the XSRF-TOKEN cookie is
+             written before the response commits — without it, GET requests
+             never seed the cookie. -->
+      <security:csrf token-repository-ref="csrfTokenRepository"
+                     request-matcher-ref="csrfRequestMatcher"
+                     request-handler-ref="csrfTokenRequestHandler"/>
+      <security:intercept-url pattern="/serverdocs/**" access="isAnonymous()" />
+	    <!-- /rest/saiku/session is the API login + session-info endpoint.
+	         permitAll lets anonymous POST (login) and authenticated GET
+	         (session info) both through; SessionResource itself returns
+	         401 on bad creds. Spring Security 6's expression evaluation
+	         doesn't reliably return true for isAnonymous() under
+	         auto-config, so permitAll is the robust replacement for the
+	         legacy `isAnonymous() or isFullyAuthenticated()` pattern. -->
+	    <security:intercept-url pattern="/rest/saiku/session" access="permitAll" />
+	    <security:intercept-url pattern="/rest/saiku/session/**" access="permitAll" />
+	    <!-- /rest/saiku/info and its sub-paths are anonymous-accessible.
+	         API clients reads /info/capabilities pre-auth to decide
+	         whether to surface the demo-mode connection panel (saiku#871).
+	         /info itself is the plugin-list endpoint the SPA pings on boot. -->
+	    <security:intercept-url pattern="/rest/saiku/info" access="permitAll" />
+	    <security:intercept-url pattern="/rest/saiku/info/**" access="permitAll" />
+	    <!-- saiku#1029: the demo email-gate endpoints run before login (they
+	         unlock the login form), so they're anonymous-accessible. They're
+	         inert unless demo mode + WorkOS are configured. -->
+	    <security:intercept-url pattern="/rest/saiku/demo/gate/**" access="permitAll" />
+	    <!-- saiku#1811 PR2: PUBLIC one-click unsubscribe. Must be usable from a mail
+	         client with no Saiku login (RFC 8058 List-Unsubscribe-Post one-click), so
+	         it is permitAll. FAIL-SAFE: this endpoint only ever ADDS to the suppression
+	         list (shrinks the mailable set) and never sends mail — it cannot enable a
+	         send. Anti-forgery is enforced in the resource by an HMAC token, and the
+	         response is a generic 200 (no enumeration oracle). Scoped to EXACTLY this
+	         one path (not a broader /mail/** prefix). Must precede /rest/** below. -->
+	    <security:intercept-url pattern="/rest/saiku/mail/unsubscribe" access="permitAll" />
+    <!-- saiku#1811 PR3: PUBLIC double-opt-in consent confirm. A recipient must be able
+         to confirm their OWN consent from a mail client with no Saiku login, so it is
+         permitAll. It only ever flips a PENDING consent record to CONFIRMED (via a
+         constant-time salted-hash token match) and never sends mail — it cannot enable a
+         send. Generic 200 for valid/invalid/expired/unknown alike (no enumeration
+         oracle). Scoped to EXACTLY this one path (not a broader /mail/** prefix). Must
+         precede /rest/** below. -->
+    <security:intercept-url pattern="/rest/saiku/mail/consent/confirm" access="permitAll" />
+	    <!-- saiku#941 shareable read-only links. The guest VIEW surface admits
+	         ROLE_SHARE_GUEST (established by shareTokenAuthFilter on a valid
+	         token) OR a logged-in user previewing the link. That role unlocks
+	         ONLY this prefix — every other path stays isFullyAuthenticated()
+	         below, so a guest can never reach /ai/query, drillthrough, other
+	         dashboards, the repository, or the mint endpoints. The owner-only
+	         mint/list/revoke surface (/share/**, not /share/view/**) requires
+	         full auth. Order matters: more specific patterns precede /rest/**. -->
+	    <security:intercept-url pattern="/rest/saiku/share/view/**" access="hasRole('SHARE_GUEST') or isFullyAuthenticated()" />
+	    <security:intercept-url pattern="/rest/saiku/share/**" access="isFullyAuthenticated()" />
+	    <!-- <saiku-embed/> Web Component surface. The READ prefixes (query +
+	         dashboard) admit ROLE_EMBED_GUEST (established by embedAuthFilter on
+	         a valid token OR a matching public-grant) OR a logged-in user
+	         previewing the embed. That role unlocks ONLY these prefixes —
+	         everything else stays isFullyAuthenticated() below, so an embed
+	         guest can never reach /ai/query directly, drillthrough, other
+	         resources, the repository, or the mint endpoints.
+	         The mint + public-grant surfaces (/embed/tokens, /embed/public)
+	         stay full-auth — only logged-in users with GRANT on the resource
+	         may mint or make public. Order matters: read prefixes BEFORE
+	         /embed/** so the more specific rule wins. -->
+	    <security:intercept-url pattern="/rest/saiku/api/embed/query/**" access="hasRole('EMBED_GUEST') or isFullyAuthenticated()" />
+	    <security:intercept-url pattern="/rest/saiku/api/embed/dashboard/**" access="hasRole('EMBED_GUEST') or isFullyAuthenticated()" />
+	    <security:intercept-url pattern="/rest/saiku/api/embed/app/**" access="hasRole('EMBED_GUEST') or isFullyAuthenticated()" />
+	    <security:intercept-url pattern="/rest/saiku/api/embed/**" access="isFullyAuthenticated()" />
+      <!-- saiku#1165 audit-3: route-level admin gate (defense in depth). The
+           admin resources already carry @RolesAllowed("ROLE_ADMIN"), but this
+           ensures a future un-annotated /admin resource can't be reached by a
+           non-admin. Must precede /rest/** (more specific first). -->
+      <security:intercept-url pattern="/rest/saiku/admin/**" access="hasRole('ADMIN')" />
+      <!-- saiku#1751 defence-in-depth: StatisticsResource (/rest/saiku/statistics/**,
+           LIVE) and DataSourceResource (/rest/saiku/{username}/org.saiku.datasources/**,
+           currently unmounted) are guarded ONLY by JAX-RS @RolesAllowed("ROLE_ADMIN"),
+           with no /admin/** URL gate over them. saiku#1732 made that JAX-RS layer
+           deterministic (the primary fix), but these URL gates are belt-and-braces so a
+           future @RolesAllowed typo — or a re-enabled DataSourceResource without the
+           annotation — can't silently expose other users' Mondrian query activity or
+           backend DB connection details/passwords to a non-admin. Must precede /rest/**
+           (more specific first); ant matcher — `*` matches the single {username} segment. -->
+      <security:intercept-url pattern="/rest/saiku/statistics/**" access="hasRole('ADMIN')" />
+      <security:intercept-url pattern="/rest/saiku/*/org.saiku.datasources/**" access="hasRole('ADMIN')" />
+
+        <!-- Swagger OpenAPI Endpoints & UI -->
+        <security:intercept-url pattern="/rest/openapi.json" access="permitAll" />
+        <security:intercept-url pattern="/rest/openapi.yaml" access="permitAll" />
+        <security:intercept-url pattern="/swagger-ui.html" access="permitAll" />
+      <!-- NOTE (saiku#1905): the /xmla SOAP endpoint is NOT gated by an
+           intercept-url in this chain. It is prefix-mapped /xmla/* (web.xml), and
+           the security="none" chains above match MVC-style (servlet-path-relative),
+           so a bare "/xmla/" (pathInfo "/") or "/xmla/<seg>" would be claimed by
+           the pattern="/" or pattern="/…/**" none chains and served anonymously
+           BEFORE reaching this chain. It is therefore gated by its own dedicated
+           ant-matched secured chain declared at the TOP of this file. See there.
+
+           NOTE (saiku#1951): that same MVC-style steal applied to this chain's own
+           /rest/** rule — a "/rest/assets/x"-shaped request was claimed by a none chain and
+           reached Jersey unfiltered. All security="none" chains now declare
+           request-matcher="ant" (match the absolute path), so the ONLY request that can
+           reach Jersey is one whose ABSOLUTE path is /rest/…, which lands here and is
+           gated by the rules below. -->
+      <security:intercept-url pattern="/rest/**" access="isFullyAuthenticated()" />
+      <security:intercept-url pattern="/json/**" access="isFullyAuthenticated()" />
+      <security:intercept-url pattern="/WEB-INF/classes/legacy-schema" access="isAnonymous()" />
+      <security:logout logout-url="/logout"/>
+      <!-- HTTP Basic re-enabled (saiku#878) so the native MCP endpoint
+           and any other stateless agent / DXT-shim client can authenticate
+           with Authorization: Basic. Coexists with the SPA form-login
+           chain — Spring Security tries Basic first on requests carrying
+           an Authorization header, falling through to the session cookie
+           otherwise.
+
+           entry-point-ref points at a no-challenge 401 entry point
+           (saiku#878 follow-up): the default BasicAuthenticationEntryPoint
+           stamps `WWW-Authenticate: Basic realm="..."` on every 401,
+           which makes the browser pop up a native auth dialog on the
+           SPA's XHR 401s. The SPA already has its own session-resume
+           modal — we never want the browser's default. The
+           HttpStatusEntryPoint just sets status 401 with no header. -->
+      <security:http-basic entry-point-ref="basicAuth401NoChallenge"/>
+      <security:oauth2-resource-server entry-point-ref="basicAuth401NoChallenge">
+        <security:jwt decoder-ref="saikuKeycloakJwtDecoder"
+                       jwt-authentication-converter-ref="saikuKeycloakJwtAuthenticationConverter" />
+      </security:oauth2-resource-server>
+      <!-- Rate-limit auth attempts before BASIC_AUTH_FILTER so a blocked
+           IP gets a clean 429 without ever waking the AuthenticationProvider.
+           LoginRateLimiter is shared with SessionResource (form-login)
+           and is fed success / failure events via SpringSecurityAuditListener. -->
+      <security:custom-filter ref="loginRateLimitFilter" before="BASIC_AUTH_FILTER"/>
+      <!-- saiku#941: establish a request-scoped ROLE_SHARE_GUEST for valid
+           share tokens on /share/view/**. Placed at PRE_AUTH_FILTER (a distinct
+           slot from loginRateLimitFilter's BASIC_AUTH_FILTER) and after the
+           security-context filter, so the guest auth is set before the
+           authorization check and never persisted to the session. -->
+      <security:custom-filter ref="shareTokenAuthFilter" before="PRE_AUTH_FILTER"/>
+      <!-- <saiku-embed/>: establish a request-scoped ROLE_EMBED_GUEST for
+           valid embed tokens OR matching public-grants on /api/embed/
+           {query,dashboard}/**. Same slot semantics as the share filter
+           (pre-auth, never persisted). The filter is a no-op on the mint
+           endpoint so the caller's authenticated session reaches it. -->
+      <security:custom-filter ref="embedAuthFilter" after="PRE_AUTH_FILTER"/>
+      <!-- saiku#1150: force the deferred CsrfToken to resolve on every
+           response so the XSRF-TOKEN cookie is written eagerly. Sits AFTER
+           Spring Security's CSRF filter (BASIC_AUTH_FILTER is a stable
+           late slot in the chain) so the request attribute is already
+           installed by the time we read it. -->
+      <security:custom-filter ref="csrfCookieMaterializerFilter" after="BASIC_AUTH_FILTER"/>
+      <security:anonymous/>
+    </security:http>
+
+    <!-- Tier-1 auth hardening: CSRF wiring (saiku#1150). -->
+    <!-- saiku#1165 audit-3: XSRF-TOKEN cookie via factory so it carries
+         SameSite=Lax (matching JSESSIONID); stays non-HttpOnly for clients. -->
+    <bean id="csrfTokenRepository"
+          class="org.saiku.web.security.csrf.SaikuCsrfTokenRepository"
+          factory-method="create"/>
+    <bean id="csrfRequestMatcher"
+          class="org.saiku.web.security.csrf.SaikuCsrfRequestMatcher"/>
+    <bean id="csrfTokenRequestHandler"
+          class="org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler"/>
+    <bean id="csrfCookieMaterializerFilter"
+          class="org.saiku.web.security.csrf.CsrfCookieMaterializerFilter"/>
+
+    <import resource="applicationContext-spring-security.xml"/>
+
+<!-- Below is the preauth configuration. If you want to use preauth, please
+     comment the previous configuration and uncomment the next lines -->
+<!--
+  <import resource="applicationContext-spring-security.xml"/>
+
+  <security:http auto-config='true' use-expressions="true" entry-point-ref="http403EntryPoint">
+    <security:csrf disabled="true"/>
+    <security:intercept-url pattern="/serverdocs/**" access="isAnonymous()" />
+    <security:intercept-url pattern="/rest/saiku/session*" access="isAnonymous() or isFullyAuthenticated()" />
+    <security:intercept-url pattern="/rest/**" access="isFullyAuthenticated()" />
+    <security:intercept-url pattern="/json/**" access="isFullyAuthenticated()" />
+    <security:intercept-url pattern="/WEB-INF/classes/legacy-schema" access="isAnonymous()" />
+    <security:logout logout-url="/logout"/>
+    <security:http-basic/>
+    <security:custom-filter after="BASIC_AUTH_FILTER" ref="preAuthFilter"/>
+  </security:http>
+-->
+
+</beans>
+
+

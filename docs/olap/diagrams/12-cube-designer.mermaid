@@ -1,0 +1,29 @@
+sequenceDiagram
+    autonumber
+    actor Admin
+    participant Sec as Spring Security / adminGuard
+    participant R as CubeDesignerResource
+    participant DS as DatasourceService
+    participant JDBC as JDBC provider
+    participant DW as Data Warehouse
+    participant OLAP as Conversor / motor OLAP
+    Admin->>Sec: GET /cube-designer/introspect/{dataSourceId}
+    Sec->>R: autorizar ROLE_ADMIN
+    R->>DS: resolver datasource
+    R->>JDBC: abrir conexión para inspección
+    JDBC->>DW: consultar metadata
+    DW-->>R: tablas y columnas
+    R-->>Admin: respuesta de introspección
+    Admin->>R: GET /cube-designer/sample/{dataSourceId}
+    R->>DW: consultar muestra acotada
+    DW-->>R: filas de ejemplo
+    R-->>Admin: muestra
+    Admin->>R: POST /cube-designer/convert o /try-query
+    R->>OLAP: convertir esquema / validar consulta
+    OLAP-->>R: resultado o error
+    R-->>Admin: JSON
+    opt AI activado
+        Admin->>R: POST /cube-designer/turn
+        R->>R: verificar proveedor de AI
+        R-->>Admin: respuesta; 503 si no está configurado
+    end

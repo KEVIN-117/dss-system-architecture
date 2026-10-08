@@ -1,0 +1,477 @@
+{
+  "export-realm.ps1": {
+    "mtime": 1791228717.4399307,
+    "ast_hash": "4ad833078d585ddd6160ab2653528afe",
+    "semantic_hash": "4ad833078d585ddd6160ab2653528afe"
+  },
+  "mvnw": {
+    "mtime": 1786461340.1436503,
+    "ast_hash": "ab50dd89da7da2346b28003352eeeeeb",
+    "semantic_hash": "ab50dd89da7da2346b28003352eeeeeb"
+  },
+  "pom.xml": {
+    "mtime": 1786970717.12081,
+    "ast_hash": "8ec39238f56871bf299f2e6ec98a6506",
+    "semantic_hash": "8ec39238f56871bf299f2e6ec98a6506"
+  },
+  "src/main/java/uatf/dss/authservice/AuthServiceApplication.java": {
+    "mtime": 1786559720.1513631,
+    "ast_hash": "45fc12cd7968306d41363f5110044022",
+    "semantic_hash": "45fc12cd7968306d41363f5110044022"
+  },
+  "src/main/java/uatf/dss/authservice/adapter/in/web/DemoEndpoint.java": {
+    "mtime": 1786897708.825864,
+    "ast_hash": "16973d78ebbf82b48316297346a11b56",
+    "semantic_hash": "16973d78ebbf82b48316297346a11b56"
+  },
+  "src/main/java/uatf/dss/authservice/adapter/in/web/ExampleUserController.java": {
+    "mtime": 1786559720.1549485,
+    "ast_hash": "ff1696f6b4f71571083219c739408042",
+    "semantic_hash": "ff1696f6b4f71571083219c739408042"
+  },
+  "src/main/java/uatf/dss/authservice/adapter/in/web/GlobalExceptionHandler.java": {
+    "mtime": 1786916462.7224724,
+    "ast_hash": "e95bf0ed6ce9311782e970aac95df1e0",
+    "semantic_hash": "e95bf0ed6ce9311782e970aac95df1e0"
+  },
+  "src/main/java/uatf/dss/authservice/adapter/in/web/RegisterExampleUserRequest.java": {
+    "mtime": 1786559720.1559496,
+    "ast_hash": "3b299d51d420f83d32bfa73506492c3b",
+    "semantic_hash": "3b299d51d420f83d32bfa73506492c3b"
+  },
+  "src/main/java/uatf/dss/authservice/adapter/in/web/UserProfileController.java": {
+    "mtime": 1786916462.7230353,
+    "ast_hash": "1c355ec80bdbcea1991cae8ac2dec22b",
+    "semantic_hash": "1c355ec80bdbcea1991cae8ac2dec22b"
+  },
+  "src/main/java/uatf/dss/authservice/adapter/in/web/UserSyncController.java": {
+    "mtime": 1791228717.4410038,
+    "ast_hash": "715b0f2d304b1cd0b0213bb5987a18af",
+    "semantic_hash": "715b0f2d304b1cd0b0213bb5987a18af"
+  },
+  "src/main/java/uatf/dss/authservice/adapter/in/web/UserSyncRequest.java": {
+    "mtime": 1786928111.6066263,
+    "ast_hash": "b675aba498043041f6753023409d45fc",
+    "semantic_hash": "b675aba498043041f6753023409d45fc"
+  },
+  "src/main/java/uatf/dss/authservice/application/port/in/AuthUserProfile.java": {
+    "mtime": 1786906965.2184944,
+    "ast_hash": "638133873693f4d9f2c37c3aacbc4e63",
+    "semantic_hash": "638133873693f4d9f2c37c3aacbc4e63"
+  },
+  "src/main/java/uatf/dss/authservice/application/port/in/GetAuthUserProfileCommand.java": {
+    "mtime": 1786906965.2184944,
+    "ast_hash": "3b62b5a8f8a98106409e3cf70aca60f4",
+    "semantic_hash": "3b62b5a8f8a98106409e3cf70aca60f4"
+  },
+  "src/main/java/uatf/dss/authservice/application/port/in/GetAuthUserProfileUseCase.java": {
+    "mtime": 1786906965.220006,
+    "ast_hash": "9150882dd9a179e57d2e0ba814d48ec1",
+    "semantic_hash": "9150882dd9a179e57d2e0ba814d48ec1"
+  },
+  "src/main/java/uatf/dss/authservice/application/port/in/RegisterExampleUserCommand.java": {
+    "mtime": 1786559720.1631925,
+    "ast_hash": "d40b6c63ad06bbf4cb54c96e2d944a96",
+    "semantic_hash": "d40b6c63ad06bbf4cb54c96e2d944a96"
+  },
+  "src/main/java/uatf/dss/authservice/application/port/in/RegisterExampleUserUseCase.java": {
+    "mtime": 1786559720.1641898,
+    "ast_hash": "b1c35ad8e70ae7479ecc2f29b44ae3ab",
+    "semantic_hash": "b1c35ad8e70ae7479ecc2f29b44ae3ab"
+  },
+  "src/main/java/uatf/dss/authservice/application/port/in/SyncUserCommand.java": {
+    "mtime": 1786692752.8019001,
+    "ast_hash": "42145fbaa6ef1e73dc70fe6bd46a0ef1",
+    "semantic_hash": "42145fbaa6ef1e73dc70fe6bd46a0ef1"
+  },
+  "src/main/java/uatf/dss/authservice/application/port/in/SyncUserUseCase.java": {
+    "mtime": 1786692752.8019001,
+    "ast_hash": "9f8c84487867d4f70258407b3bd34760",
+    "semantic_hash": "9f8c84487867d4f70258407b3bd34760"
+  },
+  "src/main/java/uatf/dss/authservice/application/service/GetAuthUserProfileService.java": {
+    "mtime": 1786912381.471,
+    "ast_hash": "ad8eb46057b0f4c37854dbe3e6f824bd",
+    "semantic_hash": "ad8eb46057b0f4c37854dbe3e6f824bd"
+  },
+  "src/main/java/uatf/dss/authservice/application/service/RegisterExampleUserService.java": {
+    "mtime": 1786559720.165777,
+    "ast_hash": "6ee07751c799f15efb4ab394065aeb71",
+    "semantic_hash": "6ee07751c799f15efb4ab394065aeb71"
+  },
+  "src/main/java/uatf/dss/authservice/application/service/SyncUserService.java": {
+    "mtime": 1786970717.1238751,
+    "ast_hash": "93ea99dc127bb5d501fff3dcd4c7ea6f",
+    "semantic_hash": "93ea99dc127bb5d501fff3dcd4c7ea6f"
+  },
+  "src/main/java/uatf/dss/authservice/configuration/ApplicationConfig.java": {
+    "mtime": 1786916462.7240772,
+    "ast_hash": "d43f79406f297cef0698dd027f544ccd",
+    "semantic_hash": "d43f79406f297cef0698dd027f544ccd"
+  },
+  "src/main/java/uatf/dss/authservice/configuration/FlywayConfig.java": {
+    "mtime": 1786897708.8274393,
+    "ast_hash": "a52da9dbe9d721e55d455773300562fb",
+    "semantic_hash": "a52da9dbe9d721e55d455773300562fb"
+  },
+  "src/main/java/uatf/dss/authservice/configuration/JwtConverter.java": {
+    "mtime": 1786897708.8279722,
+    "ast_hash": "4c872f38638c543148135e38d7a3a7ab",
+    "semantic_hash": "4c872f38638c543148135e38d7a3a7ab"
+  },
+  "src/main/java/uatf/dss/authservice/configuration/SecurityConfig.java": {
+    "mtime": 1791228717.4431527,
+    "ast_hash": "efc80522ce51e096496d607bb0b5df08",
+    "semantic_hash": "efc80522ce51e096496d607bb0b5df08"
+  },
+  "src/main/java/uatf/dss/authservice/configuration/WebhookSecretFilter.java": {
+    "mtime": 1791228717.4442258,
+    "ast_hash": "76840be2a25965325d230e42dc9f9260",
+    "semantic_hash": "76840be2a25965325d230e42dc9f9260"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/DomainException.java": {
+    "mtime": 1786725434.0568807,
+    "ast_hash": "e028119967d58d19fa02af05b4f2bf84",
+    "semantic_hash": "e028119967d58d19fa02af05b4f2bf84"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/ExampleUserAlreadyExistsException.java": {
+    "mtime": 1786725434.057908,
+    "ast_hash": "c7fc1b4b5b97acc1ba2db6539a48c0be",
+    "semantic_hash": "c7fc1b4b5b97acc1ba2db6539a48c0be"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/UserLockedException.java": {
+    "mtime": 1786725434.057908,
+    "ast_hash": "18495770f74ffc4a34700f2dd6872379",
+    "semantic_hash": "18495770f74ffc4a34700f2dd6872379"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/conflict/ConflictException.java": {
+    "mtime": 1786725434.058877,
+    "ast_hash": "6d090adbc9ab643cebdcfe29044605e0",
+    "semantic_hash": "6d090adbc9ab643cebdcfe29044605e0"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/conflict/DuplicateEmailException.java": {
+    "mtime": 1786725434.058877,
+    "ast_hash": "5b7164cfc0c152d9a7d34c5ed310d75f",
+    "semantic_hash": "5b7164cfc0c152d9a7d34c5ed310d75f"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/conflict/DuplicateKeycloakIdException.java": {
+    "mtime": 1786725434.0598807,
+    "ast_hash": "97ae84fc93372d9e6534ea8a39d244a2",
+    "semantic_hash": "97ae84fc93372d9e6534ea8a39d244a2"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/conflict/RoleAlreadyAssignedException.java": {
+    "mtime": 1786725434.0609121,
+    "ast_hash": "708e7fbe75444b58a35bdb996ae501ff",
+    "semantic_hash": "708e7fbe75444b58a35bdb996ae501ff"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/conflict/UserAlreadyExistsException.java": {
+    "mtime": 1786725434.0609121,
+    "ast_hash": "28b7362b7a2eab996c3ade6568f6b62f",
+    "semantic_hash": "28b7362b7a2eab996c3ade6568f6b62f"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/forbidden/ForbiddenException.java": {
+    "mtime": 1786725434.061471,
+    "ast_hash": "71c9ee6aa82112d3630b77cb39e1c76d",
+    "semantic_hash": "71c9ee6aa82112d3630b77cb39e1c76d"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/forbidden/UnauthorizedActionException.java": {
+    "mtime": 1786725434.0625057,
+    "ast_hash": "0be14ed31931c682aa114a8ad252b41b",
+    "semantic_hash": "0be14ed31931c682aa114a8ad252b41b"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/forbidden/UserInactiveException.java": {
+    "mtime": 1786725434.0625057,
+    "ast_hash": "548aa65e7f597b97a3517da892f6e128",
+    "semantic_hash": "548aa65e7f597b97a3517da892f6e128"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/notfound/CareerNotFoundException.java": {
+    "mtime": 1786725434.064019,
+    "ast_hash": "a22227924a48b46aa3b07d8d5ee8759b",
+    "semantic_hash": "a22227924a48b46aa3b07d8d5ee8759b"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/notfound/FacultyNotFoundException.java": {
+    "mtime": 1786725434.064019,
+    "ast_hash": "92890b4c20a44a5512c9dc2abe2153a4",
+    "semantic_hash": "92890b4c20a44a5512c9dc2abe2153a4"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/notfound/NotFoundException.java": {
+    "mtime": 1786725434.0650332,
+    "ast_hash": "8160cb1e72120433e6b6b73bcd6672d2",
+    "semantic_hash": "8160cb1e72120433e6b6b73bcd6672d2"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/notfound/RoleNotFoundException.java": {
+    "mtime": 1786725434.0650332,
+    "ast_hash": "546657d086a457f69c9e98bc1bf5b45d",
+    "semantic_hash": "546657d086a457f69c9e98bc1bf5b45d"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/notfound/UserAcademicContextNotFoundException.java": {
+    "mtime": 1786725434.0660324,
+    "ast_hash": "8cfc5208bd2d1606c2cc1a1ac2903884",
+    "semantic_hash": "8cfc5208bd2d1606c2cc1a1ac2903884"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/notfound/UserNotFoundException.java": {
+    "mtime": 1786826272.1602337,
+    "ast_hash": "4b5beead21deb345a39f9a937c85b43e",
+    "semantic_hash": "4b5beead21deb345a39f9a937c85b43e"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/FacultyRequiredException.java": {
+    "mtime": 1786725434.0670335,
+    "ast_hash": "85ec08e9dbb773fe62ad61ba2b87cfb5",
+    "semantic_hash": "85ec08e9dbb773fe62ad61ba2b87cfb5"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/InvalidAcademicContextException.java": {
+    "mtime": 1786725434.0680325,
+    "ast_hash": "34a77b123f5a8bff7d964920e444a5f4",
+    "semantic_hash": "34a77b123f5a8bff7d964920e444a5f4"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/InvalidDeanAcademicContextException.java": {
+    "mtime": 1786725434.0680325,
+    "ast_hash": "ff7dbb71f7c706c69163945cec1ee623",
+    "semantic_hash": "ff7dbb71f7c706c69163945cec1ee623"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/InvalidDirectorAcademicContextException.java": {
+    "mtime": 1786725434.0690324,
+    "ast_hash": "eb4cff754c811e6325396d1efab5cdf4",
+    "semantic_hash": "eb4cff754c811e6325396d1efab5cdf4"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/InvalidEmailException.java": {
+    "mtime": 1786725434.0690324,
+    "ast_hash": "d92c826ac0a94528de3549ede4989f25",
+    "semantic_hash": "d92c826ac0a94528de3549ede4989f25"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/InvalidRectorAcademicContextException.java": {
+    "mtime": 1786725434.0700352,
+    "ast_hash": "f5b1195fe71f7d5d4e3559f69fe70878",
+    "semantic_hash": "f5b1195fe71f7d5d4e3559f69fe70878"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/InvalidRoleAssignmentException.java": {
+    "mtime": 1786725434.0710485,
+    "ast_hash": "092af1112292ae2e9690d80298365fe9",
+    "semantic_hash": "092af1112292ae2e9690d80298365fe9"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/InvalidUsernameException.java": {
+    "mtime": 1786725434.0710485,
+    "ast_hash": "822d62b8b5a2cf35bfa12a6e6c3f8e0e",
+    "semantic_hash": "822d62b8b5a2cf35bfa12a6e6c3f8e0e"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/RoleAssignmentException.java": {
+    "mtime": 1786725434.0725384,
+    "ast_hash": "b2fae466e5f10a109ae52ab93ad9bfb6",
+    "semantic_hash": "b2fae466e5f10a109ae52ab93ad9bfb6"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/ValidationException.java": {
+    "mtime": 1786725434.0725384,
+    "ast_hash": "1136811b877cdc30149a20f0018a33e7",
+    "semantic_hash": "1136811b877cdc30149a20f0018a33e7"
+  },
+  "src/main/java/uatf/dss/authservice/domain/exception/validation/WeakPasswordException.java": {
+    "mtime": 1786725434.074659,
+    "ast_hash": "17b48691061e574262e5755f58829045",
+    "semantic_hash": "17b48691061e574262e5755f58829045"
+  },
+  "src/main/java/uatf/dss/authservice/domain/model/Email.java": {
+    "mtime": 1786725434.0756702,
+    "ast_hash": "66c7b32b5119aa9eaddc5caea4de70f3",
+    "semantic_hash": "66c7b32b5119aa9eaddc5caea4de70f3"
+  },
+  "src/main/java/uatf/dss/authservice/domain/model/ExampleUser.java": {
+    "mtime": 1786559720.1699452,
+    "ast_hash": "287acfc7c0ed4a0e8646eb0ed3ab716a",
+    "semantic_hash": "287acfc7c0ed4a0e8646eb0ed3ab716a"
+  },
+  "src/main/java/uatf/dss/authservice/domain/model/Role.java": {
+    "mtime": 1786725434.0756702,
+    "ast_hash": "d8ae7643f0a29fb34f5d695aa7dba04c",
+    "semantic_hash": "d8ae7643f0a29fb34f5d695aa7dba04c"
+  },
+  "src/main/java/uatf/dss/authservice/domain/model/RoleType.java": {
+    "mtime": 1786725434.0766766,
+    "ast_hash": "8ac6b4fbb1cac76a0ef2c9cca2b9d318",
+    "semantic_hash": "8ac6b4fbb1cac76a0ef2c9cca2b9d318"
+  },
+  "src/main/java/uatf/dss/authservice/domain/model/User.java": {
+    "mtime": 1786725434.077701,
+    "ast_hash": "9187b3b89421fad84b2d7b34dbb4727c",
+    "semantic_hash": "9187b3b89421fad84b2d7b34dbb4727c"
+  },
+  "src/main/java/uatf/dss/authservice/domain/model/UserAcademicContext.java": {
+    "mtime": 1786725434.077701,
+    "ast_hash": "da33fa5872917b7f9ec4cdfd564f81d8",
+    "semantic_hash": "da33fa5872917b7f9ec4cdfd564f81d8"
+  },
+  "src/main/java/uatf/dss/authservice/domain/validator/AcademicContextValidator.java": {
+    "mtime": 1786725434.0797377,
+    "ast_hash": "e40923cf22a4ca26f9a6ff26aa9c6b36",
+    "semantic_hash": "e40923cf22a4ca26f9a6ff26aa9c6b36"
+  },
+  "src/main/java/uatf/dss/authservice/shared/EmailValidator.java": {
+    "mtime": 1786725434.080746,
+    "ast_hash": "ff8fc833f7ccafe79a96d64657946ceb",
+    "semantic_hash": "ff8fc833f7ccafe79a96d64657946ceb"
+  },
+  "src/main/resources/db/migration/V1__init_schema.sql": {
+    "mtime": 1786583381.7738996,
+    "ast_hash": "28d72cffa0df800e7d43196373fac20e",
+    "semantic_hash": "28d72cffa0df800e7d43196373fac20e"
+  },
+  "src/test/java/uatf/dss/authservice/ArchitectureTest.java": {
+    "mtime": 1786897708.8316243,
+    "ast_hash": "4e7d10f7c53f530ef4d024728be5ca7c",
+    "semantic_hash": "4e7d10f7c53f530ef4d024728be5ca7c"
+  },
+  "src/test/java/uatf/dss/authservice/AuthServiceApplicationTests.java": {
+    "mtime": 1786559720.1749468,
+    "ast_hash": "e67ff1438ce9a8576614fc8954147e5e",
+    "semantic_hash": "e67ff1438ce9a8576614fc8954147e5e"
+  },
+  "src/test/java/uatf/dss/authservice/ExampleUser/RegisterExampleUserServiceTest.java": {
+    "mtime": 1786559720.1759462,
+    "ast_hash": "bf7d0a544d71556970981b3716ea8f10",
+    "semantic_hash": "bf7d0a544d71556970981b3716ea8f10"
+  },
+  "src/test/java/uatf/dss/authservice/NoSetterCondition.java": {
+    "mtime": 1786725434.0817466,
+    "ast_hash": "344cdcbd850260c84d3f27d568fe8873",
+    "semantic_hash": "344cdcbd850260c84d3f27d568fe8873"
+  },
+  "src/test/java/uatf/dss/authservice/TestAuthServiceApplication.java": {
+    "mtime": 1786906965.225715,
+    "ast_hash": "14977662f2245232a56fe889d342ef6a",
+    "semantic_hash": "14977662f2245232a56fe889d342ef6a"
+  },
+  "src/test/java/uatf/dss/authservice/TestcontainersConfiguration.java": {
+    "mtime": 1786692752.8089018,
+    "ast_hash": "16d9754217cf0fed03a14aa623205ea6",
+    "semantic_hash": "16d9754217cf0fed03a14aa623205ea6"
+  },
+  "src/test/java/uatf/dss/authservice/adapter/academiccontext/UserAcademicContextAdapterIntegrationTest.java": {
+    "mtime": 1786826272.1617537,
+    "ast_hash": "eb4cb590f0f76e896e36b54a035eff3b",
+    "semantic_hash": "eb4cb590f0f76e896e36b54a035eff3b"
+  },
+  "src/test/java/uatf/dss/authservice/adapter/academiccontext/UserAcademicContextAdapterTest.java": {
+    "mtime": 1786826272.162783,
+    "ast_hash": "80a056efcd5fe10d9efdf2deb0e2c965",
+    "semantic_hash": "80a056efcd5fe10d9efdf2deb0e2c965"
+  },
+  "src/test/java/uatf/dss/authservice/adapter/in/web/BaseWebMvcTest.java": {
+    "mtime": 1786897708.8337035,
+    "ast_hash": "df5dd44925daef877d07e043cb592114",
+    "semantic_hash": "df5dd44925daef877d07e043cb592114"
+  },
+  "src/test/java/uatf/dss/authservice/adapter/in/web/DemoEndpointTest.java": {
+    "mtime": 1786897708.8342297,
+    "ast_hash": "dbe91282d553317ac59497a95bb9646e",
+    "semantic_hash": "dbe91282d553317ac59497a95bb9646e"
+  },
+  "src/test/java/uatf/dss/authservice/adapter/in/web/UserProfileControllerTest.java": {
+    "mtime": 1791228717.447049,
+    "ast_hash": "f6fd7f73d9d30501af397b632d2ccaae",
+    "semantic_hash": "f6fd7f73d9d30501af397b632d2ccaae"
+  },
+  "src/test/java/uatf/dss/authservice/adapter/role/RoleRepositoryAdapterIntegrationTest.java": {
+    "mtime": 1786826272.1637864,
+    "ast_hash": "39f1fff0a9f01762ebabd0f0881874ad",
+    "semantic_hash": "39f1fff0a9f01762ebabd0f0881874ad"
+  },
+  "src/test/java/uatf/dss/authservice/adapter/role/RoleRepositoryAdapterTest.java": {
+    "mtime": 1786826272.1647847,
+    "ast_hash": "1cea802b324ac7b2d64cf99f69de8bbf",
+    "semantic_hash": "1cea802b324ac7b2d64cf99f69de8bbf"
+  },
+  "src/test/java/uatf/dss/authservice/adapter/user/UserRepositoryAdapterIntegrationTest.java": {
+    "mtime": 1786826272.1657844,
+    "ast_hash": "ba66f82806491679ff526d482a196764",
+    "semantic_hash": "ba66f82806491679ff526d482a196764"
+  },
+  "src/test/java/uatf/dss/authservice/adapter/user/UserRepositoryAdapterTest.java": {
+    "mtime": 1791228717.4478178,
+    "ast_hash": "a91bf39d2230b1a2904073a374615f20",
+    "semantic_hash": "a91bf39d2230b1a2904073a374615f20"
+  },
+  "src/test/java/uatf/dss/authservice/application/GetAuthUserProfileServiceTests.java": {
+    "mtime": 1786906965.227134,
+    "ast_hash": "c1c44b9b54c83d58431f6b991c132da8",
+    "semantic_hash": "c1c44b9b54c83d58431f6b991c132da8"
+  },
+  "src/test/java/uatf/dss/authservice/configuration/JwtValidationTest.java": {
+    "mtime": 1791228717.4488268,
+    "ast_hash": "4e4fcb45fb9caf3d8d373959ac4e385c",
+    "semantic_hash": "4e4fcb45fb9caf3d8d373959ac4e385c"
+  },
+  "src/test/java/uatf/dss/authservice/configuration/WebhookSecretFilterConfigurationTest.java": {
+    "mtime": 1791228717.4493334,
+    "ast_hash": "07941de5e6a027d142f13c33ee28e173",
+    "semantic_hash": "07941de5e6a027d142f13c33ee28e173"
+  },
+  "src/test/java/uatf/dss/authservice/domain/academiccontext/AcademicContextValidatorTest.java": {
+    "mtime": 1786725434.084268,
+    "ast_hash": "588b4170edce45796715741a212788fc",
+    "semantic_hash": "588b4170edce45796715741a212788fc"
+  },
+  "src/test/java/uatf/dss/authservice/domain/academiccontext/UserAcademicContextTest.java": {
+    "mtime": 1786725434.0848858,
+    "ast_hash": "55150e3ba3a44e39d1e92a7bb98380da",
+    "semantic_hash": "55150e3ba3a44e39d1e92a7bb98380da"
+  },
+  "src/test/java/uatf/dss/authservice/domain/role/RoleTest.java": {
+    "mtime": 1786725434.085909,
+    "ast_hash": "6ecd9b25165566ed88c1f030fc1d1061",
+    "semantic_hash": "6ecd9b25165566ed88c1f030fc1d1061"
+  },
+  "src/test/java/uatf/dss/authservice/domain/user/EmailTest.java": {
+    "mtime": 1786725434.0868924,
+    "ast_hash": "72d668e25736dab37e8d8107b996c2f9",
+    "semantic_hash": "72d668e25736dab37e8d8107b996c2f9"
+  },
+  "src/test/java/uatf/dss/authservice/domain/user/EmailValidatorTest.java": {
+    "mtime": 1786725434.0878925,
+    "ast_hash": "b3261e949440027b881efb3e5c3ba87f",
+    "semantic_hash": "b3261e949440027b881efb3e5c3ba87f"
+  },
+  "src/test/java/uatf/dss/authservice/domain/user/UserTest.java": {
+    "mtime": 1786725434.088908,
+    "ast_hash": "07d3c3b0339e9285bb2d4c9611aa13a0",
+    "semantic_hash": "07d3c3b0339e9285bb2d4c9611aa13a0"
+  },
+  "src/test/java/uatf/dss/authservice/user/SyncUserServiceTest.java": {
+    "mtime": 1786725434.08999,
+    "ast_hash": "a9541dc87faeb1036b49d4c471cded6b",
+    "semantic_hash": "a9541dc87faeb1036b49d4c471cded6b"
+  },
+  "src/test/java/uatf/dss/authservice/user/UserSyncControllerTest.java": {
+    "mtime": 1791228717.4493334,
+    "ast_hash": "bd8db4ff686d2ec9f205f37eb903eb5d",
+    "semantic_hash": "bd8db4ff686d2ec9f205f37eb903eb5d"
+  },
+  "src/test/java/uatf/dss/authservice/user/UserSyncIntegrationTest.java": {
+    "mtime": 1791228717.4508483,
+    "ast_hash": "754620e2667165cf1228cd81828bba86",
+    "semantic_hash": "754620e2667165cf1228cd81828bba86"
+  },
+  "ARCHITECTURE_GUIDE.md": {
+    "mtime": 1786559720.1473167,
+    "ast_hash": "c523cd2b39d25b5cccbbd8c2ed86ddfb",
+    "semantic_hash": "c523cd2b39d25b5cccbbd8c2ed86ddfb"
+  },
+  "README.md": {
+    "mtime": 1786559720.1483617,
+    "ast_hash": "d6350d2b56cfc1425f384e65c056c7a9",
+    "semantic_hash": "d6350d2b56cfc1425f384e65c056c7a9"
+  },
+  "docs/database/improved_erd.md": {
+    "mtime": 1786583381.7706032,
+    "ast_hash": "e9cfb3dbf65aeafb0f088a72cb953123",
+    "semantic_hash": "e9cfb3dbf65aeafb0f088a72cb953123"
+  },
+  "docs/keycloak/keycloak_specification.md": {
+    "mtime": 1786897708.8222113,
+    "ast_hash": "3a5d85b8bd9b773a55881039aecc9698",
+    "semantic_hash": "3a5d85b8bd9b773a55881039aecc9698"
+  },
+  "src/main/resources/application.yaml": {
+    "mtime": 1791228717.44634,
+    "ast_hash": "d66c4fe0d47724e4597d6623ff9895d5",
+    "semantic_hash": "d66c4fe0d47724e4597d6623ff9895d5"
+  }
+}

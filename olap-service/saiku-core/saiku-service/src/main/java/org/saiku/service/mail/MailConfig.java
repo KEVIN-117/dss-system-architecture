@@ -1,0 +1,91 @@
+/*
+ *   Copyright 2026 Spicule Ltd
+ *   Apache License, Version 2.0.
+ */
+package org.saiku.service.mail;
+
+import java.util.function.Function;
+
+/** SMTP settings, resolved env > system property > default. */
+public record MailConfig(
+        String host,
+        int port,
+        String username,
+        String password,
+        String from,
+        boolean startTls,
+        boolean ssl,
+        String selfTo) {
+
+    /** Configured only when a host and a from-address are both present. */
+    public boolean isConfigured() {
+        return notBlank(host) && notBlank(from);
+    }
+
+    /**
+     * Redacted {@code toString()} — the SMTP {@link #password()} is NEVER printed (saiku#943 P0-B,
+     * SEC). A record's generated {@code toString()} would otherwise render the plaintext password, so
+     * a stray {@code log.info("... {}", mailConfig)} anywhere would leak the credential. Overriding
+     * here closes that at the source rather than relying on every call site to remember not to log
+     * the instance. {@code passwordSet} shows presence without the value.
+     */
+    @Override
+    public String toString() {
+        return "MailConfig[host=" + host + ", port=" + port + ", username=" + username + ", passwordSet="
+                + notBlank(password) + ", from=" + from + ", startTls=" + startTls + ", ssl=" + ssl + ", selfTo="
+                + selfTo + "]";
+    }
+
+    /**
+     * True when an admin has configured the fixed self-send recipient
+     * ({@code SAIKU_MAIL_SELF_TO} / {@code saiku.mail.self.to}). The
+     * {@code /email/self} endpoint fails closed unless this is set — the
+     * recipient is never taken from the client.
+     */
+    public boolean selfSendConfigured() {
+        return notBlank(selfTo);
+    }
+
+    public static MailConfig resolve(Function<String, String> env, Function<String, String> prop) {
+        String host = pick(env, prop, "SAIKU_MAIL_SMTP_HOST", "saiku.mail.smtp.host", null);
+        String from = pick(env, prop, "SAIKU_MAIL_FROM", "saiku.mail.from", null);
+        String user = pick(env, prop, "SAIKU_MAIL_SMTP_USERNAME", "saiku.mail.smtp.username", null);
+        String pass = pick(env, prop, "SAIKU_MAIL_SMTP_PASSWORD", "saiku.mail.smtp.password", null);
+        int port = parseInt(pick(env, prop, "SAIKU_MAIL_SMTP_PORT", "saiku.mail.smtp.port", "587"), 587);
+        boolean startTls =
+                parseBool(pick(env, prop, "SAIKU_MAIL_SMTP_STARTTLS", "saiku.mail.smtp.starttls", "true"), true);
+        boolean ssl = parseBool(pick(env, prop, "SAIKU_MAIL_SMTP_SSL", "saiku.mail.smtp.ssl", "false"), false);
+        String selfTo = pick(env, prop, "SAIKU_MAIL_SELF_TO", "saiku.mail.self.to", null);
+        return new MailConfig(host, port, user, pass, from, startTls, ssl, selfTo);
+    }
+
+    /** Production factory: resolve from the real environment + system properties. */
+    public static MailConfig fromEnvironment() {
+        return resolve(System::getenv, System::getProperty);
+    }
+
+    private static String pick(
+            Function<String, String> env, Function<String, String> prop, String envKey, String propKey, String def) {
+        String v = env.apply(envKey);
+        if (notBlank(v)) return v.trim();
+        v = prop.apply(propKey);
+        if (notBlank(v)) return v.trim();
+        return def;
+    }
+
+    private static boolean notBlank(String s) {
+        return s != null && !s.isBlank();
+    }
+
+    private static int parseInt(String s, int def) {
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (RuntimeException e) {
+            return def;
+        }
+    }
+
+    private static boolean parseBool(String s, boolean def) {
+        return s == null ? def : Boolean.parseBoolean(s.trim());
+    }
+}

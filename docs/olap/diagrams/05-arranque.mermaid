@@ -1,0 +1,18 @@
+sequenceDiagram
+    autonumber
+    actor Ops as Operador
+    participant J as SaikuLauncher
+    participant Jetty as Jetty EE10
+    participant WAR as saiku-api.war
+    participant Spring as Spring Context
+    participant Jersey as SaikuJerseyApplication
+    participant Repo as RepositoryDatasourceManager
+    Ops->>J: serve --port --home
+    J->>Jetty: configurar servidor/handlers
+    Jetty->>WAR: desplegar WAR
+    WAR->>Spring: cargar XML y construir beans
+    Spring->>Repo: init-method load
+    Repo->>Repo: cargar repositorio del home
+    WAR->>Jersey: inicializar servlet /rest/*
+    Jersey->>Jersey: registrar recursos, filtros y OpenAPI
+    Jetty-->>Ops: HTTP disponible

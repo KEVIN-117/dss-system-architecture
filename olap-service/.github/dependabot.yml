@@ -1,0 +1,24 @@
+version: 2
+updates:
+  - package-ecosystem: maven
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    labels: [dependencies, maven]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels: [dependencies, github-actions]
+  # The Dockerfile FROM is digest-pinned (eclipse-temurin:21-jre-noble@sha256:…)
+  # for supply-chain integrity (#1989). Dependabot understands the tag@sha256
+  # form and bumps BOTH the tag and the digest, so the base JRE gets CVE-driven
+  # update PRs instead of freezing on a stale digest.
+  - package-ecosystem: docker
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
+    labels: [dependencies, docker]

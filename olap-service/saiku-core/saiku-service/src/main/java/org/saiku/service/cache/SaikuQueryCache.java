@@ -1,0 +1,464 @@
+/*
+ *   Copyright 2026 Spicule Ltd
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License. You may
+ *   obtain a copy of the License at http://www.apache.org/licenses/LICENSE-2.0.
+ */
+package org.saiku.service.cache;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.github.benmanes.caffeine.cache.Cache;
+import com.github.benmanes.caffeine.cache.Caffeine;
+import jakarta.annotation.PreDestroy;
+import java.io.IOException;
+import java.nio.file.DirectoryStream;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.function.Supplier;
+import org.saiku.olap.util.SaikuProperties;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+/**
+ * Disk-backed Arrow query cache with an in-memory Caffeine index of metadata.
+ *
+ * <p>Layout under {@code <saiku-home>/cache/}:
+ * <pre>
+ *   &lt;sha&gt;.arrow       // raw Arrow IPC bytes
+ *   &lt;sha&gt;.meta.json   // {key, createdAt, runtimeMs, rows, cubeVersion, bytes}
+ * </pre>
+ *
+ * <p>Semantics:
+ * <ul>
+ *   <li>{@link #get(String, Supplier)} returns cached bytes on hit, otherwise
+ *       invokes the supplier, stores, and returns. TTL-expired entries are
+ *       deleted lazily on access.</li>
+ *   <li>{@link #invalidate(String)} removes both files and the in-memory entry.</li>
+ *   <li>{@link #put(String, Entry)} is a lower-level primitive used when the
+ *       caller already has the bytes and wants a write-through.</li>
+ *   <li>Eviction: on write, if total on-disk bytes exceed
+ *       {@code maxSizeBytes}, the oldest entries (by {@code createdAt}) are
+ *       deleted until the total is below the limit.</li>
+ * </ul>
+ *
+ * <p>Thread-safety: the cache is safe for concurrent use. A per-instance lock
+ * serialises writes + eviction — Saiku query volumes are low enough that the
+ * simplicity is worth the small contention cost.
+ */
+public class SaikuQueryCache {
+
+    private static final Logger log = LoggerFactory.getLogger(SaikuQueryCache.class);
+
+    private static final String ARROW_SUFFIX = ".arrow";
+    private static final String META_SUFFIX = ".meta.json";
+
+    private final Path cacheDir;
+    private final long ttlMillis;
+    private final long maxSizeBytes;
+    private final boolean enabled;
+
+    private final Cache<String, Entry> index;
+    private final ObjectMapper mapper = new ObjectMapper();
+    private final ReentrantLock writeLock = new ReentrantLock();
+    /** Single-thread daemon executor that runs evictIfOverBudget() off the
+     *  put() write path. The previous implementation called eviction
+     *  synchronously while holding writeLock — eviction walks every meta
+     *  sidecar on disk so under load it could stall concurrent queries for
+     *  hundreds of ms. FIFO ordering keeps eviction deterministic. */
+    private final ExecutorService evictionExecutor;
+
+    /** Metadata sidecar record. Public for Jackson. */
+    public static final class Entry {
+        public String key;
+        public long createdAt;
+        public long runtimeMs;
+        public int rows;
+        public String cubeVersion;
+        public long bytes;
+
+        public Entry() {}
+
+        public Entry(String key, long createdAt, long runtimeMs, int rows, String cubeVersion, long bytes) {
+            this.key = key;
+            this.createdAt = createdAt;
+            this.runtimeMs = runtimeMs;
+            this.rows = rows;
+            this.cubeVersion = cubeVersion;
+            this.bytes = bytes;
+        }
+    }
+
+    /** Returned by the service layer to describe a cache lookup result. */
+    public static final class CachedQueryResult {
+        public final byte[] arrowBytes;
+        public final long runtimeMs;
+        public final int rows;
+        public final boolean cacheHit;
+
+        public CachedQueryResult(byte[] arrowBytes, long runtimeMs, int rows, boolean cacheHit) {
+            this.arrowBytes = arrowBytes;
+            this.runtimeMs = runtimeMs;
+            this.rows = rows;
+            this.cacheHit = cacheHit;
+        }
+    }
+
+    public SaikuQueryCache() {
+        this(
+                resolveDefaultCacheDir(),
+                TimeUnit.MINUTES.toMillis(SaikuProperties.cacheTtlMinutes),
+                SaikuProperties.cacheMaxSizeBytes,
+                SaikuProperties.cacheEnabled);
+    }
+
+    public SaikuQueryCache(Path cacheDir, long ttlMillis, long maxSizeBytes, boolean enabled) {
+        this.cacheDir = cacheDir;
+        this.ttlMillis = ttlMillis;
+        this.maxSizeBytes = maxSizeBytes;
+        this.enabled = enabled;
+        this.index = Caffeine.newBuilder().maximumSize(512).build();
+        ThreadFactory tf = r -> {
+            Thread t = new Thread(r, "SaikuQueryCache-eviction");
+            t.setDaemon(true);
+            return t;
+        };
+        this.evictionExecutor = Executors.newSingleThreadExecutor(tf);
+        try {
+            Files.createDirectories(cacheDir);
+            // Warm the in-memory index from disk so eviction sees existing entries.
+            reindexFromDisk();
+        } catch (IOException e) {
+            log.warn("SaikuQueryCache: cannot prepare cache dir {} — cache disabled: {}", cacheDir, e.toString());
+        }
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public Path getCacheDir() {
+        return cacheDir;
+    }
+
+    private static Path resolveDefaultCacheDir() {
+        String home = System.getProperty("saiku.home");
+        Path base = (home != null && !home.isEmpty()) ? Paths.get(home) : Paths.get("saiku-home");
+        return base.resolve("cache");
+    }
+
+    private void reindexFromDisk() throws IOException {
+        if (!Files.isDirectory(cacheDir)) {
+            return;
+        }
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(cacheDir, "*" + META_SUFFIX)) {
+            for (Path meta : ds) {
+                try {
+                    Entry e = mapper.readValue(meta.toFile(), Entry.class);
+                    if (e != null && e.key != null) {
+                        index.put(e.key, e);
+                    }
+                } catch (Exception ex) {
+                    log.debug("Ignoring malformed meta sidecar {}: {}", meta, ex.toString());
+                }
+            }
+        }
+        // Delete orphan .arrow files whose sidecar is missing — a crash after
+        // writing the arrow but before the meta sidecar (or after an
+        // interrupted invalidate) would otherwise leak bytes indefinitely.
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(cacheDir, "*" + ARROW_SUFFIX)) {
+            for (Path arrow : ds) {
+                String name = arrow.getFileName().toString();
+                String key = name.substring(0, name.length() - ARROW_SUFFIX.length());
+                Path meta = metaPath(key);
+                if (!Files.exists(meta)) {
+                    try {
+                        Files.deleteIfExists(arrow);
+                        log.debug("Deleted orphan arrow file {} (no sidecar)", arrow);
+                    } catch (IOException ioe) {
+                        log.debug("Failed to delete orphan arrow {}: {}", arrow, ioe.toString());
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Look up the key and return cached bytes if present (and not expired),
+     * otherwise invoke {@code supplier} to produce a fresh
+     * {@link CachedQueryResult}, store it, and return it.
+     */
+    public CachedQueryResult get(String key, String cubeVersion, Supplier<CachedQueryResult> supplier) {
+        if (!enabled) {
+            return supplier.get();
+        }
+        Entry hit = lookup(key, cubeVersion);
+        if (hit != null) {
+            try {
+                byte[] bytes = Files.readAllBytes(arrowPath(key));
+                return new CachedQueryResult(bytes, hit.runtimeMs, hit.rows, true);
+            } catch (IOException e) {
+                log.debug("Cache arrow file missing for {} — falling through: {}", key, e.toString());
+                invalidate(key);
+            }
+        }
+        CachedQueryResult fresh = supplier.get();
+        if (fresh != null && fresh.arrowBytes != null) {
+            put(key, cubeVersion, fresh);
+        }
+        return fresh;
+    }
+
+    /** Returns the entry if present, not expired, and cubeVersion matches. */
+    private Entry lookup(String key, String cubeVersion) {
+        Entry e = index.getIfPresent(key);
+        if (e == null) {
+            return null;
+        }
+        long age = System.currentTimeMillis() - e.createdAt;
+        if (age > ttlMillis) {
+            invalidate(key);
+            return null;
+        }
+        if (cubeVersion != null && e.cubeVersion != null && !cubeVersion.equals(e.cubeVersion)) {
+            invalidate(key);
+            return null;
+        }
+        return e;
+    }
+
+    public void put(String key, String cubeVersion, CachedQueryResult r) {
+        if (!enabled || r == null || r.arrowBytes == null) {
+            return;
+        }
+        writeLock.lock();
+        try {
+            Path arrow = arrowPath(key);
+            Path meta = metaPath(key);
+            // Write to tmp then atomic-move to avoid half-written files on crash.
+            Path tmp = arrow.resolveSibling(arrow.getFileName().toString() + ".tmp");
+            Files.write(tmp, r.arrowBytes);
+            moveReplace(tmp, arrow);
+
+            Entry e = new Entry(
+                    key,
+                    System.currentTimeMillis(),
+                    r.runtimeMs,
+                    r.rows,
+                    cubeVersion == null ? "" : cubeVersion,
+                    r.arrowBytes.length);
+            // Write meta via tmp + atomic move, same pattern as the arrow file,
+            // so a crash mid-write never leaves a half-serialised sidecar that
+            // would poison reindexFromDisk() / the budget walk.
+            Path metaTmp = meta.resolveSibling(meta.getFileName().toString() + ".tmp");
+            mapper.writerWithDefaultPrettyPrinter().writeValue(metaTmp.toFile(), e);
+            moveReplace(metaTmp, meta);
+            index.put(key, e);
+        } catch (IOException ex) {
+            // saiku#1337: a genuine write failure (after the moveReplace
+            // fallback) leaves the index un-updated, so the next get() is a
+            // clean miss rather than a stale hit. We log loudly rather than
+            // throw — a cache-write failure must not break the live query that
+            // produced the bytes (get() still returns the fresh result).
+            log.warn("SaikuQueryCache.put({}) failed — entry NOT cached: {}", key, ex.toString());
+        } finally {
+            writeLock.unlock();
+        }
+        // Eviction walks every .meta.json on disk + invalidates victims, which
+        // re-acquires writeLock — running it inline blocks the next put()/get()
+        // until the walk finishes. Run on the daemon executor instead so
+        // requests aren't stalled by the budget check.
+        evictionExecutor.submit(this::evictIfOverBudget);
+    }
+
+    public void invalidate(String key) {
+        writeLock.lock();
+        try {
+            index.invalidate(key);
+            Files.deleteIfExists(arrowPath(key));
+            Files.deleteIfExists(metaPath(key));
+        } catch (IOException e) {
+            log.debug("invalidate({}) IO hiccup: {}", key, e.toString());
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    public void invalidateAll() {
+        writeLock.lock();
+        try {
+            index.invalidateAll();
+            if (Files.isDirectory(cacheDir)) {
+                try (DirectoryStream<Path> ds = Files.newDirectoryStream(cacheDir)) {
+                    for (Path p : ds) {
+                        String n = p.getFileName().toString();
+                        if (n.endsWith(ARROW_SUFFIX) || n.endsWith(META_SUFFIX)) {
+                            Files.deleteIfExists(p);
+                        }
+                    }
+                }
+            }
+        } catch (IOException e) {
+            log.debug("invalidateAll IO hiccup: {}", e.toString());
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    /**
+     * Sum the bytes recorded in every {@code .meta.json} sidecar on disk.
+     * This is the source of truth for the disk budget — the Caffeine index
+     * is capped at 512 entries and silently evicts older ones, so trusting
+     * it would systematically under-report and let disk grow past
+     * {@link #maxSizeBytes}.
+     *
+     * <p>TODO: consider a rolling running total if this gets hot.
+     */
+    public long totalBytesOnDisk() {
+        return walkMetaEntries().stream().mapToLong(e -> e.bytes).sum();
+    }
+
+    /**
+     * Walk the cache dir and deserialise every {@code .meta.json} into an
+     * {@link Entry}. Malformed sidecars are skipped.
+     */
+    private List<Entry> walkMetaEntries() {
+        List<Entry> entries = new ArrayList<>();
+        if (!Files.isDirectory(cacheDir)) {
+            return entries;
+        }
+        try (DirectoryStream<Path> ds = Files.newDirectoryStream(cacheDir, "*" + META_SUFFIX)) {
+            for (Path meta : ds) {
+                try {
+                    Entry e = mapper.readValue(meta.toFile(), Entry.class);
+                    if (e != null && e.key != null) {
+                        entries.add(e);
+                    }
+                } catch (Exception ex) {
+                    log.debug("Ignoring malformed meta sidecar {}: {}", meta, ex.toString());
+                }
+            }
+        } catch (IOException ioe) {
+            log.debug("Cache meta walk failed: {}", ioe.toString());
+        }
+        return entries;
+    }
+
+    private void evictIfOverBudget() {
+        // saiku#1337: hold the write lock across the whole walk + evict so the
+        // eviction thread never reads a meta sidecar while a concurrent
+        // invalidate()/put() is deleting/replacing the same files. On POSIX
+        // deleting an open file is fine, but on Windows a delete that races an
+        // open read throws AccessDenied (which invalidate() then swallows),
+        // leaving the file on disk. Serialising here removes the race.
+        // invalidate() below re-acquires the same lock — safe, it's reentrant.
+        // Cache reads (get) never take this lock, so hits are never blocked by
+        // eviction; only other writers wait, and only while we're over budget.
+        writeLock.lock();
+        try {
+            List<Entry> all = walkMetaEntries();
+            long total = all.stream().mapToLong(e -> e.bytes).sum();
+            if (total <= maxSizeBytes) {
+                return;
+            }
+            all.sort(Comparator.comparingLong(e -> e.createdAt)); // oldest first
+            for (Entry victim : all) {
+                if (total <= maxSizeBytes) {
+                    break;
+                }
+                log.info(
+                        "SaikuQueryCache evicting {} ({} bytes, age={}ms) to stay under {} bytes",
+                        victim.key,
+                        victim.bytes,
+                        System.currentTimeMillis() - victim.createdAt,
+                        maxSizeBytes);
+                invalidate(victim.key);
+                total -= victim.bytes;
+            }
+        } finally {
+            writeLock.unlock();
+        }
+    }
+
+    Path arrowPath(String key) {
+        return cacheDir.resolve(key + ARROW_SUFFIX);
+    }
+
+    Path metaPath(String key) {
+        return cacheDir.resolve(key + META_SUFFIX);
+    }
+
+    /**
+     * Move {@code tmp} onto {@code target}, replacing it. Tries an atomic move
+     * first (the safe path — a reader sees either the whole old file or the
+     * whole new file). Some filesystems, and Windows when the target already
+     * exists or is briefly locked, reject {@code ATOMIC_MOVE} with
+     * {@link java.nio.file.AtomicMoveNotSupportedException} or an
+     * AccessDenied/FileSystem error; in that case retry with a plain replace.
+     * That move is non-atomic but still safe here because the full payload was
+     * already written to {@code tmp}, so {@code target} is never left
+     * half-written — it ends up either the previous complete file or the new
+     * complete one.
+     *
+     * <p>saiku#1337: the old code only attempted the atomic move and let the
+     * exception bubble to put()'s catch, turning a perfectly recoverable cache
+     * write into a silent no-op on the affected platforms.
+     */
+    private static void moveReplace(Path tmp, Path target) throws IOException {
+        try {
+            Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
+        } catch (IOException atomicFailed) {
+            try {
+                Files.move(tmp, target, StandardCopyOption.REPLACE_EXISTING);
+            } catch (IOException plainFailed) {
+                // Even the plain move failed (e.g. disk full): don't leak tmp.
+                try {
+                    Files.deleteIfExists(tmp);
+                } catch (IOException ignore) {
+                    // best effort
+                }
+                throw plainFailed;
+            }
+        }
+    }
+
+    /**
+     * Drain any queued eviction tasks. Intended for tests that need to assert
+     * post-eviction state — production callers should never need to flush.
+     */
+    public void flushEvictions() {
+        try {
+            Future<?> drained = evictionExecutor.submit(() -> {});
+            drained.get(30, TimeUnit.SECONDS);
+        } catch (Exception e) {
+            log.debug("flushEvictions interrupted: {}", e.toString());
+        }
+    }
+
+    /**
+     * Test hook: submit an arbitrary task to the eviction executor. Lets tests
+     * verify that put() does not block on the executor by parking a sentinel
+     * task. Package-visible by design — public so the test in another package
+     * can call it without reflection.
+     */
+    public Future<?> submitEvictionTask(Runnable task) {
+        return evictionExecutor.submit(task);
+    }
+
+    @PreDestroy
+    public void shutdown() {
+        index.invalidateAll();
+        evictionExecutor.shutdownNow();
+    }
+}

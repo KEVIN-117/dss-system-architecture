@@ -1,0 +1,21 @@
+sequenceDiagram
+    autonumber
+    actor Client
+    participant R as Query2Resource
+    participant Thin as ThinQueryService
+    participant Discover as OlapDiscoverService
+    participant CM as ConnectionManager
+    participant OLAP as olap4j/Mondrian
+    participant Format as Result formatter
+    Client->>R: POST /query/execute + ThinQuery
+    R->>Thin: ejecutar
+    Thin->>Thin: inferir tipo / crear MDX si querymodel
+    Thin->>Discover: resolver conexión
+    Discover->>CM: obtener conexión
+    CM->>OLAP: recuperar conexión
+    Thin->>OLAP: crear statement + ejecutar MDX
+    OLAP-->>Thin: CellSet
+    Thin->>Format: convertir matriz y ejes
+    Format-->>R: QueryResult
+    R-->>Client: JSON o Arrow negociado
+    Thin->>OLAP: cerrar statement en finally

@@ -1,0 +1,16 @@
+sequenceDiagram
+    autonumber
+    actor Client
+    participant R as Query2Resource
+    participant Thin as ThinQueryService
+    participant OSSIE as OssieQueryService
+    participant Backend as Backend OSSIE
+    Client->>R: POST /query/execute tipo OSSIE
+    R->>Thin: ejecutar
+    Thin->>Thin: detectar backend OSSIE
+    Thin->>OSSIE: delegar sin rama MDX/olap4j
+    OSSIE->>Backend: ejecutar consulta
+    Backend-->>OSSIE: resultado
+    OSSIE-->>Thin: CellDataSet
+    Thin-->>R: QueryResult
+    R-->>Client: JSON

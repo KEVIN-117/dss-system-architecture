@@ -1,0 +1,210 @@
+/*
+ *   Copyright 2026 Spicule Ltd
+ *   Apache License, Version 2.0.
+ */
+package org.saiku.service.olap.ai;
+
+import com.fasterxml.jackson.annotation.JsonInclude;
+import java.util.Map;
+
+/**
+ * Typed cell envelope. Replaces the v1 "pre-formatted string" cell shape
+ * so an LLM can compute on {@link #value} without re-parsing locale-
+ * specific formatted strings, and so currency / unit info round-trips
+ * cleanly through the API.
+ */
+public class AiCell {
+
+    /** Numeric value when parseable; null otherwise (e.g. for #null / error cells). */
+    private Double value;
+    /** Pre-formatted display string (from the Mondrian format string). */
+    private String formatted;
+    /** Optional unit / currency hint sniffed from the format string. */
+    private String unit;
+    /** olap4j {@code StandardCellProperty} values surfaced from the
+     *  cellset — formatString, foreColor, backColor, fontFlags, actionType,
+     *  error, etc. (saiku#773). Map keys are camelCase per the extractor
+     *  contract; the field is {@link JsonInclude.Include#NON_EMPTY} so
+     *  cells with no Mondrian-set properties stay lean in the wire
+     *  representation. */
+    @JsonInclude(JsonInclude.Include.NON_EMPTY)
+    private Map<String, String> properties;
+
+    /** Statistical anomaly verdict for this cell, attached by the
+     *  {@code /ai/anomaly} endpoint (saiku#907) only on cells the detector
+     *  flagged. {@code NON_NULL} so ordinary {@code /ai/query} cells stay
+     *  lean and unflagged anomaly cells don't carry an empty object. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private org.saiku.service.olap.ai.anomaly.AnomalyPoint anomaly;
+
+    /** saiku#905 — true when k-anonymity small-cell suppression masked this
+     *  cell because its underlying row count was below {@code ai.kAnonymity}.
+     *  {@code NON_DEFAULT} so ordinary (unsuppressed) cells stay lean on the
+     *  wire. The UI renders suppressed cells distinctively. */
+    @JsonInclude(JsonInclude.Include.NON_DEFAULT)
+    private boolean suppressed;
+
+    /** saiku#1780 — populated when a requested measure produced NO column in
+     *  the result because it has no join path to a filtered/sliced dimension.
+     *  Rather than silently omitting the measure (the agent then gets fewer
+     *  columns than it asked for, with no explanation), we surface an explicit
+     *  cell whose {@link #value}/{@link #formatted} are null and whose
+     *  {@code unavailable} carries a machine-readable reason, e.g.
+     *  {@code "no join path to filtered dimension(s): Warehouse"}. Mirrors the
+     *  VALIDATION_ERROR self-description style so an agent can act on it.
+     *  {@code NON_NULL} so ordinary cells stay lean on the wire. */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    private String unavailable;
+
+    public AiCell() {}
+
+    public AiCell(Double value, String formatted, String unit) {
+        this.value = finiteOrNull(value);
+        this.formatted = formatted;
+        this.unit = unit;
+    }
+
+    public AiCell(Double value, String formatted, String unit, Map<String, String> properties) {
+        this.value = finiteOrNull(value);
+        this.formatted = formatted;
+        this.unit = unit;
+        this.properties = properties;
+    }
+
+    /**
+     * saiku#1780 — collapse non-finite results to null.
+     *
+     * <p>A divide-by-zero calculated measure (FoodMart's {@code Stock To Sales
+     * Ratio} sliced by a warehouse geography, for instance) evaluates to
+     * {@code Infinity}. Jackson serialises that as the bare token {@code Infinity},
+     * which is not valid JSON per RFC 8259 — strict parsers reject the whole
+     * response — and any client lenient enough to accept it then renders the
+     * literal text "Infinity" in a KPI headline or a table cell.
+     *
+     * <p>Null is the honest answer: the ratio is undefined, exactly like a
+     * missing cell. {@code formatted} is left alone so the server's own rendering
+     * of the cell is still visible to anyone debugging.
+     */
+    private static Double finiteOrNull(Double v) {
+        if (v == null || v.isNaN() || v.isInfinite()) return null;
+        return v;
+    }
+
+    public Double getValue() {
+        return value;
+    }
+
+    public void setValue(Double v) {
+        this.value = finiteOrNull(v);
+    }
+
+    public String getFormatted() {
+        return formatted;
+    }
+
+    public void setFormatted(String v) {
+        this.formatted = v;
+    }
+
+    public String getUnit() {
+        return unit;
+    }
+
+    public void setUnit(String v) {
+        this.unit = v;
+    }
+
+    public Map<String, String> getProperties() {
+        return properties;
+    }
+
+    public void setProperties(Map<String, String> v) {
+        this.properties = v;
+    }
+
+    public org.saiku.service.olap.ai.anomaly.AnomalyPoint getAnomaly() {
+        return anomaly;
+    }
+
+    public void setAnomaly(org.saiku.service.olap.ai.anomaly.AnomalyPoint v) {
+        this.anomaly = v;
+    }
+
+    public boolean isSuppressed() {
+        return suppressed;
+    }
+
+    public void setSuppressed(boolean v) {
+        this.suppressed = v;
+    }
+
+    public String getUnavailable() {
+        return unavailable;
+    }
+
+    public void setUnavailable(String v) {
+        this.unavailable = v;
+    }
+
+    /**
+     * saiku#1780 — build a self-describing "unavailable measure" cell: null
+     * value/formatted, with a machine-readable reason. Used when a requested
+     * measure has no join path to a filtered/sliced dimension and Mondrian
+     * therefore drops it from the result entirely.
+     */
+    public static AiCell unavailable(String reason) {
+        AiCell c = new AiCell(null, null, null);
+        c.unavailable = reason;
+        return c;
+    }
+
+    /** Best-effort: parse a Mondrian-formatted string back into a Double,
+     *  stripping thousands separators and currency symbols. */
+    public static Double parseValueFromFormatted(String formatted) {
+        if (formatted == null || formatted.isEmpty()) return null;
+        // Strip everything except digits, dot, minus, and one comma group.
+        // This is locale-naive on purpose — Mondrian's default format uses
+        // comma thousands separators and dot decimals. Servers running a
+        // non-en locale should set saiku.format.numberformat explicitly.
+        String cleaned = formatted.trim();
+        // Drop a trailing % so percentage cells parse to the raw number.
+        boolean percent = cleaned.endsWith("%");
+        if (percent) cleaned = cleaned.substring(0, cleaned.length() - 1).trim();
+        // Strip currency symbols and other non-numeric leading chars.
+        int i = 0;
+        while (i < cleaned.length() && !isNumeric(cleaned.charAt(i)) && cleaned.charAt(i) != '-') i++;
+        cleaned = cleaned.substring(i);
+        // Remove all commas — assume they're thousands separators.
+        cleaned = cleaned.replace(",", "");
+        if (cleaned.isEmpty()) return null;
+        try {
+            double n = Double.parseDouble(cleaned);
+            return percent ? n / 100.0 : n;
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** Best-effort unit sniff from a formatted string. Handles both
+     *  prefix-currency conventions ({@code "$48,836.21"} → {@code "USD"},
+     *  {@code "£500.00"} → {@code "GBP"}) and trailing-currency conventions
+     *  used by some locales / cube formatters ({@code "29,358.98 €"} →
+     *  {@code "EUR"}). Percent cells return {@code "%"}. Sign prefixes
+     *  ({@code -}/{@code +}) are stripped before the symbol check. */
+    public static String sniffUnit(String formatted) {
+        if (formatted == null || formatted.isEmpty()) return null;
+        String s = formatted.trim();
+        if (s.endsWith("%")) return "%";
+        // Strip a sign prefix so "-$10" still sniffs.
+        String body = (s.startsWith("-") || s.startsWith("+")) ? s.substring(1).trim() : s;
+        if (body.startsWith("$") || body.endsWith("$")) return "USD";
+        if (body.startsWith("£") || body.endsWith("£")) return "GBP";
+        if (body.startsWith("€") || body.endsWith("€")) return "EUR";
+        if (body.startsWith("¥") || body.endsWith("¥")) return "JPY";
+        return null;
+    }
+
+    private static boolean isNumeric(char c) {
+        return (c >= '0' && c <= '9') || c == '.';
+    }
+}

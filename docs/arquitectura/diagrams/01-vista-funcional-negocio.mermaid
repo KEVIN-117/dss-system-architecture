@@ -1,0 +1,27 @@
+flowchart LR
+  subgraph origen[Información institucional]
+    fuentes[Datos académicos de la UATF]
+  end
+
+  subgraph capacidades[Capacidades del DSS]
+    integrar[Integrar y preparar información académica]
+    organizar[Organizar información histórica para análisis]
+    indicadores[Analizar matrícula, rendimiento y demanda académica]
+    estimar[Estimar riesgos y tendencias académicas]
+    comunicar[Presentar indicadores y resultados analíticos]
+    accesos[Administrar usuarios y alcances de acceso]
+  end
+
+  subgraph usuarios[Personas usuarias]
+    admin[Administrador]
+    autoridades[Autoridades: Rector, Vicerrector, Decano y Director]
+    analista[Analista institucional]
+  end
+
+  fuentes --> integrar --> organizar
+  organizar --> indicadores --> comunicar
+  organizar --> estimar --> comunicar
+  admin -->|Gestiona| accesos
+  accesos -. define acceso autorizado .-> comunicar
+  comunicar -->|Consulta información para decidir| autoridades
+  comunicar -->|Explora información autorizada| analista
