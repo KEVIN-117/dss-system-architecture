@@ -274,3 +274,21 @@
     @apply font-sans;
   }
 }
+
+/* React Flow's default controls use fixed light colors. Keep the canvas controls
+   legible in every design-system theme, including dark mode. */
+.cube-designer-controls .react-flow__controls-button {
+  color: var(--foreground);
+  background: var(--card);
+  border-color: var(--border);
+}
+
+.cube-designer-controls .react-flow__controls-button:hover {
+  color: var(--accent-foreground);
+  background: var(--accent);
+}
+
+.cube-designer-controls .react-flow__controls-button:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: -2px;
+}

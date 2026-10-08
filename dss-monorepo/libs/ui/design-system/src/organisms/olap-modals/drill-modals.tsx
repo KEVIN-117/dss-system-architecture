@@ -191,7 +191,7 @@ export function DrillthroughModal({
                 <li key={item.uniqueName} className="px-3 py-2">
                   <Checkbox
                     checked={group.selected.has(item.uniqueName)}
-                    onCheckedChange={(checked) =>
+                    onCheckedChange={(checked: boolean | 'indeterminate') =>
                       toggle(
                         group.set,
                         group.selected,

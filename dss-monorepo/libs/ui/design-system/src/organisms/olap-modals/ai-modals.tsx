@@ -73,8 +73,8 @@ export function EmailMeThisModal({
           <Textarea id="email-summary" value={summary} onChange={(event) => setSummary(event.target.value)} rows={6} />
         </OlapModalField>
         <div className="flex flex-wrap items-center gap-4">
-          <Checkbox checked={attachChart} onCheckedChange={(checked) => setAttachChart(checked === true)} label="Adjuntar gráfico" />
-          <Checkbox checked={attachPdf} onCheckedChange={(checked) => setAttachPdf(checked === true)} label="Adjuntar informe PDF" />
+          <Checkbox checked={attachChart} onCheckedChange={(checked: boolean | 'indeterminate') => setAttachChart(checked === true)} label="Adjuntar gráfico" />
+          <Checkbox checked={attachPdf} onCheckedChange={(checked: boolean | 'indeterminate') => setAttachPdf(checked === true)} label="Adjuntar informe PDF" />
           {onGenerateSummary ? <Button variant="outline" size="sm" onClick={onGenerateSummary} disabled={!canGenerateSummary || generating}>{generating ? 'Generando…' : 'Generar resumen'}</Button> : null}
         </div>
       </div>

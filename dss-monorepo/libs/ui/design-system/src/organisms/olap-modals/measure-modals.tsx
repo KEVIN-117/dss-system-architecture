@@ -86,7 +86,7 @@ export function MeasuresModal({
           <div className="rounded-md border border-dashed border-border p-3">
             <Checkbox
               checked={includeHidden}
-              onCheckedChange={(checked) => changeHidden(checked === true)}
+              onCheckedChange={(checked: boolean | 'indeterminate') => changeHidden(checked === true)}
               label="Mostrar medidas ocultas"
               description="Solicita al servidor que incluya medidas no visibles."
             />
@@ -98,7 +98,7 @@ export function MeasuresModal({
             <li key={measure.uniqueName} className="flex items-center gap-3 px-3 py-2">
               <Checkbox
                 checked={selected.has(measure.uniqueName)}
-                onCheckedChange={(checked) => toggle(measure.uniqueName, checked === true)}
+                onCheckedChange={(checked: boolean | 'indeterminate') => toggle(measure.uniqueName, checked === true)}
                 label={measure.caption || measure.name}
               />
               {measure.calculated ? <Badge variant="outline">Calculada</Badge> : null}
@@ -233,7 +233,7 @@ export function SelectionsModal({
             <li key={member.uniqueName} className="px-3 py-2">
               <Checkbox
                 checked={activeState.selected.has(member.uniqueName)}
-                onCheckedChange={(checked) => updateActive((current) => {
+                onCheckedChange={(checked: boolean | 'indeterminate') => updateActive((current) => {
                   const selected = new Set(current.selected);
                   if (checked === true) selected.add(member.uniqueName);
                   else selected.delete(member.uniqueName);

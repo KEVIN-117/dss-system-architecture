@@ -74,6 +74,9 @@
     },
     {
       "path": "./libs/shared/dashboard-engine"
+    },
+    {
+      "path": "./libs/shared/olap-data-access"
     }
   ]
 }

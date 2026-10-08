@@ -57,7 +57,7 @@ export function ChartEditorModal({
                 <Checkbox
                   key={field.name}
                   checked={values[field.name] === true}
-                  onCheckedChange={(checked) => setValue(field.name, checked === true)}
+                  onCheckedChange={(checked: boolean | 'indeterminate') => setValue(field.name, checked === true)}
                   label={field.label}
                   description={field.description}
                 />

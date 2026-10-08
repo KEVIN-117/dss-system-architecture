@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { Button } from '../../atoms/button';
 import { Label } from '../../atoms/label';
-import { Textarea } from '../../atoms/textarea';
+import { MonacoExpressionEditor } from './monaco-expression-editor';
 
 export interface OlapModalActionsProps {
   onCancel: () => void;
@@ -32,10 +32,22 @@ export function OlapModalModeSwitch({
 }: OlapModalModeSwitchProps) {
   return (
     <div className="mb-4 flex gap-2" role="group" aria-label={ariaLabel}>
-      <Button type="button" size="sm" variant={mode === 'simple' ? 'secondary' : 'outline'} aria-pressed={mode === 'simple'} onClick={() => onChange('simple')}>
+      <Button
+        type="button"
+        size="sm"
+        variant={mode === 'simple' ? 'secondary' : 'outline'}
+        aria-pressed={mode === 'simple'}
+        onClick={() => onChange('simple')}
+      >
         {simpleLabel}
       </Button>
-      <Button type="button" size="sm" variant={mode === 'mdx' ? 'secondary' : 'outline'} aria-pressed={mode === 'mdx'} onClick={() => onChange('mdx')}>
+      <Button
+        type="button"
+        size="sm"
+        variant={mode === 'mdx' ? 'secondary' : 'outline'}
+        aria-pressed={mode === 'mdx'}
+        onClick={() => onChange('mdx')}
+      >
         {mdxLabel}
       </Button>
     </div>
@@ -70,13 +82,27 @@ export interface OlapModalFieldProps {
   children: React.ReactNode;
 }
 
-export function OlapModalField({ id, label, description, error, children }: OlapModalFieldProps) {
+export function OlapModalField({
+  id,
+  label,
+  description,
+  error,
+  children,
+}: OlapModalFieldProps) {
   return (
     <div className="grid gap-2">
-      <Label htmlFor={id}>{label}</Label>
+      <Label htmlFor={id} id={`${id}-label`}>
+        {label}
+      </Label>
       {children}
-      {description ? <p className="text-sm text-muted-foreground">{description}</p> : null}
-      {error ? <p className="text-sm text-destructive" role="alert">{error}</p> : null}
+      {description ? (
+        <p className="text-sm text-muted-foreground">{description}</p>
+      ) : null}
+      {error ? (
+        <p className="text-sm text-destructive" role="alert">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -87,7 +113,6 @@ export interface OlapExpressionEditorProps {
   value: string;
   onChange: (value: string) => void;
   minRows?: number;
-  placeholder?: string;
   description?: React.ReactNode;
 }
 
@@ -97,19 +122,15 @@ export function OlapExpressionEditor({
   value,
   onChange,
   minRows = 8,
-  placeholder,
   description,
 }: OlapExpressionEditorProps) {
   return (
     <OlapModalField id={id} label={label} description={description}>
-      <Textarea
+      <MonacoExpressionEditor
         id={id}
         value={value}
-        onChange={(event) => onChange(event.target.value)}
-        rows={minRows}
-        placeholder={placeholder}
-        className="resize-y font-mono text-sm"
-        spellCheck={false}
+        onChange={onChange}
+        minRows={minRows}
       />
     </OlapModalField>
   );

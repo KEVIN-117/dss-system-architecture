@@ -1,9 +1,14 @@
 import type { Metadata } from 'next';
+import { Providers } from './providers';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'OLAP Workspace',
-  description: 'Espacio de trabajo OLAP de DSS.',
+  title: {
+    default: 'OLAP Workspace | DSS',
+    template: '%s | OLAP Workspace',
+  },
+  description:
+    'Espacio de análisis OLAP para explorar cubos, dashboards y aplicaciones.',
 };
 
 export default function RootLayout({
@@ -13,7 +18,11 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="es" className="dark">
-      <body>{children}</body>
+      <body>
+        <Providers bffBaseUrl={process.env.NEXT_PUBLIC_BFF_URL ?? ''}>
+          {children}
+        </Providers>
+      </body>
     </html>
   );
 }

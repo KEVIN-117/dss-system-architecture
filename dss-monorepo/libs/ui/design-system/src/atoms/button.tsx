@@ -128,7 +128,7 @@ function Button({
         tabIndex={isDisabled ? -1 : tabIndex}
         onClickCapture={
           isDisabled
-            ? (event) => {
+            ? (event: React.MouseEvent) => {
                 event.preventDefault();
                 event.stopPropagation();
               }

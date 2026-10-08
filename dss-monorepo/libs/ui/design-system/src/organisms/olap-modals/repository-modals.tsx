@@ -190,7 +190,7 @@ export function PermissionsModal({ path, allRoles, initial, open, onSave, onCanc
                     <th scope="row" className="px-3 py-2 text-left font-medium">{role}</th>
                     {(['READ', 'WRITE', 'GRANT'] as const).map((method) => (
                       <td key={method} className="px-3 py-2">
-                        <Checkbox checked={(acl.roles[role] ?? []).includes(method)} onCheckedChange={(checked) => toggleRole(role, method, checked === true)} aria-label={`${method} para ${role}`} />
+                        <Checkbox checked={(acl.roles[role] ?? []).includes(method)} onCheckedChange={(checked: boolean | 'indeterminate') => toggleRole(role, method, checked === true)} aria-label={`${method} para ${role}`} />
                       </td>
                     ))}
                   </tr>

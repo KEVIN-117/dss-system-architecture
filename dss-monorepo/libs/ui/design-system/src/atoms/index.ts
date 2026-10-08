@@ -1,4 +1,5 @@
 export * from './button';
+export * from './badge';
 export * from './checkbox';
 export * from './divider';
 export * from './dropdown';
@@ -16,6 +17,7 @@ export {
 } from './popover';
 export * from './radio';
 export * from './select';
+export * from './skeleton';
 export * from './switch';
 export * from './textarea';
 export {
