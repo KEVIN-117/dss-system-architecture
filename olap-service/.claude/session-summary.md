@@ -75,6 +75,12 @@ pushed down; normal sessions append and the history stays useful.
 
 ## Log
 
+## 2026-10-08 — feature/OLAP-002 — validated PostgreSQL OLAP session cap fixture
+**Was doing:** documented Saiku's existing external datasource properties and connection lifecycle; added a disposable `olap_test` PostgreSQL role capped at 20 sessions plus an integration assertion that session 21 is rejected. Compose integration passed, including that assertion; changes remain uncommitted in `docs/olap/`, `infra/dw-integration/` and `docs/olap/arranque-y-datasources.md`.
+**Now:** create or wire a reproducible UATF datasource/catalog and run the MDX load benchmark; the current test proves the PostgreSQL guardrail, not application query load.
+**Watch out:** 20 is an initial DB role budget derived from the fixture's 100-session PostgreSQL default, not a validated production or query-concurrency SLA. No JDBC pool is wired in Saiku's OLAP connection path.
+**Refs:** #64; `docs/olap/conexiones-dw-concurrencia.md`
+
 ## 2026-10-07 — feature/OLAP-001 — replaced the OLAP gitlink with tracked source
 **Was doing:** converted `olap-service` from a gitlink to ordinary tracked files; build outputs, IDE files, local `saiku-home` data and keys remain excluded by its `.gitignore`. The change is committed and pushed; PR #137 is open from the lowercase branch.
 **Now:** review checks and merge PR #137; keep `feature/OLAP-001` as the sole OLAP branch.

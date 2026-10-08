@@ -11,6 +11,63 @@ target_psql() {
         -h "$TARGET_HOST" -p "$TARGET_PORT" -U "$TARGET_USER" -d "$TARGET_DB" "$@"
 }
 
+assert_olap_connection_budget() {
+    expected_limit=20
+    max_connections=$(target_psql -Atqc "SHOW max_connections;")
+    if [ "$max_connections" != '100' ]; then
+        echo "Disposable DW max_connections mismatch: expected=100 actual=$max_connections" >&2
+        exit 1
+    fi
+    actual_limit=$(target_psql -Atqc "SELECT rolconnlimit FROM pg_roles WHERE rolname = 'olap_test';")
+    if [ "$actual_limit" != "$expected_limit" ]; then
+        echo "OLAP role connection limit mismatch: expected=$expected_limit actual=$actual_limit" >&2
+        exit 1
+    fi
+
+    echo 'Checking the disposable OLAP PostgreSQL connection budget (20 sessions)'
+    pids=''
+    cleanup_olap_sessions() {
+        for pid in $pids; do
+            kill "$pid" >/dev/null 2>&1 || true
+        done
+        wait >/dev/null 2>&1 || true
+    }
+    trap cleanup_olap_sessions EXIT HUP INT TERM
+
+    i=0
+    while [ "$i" -lt "$expected_limit" ]; do
+        PGPASSWORD=olap_test psql -X -v ON_ERROR_STOP=1 \
+            -h "$TARGET_HOST" -p "$TARGET_PORT" -U olap_test -d "$TARGET_DB" \
+            -c 'SELECT pg_sleep(30);' >/dev/null 2>&1 &
+        pids="$pids $!"
+        i=$((i + 1))
+    done
+
+    attempts=0
+    while [ "$attempts" -lt 40 ]; do
+        active=$(target_psql -Atqc "SELECT count(*) FROM pg_stat_activity WHERE usename = 'olap_test';")
+        if [ "$active" = "$expected_limit" ]; then
+            break
+        fi
+        sleep 0.25
+        attempts=$((attempts + 1))
+    done
+    if [ "$active" != "$expected_limit" ]; then
+        echo "Could not establish the OLAP budget: expected=$expected_limit active=$active" >&2
+        exit 1
+    fi
+
+    if PGPASSWORD=olap_test psql -X -v ON_ERROR_STOP=1 \
+        -h "$TARGET_HOST" -p "$TARGET_PORT" -U olap_test -d "$TARGET_DB" \
+        -c 'SELECT 1;' >/dev/null 2>&1; then
+        echo 'OLAP role unexpectedly opened a 21st PostgreSQL session' >&2
+        exit 1
+    fi
+
+    cleanup_olap_sessions
+    trap - EXIT HUP INT TERM
+}
+
 assert_source_count() {
     table_name=$1
     expected=$2
@@ -63,6 +120,7 @@ if source_psql -c 'CREATE TABLE public.dw008_should_fail (id integer);' >/dev/nu
 fi
 
 echo 'Checking DW migrations and technical members'
+assert_olap_connection_budget
 assert_target_count 'migration history' \
     "SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005','0006','0007');" 7
 assert_target_count 'conformed dimensions' \
