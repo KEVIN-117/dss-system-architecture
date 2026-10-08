@@ -14,7 +14,6 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.saiku.service.olap.ai.AiValidationException;
 import org.saiku.service.util.exception.SaikuAccessDeniedException;
 import org.slf4j.Logger;
@@ -105,6 +104,7 @@ public class GenericExceptionMapper implements ExceptionMapper<Throwable> {
         if (t instanceof JsonMappingException) {
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("status", "BAD_REQUEST");
+            body.put("code", "INVALID_REQUEST");
             body.put("field", "request");
             body.put("error", "Malformed request body");
             return Response.status(Response.Status.BAD_REQUEST)
@@ -120,6 +120,7 @@ public class GenericExceptionMapper implements ExceptionMapper<Throwable> {
             log.debug("Resource NPE, likely missing param", t);
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("status", "BAD_REQUEST");
+            body.put("code", "INVALID_REQUEST");
             body.put("field", "request");
             body.put("error", "Required parameter missing or null");
             return Response.status(Response.Status.BAD_REQUEST)
@@ -138,6 +139,7 @@ public class GenericExceptionMapper implements ExceptionMapper<Throwable> {
             log.warn("Access denied on datasource [detail={}]", denied.getMessage());
             Map<String, Object> body = new LinkedHashMap<>();
             body.put("status", "FORBIDDEN");
+            body.put("code", "ACCESS_DENIED");
             body.put("error", "Access denied");
             return Response.status(Response.Status.FORBIDDEN)
                     .type(MediaType.APPLICATION_JSON)
@@ -148,16 +150,7 @@ public class GenericExceptionMapper implements ExceptionMapper<Throwable> {
         // 6) Everything else: log the full stack server-side keyed by a
         //    correlation id and return an information-free 500. The body
         //    carries no message, class name, cause chain, or stack.
-        String ref = UUID.randomUUID().toString();
-        log.error("Unhandled resource exception [ref={}]", ref, t);
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("status", "ERROR");
-        body.put("error", "Internal error");
-        body.put("ref", ref);
-        return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                .type(MediaType.APPLICATION_JSON)
-                .entity(body)
-                .build();
+        return RestErrorResponses.jsonFailure(t);
     }
 
     /**

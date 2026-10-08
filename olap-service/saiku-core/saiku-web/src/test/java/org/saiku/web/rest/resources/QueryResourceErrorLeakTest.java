@@ -8,6 +8,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 
+import jakarta.ws.rs.core.Response;
 import java.sql.ResultSet;
 import org.junit.Test;
 import org.saiku.olap.dto.resultset.CellDataSet;
@@ -17,8 +18,8 @@ import org.saiku.web.rest.objects.resultset.QueryResult;
 /**
  * saiku#1165 regression: the legacy v1 {@link QueryResource} must NOT serialise raw
  * exception / root-cause text (Mondrian or SQL internals, driver messages, paths) back to the
- * client. On any failure it returns a generic {@code "Internal error"} in {@link
- * QueryResult#getError()}; the detail is logged server-side only.
+ * client. Failures now use a consistent non-2xx status and an opaque {@code QueryResult}; detail
+ * remains server-side only.
  *
  * <p>This locks a fix that silently regressed once: six catch sites used to do {@code new
  * QueryResult(ExceptionUtils.getRootCauseMessage(e))}, and a squash-merge dropped the
@@ -77,8 +78,10 @@ public class QueryResourceErrorLeakTest {
     }
 
     /** Every hardened path must return the generic message and never echo the root cause. */
-    private static void assertGenericNoLeak(QueryResult res) {
-        assertNotNull(res);
+    private static void assertGenericNoLeak(Response response) {
+        assertNotNull(response);
+        assertEquals(500, response.getStatus());
+        QueryResult res = (QueryResult) response.getEntity();
         assertEquals("Internal error", res.getError());
         assertFalse(
                 "raw exception detail must never reach the client: " + res.getError(),

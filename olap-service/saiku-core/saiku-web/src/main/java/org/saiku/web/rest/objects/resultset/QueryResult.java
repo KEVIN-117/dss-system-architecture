@@ -15,6 +15,7 @@
  */
 package org.saiku.web.rest.objects.resultset;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.util.List;
 import org.saiku.olap.dto.resultset.CellDataSet;
 import org.saiku.olap.query2.ThinQuery;
@@ -28,6 +29,9 @@ public class QueryResult {
     private Total[][] colTotalsLists;
     private Integer runtime;
     private String error;
+    private String status;
+    private String code;
+    private String ref;
     private Integer height;
     private Integer width;
     private ISaikuQuery query;
@@ -83,6 +87,33 @@ public class QueryResult {
 
     public String getError() {
         return error;
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public String getStatus() {
+        return status;
+    }
+
+    public void setStatus(String status) {
+        this.status = status;
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+    }
+
+    @JsonInclude(JsonInclude.Include.NON_NULL)
+    public String getRef() {
+        return ref;
+    }
+
+    public void setRef(String ref) {
+        this.ref = ref;
     }
 
     public Integer getHeight() {

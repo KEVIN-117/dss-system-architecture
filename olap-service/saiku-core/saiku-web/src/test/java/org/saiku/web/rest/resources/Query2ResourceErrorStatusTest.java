@@ -99,18 +99,18 @@ public class Query2ResourceErrorStatusTest {
      * no envelope would strip the only human-readable explanation out of the response.
      */
     @Test
-    public void theFailureBodyIsStillAQueryResultCarryingTheMessage() {
-        Response resp = executeFailing(
-                new SaikuServiceException("wrapped", new SaikuOlapException("Unknown connection ( nope )")));
+    public void internalFailureKeepsTheQueryEnvelopeWithoutLeakingDetails() {
+        Response resp =
+                executeFailing(new IllegalStateException("jdbc:postgresql://warehouse/db?user=svc&password=secret"));
 
         assertNotNull("failure must carry a body", resp.getEntity());
         assertTrue(
                 "failure body must still be a QueryResult, not a bare string", resp.getEntity() instanceof QueryResult);
         QueryResult qr = (QueryResult) resp.getEntity();
-        assertNotNull("the error message was dropped", qr.getError());
-        assertTrue(
-                "the message lost the connection name: " + qr.getError(),
-                qr.getError().contains("nope"));
+        assertEquals("Internal error", qr.getError());
+        assertEquals("INTERNAL_ERROR", qr.getCode());
+        assertNotNull("internal errors need a correlation reference", qr.getRef());
+        assertTrue(!qr.getError().contains("password=secret"));
     }
 
     /**
@@ -133,6 +133,28 @@ public class Query2ResourceErrorStatusTest {
                 "Mondrian Error:Internal error", new java.sql.SQLException("connection reset by peer")));
 
         assertEquals(500, resp.getStatus());
+    }
+
+    @Test
+    public void aConnectionFailureIsServiceUnavailableAndOpaque() {
+        Response response = executeFailing(new RuntimeException(
+                "query failed",
+                new java.sql.SQLException("jdbc:postgresql://warehouse/db?user=svc&password=secret", "08001")));
+
+        assertEquals(503, response.getStatus());
+        QueryResult body = (QueryResult) response.getEntity();
+        assertEquals("OLAP_CONNECTION_FAILED", body.getCode());
+        assertEquals("OLAP datasource unavailable", body.getError());
+        assertTrue(!body.getError().contains("password=secret"));
+    }
+
+    @Test
+    public void aSqlSyntaxFailureIsAClientError() {
+        Response response = executeFailing(
+                new RuntimeException("query failed", new java.sql.SQLException("syntax near SELECT", "42601")));
+
+        assertEquals(400, response.getStatus());
+        assertEquals("INVALID_QUERY", ((QueryResult) response.getEntity()).getCode());
     }
 
     /** Resource limits mean the query was valid and we could not finish it. */

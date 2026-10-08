@@ -11,6 +11,7 @@ Este documento describe el servicio que existe en el repositorio hoy: el runtime
 5. [Descubrimiento y consulta MDX](consulta-mdx-y-descubrimiento.md): petición REST síncrona desde el BFF hasta CellSet/JSON.
 6. [Consulta SQL/OSSIE](consulta-ossie.md): ruta alternativa que no ejecuta MDX ni pasa por Mondrian.
 7. [Ejecución asíncrona](ejecucion-asincrona.md): ciclo de trabajo, propiedad del resultado y cancelación.
+8. [Capas de aplicación y errores REST](capas-y-errores.md): límites Resource→Service→Adapter y contrato de errores HTTP seguro.
 
 Los fuentes Mermaid editables están en [`diagrams/`](diagrams/). Cada página incluye sus diagramas y explica los pasos y bifurcaciones relevantes.
 
