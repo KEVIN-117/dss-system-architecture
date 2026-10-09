@@ -63,6 +63,9 @@ secrets/
 infra/**/data/*
 docker-compose.override.yml
 
+# Resultados locales de analisis OLTP (pueden contener datos sensibles).
+/analysis-output/jachasun/
+
 # ------------------------------------------
 # Datos fuente / históricos locales (no versionar)
 # ------------------------------------------
