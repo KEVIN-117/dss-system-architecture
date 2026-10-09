@@ -10,9 +10,9 @@ Este documento registra el avance del Req. 6 de la issue #133. Las fases 6.2–6
 | 6.2 Extracción Hop y manifiestos de nueve fuentes | Completa en fixture sintético | Un workflow ejecutó las nueve fuentes; cada una registró manifiesto, filas, huella de consulta/esquema, métrica y paso. |
 | 6.3 `DIM_PROGRAMA`, `DIM_MATERIA`, `DIM_PERIODO_ACADEMICO`, `DIM_ADMISION` | Completa en fixture sintético | Cuatro lotes tipados fueron preparados y sellados en el landing privado con conteos esperados; ninguna fila se publicó directamente en `dw`. |
 | 6.4 `DIM_ESTUDIANTE` SCD2 | Completa en fixture sintético | Pipeline Hop, hash canónico, corte DSA, transiciones privadas `CLOSE`/`INSERT`, no-cambio, conflicto de identidad, orden temporal y aplicación por publisher atómico probados. |
-| 6.5 `fact_admision` y `fact_cursado` | Completa en fixture sintético | Ambos pipelines pasan la integración Docker, consultan el corte autorizado, validan grano/calidad y sellan lotes privados; Retención sigue bloqueando publicación. |
-| 6.6 `fact_retencion_desercion` | Bloqueada por decisión funcional DSA | Aprobar continuidad entre cierres, egreso y dominio de estados; `NO_EVALUABLE` debe excluirse del denominador. |
-| 6.7 Integración y regresión de extremo a extremo | Pendiente | Éxito/fallo por fase, nuevo `run_id` en retry, persistencia de publicación previa y permisos mínimos. |
+| 6.5 `fact_admision` y `fact_cursado` | Completa en fixture sintético | Ambos pipelines pasan integración, validan grano/calidad y sellan lotes privados. |
+| 6.6 `fact_retencion_desercion` | Completa en fixture sintético | Regla DSA implementada, agregación desde el lote privado de cursado, casos de clasificación y publicación del tercer hecho verificados en Docker. |
+| 6.7 Integración y regresión de extremo a extremo | Completa en fixture sintético | Docker ejecutó nueve fuentes, cinco dimensiones, tres hechos, el gate de ocho lotes y la publicación atómica; aserciones verificaron auditoría, conteos y cierre procesado. |
 | 6.8 Aprobación operativa | Bloqueada por DSA/TI | Validación real de contratos, cardinalidades/volúmenes, cuenta OLTP read-only y evidencia de operación. |
 
 ## Implementación de 6.2
@@ -20,7 +20,7 @@ Este documento registra el avance del Req. 6 de la issue #133. Las fases 6.2–6
 - El workflow `workflows/wf_vertical_uatf_datos_smoke.hwf` invoca nueve pipelines: `uatf_datos`, `alumnos`, `postulantes`, `programas`, `materias`, `notas_planilla`, `facultades`, `colegios` y `localidades`.
 - Cada pipeline valida el contrato del fixture, ejecuta su proyección SQL canónica en orden estable y registra por rutinas de `etl_control` manifiesto completo, conteo/métrica y paso. Se registran hashes de query/esquema; no se copian filas OLTP a tablas RAW.
 - Postulaciones y notas aplican parámetros tipados para el cierre solicitado; el smoke confirma 3 postulaciones globales y 6 filas de notas en la fuente, y transforma solo las del periodo 2025/2.
-- El flujo no tiene salida publicable: después de extracción y preparación de dimensiones se registra deliberadamente un gate incompleto/fallido.
+- El flujo solo publica cuando las nueve fuentes, cinco dimensiones y tres hechos pasan validación. El publisher atómico es el único que hace visibles los cambios.
 
 ## Implementación de 6.3
 
@@ -41,14 +41,24 @@ Este documento registra el avance del Req. 6 de la issue #133. Las fases 6.2–6
 
 ## Implementación de 6.5
 
-- La migración nueva `0015_add_hop_fact_preparation.sql` conserva `0001`–`0014` inmutables, alinea `dw.fact_admision.id_alumno_origen` a la restricción `UNIQUE (id_alumno)` hallada en el DDL local y añade rutinas `SECURITY DEFINER` para resolver surrogate keys/preparar hechos sin DML directo del usuario Hop.
+- Las migraciones `0015` y `0016` conservan `0001`–`0014` inmutables y añaden rutinas `SECURITY DEFINER` para preparar los tres hechos sin DML directo del usuario Hop.
 - `pl_fact_admision_mvp.hpl` procesa una fila por `public.postulantes.id_alumno`, filtrada por gestión/periodo solicitados y programas aprobados. El DDL local documenta `A` como aprobado y `P` como reprobado; códigos fuera de ese dominio se conservan como desconocidos. La cardinalidad y semántica requieren confirmación en la instancia real/DSA antes de producción.
 - `pl_fact_cursado_mvp.hpl` procesa una fila por PK `notas_planilla.id_matricula`, con joins requeridos a alumno, programa y materia, filtro de programa y periodo. Las notas fuera de `[0,100]` bloquean la fila; se conserva `estado` crudo y no se inventan flags mientras DSA/TI no confirme el dominio.
-- Ambos flujos resuelven `DIM_ESTUDIANTE` para el `effective_at` del cierre y las dimensiones conformadas preparadas o publicadas. Registran pasos/métricas y sellan conteos contra las filas privadas reales. Solo `etl_work.hop_publication_row` recibe los resultados; las tablas `dw.fact_*` permanecen vacías.
-- El smoke ahora verifica cinco lotes dimensionales y dos lotes de hechos (1 admisión y 3 intentos de cursado para 2025/2). El gate sigue terminando `FALLIDA` deliberadamente porque no se preparó `FACT_RETENCION_DESERCION`; por tanto, no llama al publisher ni expone un DW parcial.
-- Verificación adicional Docker: el workflow ejecutó las nueve fuentes (incluido el snapshot UATF de 2.002 filas, usado solo para el conteo de auditoría), preparó cinco dimensiones y selló ambos hechos. La aserción confirmó 9 manifiestos, 7 lotes privados, 17 filas preparadas, rechazo de nota fuera de rango y ninguna fila visible en `dw.fact_*`.
+- Los tres flujos resuelven `DIM_ESTUDIANTE` para el `effective_at` del cierre y las dimensiones conformadas preparadas o publicadas. Registran pasos/métricas y sellan conteos contra filas privadas. Solo el publisher atómico hace visibles sus resultados en `dw.fact_*`.
+- El smoke ejecuta cinco lotes dimensionales y tres de hechos. En 2025/2, la retención queda `NO_EVALUABLE` porque el cierre 2025/3 aún no se procesó; ese estado no participa en el denominador.
+- Evidencia Docker de extremo a extremo: nueve fuentes (el snapshot UATF de 2.002 filas se usa solo para auditoría), cinco dimensiones y tres hechos se prepararon y publicaron atómicamente. Las aserciones confirmaron 9 manifiestos, 8 lotes, conteos de los tres hechos, rechazo de nota fuera de rango, criterios de retención y regresiones SCD2.
 - El fixture histórico ahora normaliza `carreras.xlsx.activo` (`A/B`) al dominio contractual `S/N` dentro de `academico.alm_programas`; el catálogo auxiliar preserva `A/B`. Se agregó validación del dominio y un corrector acotado para una base de prueba ya sembrada con la versión previa.
-- Esta evidencia concluye la preparación técnica de los dos hechos, no una carga histórica completa 2000–2025 ni una publicación visible: el smoke usa 2025/2 y el cierre global continúa correctamente bloqueado hasta completar retención.
+- La integración confirma el MVP contra fixtures sintéticos; no acredita la carga histórica completa 2000–2025 ni autoriza producción. La validación con la instancia real de Jachasun y la aprobación operativa siguen pendientes de DSA/TI.
+
+## Implementación de 6.6
+
+- DSA confirmó la regla: menos de dos parciales rendidos y ausencia de cursado en el siguiente cierre procesado = `DESERTOR`; cursado en ese cierre = `RETENIDO`.
+- El siguiente cierre se obtiene del calendario DSA por `effective_at`, no mediante aritmética sobre `periodo`. Si aún no está procesado, fue reabierto o hay empate temporal ambiguo, el snapshot es `NO_EVALUABLE`; también lo es cuando existe evidencia de egreso al corte.
+- El cálculo agrega las notas del lote privado de cursado por estudiante/programa/periodo. Un parcial rendido se detecta con el criterio de los análisis SQL ya existentes (`parcial IS NOT NULL AND parcial <> 0`). Las materias aprobadas usan la mejor nota entre final y complementaria (`> 50`); reprobadas usan `(0,50]`. PPA y materias arrastradas permanecen `NULL`, pues su fórmula no está aprobada.
+- La población observable es la que tiene al menos una fila de `notas_planilla` para el corte. No se inventan snapshots para estudiantes sin fila de cursado: el contrato actual no aporta un padrón histórico por periodo que permita demostrar su pertenencia a la población evaluable.
+- El workflow prepara `FACT_RETENCION_DESERCION`, valida los 9 manifiestos y 8 lotes sellados, y luego invoca la publicación atómica ya existente. Los hechos no se escriben directamente desde Hop.
+- La prueba Docker completó el flujo con `dw_hop_runtime`: nueve manifiestos, cinco dimensiones, tres hechos sellados, gate de staging y publisher atómico. Las aserciones confirmaron ejecución `EXITOSA`, el cierre 2025/2 `PROCESADO` ligado al `run_id`, las tres filas de retención `NO_EVALUABLE` mientras 2025/3 no estaba procesado, y las ramas `DESERTOR`, `RETENIDO` y `NO_EVALUABLE`.
+- El SCD2 regresivo usa cierres posteriores sintéticos 2025/4 y 2025/5 dentro de una transacción con `ROLLBACK`, evitando reutilizar el cierre 2025/2 que el workflow principal ya procesó.
 
 ## Prueba reproducible
 
@@ -65,7 +75,7 @@ docker compose -p dss-dw-req65 -f $f --profile dw-vertical run --rm --no-deps ho
 docker compose -p dss-dw-req65 -f $f --profile dw-vertical run --rm --no-deps hop-vertical-assert
 ```
 
-Resultado verificado: el workflow Hop completó la extracción, preparó 5 dimensiones y 2 hechos, y registró el gate de retención faltante; la aserción confirmó 9 manifiestos, 7 lotes sellados, 17 filas privadas, rechazo de nota 101 y cero filas publicadas. La prueba SCD2 adicional ejecuta publicación solo dentro de una transacción de test que termina en `ROLLBACK`. `down --volumes` se limita al proyecto nombrado `dss-dw-req65`, dedicado a fixtures desechables; nunca usarlo contra otros proyectos/ambientes.
+Evidencia histórica de 6.5: el workflow Hop completó la extracción, preparó 5 dimensiones y 2 hechos y registró el gate de retención faltante; la aserción confirmó 9 manifiestos, 7 lotes sellados, 17 filas privadas, rechazo de nota 101 y cero filas publicadas. La prueba SCD2 adicional publicó solo dentro de una transacción de test revertida. `down --volumes` aplica únicamente al proyecto aislado `dss-dw-req65`; nunca usarlo contra otros ambientes.
 
 ## Pendientes y límites
 

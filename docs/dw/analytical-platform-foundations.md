@@ -45,7 +45,7 @@ En Docker, `dw-migrator` espera a que `postgres-dw` esté saludable y finaliza t
 
 ## Operación y rollback
 
-Las cinco dimensiones proceden de `0004`; `0008` añade vigencias SCD2 de estudiante, `0009` crea los tres hechos y `0015` prepara admisión/cursado para Hop, según [la base consolidada](mvp-direct-hop.md). No se agrega un segundo modelo de dimensiones ni de auditoría. El runtime Hop cuenta con contrato de control y publicación atómica. Las fases 6.2–6.5 tienen flujos y pruebas sintéticas; retención, validación con datos reales de Jachasun y la verificación end-to-end de producción permanecen pendientes. El compose histórico no constituye evidencia de esa integración.
+Las cinco dimensiones proceden de `0004`; `0008` añade vigencias SCD2 de estudiante, `0009` crea los tres hechos, `0015` prepara admisión/cursado y `0016` prepara retención para Hop, según [la base consolidada](mvp-direct-hop.md). No se agrega un segundo modelo de dimensiones ni de auditoría. El runtime Hop conserva contrato de control y publicación atómica. El flujo de 6.2–6.7 pasó la regresión Docker con fixtures sintéticos; esto no sustituye la validación real de Jachasun ni la aprobación operativa pendiente de DSA/TI.
 
 Para una validación aislada:
 

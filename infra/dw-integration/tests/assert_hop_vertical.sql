@@ -6,8 +6,8 @@ DECLARE
     v_manifest etl_control.etl_source_manifest;
 BEGIN
     SELECT * INTO STRICT v_execution FROM etl_control.etl_execution WHERE run_id=v_run_id;
-    IF v_execution.status <> 'FALLIDA' OR v_execution.requested_by <> 'hop_vertical_test' THEN
-        RAISE EXCEPTION 'Nine-source smoke must remain audited as FALLIDA by restricted Hop login';
+    IF v_execution.status <> 'EXITOSA' OR v_execution.requested_by <> 'hop_vertical_test' THEN
+        RAISE EXCEPTION 'The nine-source DW vertical run did not publish successfully under the restricted Hop login';
     END IF;
 
     FOR v_expected IN
@@ -40,73 +40,88 @@ BEGIN
        OR (SELECT count(*) FROM etl_control.etl_execution_step
            WHERE run_id=v_run_id AND step_code LIKE 'dimension_%' AND status='EXITOSO') <> 5
        OR (SELECT count(*) FROM etl_control.etl_execution_step
-           WHERE run_id=v_run_id AND step_code IN ('fact_admision','fact_cursado') AND status='EXITOSO') <> 2
+           WHERE run_id=v_run_id AND step_code IN ('fact_admision','fact_cursado','fact_retencion_desercion') AND status='EXITOSO') <> 3
        OR (SELECT count(*) FROM etl_work.hop_publication_batch
            WHERE run_id=v_run_id AND (target_code,expected_rows) IN
              (('DIM_PROGRAMA',2),('DIM_MATERIA',3),('DIM_PERIODO_ACADEMICO',3),('DIM_ADMISION',2),('DIM_ESTUDIANTE',3))) <> 5
        OR (SELECT count(*) FROM etl_work.hop_publication_batch
-           WHERE run_id=v_run_id AND target_code IN ('FACT_ADMISION','FACT_CURSADO')
+           WHERE run_id=v_run_id AND target_code IN ('FACT_ADMISION','FACT_CURSADO','FACT_RETENCION_DESERCION')
              AND sealed_at IS NOT NULL
              AND ((target_code='FACT_ADMISION' AND expected_rows=1)
-               OR (target_code='FACT_CURSADO' AND expected_rows=3))) <> 2
-       OR (SELECT count(*) FROM etl_work.hop_publication_row WHERE run_id=v_run_id) <> 17
-       OR (SELECT count(*) FROM etl_work.hop_publication_row
-           WHERE run_id=v_run_id AND target_code='FACT_ADMISION'
-             AND natural_key='1003' AND record_data->>'es_admitido'='true'
-             AND record_data->>'puntaje_examen'='76') <> 1
-       OR (SELECT count(*) FROM etl_work.hop_publication_row
-           WHERE run_id=v_run_id AND target_code='FACT_CURSADO'
-             AND natural_key IN ('9003','9004','9005')
-             AND (record_data->>'conteo_intento')::integer=1
-             AND record_data->'es_aprobado'='null'::jsonb) <> 3
-       OR (SELECT count(*) FROM etl_work.hop_publication_row
-           WHERE run_id=v_run_id AND target_code='DIM_ESTUDIANTE' AND operation='INSERT'
-             AND (record_data->>'valid_from')::timestamptz=(SELECT effective_at FROM etl_control.academic_period_closure
-                 WHERE gestion=2025 AND periodo=2)
-             AND record_data->>'is_current'='true'
-             AND record_data->>'attribute_hash_scd2' ~ '^[0-9a-f]{64}$') <> 3
-       OR (SELECT count(*) FROM etl_work.hop_publication_row
-           WHERE run_id=v_run_id AND target_code='DIM_ESTUDIANTE' AND operation='CLOSE') <> 0
+               OR (target_code='FACT_CURSADO' AND expected_rows=3)
+               OR (target_code='FACT_RETENCION_DESERCION' AND expected_rows=3))) <> 3
+       OR (SELECT count(*) FROM etl_work.hop_publication_batch WHERE run_id=v_run_id) <> 8
+       OR (SELECT count(*) FROM etl_work.hop_publication_row WHERE run_id=v_run_id) <> 0
+       OR (SELECT count(*) FROM dw.fact_admision
+           WHERE id_alumno_origen=1003 AND es_admitido IS TRUE AND puntaje_examen=76) <> 1
+       OR (SELECT count(*) FROM dw.fact_cursado
+           WHERE id_matricula_origen IN (9003,9004,9005) AND conteo_intento=1
+             AND es_aprobado IS NULL) <> 3
+       OR (SELECT count(*) FROM dw.fact_retencion_desercion
+           WHERE closure_id=(SELECT closure_id FROM etl_control.academic_period_closure
+                             WHERE gestion=2025 AND periodo=2)
+             AND resultado_retencion='NO_EVALUABLE' AND es_desercion IS NULL
+             AND conteo_evaluable=0 AND materias_cursadas IS NOT NULL) <> 3
        OR (SELECT count(*) FROM etl_control.etl_execution_step
-           WHERE run_id=v_run_id AND step_code='mvp_completion_gate' AND status='FALLIDO'
-             AND details->>'observed_source_manifests'='9'
-             AND details->>'prepared_dimension_batches'='5'
-             AND details->>'prepared_fact_batches'='2'
-             AND details->>'missing_target'='FACT_RETENCION_DESERCION') <> 1
-       OR (SELECT count(*) FROM etl_control.etl_execution_error
-           WHERE run_id=v_run_id AND error_code='MVP_VERTICAL_ONLY' AND is_blocking) <> 1 THEN
-        RAISE EXCEPTION 'Source audit, five dimension batches, two fact batches, or incomplete-run gate is wrong';
+           WHERE run_id=v_run_id AND step_code='mvp_staging_gate' AND phase='VALIDACION'
+             AND status='EXITOSO' AND details->>'complete_source_manifests'='9'
+             AND details->>'sealed_dimension_and_fact_batches'='8') <> 1
+       OR (SELECT count(*) FROM etl_control.etl_execution_step
+           WHERE run_id=v_run_id AND step_code='atomic_dw_publish' AND phase='PUBLICACION'
+             AND status='EXITOSO') <> 1
+       OR EXISTS (SELECT 1 FROM etl_control.etl_execution_error
+                  WHERE run_id=v_run_id AND is_blocking) THEN
+        RAISE EXCEPTION 'Source audit, eight sealed batches, retention snapshots, or atomic publication is incorrect';
     END IF;
 
-    IF (SELECT count(*) FROM dw.dim_programa WHERE member_type='STANDARD')
-       +(SELECT count(*) FROM dw.dim_materia WHERE member_type='STANDARD')
-       +(SELECT count(*) FROM dw.dim_periodo_academico WHERE member_type='STANDARD')
-       +(SELECT count(*) FROM dw.dim_admision WHERE member_type='STANDARD')
-       +(SELECT count(*) FROM dw.dim_estudiante WHERE member_type='STANDARD') <> 0 THEN
-        RAISE EXCEPTION 'Dimension rows were published before the atomic publisher gate';
+    IF (SELECT count(*) FROM dw.dim_programa WHERE member_type='STANDARD') <> 2
+       OR (SELECT count(*) FROM dw.dim_materia WHERE member_type='STANDARD') <> 3
+       OR (SELECT count(*) FROM dw.dim_admision WHERE member_type='STANDARD') <> 2
+       OR (SELECT count(*) FROM dw.dim_estudiante WHERE member_type='STANDARD' AND is_current) <> 3 THEN
+        RAISE EXCEPTION 'The atomic publisher did not expose the expected conformed dimensions';
     END IF;
 
     IF (SELECT count(*) FROM etl_control.academic_period_closure
-        WHERE gestion=2025 AND periodo IN (1,2) AND status='CERRADO') <> 2
+        WHERE gestion=2025 AND periodo=1 AND status='CERRADO') <> 1
+       OR (SELECT count(*) FROM etl_control.academic_period_closure
+        WHERE gestion=2025 AND periodo=2 AND status='PROCESADO' AND processed_run_id=v_run_id) <> 1
        OR (SELECT count(*) FROM etl_control.academic_period_closure_event
         WHERE closure_id IN (SELECT closure_id FROM etl_control.academic_period_closure
                              WHERE gestion=2025 AND periodo IN (1,2))
-          AND to_status='CERRADO' AND actor_subject='dsa:integration-fixture') <> 2 THEN
-        RAISE EXCEPTION 'Synthetic closure fixture was not auditable';
+          AND to_status='CERRADO' AND actor_subject='dsa:integration-fixture') <> 2
+       OR (SELECT count(*) FROM etl_control.academic_period_closure_event
+          WHERE closure_id=(SELECT closure_id FROM etl_control.academic_period_closure
+                            WHERE gestion=2025 AND periodo=2)
+            AND to_status='PROCESADO' AND run_id=v_run_id) <> 1 THEN
+        RAISE EXCEPTION 'Synthetic closure processing or audit transition is incorrect';
     END IF;
 
     IF (SELECT count(*) FROM etl_control.etl_execution_event
-        WHERE run_id=v_run_id AND new_status IN ('SOLICITADA','EN_EJECUCION','FALLIDA')) <> 3 THEN
-        RAISE EXCEPTION 'Expected requested -> running -> failed state history';
+        WHERE run_id=v_run_id AND new_status IN ('SOLICITADA','EN_EJECUCION','PUBLICANDO','EXITOSA')) <> 4 THEN
+        RAISE EXCEPTION 'Expected requested -> running -> publishing -> successful state history';
     END IF;
-    IF (SELECT count(*) FROM dw.fact_admision)+(SELECT count(*) FROM dw.fact_cursado)
-       +(SELECT count(*) FROM dw.fact_retencion_desercion)
-       +(SELECT count(*) FROM staging.raw_uatf_datos) <> 0 THEN
-        RAISE EXCEPTION 'Smoke wrote published or legacy RAW rows';
+    IF (SELECT count(*) FROM dw.fact_admision) <> 1
+       OR (SELECT count(*) FROM dw.fact_cursado) <> 3
+       OR (SELECT count(*) FROM dw.fact_retencion_desercion) <> 3
+       OR (SELECT count(*) FROM staging.raw_uatf_datos) <> 0 THEN
+        RAISE EXCEPTION 'Published fact counts are incorrect or legacy RAW was written';
     END IF;
     IF has_table_privilege('hop_vertical_test','dw.fact_admision','INSERT')
        OR has_table_privilege('hop_vertical_test','etl_control.etl_execution','INSERT') THEN
         RAISE EXCEPTION 'Hop test principal unexpectedly has direct DML grants';
+    END IF;
+END;
+$$;
+
+DO $$
+BEGIN
+    IF etl_control.classify_hop_retention(TRUE, FALSE, 1, FALSE) <> 'DESERTOR'
+       OR etl_control.classify_hop_retention(TRUE, TRUE, 0, FALSE) <> 'RETENIDO'
+       OR etl_control.classify_hop_retention(FALSE, FALSE, 1, FALSE) <> 'NO_EVALUABLE'
+       OR etl_control.classify_hop_retention(TRUE, FALSE, 2, FALSE) <> 'NO_EVALUABLE'
+       OR etl_control.classify_hop_retention(TRUE, TRUE, 1, TRUE) <> 'NO_EVALUABLE'
+       OR etl_control.classify_hop_retention(TRUE, FALSE, NULL, FALSE) <> 'NO_EVALUABLE' THEN
+        RAISE EXCEPTION 'Retention classification rules do not match the approved DSA criteria';
     END IF;
 END;
 $$;
@@ -149,6 +164,7 @@ DECLARE
     v_closure_1 BIGINT;
     v_closure_2 BIGINT;
     v_closure_3 BIGINT;
+    v_closure_4 BIGINT;
     v_effective_1 TIMESTAMPTZ;
     v_effective_2 TIMESTAMPTZ;
     v_run_1 UUID := 'a1300000-0000-0000-0000-000000000011';
@@ -175,12 +191,31 @@ DECLARE
     v_batch_count BIGINT;
     v_lock etl_control.etl_execution_lock;
 BEGIN
+    -- The vertical smoke workflow has already consumed 2025/2. Reserve later
+    -- reversible cuts for the SCD2 test runs rather than reusing a processed closure.
+    INSERT INTO etl_control.academic_period_closure (
+        gestion, periodo, created_by_subject, closure_reason
+    ) VALUES
+        (2025, 4, 'dsa:integration-fixture', 'Synthetic SCD2 test closure'),
+        (2025, 5, 'dsa:integration-fixture', 'Synthetic SCD2 test closure');
+    PERFORM etl_control.transition_academic_period_closure(
+        2025::smallint, 4::smallint, 'CERRADO'::varchar(16),
+        'dsa:integration-fixture'::varchar(255), 'Synthetic reversible SCD2 test',
+        clock_timestamp() - interval '2 hours'
+    );
+    PERFORM etl_control.transition_academic_period_closure(
+        2025::smallint, 5::smallint, 'CERRADO'::varchar(16),
+        'dsa:integration-fixture'::varchar(255), 'Synthetic reversible SCD2 test',
+        clock_timestamp() - interval '1 hour'
+    );
     SELECT closure_id, effective_at INTO STRICT v_closure_1, v_effective_1
     FROM etl_control.academic_period_closure WHERE gestion=2025 AND periodo=1;
     SELECT closure_id, effective_at INTO STRICT v_closure_2, v_effective_2
-    FROM etl_control.academic_period_closure WHERE gestion=2025 AND periodo=2;
-    SELECT closure_id INTO STRICT v_closure_3
     FROM etl_control.academic_period_closure WHERE gestion=2025 AND periodo=3;
+    SELECT closure_id INTO STRICT v_closure_3
+    FROM etl_control.academic_period_closure WHERE gestion=2025 AND periodo=4;
+    SELECT closure_id INTO STRICT v_closure_4
+    FROM etl_control.academic_period_closure WHERE gestion=2025 AND periodo=5;
 
     PERFORM etl_control.create_hop_etl_execution(
         v_run_1,'CIERRE_ACADEMICO',v_closure_1,NULL,NULL,NULL,NULL,'SCD2 reversible integration test'
@@ -299,7 +334,7 @@ BEGIN
     PERFORM etl_control.fail_hop_etl_execution(v_run_3,'End reversible unchanged SCD2 test');
 
     PERFORM etl_control.create_hop_etl_execution(
-        v_run_4,'CIERRE_ACADEMICO',v_closure_3,NULL,NULL,NULL,NULL,'SCD2 identity conflict test'
+        v_run_4,'CIERRE_ACADEMICO',v_closure_4,NULL,NULL,NULL,NULL,'SCD2 identity conflict test'
     );
     PERFORM etl_control.start_hop_etl_execution(v_run_4,'SCD2 test identity conflict');
     BEGIN
@@ -327,4 +362,4 @@ END;
 $$;
 ROLLBACK;
 
-SELECT 'Apache Hop 9-source extraction, 5 dimensions, 2 private fact batches (17 staged rows), grade-range rejection, and SCD2 tests passed; retention gate kept publication disabled' AS result;
+SELECT 'Apache Hop 9-source extraction, 5 dimensions, 3 fact batches, atomic publication, retention classification, grade-range rejection, and SCD2 tests passed' AS result;

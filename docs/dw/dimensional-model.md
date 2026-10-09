@@ -180,9 +180,9 @@ DW-005 no congela códigos de `estado` como A/R/U/Z/T. DSA/TI debe validar el do
 
 #### Política de `NO_EVALUABLE` y egreso
 
-Si todavía no existe un periodo posterior cerrado por DSA, el snapshot se clasifica como `NO_EVALUABLE`, `es_desercion = NULL` y `conteo_evaluable = 0`. No participa en tasas de deserción/retención ni en entrenamiento de modelos. Cuando exista el periodo posterior autorizado, la derivación podrá comparar continuidad bajo las reglas aprobadas.
+DSA confirmó esta regla: con un siguiente cierre procesado, cursado del estudiante en ese cierre significa `RETENIDO`; sin cursado allí, menos de dos parciales rendidos en el periodo evaluado significa `DESERTOR`. Si el cierre siguiente aún no está procesado, fue reabierto o su orden temporal es ambiguo, el snapshot se clasifica como `NO_EVALUABLE`, `es_desercion = NULL` y `conteo_evaluable = 0`; no participa en tasas ni entrenamiento.
 
-Los casos con indicio de egreso conocido también quedan fuera del denominador hasta que DSA/TI valide la calidad y semántica de `estado` y `fec_egreso`. No se los etiqueta artificialmente como retenidos o desertores. La definición final de continuidad, deserción y egreso es una aprobación funcional previa a cualquier carga productiva.
+Los casos con indicio de egreso conocido también quedan fuera del denominador hasta que DSA/TI valide la calidad de `fec_egreso`; la fuente oficial futura indicada para graduación es `actas_graduacion.graduados`, fuera de los nueve contratos actuales. La población observable de este primer flujo requiere una fila de `notas_planilla` para el periodo: no se crean snapshots para estudiantes sin fila porque no hay padrón histórico por periodo en los contratos vigentes. Estos límites deben validarse antes de cargas productivas.
 
 ## Mapa de KPI a hechos
 

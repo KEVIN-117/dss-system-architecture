@@ -2,7 +2,7 @@
 
 La decisión vigente para la issue #133 es **Jachasun → Apache Hop → dw**, con `etl_control` como control lateral. La [base consolidada](mvp-direct-hop.md) es el punto de entrada para alcance, objetos existentes, migraciones pendientes y orden de implementación.
 
-El [contrato de ejecución Hop](hop-execution-contract.md) define parámetros y la API/gates SQL añadidos en 0010. Existe un smoke vertical ejecutable y el publisher atómico fue probado con fixture sintético; la extracción/transformación completa de nueve fuentes y la validación contra Jachasun real siguen pendientes.
+El [contrato de ejecución Hop](hop-execution-contract.md) define parámetros y la API/gates SQL. El flujo vertical de nueve fuentes, cinco dimensiones, tres hechos y publicación atómica pasó su regresión Docker con fixtures sintéticos; la validación contra Jachasun real sigue pendiente.
 
 El seguimiento incremental de la implementación Req. 6 está en [hop-req-6-progress.md](hop-req-6-progress.md); el avance de las consultas y pruebas de fuente no equivale al ETL completo.
 

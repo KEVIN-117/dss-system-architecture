@@ -3,7 +3,7 @@
   <name>wf_vertical_uatf_datos_smoke</name>
   <name_sync_with_filename>Y</name_sync_with_filename>
   <description>Flujo vertical controlado de las nueve fuentes DW-001 (solo desarrollo)</description>
-  <extended_description>Lee las nueve fuentes y prepara cinco dimensiones, FACT_ADMISION y FACT_CURSADO en el landing privado. No publica tablas DW: FACT_RETENCION_DESERCION sigue pendiente y el gate final mantiene el intento FALLIDO.</extended_description>
+  <extended_description>Lee las nueve fuentes, prepara cinco dimensiones y los tres hechos en landing privado, valida manifiestos/lotes y ejecuta el publisher atómico. Solo el commit final hace visible el conjunto completo; cualquier fallo conserva la publicación anterior.</extended_description>
   <created_user>DSA</created_user>
   <modified_user>DSA</modified_user>
   <created_date>2026/10/03 00:00:00.000</created_date>
@@ -523,7 +523,7 @@
       <attributes_hac/>
     </action>
     <action>
-      <filename>${PROJECT_HOME}/pipelines/control/pl_hop_mark_vertical_incomplete.hpl</filename>
+      <filename>${PROJECT_HOME}/pipelines/facts/pl_fact_retencion_desercion_mvp.hpl</filename>
       <params_from_previous>N</params_from_previous>
       <exec_per_row>N</exec_per_row>
       <clear_rows>N</clear_rows>
@@ -541,11 +541,107 @@
         <pass_all_parameters>Y</pass_all_parameters>
       </parameters>
       <run_configuration>local</run_configuration>
-      <name>Mark intentionally incomplete</name>
-      <description>Records missing FACT_RETENCION_DESERCION; no publication is attempted</description>
+      <name>Prepare FACT_RETENCION_DESERCION</name>
+      <description>Agrega cursado por estudiante/programa/periodo y evalúa continuidad al siguiente cierre procesado</description>
       <type>PIPELINE</type>
       <attributes/>
       <xloc>2640</xloc>
+      <yloc>48</yloc>
+      <parallel>N</parallel>
+      <attributes_hac/>
+    </action>
+    <action>
+      <filename>${PROJECT_HOME}/pipelines/control/pl_hop_mark_vertical_ready.hpl</filename>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <create_parent_folder>N</create_parent_folder>
+      <set_logfile>N</set_logfile>
+      <set_append_logfile>N</set_append_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <wait_until_finished>Y</wait_until_finished>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <run_configuration>local</run_configuration>
+      <name>Validate staged run</name>
+      <description>Verifica nueve manifiestos y ocho lotes sellados antes de publicar</description>
+      <type>PIPELINE</type>
+      <attributes/>
+      <xloc>2784</xloc>
+      <yloc>48</yloc>
+      <parallel>N</parallel>
+      <attributes_hac/>
+    </action>
+    <action>
+      <filename>${PROJECT_HOME}/pipelines/control/pl_hop_publish_staged_run.hpl</filename>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <create_parent_folder>N</create_parent_folder>
+      <set_logfile>N</set_logfile>
+      <set_append_logfile>N</set_append_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <wait_until_finished>Y</wait_until_finished>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <run_configuration>local</run_configuration>
+      <name>Atomic publish</name>
+      <description>Publica dimensiones y hechos juntos en una transacción</description>
+      <type>PIPELINE</type>
+      <attributes/>
+      <xloc>2928</xloc>
+      <yloc>48</yloc>
+      <parallel>N</parallel>
+      <attributes_hac/>
+    </action>
+    <action>
+      <filename>${PROJECT_HOME}/pipelines/control/pl_hop_fail_publication.hpl</filename>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <create_parent_folder>N</create_parent_folder>
+      <set_logfile>N</set_logfile>
+      <set_append_logfile>N</set_append_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <wait_until_finished>Y</wait_until_finished>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <run_configuration>local</run_configuration>
+      <name>Audit failed publish</name>
+      <description>Audita el fallo y conserva la publicación previa</description>
+      <type>PIPELINE</type>
+      <attributes/>
+      <xloc>3072</xloc>
+      <yloc>48</yloc>
+      <parallel>N</parallel>
+      <attributes_hac/>
+    </action>
+    <action>
+      <message>La publicación atómica falló; el intento quedó auditado y la publicación anterior se conserva.</message>
+      <loglevel>Error</loglevel>
+      <name>Abort workflow after failed publish</name>
+      <description>Propaga el fallo del publisher atómico al caller</description>
+      <type>ABORT</type>
+      <attributes/>
+      <xloc>3216</xloc>
       <yloc>48</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -573,7 +669,7 @@
       <description>Sane failure path if schema validation, source read or audit registration fails</description>
       <type>PIPELINE</type>
       <attributes/>
-      <xloc>2640</xloc>
+      <xloc>2928</xloc>
       <yloc>176</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -701,9 +797,37 @@
     </hop>
     <hop>
       <from>Prepare FACT_CURSADO</from>
-      <to>Mark intentionally incomplete</to>
+      <to>Prepare FACT_RETENCION_DESERCION</to>
       <evaluation>Y</evaluation>
       <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Prepare FACT_RETENCION_DESERCION</from>
+      <to>Validate staged run</to>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Validate staged run</from>
+      <to>Atomic publish</to>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Atomic publish</from>
+      <to>Audit failed publish</to>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Audit failed publish</from>
+      <to>Abort workflow after failed publish</to>
+      <evaluation>Y</evaluation>
+      <unconditional>Y</unconditional>
       <enabled>Y</enabled>
     </hop>
     <hop>
@@ -813,6 +937,20 @@
     </hop>
     <hop>
       <from>Prepare FACT_CURSADO</from>
+      <to>Audit extraction failure</to>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Prepare FACT_RETENCION_DESERCION</from>
+      <to>Audit extraction failure</to>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Validate staged run</from>
       <to>Audit extraction failure</to>
       <evaluation>N</evaluation>
       <unconditional>N</unconditional>

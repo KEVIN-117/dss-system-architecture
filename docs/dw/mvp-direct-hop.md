@@ -39,6 +39,8 @@ Por tanto, “ETL directo Jachasun → Hop → DW” significa que no se impleme
 | `0010_add_hop_execution_gates.sql` | API de preflight, manifiestos exactos, leases de publicación y grupo `dw_hop_runtime` | Base de control para Hop; no transforma ni publica datos de negocio. |
 | `0011_create_hop_atomic_publisher.sql` | Buffer privado por `run_id` en `etl_work`, sellado SHA-256 canónico y publisher transaccional con fencing token | Única ruta autorizada que sustituye el corte DW y finaliza un run exitoso. |
 | `0012_add_hop_publication_abort.sql` | Salida de error con token, error/paso auditables, lease liberado, limpieza del landing y estado FALLIDA | La ruta de fallo no escribe en DW y conserva la publicación previa. |
+| `0013`–`0015` | Contratos de ejecución y preparación segura de dimensiones SCD2 y hechos de admisión/cursado | Extensiones controladas para el workflow Hop. |
+| `0016_add_hop_retention_fact_preparation.sql` | Cálculo de retención/deserción desde el lote privado de cursado y gate de staging completo | Prepara el tercer hecho antes de invocar la publicación atómica. |
 
 Los esquemas adicionales creados por `0002` permanecen físicamente presentes; no son etapas del flujo activo. No se cambia ninguna migración existente ni se eliminan objetos o datos de una base desplegada. Retirar los borradores locales `0000_create_schemas.sql`, `0008_create_dw_model.sql` y `0009_create_etl_control_model.sql` no equivale a revertir DDL ya ejecutado. Si alguno fue aplicado manualmente, TI/DBA deberá inventariar objetos e historial antes de continuar; no se borrarán automáticamente.
 
@@ -54,7 +56,7 @@ Las dimensiones existentes son `dw.dim_estudiante`, `dw.dim_programa`, `dw.dim_m
 
 El DDL de los hechos está en `infra/dw-schema/migrations/0009_create_constellation_facts.sql`. La migración `0008_add_student_scd2_versions.sql` implementa el prerrequisito temporal de estudiante. El runner aplica ambas antes de las cargas Hop; el orden y los SHA-256 registrados preservan la inmutabilidad.
 
-Las migraciones definen columnas del diccionario, PK, FKs a las surrogate keys de `0004`, claves operacionales, `run_id` vinculado a `etl_control.etl_execution`, restricciones del grano e índices. `fact_cursado` aplica unicidad a `id_matricula`; retención aplica unicidad estudiante/programa/periodo y valida el cierre. La migración `0015` alinea admisión a `UNIQUE (id_alumno)` observado en el DDL local. `run_id` es linaje, no una clave para permitir duplicar el mismo hecho en cada reintento. Admisión y cursado ya se preparan en staging privado; retención y publicación completa quedan pendientes.
+Las migraciones definen columnas del diccionario, PK, FKs a las surrogate keys de `0004`, claves operacionales, `run_id` vinculado a `etl_control.etl_execution`, restricciones del grano e índices. `fact_cursado` aplica unicidad a `id_matricula`; retención aplica unicidad estudiante/programa/periodo y valida el cierre. La migración `0015` alinea admisión a `UNIQUE (id_alumno)` observado en el DDL local. `run_id` es linaje, no una clave para permitir duplicar el mismo hecho en cada reintento. Las tres preparaciones de hechos usan el landing privado; el workflow completo requiere todavía regresión Docker antes de considerarse validado.
 
 El [modelo dimensional](dimensional-model.md) sigue siendo la definición de medidas y agregaciones. Sin siguiente periodo cerrado, retención será `NO_EVALUABLE` y `es_desercion = NULL`, fuera de tasas y entrenamiento. No se inventan ceros ni se mezclan granos.
 
@@ -88,13 +90,11 @@ Se conservan los gates de DW-004: validación exitosa, manifiestos completos y a
 - Un `run_id` común no garantiza snapshot compartido entre conexiones JDBC. La lectura multisource todavía requiere política de corte y validación operativa. La sustitución del conjunto DW sí es atómica: PostgreSQL MVCC conserva el conjunto anterior hasta el commit; una excepción revierte deletes, upserts, cierre de lease y éxito.
 - Reintentar exige un nuevo `run_id` y volver a leer OLTP para preparar un nuevo buffer privado; el buffer no es un checkpoint de extracción ni permite reanudar una lectura parcial. Un fallo no debe dejar datos parciales visibles ni alterar el corte ya publicado.
 
-## Implementación incremental pendiente
+## Estado y siguientes validaciones
 
-1. Revisar contratos reales, dominios, identidad y autorización con DSA/TI; configurar conexiones Hop de solo lectura y fixture.
-2. Aplicar `0008` y `0009` mediante el runner. Las filas estándar preexistentes de estudiante reciben `created_at` como baseline técnico con hash nulo; esa fecha no afirma historia OLTP. Conciliar baseline y hashes con DSA/TI antes de cargar snapshots históricos.
-3. Construir una vertical inicial en Hop contra fixture y aplicar el contrato/gates SQL de 0010. `0008` incorpora vigencias SCD2 y evita solapamientos; Hop aún debe producir hashes canónicos, asignar fechas efectivas y resolver la versión estudiantil correcta para cada hecho.
-4. Incorporar admisión y retención; conciliar medidas, casos no evaluables y reintentos.
-5. Publisher implementado en 0011 y workflow reutilizable `wf_hop_publish_staged_run.hwf`: adquiere lease, exige nueve manifiestos, cambia a PUBLICANDO, verifica ocho lotes sellados y hashes, sustituye solo el corte, libera lease y marca EXITOSA en una operación atómica. El handler de error registra evidencia saneada y deja FALLIDA mediante 0012.
-6. Pendiente para Req. 6: construir e integrar las pipelines que extraen las nueve fuentes, transforman dimensiones/hechos y llaman a la API de staging; ejecutar éxito/fallos del flujo completo con fixtures, además de aprobar contratos/permisos con DSA/TI. La prueba del publisher no demuestra por sí misma la carga semántica ni la consistencia multisource.
+1. El workflow de 6.2–6.7 pasó el compose de integración: nueve fuentes, cinco dimensiones, tres hechos, readiness gate y publisher atómico.
+2. Añadir o completar casos E2E adicionales de fallo de transformación/publicación, reintento con nuevo `run_id` y conservación del corte anterior; la ejecución feliz ya está verificada.
+3. Confirmar con DSA/TI los contratos reales, volúmenes, unicidad de postulantes, semántica de notas y fiabilidad de `fec_egreso`; no inferir graduaciones automáticamente.
+4. La carga histórica completa 2000–2025 requiere validar la secuencia de cierres, el baseline SCD2 y la estrategia operativa antes de ejecutarse.
 
-Esta consolidación es documental y de limpieza de borradores. No cambia pipelines, permisos efectivos ni datos desplegados. Las suites históricas se conservan como regresión, no como prueba de que la nueva ruta directa ya funciona.
+La implementación del flujo vertical y la migración `0016` están probadas únicamente contra bases y fixtures sintéticos. Esto no cambia permisos ni datos desplegados en Jachasun y no sustituye la aprobación DSA/TI; las suites históricas se conservan como regresión.

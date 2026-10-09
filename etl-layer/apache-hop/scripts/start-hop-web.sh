@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -euo pipefail
+set -euo pipefail # fail fast and propagate failures from shell pipelines
 
 hop_home="/usr/local/tomcat/webapps/ROOT"
 cd "$hop_home"
@@ -18,7 +18,7 @@ if ! ./hop-conf.sh --projects-list | grep -Fq "  ${HOP_PROJECT_NAME} :"; then
     --project-keep-config-file
 fi
 
-if ! ./hop-conf.sh --environment-list | grep -Fxq "  ${HOP_ENVIRONMENT_NAME}"; then
+if ! ./hop-conf.sh --environments-list | grep -Fxq "  ${HOP_ENVIRONMENT_NAME}"; then
   ./hop-conf.sh \
     --environment="${HOP_ENVIRONMENT_NAME}" \
     --environment-create \

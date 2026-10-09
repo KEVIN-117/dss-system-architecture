@@ -402,18 +402,22 @@ def validate() -> list[str]:
         if "dw.dim_" in pipeline_text or "TableOutput" in pipeline_text:
             errors.append(f"{pipeline_name} must not write directly to published DW dimensions")
 
-    # Req. 6.5 prepares the two approved MVP facts at their operational grains.
+    # Req. 6.5–6.6 prepares the three approved MVP facts at their operational grains.
     fact_pipelines = {
         "pl_fact_admision_mvp.hpl": (
             "etl_control.stage_hop_fact_admission", "public.postulantes",
-            "id_alumno", "FACT_ADMISION",
+            ("id_alumno", "P_REQUESTED_GESTION", "P_REQUESTED_PERIODO"), "FACT_ADMISION",
         ),
         "pl_fact_cursado_mvp.hpl": (
             "etl_control.stage_hop_fact_coursework", "academico.notas_planilla",
-            "id_matricula", "FACT_CURSADO",
+            ("id_matricula", "P_REQUESTED_GESTION", "P_REQUESTED_PERIODO"), "FACT_CURSADO",
+        ),
+        "pl_fact_retencion_desercion_mvp.hpl": (
+            "etl_control.prepare_and_complete_hop_fact_retention", "FACT_CURSADO",
+            ("NO_EVALUABLE", "siguiente cierre DSA procesado"), "FACT_RETENCION_DESERCION",
         ),
     }
-    for pipeline_name, (stage_call, source_table, grain_column, target_code) in fact_pipelines.items():
+    for pipeline_name, (stage_call, source_table, required_contract, target_code) in fact_pipelines.items():
         pipeline_path = PROJECT / "pipelines" / "facts" / pipeline_name
         if not pipeline_path.is_file():
             errors.append(f"Missing Req. 6.5 fact pipeline: {pipeline_name}")
@@ -421,21 +425,30 @@ def validate() -> list[str]:
         fact_text = pipeline_path.read_text(encoding="utf-8")
         if pipeline_name not in workflow_text:
             errors.append(f"The vertical workflow does not execute {pipeline_name}")
-        for required_text in (stage_call, source_table, grain_column,
-                              "etl_control.complete_hop_fact_batch", target_code,
-                              "P_REQUESTED_GESTION", "P_REQUESTED_PERIODO"):
+        required_calls = [stage_call, source_table, *required_contract, target_code]
+        if pipeline_name != "pl_fact_retencion_desercion_mvp.hpl":
+            required_calls.append("etl_control.complete_hop_fact_batch")
+        for required_text in required_calls:
             if required_text not in fact_text:
                 errors.append(f"{pipeline_name} is missing required fact-flow contract: {required_text}")
         if "TableOutput" in fact_text or re.search(
-                r"\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+dw\.fact_(admision|cursado)\b",
+                r"\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+dw\.fact_(admision|cursado|retencion_desercion)\b",
                 fact_text, re.I):
             errors.append(f"{pipeline_name} must stage privately and never write directly to a published fact")
-    gate_pipeline = PROJECT / "pipelines" / "control" / "pl_hop_mark_vertical_incomplete.hpl"
-    if gate_pipeline.is_file():
-        gate_text = gate_pipeline.read_text(encoding="utf-8")
-        for required_gate_value in ('"prepared_fact_batches":2', '"missing_target":"FACT_RETENCION_DESERCION"'):
-            if required_gate_value not in gate_text:
-                errors.append(f"The 6.5 incomplete-publication gate must report {required_gate_value}")
+    gate_pipeline = PROJECT / "pipelines" / "control" / "pl_hop_mark_vertical_ready.hpl"
+    if not gate_pipeline.is_file():
+        errors.append("Missing Req. 6.6 staging readiness gate")
+    elif "etl_control.mark_hop_run_staging_ready" not in gate_pipeline.read_text(encoding="utf-8"):
+        errors.append("The readiness gate must call etl_control.mark_hop_run_staging_ready")
+    for pipeline_name, routine in (
+        ("pl_hop_publish_staged_run.hpl", "etl_control.publish_hop_staged_run"),
+        ("pl_hop_fail_publication.hpl", "etl_control.abort_hop_publication"),
+    ):
+        pipeline_path = PROJECT / "pipelines" / "control" / pipeline_name
+        if not pipeline_path.is_file() or routine not in pipeline_path.read_text(encoding="utf-8"):
+            errors.append(f"The vertical publish flow is missing its control routine: {routine}")
+    if "pl_hop_mark_vertical_ready.hpl" not in workflow_text or "pl_hop_publish_staged_run.hpl" not in workflow_text:
+        errors.append("The vertical workflow must validate staging and invoke the atomic publisher")
 
     # Every approved OLTP source must have a version-controlled, read-only query.
     # The source pipeline is still wired incrementally; these checks prevent the
