@@ -310,3 +310,4 @@ core.*
 /etl-service
 /dss-etl-hop
 /saiku-ui
+/analysis-output
