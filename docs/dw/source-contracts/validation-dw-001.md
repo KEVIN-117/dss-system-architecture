@@ -4,6 +4,8 @@
 
 **Estado actual: pendiente de validación en Jachasun.** Los contratos se derivaron del DDL local `infra/postgres-tx/ddl/ddl_jachasun.sql` y de los documentos de mapeo. Esta evidencia estática no autoriza el cierre de DW-001.
 
+El DDL local es la fuente de verdad para los tipos, longitudes, nulabilidad y claves de los contratos estáticos y validadores Hop. Los fixtures reutilizados por pruebas deben reproducir esos atributos para las columnas extraídas; una discrepancia con una instancia real se registra como hallazgo de validación, no se resuelve relajando el contrato basado en el fixture.
+
 ## Hallazgos estáticos
 
 | ID | Hallazgo | Riesgo | Acción de validación real |

@@ -42,8 +42,8 @@
         (2, 'id_sexo',      ARRAY['varchar']::text[],  1::integer, 'YES'::text),
         (3, 'estado_civil', ARRAY['int2']::text[],     NULL::integer, 'NO'::text),
         (4, 'nac_pais',     ARRAY['int4']::text[],     NULL::integer, 'YES'::text),
-        (5, 'id_colegio',   ARRAY['int2','int4']::text[], NULL::integer, 'YES'::text),
-        (6, 'id_loc',       ARRAY['int2','int4']::text[], NULL::integer, 'YES'::text),
+        (5, 'id_colegio',   ARRAY['int2']::text[], NULL::integer, 'YES'::text),
+        (6, 'id_loc',       ARRAY['int2']::text[], NULL::integer, 'YES'::text),
         (7, 'egr_gestion',  ARRAY['int2']::text[],     NULL::integer, 'YES'::text),
         (8, '_modificado',  ARRAY['timestamp']::text[], NULL::integer, 'NO'::text)
 ), observed AS (

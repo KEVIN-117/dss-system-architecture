@@ -187,6 +187,10 @@ def validate() -> list[str]:
         if "HOP_OPTIONS:" not in hop_service or "-DDB_DW_HOST=" not in hop_service \
                 or "-DDB_TX_HOST=" not in hop_service:
             errors.append("docker-compose.yml must pass DB endpoint variables as JVM properties for Hop resolution")
+        if "HOP_ADDITIONAL_ENVIRONMENT_NAMES:" not in hop_service:
+            errors.append("docker-compose.yml must declare additional lifecycle environments for the Hop Web selector")
+        if "HOP_ADDITIONAL_ENVIRONMENT_NAMES:-" in hop_service:
+            errors.append("docker-compose.yml must allow production to set an explicitly empty additional-environments list")
 
     startup_script = PROJECT.parents[1] / "scripts" / "start-hop-web.sh"
     if not startup_script.is_file():
@@ -196,6 +200,10 @@ def validate() -> list[str]:
         if "--default-project=\"${HOP_PROJECT_NAME}\"" not in startup \
                 or "--default-environment=\"${HOP_ENVIRONMENT_NAME}\"" not in startup:
             errors.append("Hop Web startup wrapper must select the configured project and lifecycle environment by default")
+        if "HOP_ADDITIONAL_ENVIRONMENT_NAMES" not in startup or "ensure_environment" not in startup:
+            errors.append("Hop Web startup wrapper must register each available lifecycle environment separately")
+        if "Required Hop environment config is missing" not in startup:
+            errors.append("Hop Web startup wrapper must fail fast when the selected environment config is absent")
 
     # Parse every Hop artifact before publishing it to Hop Web or hop-run.
     for artifact in (*PROJECT.glob("workflows/**/*.hwf"), *PROJECT.glob("pipelines/**/*.hpl")):

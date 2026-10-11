@@ -15,7 +15,7 @@ assert_query_count() {
     # The fixture test exercises the historical/full-snapshot path. Replace
     # only JDBC bind markers with typed NULL values, making the optional cut
     # predicates include all available synthetic rows.
-    query=$(sed 's/?/NULL/g' "$query_file")
+    query=$(tr -d '\r' < "$query_file" | sed 's/?/NULL/g')
     query=${query%;}
     actual=$(psql -X -v ON_ERROR_STOP=1 -Atc "SELECT count(*) FROM ($query) AS source_rows")
     if [ "$actual" != "$expected" ]; then
@@ -42,19 +42,23 @@ assert_query_count "academico.alumnos" "select_alumnos.sql" 3
 assert_query_count "public.postulantes" "select_postulantes.sql" 4
 assert_query_count "academico.alm_programas" "select_programas.sql" 2
 assert_query_count "academico.pln_materias" "select_materias.sql" 3
-assert_query_count "academico.notas_planilla" "select_notas_planilla.sql" 5
+assert_query_count "academico.notas_planilla" "select_notas_planilla.sql" 6
 assert_query_count "academico.alm_programas_facultades" "select_facultades.sql" 2
 assert_query_count "public.prs_colegios" "select_colegios.sql" 2
 assert_query_count "public.lugar_localidad" "select_localidades.sql" 2
 
 for filename in select_postulantes.sql select_notas_planilla.sql; do
-    query=$(sed -e 's/?::smallint/2025::smallint/' \
+    case "$filename" in
+        select_postulantes.sql) expected_cut_rows=1 ;;
+        select_notas_planilla.sql) expected_cut_rows=2 ;;
+    esac
+    query=$(tr -d '\r' < "/queries/$filename" | sed -e 's/?::smallint/2025::smallint/' \
         -e 's/?::smallint/2025::smallint/' \
-        -e 's/?::smallint/1::smallint/' "/queries/$filename")
+        -e 's/?::smallint/1::smallint/')
     query=${query%;}
     actual=$(psql -X -v ON_ERROR_STOP=1 -Atc "SELECT count(*) FROM ($query) AS cut_rows")
-    if [ "$actual" != "2" ]; then
-        echo "$filename returned $actual rows through academic cut (2025, 1); expected 2" >&2
+    if [ "$actual" != "$expected_cut_rows" ]; then
+        echo "$filename returned $actual rows through academic cut (2025, 1); expected $expected_cut_rows" >&2
         exit 1
     fi
     echo "PASS $filename: cut filter (2025, 1) returned $actual rows"

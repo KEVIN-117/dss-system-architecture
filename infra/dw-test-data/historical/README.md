@@ -1,4 +1,6 @@
-# Dataset histórico sintético OLTP para pruebas DW
+# Dataset histórico sintético OLTP — revisión anterior (no usar para nuevas pruebas)
+
+> Este procedimiento es legado. Su destino `jachasun` corresponde a un volumen persistente del Compose externo y no debe usarse para una nueva carga ni para ampliar datos ya existentes. La revisión aislada recomendada es [`../historical-v2/`](../historical-v2/README.md), que usa `jachasun_test` en un contenedor efímero.
 
 Este perfil carga únicamente el servicio PostgreSQL `postgres` de `dss-uatf/database/neo4j-db.yml`. No inicia ni modifica Neo4j, no se conecta a producción y no reutiliza filas personales de los CSV/Excel de referencia. Debe ejecutarse solo en una instancia local/descartable de Jachasun.
 
@@ -21,6 +23,8 @@ Este perfil carga únicamente el servicio PostgreSQL `postgres` de `dss-uatf/dat
 - `expected/historical-cases.yml`: casos específicos para validar extracción y transformaciones.
 
 ## Preparación y ejecución (PowerShell)
+
+El procedimiento de abajo se conserva solo como referencia histórica. No lo ejecutes en una instancia de desarrollo que tenga datos que deban conservarse. Para una prueba nueva, sigue la guía de `historical-v2`.
 
 Desde la raíz de `dss-system-architecture`, con Docker Desktop iniciado:
 

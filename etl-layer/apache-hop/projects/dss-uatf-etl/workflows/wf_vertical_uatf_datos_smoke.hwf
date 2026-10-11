@@ -439,6 +439,34 @@
       <attributes_hac/>
     </action>
     <action>
+      <filename>${PROJECT_HOME}/pipelines/dimensions/pl_seal_dim_admision_batch.hpl</filename>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <create_parent_folder>N</create_parent_folder>
+      <set_logfile>N</set_logfile>
+      <set_append_logfile>N</set_append_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <wait_until_finished>Y</wait_until_finished>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <run_configuration>local</run_configuration>
+      <name>Seal DIM_ADMISION</name>
+      <description>Sella el lote después del staging y admite un lote vacío</description>
+      <type>PIPELINE</type>
+      <attributes/>
+      <xloc>2208</xloc>
+      <yloc>48</yloc>
+      <parallel>N</parallel>
+      <attributes_hac/>
+    </action>
+    <action>
       <filename>${PROJECT_HOME}/pipelines/dimensions/pl_dim_estudiante_scd2_mvp.hpl</filename>
       <params_from_previous>N</params_from_previous>
       <exec_per_row>N</exec_per_row>
@@ -461,7 +489,7 @@
       <description>Resuelve identidad, calcula hash y prepara versiones con vigencia del cierre en staging privado</description>
       <type>PIPELINE</type>
       <attributes/>
-      <xloc>2208</xloc>
+      <xloc>2352</xloc>
       <yloc>48</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -486,10 +514,10 @@
       </parameters>
       <run_configuration>local</run_configuration>
       <name>Prepare FACT_ADMISION</name>
-      <description>Prepara postulaciones del periodo en su grano operacional y sella el lote privado</description>
+      <description>Prepara postulaciones del periodo; el sellado ocurre en la acción siguiente, tras confirmar las escrituras</description>
       <type>PIPELINE</type>
       <attributes/>
-      <xloc>2352</xloc>
+      <xloc>2496</xloc>
       <yloc>48</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -514,10 +542,66 @@
       </parameters>
       <run_configuration>local</run_configuration>
       <name>Prepare FACT_CURSADO</name>
-      <description>Prepara intentos de cursado por id_matricula; conserva el estado fuente sin inferir flags</description>
+      <description>Prepara intentos por id_matricula; el sellado ocurre en la acción siguiente, tras confirmar las escrituras</description>
       <type>PIPELINE</type>
       <attributes/>
-      <xloc>2496</xloc>
+      <xloc>2784</xloc>
+      <yloc>48</yloc>
+      <parallel>N</parallel>
+      <attributes_hac/>
+    </action>
+    <action>
+      <filename>${PROJECT_HOME}/pipelines/facts/pl_seal_fact_admision_batch.hpl</filename>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <create_parent_folder>N</create_parent_folder>
+      <set_logfile>N</set_logfile>
+      <set_append_logfile>N</set_append_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <wait_until_finished>Y</wait_until_finished>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <run_configuration>local</run_configuration>
+      <name>Seal FACT_ADMISION</name>
+      <description>Sella el lote tras confirmar las escrituras del pipeline de staging</description>
+      <type>PIPELINE</type>
+      <attributes/>
+      <xloc>2640</xloc>
+      <yloc>48</yloc>
+      <parallel>N</parallel>
+      <attributes_hac/>
+    </action>
+    <action>
+      <filename>${PROJECT_HOME}/pipelines/facts/pl_seal_fact_cursado_batch.hpl</filename>
+      <params_from_previous>N</params_from_previous>
+      <exec_per_row>N</exec_per_row>
+      <clear_rows>N</clear_rows>
+      <clear_files>N</clear_files>
+      <create_parent_folder>N</create_parent_folder>
+      <set_logfile>N</set_logfile>
+      <set_append_logfile>N</set_append_logfile>
+      <logfile/>
+      <logext/>
+      <add_date>N</add_date>
+      <add_time>N</add_time>
+      <loglevel>Basic</loglevel>
+      <wait_until_finished>Y</wait_until_finished>
+      <parameters>
+        <pass_all_parameters>Y</pass_all_parameters>
+      </parameters>
+      <run_configuration>local</run_configuration>
+      <name>Seal FACT_CURSADO</name>
+      <description>Sella el lote tras confirmar las escrituras del pipeline de staging</description>
+      <type>PIPELINE</type>
+      <attributes/>
+      <xloc>2928</xloc>
       <yloc>48</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -545,7 +629,7 @@
       <description>Agrega cursado por estudiante/programa/periodo y evalúa continuidad al siguiente cierre procesado</description>
       <type>PIPELINE</type>
       <attributes/>
-      <xloc>2640</xloc>
+      <xloc>3072</xloc>
       <yloc>48</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -573,7 +657,7 @@
       <description>Verifica nueve manifiestos y ocho lotes sellados antes de publicar</description>
       <type>PIPELINE</type>
       <attributes/>
-      <xloc>2784</xloc>
+      <xloc>3216</xloc>
       <yloc>48</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -601,7 +685,7 @@
       <description>Publica dimensiones y hechos juntos en una transacción</description>
       <type>PIPELINE</type>
       <attributes/>
-      <xloc>2928</xloc>
+      <xloc>3360</xloc>
       <yloc>48</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -629,7 +713,7 @@
       <description>Audita el fallo y conserva la publicación previa</description>
       <type>PIPELINE</type>
       <attributes/>
-      <xloc>3072</xloc>
+      <xloc>3504</xloc>
       <yloc>48</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -641,7 +725,7 @@
       <description>Propaga el fallo del publisher atómico al caller</description>
       <type>ABORT</type>
       <attributes/>
-      <xloc>3216</xloc>
+      <xloc>3648</xloc>
       <yloc>48</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -669,7 +753,7 @@
       <description>Sane failure path if schema validation, source read or audit registration fails</description>
       <type>PIPELINE</type>
       <attributes/>
-      <xloc>2928</xloc>
+      <xloc>3360</xloc>
       <yloc>176</yloc>
       <parallel>N</parallel>
       <attributes_hac/>
@@ -776,6 +860,13 @@
     </hop>
     <hop>
       <from>Prepare DIM_ADMISION</from>
+      <to>Seal DIM_ADMISION</to>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Seal DIM_ADMISION</from>
       <to>Prepare DIM_ESTUDIANTE SCD2</to>
       <evaluation>Y</evaluation>
       <unconditional>N</unconditional>
@@ -790,6 +881,13 @@
     </hop>
     <hop>
       <from>Prepare FACT_ADMISION</from>
+      <to>Seal FACT_ADMISION</to>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Seal FACT_ADMISION</from>
       <to>Prepare FACT_CURSADO</to>
       <evaluation>Y</evaluation>
       <unconditional>N</unconditional>
@@ -797,6 +895,13 @@
     </hop>
     <hop>
       <from>Prepare FACT_CURSADO</from>
+      <to>Seal FACT_CURSADO</to>
+      <evaluation>Y</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Seal FACT_CURSADO</from>
       <to>Prepare FACT_RETENCION_DESERCION</to>
       <evaluation>Y</evaluation>
       <unconditional>N</unconditional>
@@ -922,6 +1027,13 @@
       <enabled>Y</enabled>
     </hop>
     <hop>
+      <from>Seal DIM_ADMISION</from>
+      <to>Audit extraction failure</to>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
       <from>Prepare DIM_ESTUDIANTE SCD2</from>
       <to>Audit extraction failure</to>
       <evaluation>N</evaluation>
@@ -936,7 +1048,21 @@
       <enabled>Y</enabled>
     </hop>
     <hop>
+      <from>Seal FACT_ADMISION</from>
+      <to>Audit extraction failure</to>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
       <from>Prepare FACT_CURSADO</from>
+      <to>Audit extraction failure</to>
+      <evaluation>N</evaluation>
+      <unconditional>N</unconditional>
+      <enabled>Y</enabled>
+    </hop>
+    <hop>
+      <from>Seal FACT_CURSADO</from>
       <to>Audit extraction failure</to>
       <evaluation>N</evaluation>
       <unconditional>N</unconditional>

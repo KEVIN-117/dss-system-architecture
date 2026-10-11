@@ -14,7 +14,7 @@ BEGIN
         SELECT * FROM (VALUES
           ('public.uatf_datos',2002,NULL::text),
           ('academico.alumnos',3,'9bfd57a5fab36ac19e6c20cb49495effbc85434d8e1c1570e6fbc907ef1923f8'),
-          ('public.postulantes',3,'996751a46c044c8ea1c8e86213f6115ea207f0a9d4a1cd14d892bfb42219d52e'),
+          ('public.postulantes',4,'996751a46c044c8ea1c8e86213f6115ea207f0a9d4a1cd14d892bfb42219d52e'),
           ('academico.alm_programas',2,'d0703dc2a7bc8712d9ad09f889608589dedfca53ccba762bd0d2e21e71517d23'),
           ('academico.pln_materias',3,'04816fa6cf7a3e594d478a8b162cbf895683748fc1586712e41447fc02941d23'),
           ('academico.notas_planilla',6,'4a591f9e237952dfb0b4fe6a9dc3308590dfb2563776c40a8f27d598d7ce41ca'),
@@ -47,13 +47,21 @@ BEGIN
        OR (SELECT count(*) FROM etl_work.hop_publication_batch
            WHERE run_id=v_run_id AND target_code IN ('FACT_ADMISION','FACT_CURSADO','FACT_RETENCION_DESERCION')
              AND sealed_at IS NOT NULL
-             AND ((target_code='FACT_ADMISION' AND expected_rows=1)
+             AND ((target_code='FACT_ADMISION' AND expected_rows=3)
                OR (target_code='FACT_CURSADO' AND expected_rows=3)
                OR (target_code='FACT_RETENCION_DESERCION' AND expected_rows=3))) <> 3
        OR (SELECT count(*) FROM etl_work.hop_publication_batch WHERE run_id=v_run_id) <> 8
        OR (SELECT count(*) FROM etl_work.hop_publication_row WHERE run_id=v_run_id) <> 0
        OR (SELECT count(*) FROM dw.fact_admision
            WHERE id_alumno_origen=1003 AND es_admitido IS TRUE AND puntaje_examen=76) <> 1
+       OR (SELECT count(*) FROM dw.fact_admision f
+           JOIN dw.dim_estudiante d USING (estudiante_sk)
+           WHERE f.id_alumno_origen=1002 AND f.es_admitido IS FALSE
+             AND d.id_alumno=1002 AND d.id_ra IS NULL) <> 1
+       OR (SELECT count(*) FROM dw.fact_admision f
+           JOIN dw.dim_estudiante d USING (estudiante_sk)
+           WHERE f.id_alumno_origen=1004 AND d.estudiante_sk=-1
+             AND d.member_type='UNKNOWN' AND f.es_admitido IS FALSE) <> 1
        OR (SELECT count(*) FROM dw.fact_cursado
            WHERE id_matricula_origen IN (9003,9004,9005) AND conteo_intento=1
              AND es_aprobado IS NULL) <> 3
@@ -100,7 +108,7 @@ BEGIN
         WHERE run_id=v_run_id AND new_status IN ('SOLICITADA','EN_EJECUCION','PUBLICANDO','EXITOSA')) <> 4 THEN
         RAISE EXCEPTION 'Expected requested -> running -> publishing -> successful state history';
     END IF;
-    IF (SELECT count(*) FROM dw.fact_admision) <> 1
+    IF (SELECT count(*) FROM dw.fact_admision) <> 3
        OR (SELECT count(*) FROM dw.fact_cursado) <> 3
        OR (SELECT count(*) FROM dw.fact_retencion_desercion) <> 3
        OR (SELECT count(*) FROM staging.raw_uatf_datos) <> 0 THEN

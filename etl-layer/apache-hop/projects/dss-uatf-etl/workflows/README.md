@@ -7,7 +7,7 @@ El workflow `wf_vertical_uatf_datos_smoke.hwf` integra con fixtures las fases 6.
 1. Recibe un UUID de prueba nuevo y crea/inicia una ejecución asociada al cierre sintético 2025/2 mediante las rutinas autorizadas.
 2. Ejecuta, secuencialmente, `pl_source_uatf_datos_vertical`, `pl_source_alumnos_vertical`, `pl_source_postulantes_vertical`, `pl_source_programas_vertical`, `pl_source_materias_vertical`, `pl_source_notas_planilla_vertical`, `pl_source_facultades_vertical`, `pl_source_colegios_vertical` y `pl_source_localidades_vertical`.
 3. Cada fuente valida contrato, realiza lectura ordenada, y registra manifiesto, hash de consulta/esquema, conteo, métrica y paso a través de `etl_control`; no persiste filas personales.
-4. Ejecuta preparación privada de `DIM_PROGRAMA`, `DIM_MATERIA`, `DIM_PERIODO_ACADEMICO` y `DIM_ADMISION`.
+4. Ejecuta preparación privada de `DIM_PROGRAMA`, `DIM_MATERIA`, `DIM_PERIODO_ACADEMICO` y `DIM_ADMISION`; sella `DIM_ADMISION` en una acción posterior para registrar también lotes válidos de cero filas.
 5. `pl_dim_estudiante_scd2_mvp.hpl` usa el `effective_at` del cierre DSA, calcula identidad/hash de los atributos historizables y prepara `INSERT`, `CLOSE` + `INSERT` o ningún cambio mediante APIs autorizadas.
 6. `pl_fact_admision_mvp.hpl` filtra `postulantes` por el corte y grano `id_alumno`; `pl_fact_cursado_mvp.hpl` filtra el mismo periodo, une notas con alumno/programa/materia y respeta el grano `id_matricula`. Ambos validan/resuelven claves mediante rutinas restringidas y sellan sus lotes privados.
 7. `pl_fact_retencion_desercion_mvp.hpl` produce un snapshot por estudiante/programa/periodo; sin siguiente cierre procesado o con egreso conocido marca `NO_EVALUABLE`.

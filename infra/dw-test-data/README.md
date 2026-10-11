@@ -17,8 +17,10 @@ docker compose -f infra/dw-integration/dw-integration-test.yml down --volumes
 
 Los IDs `RA-T*`, `ALUMNO-TEST-*` y `MAT-TEST-*` son referencias sintéticas de integración; no son la identidad reservada del perfil histórico.
 
-## Perfil histórico de desarrollo
+## Perfil histórico aislado recomendado
 
-[`historical/`](historical/README.md) contiene el dataset sintético 2000–2025 para el PostgreSQL local de Jachasun, basado en su DDL y en el catálogo depurado de carreras. Se guarda en el volumen de desarrollo y exige tablas objetivo vacías antes de sembrar. No contiene filas personales reales.
+[`historical-v2/`](historical-v2/README.md) es el perfil recomendado para la demostración: usa su propio PostgreSQL efímero `jachasun_test`, puerto 55432, usuario de lectura para Hop y seed de 2000–2025. No reutiliza ni modifica el volumen persistente del Compose `dss-uatf`.
 
-Este perfil solo puebla el origen OLTP. No inserta cierres ni hechos en la base DW; el calendario DSA se prepara por separado para probar `fact_retencion_desercion` y las reglas de elegibilidad.
+`historical/` es la revisión anterior, cuyo procedimiento apuntaba a la base persistente `jachasun`. Se conserva para trazabilidad, pero no se debe volver a sembrar ni ampliar en esa instancia. Para rehacer una prueba usa el Compose aislado de `historical-v2`.
+
+El OLTP sintético solo puebla origen; no crea cierres ni hechos en el DW. Los 52 cierres de demostración se preparan separadamente, de manera auditable y explícitamente ficticia, con [`historical-v2/seed_dw_test_closures.sql`](historical-v2/seed_dw_test_closures.sql). Nunca ejecutar ese fixture en producción.

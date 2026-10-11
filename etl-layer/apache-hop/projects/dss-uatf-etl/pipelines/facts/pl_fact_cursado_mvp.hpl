@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pipeline>
-  <info><name>pl_fact_cursado_mvp</name><name_sync_with_filename>Y</name_sync_with_filename><description>Prepara FACT_CURSADO desde academico.notas_planilla para el cierre solicitado</description><extended_description>Grano: una fila por notas_planilla.id_matricula (PK en DDL Jachasun). Lee solo el periodo del cierre, aplica filtro contractual de programas y prepara mediante API privada. No infiere flags de estado académico no documentados.</extended_description><pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type><parameters>
+  <info><name>pl_fact_cursado_mvp</name><name_sync_with_filename>Y</name_sync_with_filename><description>Prepara FACT_CURSADO desde academico.notas_planilla para el cierre solicitado</description><extended_description>Grano: una fila por notas_planilla.id_matricula (PK en DDL Jachasun). Lee solo el periodo del cierre, aplica filtro contractual de programas y prepara mediante API privada. Este pipeline prepara filas; el lote se sella en una acción posterior para respetar el commit del JDBC writer. No infiere flags de estado académico no documentados.</extended_description><pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type><parameters>
     <parameter><name>P_RUN_ID</name><default_value/><description>UUID de ejecución activa</description></parameter>
     <parameter><name>P_REQUESTED_GESTION</name><default_value/><description>Gestión autorizada del cierre</description></parameter>
     <parameter><name>P_REQUESTED_PERIODO</name><default_value/><description>Periodo autorizado del cierre</description></parameter>
@@ -9,8 +9,6 @@
   <order>
     <hop><from>Get request parameters</from><to>Read coursework source rows</to><enabled>Y</enabled></hop>
     <hop><from>Read coursework source rows</from><to>Stage FACT_CURSADO row</to><enabled>Y</enabled></hop>
-    <hop><from>Stage FACT_CURSADO row</from><to>Count staged rows</to><enabled>Y</enabled></hop>
-    <hop><from>Count staged rows</from><to>Seal FACT_CURSADO batch</to><enabled>Y</enabled></hop>
   </order>
   <transform><name>Get request parameters</name><type>GetVariable</type><description>Lee parámetros tipados sin interpolarlos en SQL</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><fields>
     <field><currency/><decimal/><format/><group/><length>36</length><name>run_id</name><precision>-1</precision><trim_type>both</trim_type><type>String</type><variable>${P_RUN_ID}</variable></field>
@@ -42,10 +40,5 @@ WHERE n.id_gestion=params.gestion AND n.id_periodo=params.periodo
 ORDER BY n.id_matricula</sql><limit>0</limit><lookup>Get request parameters</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>448</xloc><yloc>128</yloc></GUI></transform>
   <transform><name>Stage FACT_CURSADO row</name><type>TableInput</type><description>Valida integridad, rango de notas, periodo y versión SCD2; prepara en staging privado</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection><sql>SELECT ?::uuid AS run_id,
        etl_control.stage_hop_fact_coursework(?::uuid, ?::bigint, ?::jsonb) AS staged_row_id</sql><limit>0</limit><lookup>Read coursework source rows</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>800</xloc><yloc>128</yloc></GUI></transform>
-  <transform><name>Count staged rows</name><type>GroupBy</type><description>Cuenta filas preparadas para sellar el lote</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><add_linenr>N</add_linenr><all_rows>N</all_rows><directory>${java.io.tmpdir}</directory><fields><field><aggregate>prepared_count</aggregate><subject>staged_row_id</subject><type>COUNT_ANY</type><valuefield/></field></fields><give_back_row>Y</give_back_row><group><field><name>run_id</name></field></group><ignore_aggregate>N</ignore_aggregate><prefix>grp</prefix><attributes/><GUI><xloc>1088</xloc><yloc>128</yloc></GUI></transform>
-  <transform><name>Seal FACT_CURSADO batch</name><type>TableInput</type><description>Sella el lote y registra métrica/paso; la cuenta se recalcula dentro de PostgreSQL</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection><sql>SELECT etl_control.complete_hop_fact_batch(
-    ?::uuid, ?::bigint, 'FACT_CURSADO'::varchar(40), 'fact_cursado'::varchar(100),
-    'pipelines/facts/pl_fact_cursado_mvp.hpl'::text, 'hop-mvp-fact-cursado-v1'::varchar(255)
-) AS prepared_rows</sql><limit>0</limit><lookup>Count staged rows</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>1376</xloc><yloc>128</yloc></GUI></transform>
   <transform_error_handling/><attributes/>
 </pipeline>

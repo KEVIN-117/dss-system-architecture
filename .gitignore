@@ -24,10 +24,12 @@ etl-layer/loadmanager/.env
 # Apache Hop: active environment files may contain local endpoints and credentials.
 # Keep only sanitized examples in Git; preserve the active files locally.
 etl-layer/apache-hop/projects/dss-uatf-etl/environments/dev-env.json
+etl-layer/apache-hop/projects/dss-uatf-etl/environments/test-env.json
 etl-layer/apache-hop/projects/dss-uatf-etl/environments/integration-env.json
 etl-layer/apache-hop/projects/dss-uatf-etl/environments/integration-test.json
 etl-layer/apache-hop/projects/dss-uatf-etl/environments/prod-env.json
 !etl-layer/apache-hop/projects/dss-uatf-etl/environments/dev-env.example.json
+!etl-layer/apache-hop/projects/dss-uatf-etl/environments/test-env.example.json
 !etl-layer/apache-hop/projects/dss-uatf-etl/environments/integration-env.example.json
 !etl-layer/apache-hop/projects/dss-uatf-etl/environments/prod-env.example.json
 

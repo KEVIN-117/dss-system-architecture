@@ -4,7 +4,7 @@
 
 DW-008 proporciona un entorno aislado y reproducible para validar contratos fuente, cierres académicos, ejecuciones y futuras cargas dimensionales sin depender de Jachasun ni de datos reales. El entorno es de integración: no sustituye las pruebas unitarias de migraciones de `infra/dw-schema` y no habilita conexiones hacia producción.
 
-Para el MVP de #133 se reutilizarán estos fixtures al validar el flujo directo Jachasun → Hop → `dw`, según [la base consolidada](mvp-direct-hop.md). Este documento describe la base de pruebas DW-008; los perfiles posteriores de Go/RAW se conservan como regresión histórica y no certifican el nuevo workflow directo. La suite Hop del MVP y las pruebas físicas de hechos/SCD2 todavía deben implementarse.
+Para el MVP de #133, el fixture pequeño de este documento valida los contratos y regresiones de integración. El flujo directo Jachasun → Hop → `dw` y las fases 6.1–6.7 tienen su propio estado en [el progreso de Req. 6](hop-req-6-progress.md). Para una demostración de mayor volumen usa [`historical-v2`](../../infra/dw-test-data/historical-v2/README.md), no el volumen persistente del perfil legado.
 
 ## Política de privacidad
 
@@ -48,7 +48,7 @@ El catálogo de casos está separado por responsabilidad en `infra/dw-test-data/
 | Corrección tardía | Caso declarado con fecha efectiva anterior | Requiere reproceso autorizado y trazabilidad. |
 | Nota inválida | Caso esperado fuera de `[0,100]` | Se aísla como error de calidad. |
 
-Los casos de SCD2 y hechos se representan como observaciones fuente y expectativas. Aunque `0008` y `0009` ya crean esas estructuras, el harness todavía no carga filas en ellas ni comprueba sus restricciones de grano.
+La suite pequeña descrita aquí representa casos SCD2 y hechos como observaciones y expectativas; la publicación física del MVP se valida con los workflows Hop y sus pruebas de integración, descritos en el documento de progreso de Req. 6.
 
 ## Linaje y ejecución
 
@@ -82,7 +82,7 @@ La ejecución correcta muestra `integration-test` con `Exited (0)`. La restaurac
 - No se implementan las cargas SCD2 ni de hechos, workflows Apache Hop, cron ni API en este entorno. Load Manager se conserva como regresión de la arquitectura anterior.
 - No se usa `session_replication_role = replica`.
 - Los datos de prueba no prueban la cardinalidad real de Jachasun; esa validación permanece en DW-001.
-- El perfil efímero anterior sigue aislado e inmutable. Para cargas Hop de mayor volumen existe un perfil separado de OLTP sintético histórico en [`infra/dw-test-data/historical/`](../../infra/dw-test-data/historical/README.md), dirigido solo a PostgreSQL local y persistente. Exige tablas objetivo vacías y no contiene historia real ni autoriza producción.
+- El perfil efímero anterior sigue aislado e inmutable. Para mayor volumen existe un PostgreSQL histórico sintético aislado y temporal en [`infra/dw-test-data/historical-v2/`](../../infra/dw-test-data/historical-v2/README.md). El perfil anterior [`historical/`](../../infra/dw-test-data/historical/README.md) queda solo como referencia y no debe cargarse de nuevo en el volumen persistente `jachasun`.
 
 ## Definition of Done
 

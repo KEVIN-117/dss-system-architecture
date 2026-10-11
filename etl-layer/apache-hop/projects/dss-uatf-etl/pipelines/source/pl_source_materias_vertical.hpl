@@ -16,16 +16,16 @@
   <transform><name>Validate contract</name><type>TableInput</type><description>Verifica presencia, tipos, longitudes, nulabilidad, clave y datos obligatorios</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>WITH expected(ordinal_position,column_name,udt_name,char_length,is_nullable) AS (
     VALUES
         (1, 'id_materia', 'int4', NULL, 'NO'),
-        (2, 'sigla', 'varchar', 64, 'NO'),
-        (3, 'materia', 'varchar', 255, 'NO'),
+        (2, 'sigla', 'bpchar', 7, 'NO'),
+        (3, 'materia', 'varchar', NULL, 'NO'),
         (4, 'id_programa', 'bpchar', 3, 'YES'),
         (5, 'id_plan', 'int4', NULL, 'YES'),
         (6, 'id_materia_padre', 'int4', NULL, 'YES'),
         (7, 'ciclo', 'int4', NULL, 'YES'),
         (8, 'nivel_academico', 'int2', NULL, 'YES'),
-        (9, 'hrs_teoricas', 'numeric', NULL, 'YES'),
-        (10, 'hrs_practicas', 'numeric', NULL, 'YES'),
-        (11, 'creditos', 'numeric', NULL, 'YES')
+        (9, 'hrs_teoricas', 'int2', NULL, 'YES'),
+        (10, 'hrs_practicas', 'int2', NULL, 'YES'),
+        (11, 'creditos', 'int2', NULL, 'YES')
 ), observed AS (
     SELECT e.*, c.column_name AS actual_name, c.udt_name AS actual_udt,
            c.character_maximum_length AS actual_length, c.is_nullable AS actual_nullable

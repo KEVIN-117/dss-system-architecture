@@ -147,6 +147,7 @@ services:
       HOP_PROJECT_FOLDER: /files/project
       HOP_ENVIRONMENT_NAME: ${HOP_ENVIRONMENT_NAME:-dev}
       HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/${HOP_ENVIRONMENT_NAME:-dev}-env.json
+      HOP_ADDITIONAL_ENVIRONMENT_NAMES: ${HOP_ADDITIONAL_ENVIRONMENT_NAMES-dev,test}
       HOP_SHARED_JDBC_FOLDERS: /files/jdbc
       HOP_OPTIONS: >-
         -DDB_DW_HOST=${DB_DW_HOST:-host.docker.internal}
