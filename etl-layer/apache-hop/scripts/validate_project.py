@@ -92,46 +92,28 @@ def validate() -> list[str]:
         if not (PROJECT / relative).is_dir():
             errors.append(f"Missing project directory: {relative}")
 
-    environment_values: dict[str, dict[str, str]] = {}
-    checked_runtime_environments: set[str] = set()
     expected_names = set(EXPECTED_ENV["dev"]) | set(CONSISTENT_FINAL_VALUES)
     for env_name in ("dev", "integration", "prod"):
-        path = PROJECT / "environments" / f"{env_name}-env.json"
-        is_example = False
+        # Validate only sanitized, versioned templates. Active environment files
+        # are intentionally ignored and may contain developer-specific endpoints.
+        path = PROJECT / "environments" / f"{env_name}-env.example.json"
         if not path.is_file():
-            path = PROJECT / "environments" / f"{env_name}-env.example.json"
-            is_example = True
-            if not path.is_file():
-                errors.append(f"Missing runtime or example environment file: {env_name}-env.json")
-                continue
+            errors.append(f"Missing sanitized environment template: {path.name}")
+            continue
         variables = load_json(path).get("variables", [])
         actual = {item.get("name"): item.get("value") for item in variables}
-        environment_values[env_name] = actual
         if set(actual) != expected_names or len(variables) != len(actual):
             missing = sorted(expected_names - set(actual))
             extra = sorted(set(actual) - expected_names)
             errors.append(f"{path.name}: variable names differ or contain duplicates (missing={missing}, extra={extra})")
-        if is_example:
-            for variable, value in actual.items():
-                if not isinstance(value, str) or not (
-                    value.startswith("REPLACE_WITH_")
-                    or "REPLACE_WITH_" in value
-                    or value == "INJECT_FROM_INTEGRATION_SECRET_STORE"
-                    or value == "INJECT_FROM_PRODUCTION_SECRET_STORE"
-                ):
-                    errors.append(f"{path.name}: example value for {variable} must remain a non-secret placeholder")
-        else:
-            checked_runtime_environments.add(env_name)
-            for variable, expected_value in EXPECTED_ENV[env_name].items():
-                if actual.get(variable) != expected_value:
-                    errors.append(f"{path.name}: {variable} must retain {expected_value}")
-
-    if checked_runtime_environments == {"dev", "integration", "prod"}:
-        for env_name in ("integration", "prod"):
-            actual = environment_values[env_name]
-            for variable in CONSISTENT_FINAL_VALUES:
-                if actual.get(variable) != environment_values["dev"].get(variable):
-                    errors.append(f"{env_name}-env.json: {variable} differs from the agreed dev value")
+        for variable, value in actual.items():
+            if not isinstance(value, str) or not (
+                value.startswith("REPLACE_WITH_")
+                or "REPLACE_WITH_" in value
+                or value == "INJECT_FROM_INTEGRATION_SECRET_STORE"
+                or value == "INJECT_FROM_PRODUCTION_SECRET_STORE"
+            ):
+                errors.append(f"{path.name}: example value for {variable} must remain a non-secret placeholder")
 
     for connection_name, (filename, source_suffix) in CONNECTIONS.items():
         path = PROJECT / "metadata" / "rdbms" / filename
@@ -398,17 +380,27 @@ def validate() -> list[str]:
         pipeline_text = pipeline_path.read_text(encoding="utf-8")
         if pipeline_name not in workflow_text:
             errors.append(f"The vertical workflow does not execute {pipeline_name}")
-        required_calls = (
-            ("etl_control.prepare_hop_student_scd2", "etl_control.seal_hop_publication_batch")
-            if pipeline_name == "pl_dim_estudiante_scd2_mvp.hpl"
-            else ("etl_control.resolve_hop_dimension_key", "etl_control.stage_hop_publication_row",
-                  "etl_control.seal_hop_publication_batch")
-        )
+        if pipeline_name == "pl_dim_estudiante_scd2_mvp.hpl":
+            required_calls = ("etl_control.prepare_hop_student_scd2", "etl_control.seal_hop_publication_batch")
+        elif pipeline_name == "pl_dim_admision_mvp.hpl":
+            # This dimension's seal is a separate workflow action so empty
+            # source snapshots can still be registered as completed batches.
+            required_calls = ("etl_control.resolve_hop_dimension_key", "etl_control.stage_hop_publication_row")
+        else:
+            required_calls = ("etl_control.resolve_hop_dimension_key", "etl_control.stage_hop_publication_row",
+                              "etl_control.seal_hop_publication_batch")
         for required_call in required_calls:
             if required_call not in pipeline_text:
                 errors.append(f"{pipeline_name} is missing required safe-staging call {required_call}")
         if "dw.dim_" in pipeline_text or "TableOutput" in pipeline_text:
             errors.append(f"{pipeline_name} must not write directly to published DW dimensions")
+
+    admission_dimension_seal = PROJECT / "pipelines" / "dimensions" / "pl_seal_dim_admision_batch.hpl"
+    if not admission_dimension_seal.is_file() or \
+            "etl_control.seal_hop_admission_dimension_batch" not in admission_dimension_seal.read_text(encoding="utf-8"):
+        errors.append("DIM_ADMISION must seal its staged batch in the separate seal pipeline")
+    elif "pl_seal_dim_admision_batch.hpl" not in workflow_text:
+        errors.append("The vertical workflow must execute the DIM_ADMISION seal pipeline")
 
     # Req. 6.5–6.6 prepares the three approved MVP facts at their operational grains.
     fact_pipelines = {
@@ -434,8 +426,6 @@ def validate() -> list[str]:
         if pipeline_name not in workflow_text:
             errors.append(f"The vertical workflow does not execute {pipeline_name}")
         required_calls = [stage_call, source_table, *required_contract, target_code]
-        if pipeline_name != "pl_fact_retencion_desercion_mvp.hpl":
-            required_calls.append("etl_control.complete_hop_fact_batch")
         for required_text in required_calls:
             if required_text not in fact_text:
                 errors.append(f"{pipeline_name} is missing required fact-flow contract: {required_text}")
@@ -443,6 +433,16 @@ def validate() -> list[str]:
                 r"\b(?:INSERT\s+INTO|UPDATE|DELETE\s+FROM)\s+dw\.fact_(admision|cursado|retencion_desercion)\b",
                 fact_text, re.I):
             errors.append(f"{pipeline_name} must stage privately and never write directly to a published fact")
+
+    for pipeline_name, seal_routine in (
+        ("pl_seal_fact_admision_batch.hpl", "etl_control.seal_hop_fact_admission_batch"),
+        ("pl_seal_fact_cursado_batch.hpl", "etl_control.seal_hop_fact_coursework_batch"),
+    ):
+        seal_path = PROJECT / "pipelines" / "facts" / pipeline_name
+        if not seal_path.is_file() or seal_routine not in seal_path.read_text(encoding="utf-8"):
+            errors.append(f"Missing fact-batch seal pipeline or routine: {pipeline_name}")
+        elif pipeline_name not in workflow_text:
+            errors.append(f"The vertical workflow does not execute {pipeline_name}")
     gate_pipeline = PROJECT / "pipelines" / "control" / "pl_hop_mark_vertical_ready.hpl"
     if not gate_pipeline.is_file():
         errors.append("Missing Req. 6.6 staging readiness gate")

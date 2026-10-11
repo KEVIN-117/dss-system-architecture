@@ -1,0 +1,63 @@
+name: DW and Apache Hop CI
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/dw-hop-ci.yml"
+      - ".env.example"
+      - "docker-compose.yml"
+      - "docs/dw/**"
+      - "etl-layer/apache-hop/**"
+      - "infra/dw-schema/**"
+      - "infra/dw-integration/**"
+      - "infra/dw-test-data/**"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/dw-hop-ci.yml"
+      - ".env.example"
+      - "docker-compose.yml"
+      - "docs/dw/**"
+      - "etl-layer/apache-hop/**"
+      - "infra/dw-schema/**"
+      - "infra/dw-integration/**"
+      - "infra/dw-test-data/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate Hop project and Compose files
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Validate Apache Hop project
+        run: python etl-layer/apache-hop/scripts/validate_project.py
+
+      - name: Validate Compose configuration
+        env:
+          # Compose requires this value while rendering the full stack. It is
+          # a disposable placeholder; CI does not start services or connect to
+          # any database.
+          KEYCLOAK_BFF_CLIENT_SECRET: ci-placeholder
+        run: |
+          docker compose --env-file .env.example config --quiet
+          docker compose -f infra/dw-schema/dw-test-docker.yml config --quiet
+          docker compose -f infra/dw-integration/dw-integration-test.yml config --quiet
+          docker compose -f infra/dw-test-data/historical-v2/compose.yml config --quiet
+
+      - name: Run PostgreSQL DW regression suite
+        run: docker compose -f infra/dw-schema/dw-test-docker.yml up --build --exit-code-from dw-schema-test
+
+      - name: Stop test containers
+        if: always()
+        run: docker compose -f infra/dw-schema/dw-test-docker.yml down --volumes
