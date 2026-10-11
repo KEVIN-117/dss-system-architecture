@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pipeline>
+  <info><name>pl_source_colegios_vertical</name><name_sync_with_filename>Y</name_sync_with_filename><description>Valida, extrae y audita el snapshot public.prs_colegios</description><extended_description>Lectura de solo lectura; no retiene filas ni escribe directamente en DW. Fuente asociada al contrato DW-001/v1.</extended_description><pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type><parameters><parameter><name>P_RUN_ID</name><default_value/><description>UUID del intento iniciado por el workflow</description></parameter></parameters><capture_transform_performance>N</capture_transform_performance><transform_performance_capturing_delay>1000</transform_performance_capturing_delay><transform_performance_capturing_size_limit>100</transform_performance_capturing_size_limit><created_user>DSA</created_user><created_date>2026/10/04 00:00:00.000</created_date><modified_user>DSA</modified_user><modified_date>2026/10/04 00:00:00.000</modified_date></info>
+  <notepads/>
+  <order>
+    <hop><from>Validate contract</from><to>Hash observed schema</to><enabled>Y</enabled></hop>
+    <hop><from>Hash observed schema</from><to>Contract accepted?</to><enabled>Y</enabled></hop>
+    <hop><from>Contract accepted?</from><to>Abort invalid contract</to><enabled>Y</enabled></hop>
+    <hop><from>Contract accepted?</from><to>Keep audit fields</to><enabled>Y</enabled></hop>
+    <hop><from>Keep audit fields</from><to>Read source snapshot</to><enabled>Y</enabled></hop>
+    <hop><from>Read source snapshot</from><to>Count rows</to><enabled>Y</enabled></hop>
+    <hop><from>Count rows</from><to>Get run ID</to><enabled>Y</enabled></hop>
+    <hop><from>Get run ID</from><to>Audit parameters</to><enabled>Y</enabled></hop>
+    <hop><from>Audit parameters</from><to>Register source audit</to><enabled>Y</enabled></hop>
+  </order>
+  <transform><name>Validate contract</name><type>TableInput</type><description>Verifica presencia, tipos, longitudes, nulabilidad, clave y datos obligatorios</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>WITH expected(ordinal_position,column_name,udt_name,char_length,is_nullable) AS (
+    VALUES
+        (1, 'id_colegio', 'int4', NULL, 'NO'),
+        (2, 'colegio', 'varchar', 65, 'NO'),
+        (3, 'tipo', 'bpchar', 1, 'NO'),
+        (4, 'turno', 'bpchar', 1, 'NO'),
+        (5, 'area', 'bpchar', 1, 'NO'),
+        (6, 'cod_loc', 'int2', NULL, 'NO'),
+        (7, '_estado', 'bpchar', 1, 'NO')
+), observed AS (
+    SELECT e.*, c.column_name AS actual_name, c.udt_name AS actual_udt,
+           c.character_maximum_length AS actual_length, c.is_nullable AS actual_nullable
+    FROM expected e LEFT JOIN information_schema.columns c
+      ON c.table_schema='public' AND c.table_name='prs_colegios' AND c.column_name=e.column_name
+), signature AS (
+    SELECT string_agg(concat_ws(':',column_name,coalesce(actual_udt,'&lt;missing&gt;'),
+        coalesce(actual_length::text,''),coalesce(actual_nullable,'&lt;missing&gt;')), E'\n' ORDER BY ordinal_position) AS value
+    FROM observed
+)
+SELECT CASE WHEN NOT EXISTS (
+    SELECT 1 FROM observed WHERE actual_name IS NULL OR actual_udt &lt;&gt; udt_name
+       OR actual_length IS DISTINCT FROM char_length OR actual_nullable &lt;&gt; is_nullable
+) AND NOT EXISTS (SELECT 1 FROM public.prs_colegios WHERE id_colegio IS NULL OR colegio IS NULL OR tipo IS NULL OR turno IS NULL OR area IS NULL OR cod_loc IS NULL OR _estado IS NULL)
+AND EXISTS (
+        SELECT 1 FROM pg_constraint c WHERE c.conrelid = 'public.prs_colegios'::regclass AND c.contype='p'
+          AND c.conkey = ARRAY[(SELECT a.attnum FROM pg_attribute a WHERE a.attrelid=c.conrelid AND a.attname='id_colegio' AND NOT a.attisdropped)]::smallint[]
+    )
+THEN 1 ELSE 0 END AS contract_ok,
+signature.value AS schema_signature,
+NULL::smallint AS p_filter_gestion,
+NULL::smallint AS p_gestion,
+NULL::smallint AS p_periodo
+FROM signature</sql><limit>0</limit><lookup/><execute_each_row>N</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>128</xloc><yloc>128</yloc></GUI></transform>
+  <transform><name>Hash observed schema</name><type>CheckSum</type><description>SHA-256 de la firma observada</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><checksumtype>SHA-256</checksumtype><resultfieldName>schema_sha256</resultfieldName><resultType>hexadecimal</resultType><fields><field><name>schema_signature</name></field></fields><attributes/><GUI><xloc>384</xloc><yloc>128</yloc></GUI></transform>
+  <transform><name>Contract accepted?</name><type>FilterRows</type><description>Bloquea la lectura si la fuente incumple el contrato</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><compare><condition><conditions/><function>=</function><leftvalue>contract_ok</leftvalue><negated>N</negated><operator>-</operator><value><isnull>N</isnull><length>-1</length><mask>####0;-####0</mask><name>constant</name><precision>0</precision><text>1</text><type>Integer</type></value></condition></compare><send_false_to>Abort invalid contract</send_false_to><send_true_to>Keep audit fields</send_true_to><attributes/><GUI><xloc>640</xloc><yloc>128</yloc></GUI></transform>
+  <transform><name>Abort invalid contract</name><type>Abort</type><description>Interrumpe antes de leer el snapshot</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><abort_option>ABORT_WITH_ERROR</abort_option><always_log_rows>N</always_log_rows><message>El contrato public.prs_colegios no coincide o contiene datos inválidos</message><row_threshold>0</row_threshold><attributes/><GUI><xloc>896</xloc><yloc>32</yloc></GUI></transform>
+  <transform><name>Keep audit fields</name><type>SelectValues</type><description>Conserva solamente parámetros de consulta y hash de esquema</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><fields><field><name>schema_sha256</name><length>-2</length><precision>-2</precision></field></fields><select_unspecified>N</select_unspecified><attributes/><GUI><xloc>896</xloc><yloc>176</yloc></GUI></transform>
+  <transform><name>Read source snapshot</name><type>TableInput</type><description>Consulta contractualmente ordenada, parametrizada y read-only</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>-- Contract 08 v1: complete school lookup snapshot.
+SELECT
+    id_colegio,
+    colegio,
+    tipo,
+    turno,
+    area,
+    cod_loc,
+    _estado,
+    ?::char(64) AS source_schema_sha256
+FROM public.prs_colegios
+ORDER BY id_colegio ASC</sql><limit>0</limit><lookup>Keep audit fields</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>1152</xloc><yloc>176</yloc></GUI></transform>
+  <transform><name>Count rows</name><type>GroupBy</type><description>Cuenta sin enviar datos personales a etl_control</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><add_linenr>N</add_linenr><all_rows>N</all_rows><directory>${java.io.tmpdir}</directory><fields><field><aggregate>record_count</aggregate><subject/><type>COUNT_ANY</type><valuefield/></field></fields><give_back_row>Y</give_back_row><group><field><name>source_schema_sha256</name></field></group><ignore_aggregate>N</ignore_aggregate><prefix>grp</prefix><attributes/><GUI><xloc>1408</xloc><yloc>176</yloc></GUI></transform>
+  <transform><name>Get run ID</name><type>GetVariable</type><description>Obtiene el UUID para auditoría</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><fields><field><currency/><decimal/><format/><group/><length>36</length><name>run_id</name><precision>-1</precision><trim_type>both</trim_type><type>String</type><variable>${P_RUN_ID}</variable></field></fields><attributes/><GUI><xloc>1664</xloc><yloc>176</yloc></GUI></transform>
+  <transform><name>Audit parameters</name><type>SelectValues</type><description>Solo UUID, hash y conteo llegan a la auditoría</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><fields><field><name>run_id</name><length>-2</length><precision>-2</precision></field><field><name>source_schema_sha256</name><rename>schema_sha256</rename><length>-2</length><precision>-2</precision></field><field><name>record_count</name><length>-2</length><precision>-2</precision></field></fields><select_unspecified>N</select_unspecified><attributes/><GUI><xloc>1920</xloc><yloc>176</yloc></GUI></transform>
+  <transform><name>Register source audit</name><type>TableInput</type><description>Registra manifiesto, métrica y paso mediante API de control</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection><sql>WITH params AS MATERIALIZED (
+    SELECT ?::uuid AS run_id, ?::char(64) AS schema_sha256, ?::bigint AS record_count
+), registered_manifest AS (
+    SELECT (etl_control.register_etl_source_manifest(
+        p.run_id, 'public.prs_colegios'::varchar(150), 'DW-001/v1'::varchar(64),
+        'public'::varchar(63), 'prs_colegios'::varchar(63),
+        '6d0db6e71f8563de984eea72d0dc7ef67fde5cd2e474059d145a176c3d51a7fa'::char(64), 'id_colegio ASC'::text,
+        'COMPLETO'::varchar(16), p.schema_sha256,
+        NULL::smallint, NULL::smallint, NULL::timestamptz, p.record_count,
+        '{"engine":"apache-hop","source_rows_retained":false,"source_query_file":"pipelines/source/sql/select_colegios.sql"}'::jsonb
+    )).manifest_id AS manifest_id FROM params p
+), metric AS (
+    SELECT (etl_control.record_etl_execution_metric(
+        p.run_id,'source_rows_observed'::varchar(100),p.record_count::numeric,
+        'ROWS'::varchar(32),NULL::bigint,'{"source_contract_id":"public.prs_colegios"}'::jsonb
+    )).metric_id AS metric_id FROM params p CROSS JOIN registered_manifest
+), step AS (
+    SELECT (etl_control.register_etl_execution_step(
+        p.run_id,'source_colegios'::varchar(100),'EXTRACCION'::varchar(20),
+        'EXITOSO'::varchar(16),8::smallint,
+        'pipelines/source/pl_source_colegios_vertical.hpl'::text,
+        'hop-mvp-source-v1'::varchar(255),
+        jsonb_build_object('record_count',p.record_count,'source_rows_retained',false)
+    )).step_id AS step_id FROM params p CROSS JOIN registered_manifest CROSS JOIN metric
+)
+SELECT step_id FROM step</sql><limit>0</limit><lookup>Audit parameters</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>2176</xloc><yloc>176</yloc></GUI></transform>
+  <transform_error_handling/><attributes/>
+</pipeline>
+
+

@@ -1,38 +1,39 @@
 # DW-003 — Fundamentos de la plataforma analítica
 
-DW-003 establece las capas y controles de acceso de la base analítica. DW-004 incorpora el control de ejecuciones, DW-005 documenta el modelo dimensional lógico y DW-006 materializa sus dimensiones conformadas. DW-009 añade una primera vertical de integración para `public.uatf_datos`, incluido su aterrizaje mínimo en `staging.raw_uatf_datos`; DW-012 conserva el alcance de completar y estandarizar el diseño RAW y las cargas para el conjunto de fuentes aprobadas.
+DW-003 establece los esquemas y controles de acceso de la base analítica. DW-004 incorpora el control de ejecuciones, DW-005 documenta el modelo dimensional lógico y DW-006 materializa sus dimensiones conformadas. Para el MVP de la issue #133, la ruta activa será **Jachasun → Apache Hop → dw**, con `etl_control` como control lateral. La [base consolidada del MVP](mvp-direct-hop.md) distingue los objetos existentes de las cargas y migraciones aún pendientes. Load Manager y el aterrizaje RAW se conservan como implementación futura, no como dependencias del MVP.
 
 ## Capas
 
 ```mermaid
 flowchart LR
-    OLTP[Jachasun OLTP] --> STG[staging\nDatos planos extraídos]
-    STG --> WORK[etl_work\nTransformación temporal]
-    WORK --> DWH[dw\nModelo publicado]
-    DWH --> ML[ml_workspace\nTrabajo de ML]
-    CTRL[etl_control\nCierres, migraciones y auditoría] -. gobierna .-> STG
-    CTRL -. gobierna .-> WORK
-    CTRL -. gobierna .-> DWH
+    OLTP[Jachasun OLTP] --> HOP[Apache Hop]
+    HOP --> WORK[etl_work: buffer privado por run_id]
+    WORK --> PUB[Publisher PostgreSQL: publicación atómica]
+    PUB --> DWH[dw: dimensiones y hechos]
+    CTRL[etl_control: cierres y auditoría] -. gobierna .-> HOP
+    HOP -. registra evidencia .-> CTRL
+    PUB -. valida lock y registra resultado .-> CTRL
 ```
 
-`staging` conserva la observación de las fuentes sin transformación analítica. `etl_work` contiene resultados temporales de transformación. `dw` es la única capa para el modelo dimensional publicado. `ml_workspace` no publica datos al DW. `etl_control` conserva metadatos operativos; DW-004 incorpora allí el registro auditable de ejecuciones.
+El diagrama representa la ruta directa del MVP. Hop extrae, valida y transforma; guarda el lote preparado por `run_id` en `etl_work`, que funciona únicamente como buffer privado del publisher, no como staging de extracción ni como almacenamiento de negocio consumible. El publisher aplica el lote en `dw` de forma atómica. `etl_control` registra autorización, locks y evidencia. Las pipelines cuentan con pruebas sintéticas; la validación con Jachasun real sigue pendiente. El esquema `staging` de la integración Go/RAW está pausado; `staging`, `etl_work` y `ml_workspace` se conservan físicamente y no se eliminan.
 
 ## Roles de grupo
 
-Los roles son `NOLOGIN`; TI/DBA crea las cuentas de usuario o servicio por ambiente, las asigna al grupo correspondiente y conserva las credenciales fuera del repositorio.
+Los roles son `NOLOGIN`; TI/DBA crea las cuentas de usuario o servicio por ambiente, las asigna al grupo correspondiente y conserva las credenciales fuera del repositorio. La matriz siguiente describe los privilegios de la base histórica, no una recomendación de asignar todos esos roles a Hop. Los grants mínimos para su ruta directa deberán adaptarse por migración y probarse antes de operar.
 
 | Rol | Acceso permitido |
 | --- | --- |
 | `dw_staging_writer` | DML en `staging`; no accede a `dw`. |
 | `dw_transformer` | Lee `staging`, opera `etl_work` y consulta control mínimo. |
 | `dw_control_operator` | Crea cierres pendientes, consulta auditoría y ejecuta la transición autorizada. |
-| `dw_publisher` | Lee `etl_work` y publica datos en `dw`. |
+| `dw_publisher` | Rol legado con DML DW; no asignarlo al runtime de Hop. |
+| `dw_hop_runtime` | Grupo runtime creado en 0010; APIs de control/landing y publisher 0011 por `SECURITY DEFINER`, sin DML directo en `dw`. |
 | `dw_ml_writer` | Lee `dw` y opera `ml_workspace`. |
 | `dw_reader` | Solo lectura sobre `dw`. |
 
 `dw_owner` posee los esquemas y objetos. El rol que ejecuta migraciones debe ser superusuario o contar con privilegios administrativos suficientes para crear roles y asumir `dw_owner`; no debe utilizarse para servicios de aplicación.
 
-Las funciones de cierre no están disponibles para `PUBLIC`. Las operaciones que deben escribir la bitácora se ejecutan como `dw_owner` mediante funciones `SECURITY DEFINER` con `search_path` fijo; así `dw_control_operator` no recibe permisos directos de actualización. El control de que una acción provenga de DSA se mantiene en la futura API/BFF; el rol SQL limita quién puede invocar la función, pero no sustituye la autorización funcional.
+Las funciones de cierre no están disponibles para `PUBLIC`. Las operaciones que deben escribir la bitácora se ejecutan como `dw_owner` mediante funciones `SECURITY DEFINER` con `search_path` fijo; así `dw_control_operator` no recibe permisos directos de actualización. El rol SQL no sustituye la autorización funcional DSA: en el MVP se registrará mediante operación manual autorizada; la futura API/BFF podrá automatizar su comprobación.
 
 ## Migraciones
 
@@ -43,6 +44,8 @@ El primer uso desde DW-002 aplica `0001` de manera idempotente y luego `0002`, q
 En Docker, `dw-migrator` espera a que `postgres-dw` esté saludable y finaliza tras aplicar las migraciones. Hop depende de esa finalización exitosa. El antiguo script de `public` deja de montarse: las tablas legacy existentes no se borran, pero quedan fuera de la ruta soportada.
 
 ## Operación y rollback
+
+Las cinco dimensiones proceden de `0004`; `0008` añade vigencias SCD2 de estudiante, `0009` crea los tres hechos, `0015` prepara admisión/cursado y `0016` prepara retención para Hop, según [la base consolidada](mvp-direct-hop.md). No se agrega un segundo modelo de dimensiones ni de auditoría. El runtime Hop conserva contrato de control y publicación atómica. El flujo de 6.2–6.7 pasó la regresión Docker con fixtures sintéticos; esto no sustituye la validación real de Jachasun ni la aprobación operativa pendiente de DSA/TI.
 
 Para una validación aislada:
 

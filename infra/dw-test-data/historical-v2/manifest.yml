@@ -1,0 +1,41 @@
+dataset:
+  name: jachasun-historical-synthetic-v2
+  database: jachasun_test
+  mode: deterministic-synthetic
+  year_range: [2000, 2025]
+  personal_data: false
+  status: loaded-and-validated-locally
+  source_of_schema: infra/postgres-tx/ddl/ddl_jachasun.sql
+  note: Synthetic fixture only; not a statistical replica or official academic calendar.
+
+source_counts:
+  public.uatf_datos: 6000
+  public.postulantes: 6857
+  academico.alm_programas_facultades: 13
+  academico.alm_programas: 85
+  academico.docentes: 85
+  academico.pln_materias: 2520
+  academico.alumnos: 4154
+  academico.notas_planilla: 107971
+  academico.alm_programaciones: 107971
+  academico.dct_asignaciones: 107839
+
+quality:
+  gestiones_with_course_rows: 26
+  academic_period_codes_in_course_rows: [1, 2]
+  unsupported_period_zero_rows: 0
+  orphan_course_students: 0
+  orphan_course_subjects: 0
+  synthetic_identity_rows_with_personal_fields: 0
+  partial_cases_with_less_than_two_nonzero_scores: 28
+  dct_period_pairs_missing_for_coursework: 0
+
+dw_test_calendar:
+  database: dss_dw
+  closures_created: 52
+  range: [2000, 2025]
+  periods: [1, 2]
+  status: CERRADO
+  audit_events: 104
+  effective_at: synthetic-order-only
+  production_approval: false

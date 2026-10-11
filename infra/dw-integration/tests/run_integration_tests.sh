@@ -96,7 +96,7 @@ assert_source_count public.postulantes 4
 assert_source_count academico.alm_programas 2
 assert_source_count academico.alm_programas_facultades 2
 assert_source_count academico.pln_materias 3
-assert_source_count academico.notas_planilla 5
+assert_source_count academico.notas_planilla 6
 
 expected_cases=$(grep -h -c '^[[:space:]]*-[[:space:]]*case_code:' \
     /fixtures/expected/scd2-cases.yml \
@@ -122,7 +122,7 @@ fi
 echo 'Checking DW migrations and technical members'
 assert_olap_connection_budget
 assert_target_count 'migration history' \
-    "SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005','0006','0007');" 7
+    "SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005','0006','0007','0008','0009','0010','0011','0012','0013','0014','0015','0016','0017','0018','0019','0020');" 20
 assert_target_count 'conformed dimensions' \
     "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'dw' AND table_name IN ('dim_estudiante','dim_programa','dim_materia','dim_periodo_academico','dim_admision');" 5
 assert_target_count 'technical dimension members' \
@@ -179,20 +179,71 @@ assert_file_hash() {
     fi
 }
 
-assert_file_hash /fixtures/source/alm_programas.sql 37cff404c6c4d5d7e25b7c69293943734f55ec1a5f7a956242608d2fa4fb13b2
+echo 'Creating reversible synthetic academic closures for the Hop dimensional-preparation test'
+target_psql <<'SQL'
+INSERT INTO etl_control.academic_period_closure (
+    gestion, periodo, created_by_subject, closure_reason
+) VALUES
+    (2025, 1, 'integration-test:fixture', 'Synthetic closure for DIM_PERIODO_ACADEMICO'),
+    (2025, 2, 'integration-test:fixture', 'Synthetic closure for DIM_PERIODO_ACADEMICO'),
+    (2025, 3, 'integration-test:fixture', 'Synthetic closure for SCD2 unchanged-snapshot test');
+SELECT etl_control.transition_academic_period_closure(
+    2025::smallint, 1::smallint, 'CERRADO'::varchar(16), 'dsa:integration-fixture'::varchar(255),
+    'Synthetic authorized closure for integration only', clock_timestamp() - interval '180 days'
+);
+SELECT etl_control.transition_academic_period_closure(
+    2025::smallint, 2::smallint, 'CERRADO'::varchar(16), 'dsa:integration-fixture'::varchar(255),
+    'Synthetic authorized closure for integration only', clock_timestamp() - interval '90 days'
+);
+SELECT etl_control.transition_academic_period_closure(
+    2025::smallint, 3::smallint, 'CERRADO'::varchar(16), 'dsa:integration-fixture'::varchar(255),
+    'Synthetic authorized closure for unchanged SCD2 replay', clock_timestamp() - interval '30 days'
+);
+SQL
+
+assert_file_hash /fixtures/source/alm_programas.sql 2f8460b6ac83f402dd417b3280298850d76912946473bdf2ae50aaa3ef9f4688
 assert_file_hash /fixtures/source/alm_programas_facultades.sql 5994f8097179bdc92a8bcf4a034a5767d97373a55881cb0c3bb1ff0002149197
 assert_file_hash /fixtures/source/alumnos.sql 1a6d5dfea45e2a1d7b01e55275879506b61f62639521f7c8620c65d81796ee9f
-assert_file_hash /fixtures/source/lugar_localidad.sql ace4e10a1a94fa6a84a81069ad6cce0fbc88e213341dc4cb4d84662635e079a8
-assert_file_hash /fixtures/source/notas_planilla.sql 4c6493a84d5a72a8184574755f508d53e29ba1ca0a1a26e9048bbfba659bd036
-assert_file_hash /fixtures/source/pln_materias.sql e762d5583a202f09c20cee4530e693033b59605de6c5c784124b3cf3ab08a531
-assert_file_hash /fixtures/source/postulantes.sql c8091cda5cf13a37d2b12226b9dd9f83cf37822a8ab8547f8f0d6c525f43f6d1
+assert_file_hash /fixtures/source/lugar_localidad.sql e48302f047217cc1b02ee720678ab97fc65d3f212d11405fe0e95639addd322f
+assert_file_hash /fixtures/source/notas_planilla.sql c6cc589b189bc76d9e14b27ab5742fb014a805b3e6f7220c876f3c074fe7ea96
+assert_file_hash /fixtures/source/pln_materias.sql 58b71982f1ef9ad495a22c23422da9958d3576f84f5af75b2e46f3be2f307efd
+assert_file_hash /fixtures/source/postulantes.sql f9cba446015f59e3bda6c506e1d0066ac2aba8a831cbea0aeba1b5c4c8dfda54
 assert_file_hash /fixtures/source/prs_colegios.sql b7d9b8a0f208bd3cc28180bbe07e9441b1aee6e702170032f06c1f60d16ed1ea
-assert_file_hash /fixtures/source/uatf_datos.sql c7e2253debe9fb740dfa26c07086b79c90a2513073fc6f85f49a08a76fcf7b0c
+assert_file_hash /fixtures/source/uatf_datos.sql cbecc161b0f98b314fb166bbb856afc54fbe1596663473fed83398ee33ca1028
 assert_file_hash /fixtures/expected/scd2-cases.yml 0efe7aec63e30d22c137cac05949a142dcde543ebee60f02f98170ebeb910a85
 assert_file_hash /fixtures/expected/closure-cases.yml 94d7ebc2ee8feaa1fe9e7df945754b77eaa61a70dbd4106fa10c3f5e5dbf5afe
 assert_file_hash /fixtures/expected/quality-cases.yml e7dffe9d18e686b9cdb8cc32de9d7c512fa8662d7871ff8fecfa9a74884de7d6
 echo 'Provisioning restricted Load Manager test principal'
 target_psql -c "CREATE ROLE loadmanager_test LOGIN PASSWORD 'loadmanager_test' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION"
 target_psql -c 'GRANT dw_staging_writer TO loadmanager_test'
+echo 'Provisioning restricted Apache Hop vertical-flow test principal'
+target_psql -c "CREATE ROLE hop_vertical_test LOGIN PASSWORD 'hop_vertical_test' NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION"
+target_psql -c 'GRANT dw_hop_runtime TO hop_vertical_test'
+echo 'Checking that an empty DIM_ADMISION snapshot can be sealed'
+PGPASSWORD=hop_vertical_test psql -X -v ON_ERROR_STOP=1 \
+    -h "$TARGET_HOST" -p "$TARGET_PORT" -U hop_vertical_test -d "$TARGET_DB" <<'SQL'
+BEGIN;
+SELECT etl_control.create_hop_etl_execution(
+    'd1300000-0000-0000-0000-000000000001'::uuid,
+    'HISTORICA'::varchar(24), NULL::bigint, NULL::smallint, NULL::smallint,
+    NULL::timestamptz, NULL::uuid, 'Empty DIM_ADMISION batch regression test'::text
+);
+SELECT etl_control.start_hop_etl_execution(
+    'd1300000-0000-0000-0000-000000000001'::uuid, 'Start empty dimension regression test'
+);
+DO $$
+DECLARE
+    v_rows BIGINT;
+BEGIN
+    v_rows := etl_control.seal_hop_admission_dimension_batch(
+        'd1300000-0000-0000-0000-000000000001'::uuid
+    );
+    IF v_rows <> 0 THEN
+        RAISE EXCEPTION 'Expected DIM_ADMISION zero-row batch to seal with count 0, got %', v_rows;
+    END IF;
+END;
+$$;
+ROLLBACK;
+SQL
 sha256sum /fixtures/source/*.sql /fixtures/expected/*.yml
 echo 'DW-011 integration test passed'

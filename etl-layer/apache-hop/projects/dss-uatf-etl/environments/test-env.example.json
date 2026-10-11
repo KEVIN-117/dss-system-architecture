@@ -1,0 +1,17 @@
+{
+  "variables": [
+    { "name": "DSS_DW_HOSTNAME", "value": "host.docker.internal", "description": "Host del DW desde Hop Web" },
+    { "name": "DSS_DW_PORT", "value": "5434", "description": "Puerto publicado del DW local" },
+    { "name": "DSS_DW_DATABASE", "value": "dss_dw", "description": "Base DW de desarrollo; este perfil no la aísla" },
+    { "name": "DSS_DW_USERNAME", "value": "REPLACE_WITH_DW_RUNTIME_USER", "description": "Usuario runtime restringido de Hop" },
+    { "name": "DSS_DW_PASSWORD", "value": "INJECT_FROM_LOCAL_SECRET", "description": "Secreto local del runtime DW" },
+    { "name": "DSS_DW_URL", "value": "jdbc:postgresql://host.docker.internal:5434/dss_dw", "description": "URL JDBC del DW local" },
+
+    { "name": "OLTP_DB_HOSTNAME", "value": "host.docker.internal", "description": "Host del PostgreSQL persistente de dss-uatf desde Hop Web" },
+    { "name": "OLTP_DB_PORT", "value": "5432", "description": "Puerto publicado por neo4j-db.yml" },
+    { "name": "OLTP_DB_DATABASE", "value": "jachasun", "description": "Base del PostgreSQL persistente" },
+    { "name": "OLTP_DB_USERNAME", "value": "REPLACE_WITH_OLTP_READ_ONLY_USER", "description": "Cuenta de solo lectura para pruebas" },
+    { "name": "OLTP_DB_PASSWORD", "value": "INJECT_FROM_LOCAL_SECRET", "description": "Secreto local de la cuenta OLTP de solo lectura" },
+    { "name": "OLTP_DB_URL", "value": "jdbc:postgresql://host.docker.internal:5432/jachasun", "description": "URL JDBC del OLTP persistente" }
+  ]
+}

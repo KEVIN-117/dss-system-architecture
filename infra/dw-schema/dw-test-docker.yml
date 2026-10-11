@@ -40,6 +40,7 @@ services:
         psql -v ON_ERROR_STOP=1 -f /tests/dw_002_upgrade_fixture.sql
         psql -v ON_ERROR_STOP=1 -f /migrations/0002_create_analytical_layers_and_roles.sql
         psql -v ON_ERROR_STOP=1 -f /tests/dw_004_upgrade_fixture.sql
+        psql -v ON_ERROR_STOP=1 -c "CREATE EXTENSION pgcrypto WITH SCHEMA public"
         tr -d '\r' < /scripts/apply-migrations.sh | /bin/sh
         psql -v ON_ERROR_STOP=1 -f /tests/dw_003_upgrade_assertion.sql
         psql -v ON_ERROR_STOP=1 -f /tests/dw_004_upgrade_assertion.sql
@@ -48,5 +49,8 @@ services:
         psql -v ON_ERROR_STOP=1 -f /tests/analytical_layers_and_roles_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/execution_control_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/conformed_dimensions_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/hop_execution_gates_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/hop_atomic_publisher_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/hop_atomic_publisher_rollback_test.sql
         tr -d '\r' < /tests/execution_lock_concurrency_test.sh | sh
     restart: "no"

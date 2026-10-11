@@ -30,7 +30,7 @@ legacy_rows=$(PGDATABASE="$upgrade_db" psql -X -v ON_ERROR_STOP=1 -Atqc \
     "SELECT count(*) FROM staging.raw_uatf_datos WHERE run_id = '99999999-9999-9999-9999-999999999999' AND id_ra IS NULL AND estado_civil IS NULL AND _modificado IS NULL")
 test "$legacy_rows" = 1
 versions=$(PGDATABASE="$upgrade_db" psql -X -v ON_ERROR_STOP=1 -Atqc \
-    "SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005','0006','0007')")
+    "SELECT count(*) FROM etl_control.schema_migration WHERE version IN ('0001','0002','0003','0004','0005','0006','0007','0008','0009')")
 test "$versions" = 7
 if PGDATABASE="$upgrade_db" psql -X -v ON_ERROR_STOP=1 -qc \
     "INSERT INTO staging.raw_uatf_datos (run_id, row_ordinal, id_ra, estado_civil, _modificado, row_sha256) VALUES ('99999999-9999-9999-9999-999999999999', 2, NULL, NULL, NULL, repeat('a', 64))" >/dev/null 2>&1; then

@@ -5,13 +5,13 @@ REVOKE CREATE ON SCHEMA public, academico FROM PUBLIC;
 
 CREATE TABLE academico.alm_programas (
     id_programa CHAR(3) PRIMARY KEY,
-    programa VARCHAR(255) NOT NULL,
+    programa VARCHAR NOT NULL,
     id_facultad SMALLINT NOT NULL,
-    id_nivel SMALLINT,
-    nivel VARCHAR(255),
+    id_nivel SMALLINT NOT NULL,
+    nivel VARCHAR(45),
     sede VARCHAR(1),
     _tipo_academico CHAR(3) NOT NULL,
-    activo VARCHAR(16)
+    activo VARCHAR
 );
 
 INSERT INTO academico.alm_programas (

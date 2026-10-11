@@ -16,19 +16,21 @@ stateDiagram-v2
 
 Un periodo admite cualquier código positivo: semestres regulares, invierno, verano o nuevos tipos institucionales. No se crean cierres académicos reales mediante la migración.
 
+El diagrama separa la autorización funcional de la ejecución técnica. DSA habilita el cierre y puede reabrirlo; solo una carga exitosa del mismo cierre permite `PROCESADO`. Reabrir conserva la auditoría y obliga a un reproceso autorizado, no a borrar automáticamente la publicación anterior.
+
 ## Responsabilidades
 
 | Rol | Responsabilidad |
 | --- | --- |
 | DSA | Crear cortes pendientes y autorizar su cierre o reapertura, siempre con sujeto identificable y motivo. |
 | TI/DBA | Aplicar migraciones, administrar permisos de base de datos y revisar la bitácora. |
-| Load Manager futuro | Marcar un corte como `PROCESADO` solo tras una carga publicada exitosamente y con `run_id`. |
+| Apache Hop y operador autorizado | Registrar la ejecución técnica y marcar el corte como `PROCESADO` mediante la función, solo tras publicación exitosa con `run_id` del mismo cierre. |
 
-La futura API/BFF debe verificar autorización DSA antes de invocar `etl_control.transition_academic_period_closure`; la función SQL exige actor, motivo y la transición válida, pero no reemplaza la autorización JWT de DW-015/DW-016.
+En el MVP de la issue #133, la autorización DSA se conserva mediante operación manual identificada y auditable. La futura API/BFF deberá verificarla antes de invocar `etl_control.transition_academic_period_closure`; no es una dependencia del flujo directo Hop. La función SQL exige actor, motivo y transición válida, pero un actor declarado no demuestra por sí solo autorización funcional.
 
 ## Elegibilidad y reapertura
 
-Un scheduler futuro podrá solicitar una carga solo cuando el corte esté en `CERRADO`, `effective_at <= now()` y `processed_at IS NULL`. La reapertura limpia la marca de procesamiento vigente, bloquea cargas automáticas y conserva los eventos históricos, incluido el `run_id` previamente publicado. El contenido DW publicado no se reemplaza hasta que un reproceso posterior finalice exitosamente.
+El workflow Hop deberá solicitar una carga por cierre solo cuando el corte esté en `CERRADO`, `effective_at <= now()` y `processed_at IS NULL`; esta regla se aplica también a la ejecución manual, no solo a un scheduler futuro. La reapertura limpia la marca vigente, bloquea nuevas cargas por cierre y conserva los eventos históricos, incluido el `run_id` previamente publicado. El contenido DW publicado no se reemplaza hasta que un reproceso posterior finalice exitosamente. Las cargas históricas tendrán autorización explícita separada.
 
 ## Operación manual
 
@@ -41,7 +43,7 @@ SELECT etl_control.transition_academic_period_closure(
 );
 ```
 
-`CERRADO` exige fecha efectiva; `PROCESADO` exige UUID de ejecución. La tabla de eventos es inmutable y toda actualización directa de campos de estado es rechazada.
+`CERRADO` exige fecha efectiva; desde DW-004, `PROCESADO` exige un UUID de ejecución `EXITOSA` vinculada al mismo cierre. La tabla de eventos es inmutable y toda actualización directa de campos de estado es rechazada.
 
 ## Despliegue y prueba
 
@@ -57,4 +59,4 @@ El entorno no publica puertos ni persiste datos: PostgreSQL usa almacenamiento t
 
 TI/DBA puede aplicar los mismos archivos en un entorno administrado con `psql -v ON_ERROR_STOP=1`; la prueba abre una transacción y finaliza en `ROLLBACK`, por lo que no conserva registros de prueba.
 
-Los permisos productivos se concederán cuando exista el rol de aplicación del Load Manager. Hasta entonces, TI/DBA debe restringir la escritura directa y utilizar la función de transición para los cambios operativos autorizados por DSA.
+`dw_control_operator` conserva las rutinas de cierres. TI/DBA provisiona cuentas externas y restringe la escritura directa; no se espera al Load Manager para operar el calendario. La adaptación de permisos de la cuenta Hop queda pendiente y no debe otorgarle administración ni autoridad DSA implícita. Véase [la base consolidada](mvp-direct-hop.md).

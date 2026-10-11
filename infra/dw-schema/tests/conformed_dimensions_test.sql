@@ -103,10 +103,12 @@ RESET ROLE;
 SET LOCAL ROLE dw_publisher;
 INSERT INTO dw.dim_estudiante (
     member_type, id_ra, id_alumno, id_sexo, estado_civil,
-    fec_inscripcion, estado_academico, tipo_alumno, source_run_id
+    fec_inscripcion, estado_academico, tipo_alumno, source_run_id, attribute_hash_scd2,
+    valid_from, is_current
 ) VALUES (
     'STANDARD', 'RA-DW006', 960001, 'F', 1,
-    DATE '2034-02-01', 'A', 'R', '77777777-7777-7777-7777-777777777777'::uuid
+    DATE '2034-02-01', 'A', 'R', '77777777-7777-7777-7777-777777777777'::uuid,
+    repeat('a', 64)::char(64), DATE '2034-02-01', TRUE
 );
 INSERT INTO dw.dim_programa (
     member_type, id_programa, programa, id_facultad, facultad,
@@ -139,10 +141,13 @@ WHERE id_programa = 'SIS';
 DO $$
 BEGIN
     BEGIN
-        INSERT INTO dw.dim_estudiante (member_type, id_ra)
-        VALUES ('STANDARD', 'RA-DW006');
+        INSERT INTO dw.dim_estudiante (
+            member_type, id_ra, attribute_hash_scd2, valid_from, is_current
+        ) VALUES (
+            'STANDARD', 'RA-DW006', repeat('b', 64)::char(64), DATE '2034-02-01', TRUE
+        );
         RAISE EXCEPTION 'Duplicado de id_ra no fue rechazado';
-    EXCEPTION WHEN unique_violation THEN
+    EXCEPTION WHEN exclusion_violation THEN
         NULL;
     END;
 

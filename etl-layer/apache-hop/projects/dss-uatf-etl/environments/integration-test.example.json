@@ -1,0 +1,16 @@
+{
+  "variables": [
+    { "name": "DSS_DW_HOSTNAME", "value": "postgres-dw", "description": "Docker integration DW host" },
+    { "name": "DSS_DW_PORT", "value": "5432", "description": "Docker integration DW port" },
+    { "name": "DSS_DW_DATABASE", "value": "dw_integration", "description": "Disposable integration database" },
+    { "name": "DSS_DW_USERNAME", "value": "hop_vertical_test", "description": "Restricted synthetic Hop principal" },
+    { "name": "DSS_DW_PASSWORD", "value": "hop_vertical_test", "description": "Disposable integration-only password" },
+    { "name": "DSS_DW_URL", "value": "jdbc:postgresql://postgres-dw:5432/dw_integration", "description": "Docker integration DW JDBC URL" },
+    { "name": "OLTP_DB_HOSTNAME", "value": "jachasun-fixture", "description": "Docker integration OLTP host" },
+    { "name": "OLTP_DB_PORT", "value": "5432", "description": "Docker integration OLTP port" },
+    { "name": "OLTP_DB_DATABASE", "value": "jachasun_test", "description": "Disposable synthetic source database" },
+    { "name": "OLTP_DB_USERNAME", "value": "dw_fixture_reader", "description": "Read-only synthetic source principal" },
+    { "name": "OLTP_DB_PASSWORD", "value": "fixture_readonly", "description": "Disposable integration-only password" },
+    { "name": "OLTP_DB_URL", "value": "jdbc:postgresql://jachasun-fixture:5432/jachasun_test", "description": "Docker integration OLTP JDBC URL" }
+  ]
+}

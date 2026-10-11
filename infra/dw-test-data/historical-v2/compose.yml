@@ -1,0 +1,25 @@
+name: dss-dw-historical-v2
+
+services:
+  jachasun-test:
+    image: postgres:15-alpine
+    container_name: dss-dw-historical-v2-oltp
+    environment:
+      POSTGRES_DB: jachasun_test
+      POSTGRES_USER: source_test
+      POSTGRES_PASSWORD: source_test
+    ports:
+      - "127.0.0.1:${DW_HISTORICAL_OLTP_PORT:-55432}:5432"
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ../../../infra/postgres-tx/schemas/create_schemas.sql:/docker-entrypoint-initdb.d/00-create-schemas.sql:ro
+      - ../../../infra/postgres-tx/ddl/ddl_jachasun.sql:/docker-entrypoint-initdb.d/01-ddl-jachasun.sql:ro
+      - ./create_fixture_reader.sql:/docker-entrypoint-initdb.d/02-create-fixture-reader.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U source_test -d jachasun_test"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: "no"

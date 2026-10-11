@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<pipeline>
+  <info><name>pl_fact_cursado_mvp</name><name_sync_with_filename>Y</name_sync_with_filename><description>Prepara FACT_CURSADO desde academico.notas_planilla para el cierre solicitado</description><extended_description>Grano: una fila por notas_planilla.id_matricula (PK en DDL Jachasun). Lee solo el periodo del cierre, aplica filtro contractual de programas y prepara mediante API privada. Este pipeline prepara filas; el lote se sella en una acción posterior para respetar el commit del JDBC writer. No infiere flags de estado académico no documentados.</extended_description><pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type><parameters>
+    <parameter><name>P_RUN_ID</name><default_value/><description>UUID de ejecución activa</description></parameter>
+    <parameter><name>P_REQUESTED_GESTION</name><default_value/><description>Gestión autorizada del cierre</description></parameter>
+    <parameter><name>P_REQUESTED_PERIODO</name><default_value/><description>Periodo autorizado del cierre</description></parameter>
+  </parameters><capture_transform_performance>N</capture_transform_performance><transform_performance_capturing_delay>1000</transform_performance_capturing_delay><transform_performance_capturing_size_limit>100</transform_performance_capturing_size_limit><created_user>DSA</created_user><created_date>2026/10/04 00:00:00.000</created_date><modified_user>DSA</modified_user><modified_date>2026/10/04 00:00:00.000</modified_date></info>
+  <notepads/>
+  <order>
+    <hop><from>Get request parameters</from><to>Read coursework source rows</to><enabled>Y</enabled></hop>
+    <hop><from>Read coursework source rows</from><to>Stage FACT_CURSADO row</to><enabled>Y</enabled></hop>
+  </order>
+  <transform><name>Get request parameters</name><type>GetVariable</type><description>Lee parámetros tipados sin interpolarlos en SQL</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><fields>
+    <field><currency/><decimal/><format/><group/><length>36</length><name>run_id</name><precision>-1</precision><trim_type>both</trim_type><type>String</type><variable>${P_RUN_ID}</variable></field>
+    <field><currency/><decimal/><format/><group/><length>4</length><name>gestion</name><precision>0</precision><trim_type>both</trim_type><type>Integer</type><variable>${P_REQUESTED_GESTION}</variable></field>
+    <field><currency/><decimal/><format/><group/><length>2</length><name>periodo</name><precision>0</precision><trim_type>both</trim_type><type>Integer</type><variable>${P_REQUESTED_PERIODO}</variable></field>
+  </fields><attributes/><GUI><xloc>128</xloc><yloc>128</yloc></GUI></transform>
+  <transform><name>Read coursework source rows</name><type>TableInput</type><description>Une matrícula con alumno/programa/materia; conserva solo el cierre, ordenado por PK id_matricula</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>WITH params AS MATERIALIZED (
+    SELECT ?::uuid AS run_id, ?::smallint AS gestion, ?::smallint AS periodo
+)
+SELECT params.run_id, params.run_id AS staging_run_id,
+       row_number() OVER (ORDER BY n.id_matricula)::bigint AS row_ordinal,
+       jsonb_build_object(
+           'id_matricula', n.id_matricula, 'id_gestion', n.id_gestion,
+           'id_periodo', n.id_periodo, 'id_alumno', n.id_alumno,
+           'id_ra', a.id_ra, 'id_programa', a.id_programa,
+           'id_materia', n.id_materia, 'grupo', n.grupo,
+           'nota', n.nota, 'nota_2da', n.nota_2da,
+           'nota_ex_mesa', n.nota_ex_mesa, 'pparcial', n.pparcial,
+           'sparcial', n.sparcial, 'tparcial', n.tparcial,
+           'cparcial', n.cparcial, 'estado', n.estado
+       ) AS source_data
+FROM academico.notas_planilla n CROSS JOIN params
+JOIN academico.alumnos a ON a.id_alumno=n.id_alumno
+JOIN academico.alm_programas programa ON programa.id_programa=a.id_programa
+JOIN academico.pln_materias materia ON materia.id_materia=n.id_materia
+WHERE n.id_gestion=params.gestion AND n.id_periodo=params.periodo
+  AND upper(btrim(programa._tipo_academico)) IN ('CAR','PRO','TES','TEM')
+  AND upper(btrim(coalesce(programa.activo,''))) IN ('1','S','Y')
+ORDER BY n.id_matricula</sql><limit>0</limit><lookup>Get request parameters</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>448</xloc><yloc>128</yloc></GUI></transform>
+  <transform><name>Stage FACT_CURSADO row</name><type>TableInput</type><description>Valida integridad, rango de notas, periodo y versión SCD2; prepara en staging privado</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection><sql>SELECT ?::uuid AS run_id,
+       etl_control.stage_hop_fact_coursework(?::uuid, ?::bigint, ?::jsonb) AS staged_row_id</sql><limit>0</limit><lookup>Read coursework source rows</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>800</xloc><yloc>128</yloc></GUI></transform>
+  <transform_error_handling/><attributes/>
+</pipeline>

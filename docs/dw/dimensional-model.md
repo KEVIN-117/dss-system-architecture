@@ -2,22 +2,28 @@
 
 ## Propósito y alcance
 
-Este documento define el modelo lógico aprobable del primer Data Warehouse relacional de Jachasun: una constelación de hechos para admisión, cursado y retención/deserción. Su propósito es fijar significados, granos y agregaciones antes de crear objetos físicos.
+Este documento define el modelo lógico del primer Data Warehouse relacional de Jachasun: una constelación de hechos para admisión, cursado y retención/deserción. El DDL correspondiente está en la migración `0009`; aquí se fijan significados, granos y agregaciones para las cargas posteriores.
 
-No crea DDL, tablas, dimensiones, cargas, transformaciones Apache Hop ni procesos de extracción. DW-006 materializa las dimensiones y sus miembros técnicos en [conformed-dimensions.md](conformed-dimensions.md); DW-007 decidirá la historización SCD; y las issues de staging, transformación y publicación materializarán los hechos. Las fuentes continúan siendo de solo lectura y los contratos de DW-001 son la referencia de campos y filtros autorizados.
+Este documento no ejecuta DDL ni cargas. DW-006 ya materializa las dimensiones y sus miembros técnicos en [conformed-dimensions.md](conformed-dimensions.md); DW-007 documenta la política SCD, aún pendiente de implementación física. La issue #133 adopta Jachasun → Apache Hop → `dw`, sin dependencia del Load Manager en Go ni de su staging RAW. Se conserva el buffer privado `etl_work` usado por el publisher atómico de Hop. Las fuentes continúan siendo de solo lectura y DW-001 es la referencia de campos y filtros autorizados.
+
+### Alcance consolidado del MVP
+
+Se conservan únicamente `dw.fact_admision`, `dw.fact_cursado` y `dw.fact_retencion_desercion`. Su DDL está en `infra/dw-schema/migrations/0009_create_constellation_facts.sql`; `0008_add_student_scd2_versions.sql` proporciona la vigencia requerida para resolver la surrogate key temporal del estudiante. No se recrean las dimensiones de `0004` ni las entidades de control de `0001`–`0003`.
+
+`fact_enrollment` queda para una ampliación futura. `fact_graduation` también queda fuera del DDL y las cargas del MVP: se registra `actas_graduacion.graduados` como fuente oficial para su análisis posterior, pendiente de resolver semántica del evento/estado y correspondencia temporal con el periodo académico. Ambas fuentes quedan fuera de los nueve contratos actuales. Esta decisión no cambia silenciosamente las reglas de egreso ni los denominadores de retención. Véase [la base consolidada](mvp-direct-hop.md).
 
 ## Principios de diseño
 
 - Cada hecho responde a un proceso de negocio y tiene un grano propio. No existe una tabla de hechos única que mezcle admisiones, calificaciones y snapshots de permanencia.
 - Las dimensiones conformadas permiten comparar procesos sin duplicar definiciones: estudiante, programa y periodo académico son comunes cuando el proceso dispone de ellas.
-- Las claves sustitutas se crearán en DW-006. Hasta entonces, las claves naturales documentadas aquí conservan trazabilidad con Jachasun.
+- Las claves sustitutas ya existen en las dimensiones de DW-006. Las claves naturales documentadas aquí conservan trazabilidad con Jachasun.
 - `run_id` conserva el linaje técnico de una publicación y referencia el control de DW-004; no es una dimensión para filtros ni agregaciones analíticas.
-- Los valores ausentes, desconocidos o no aplicables no se reemplazan por ceros. DW-006 definirá los miembros técnicos `UNKNOWN` y `NO_APLICA` donde corresponda.
+- Los valores ausentes, desconocidos o no aplicables no se reemplazan por ceros. DW-006 define los miembros técnicos `UNKNOWN (-1)` y `NOT_APPLICABLE (0)` donde corresponda.
 - El filtro de programas aprobado en DW-001 se aplica antes de publicar cualquiera de los hechos: programas activos y de tipo académico permitido. La implementación concreta reutilizará el contrato de `academico.alm_programas` y no inventará un segundo criterio.
 
 ## Dimensiones conformadas
 
-| Dimensión lógica | Futura clave sustituta | Clave natural o identidad de negocio | Atributos y fuente principal | Hechos que la usan |
+| Dimensión lógica | Clave sustituta existente | Clave natural o identidad de negocio | Atributos y fuente principal | Hechos que la usan |
 | --- | --- | --- | --- | --- |
 | `DIM_ESTUDIANTE` | `estudiante_sk` | `id_ra` es la identidad canónica cuando existe; `id_alumno` es el identificador académico alterno. | Persona y atributos académicos de `public.uatf_datos` y `academico.alumnos`; colegio (`public.prs_colegios`) y localidad (`public.lugar_localidad`) son atributos del estudiante. | Admisión, cursado, retención/deserción |
 | `DIM_PROGRAMA` | `programa_sk` | `id_programa` | Nombre, facultad, nivel, sede y atributos autorizados de `academico.alm_programas` y su relación de facultad. | Admisión, cursado, retención/deserción |
@@ -113,9 +119,9 @@ Las líneas del diagrama representan relaciones uno-a-muchos desde una dimensió
 | Elemento | Definición |
 | --- | --- |
 | Proceso | Postulación y resultado de admisión a un programa. |
-| Grano | Una fila por registro operativo de `public.postulantes`, provisionalmente identificado por `postulantes.id_alumno`, asociado al programa y periodo informados. |
-| Clave operacional de trazabilidad | `postulantes.id_alumno`, con `id_programa`, `id_gestion` e `id_periodo` conservados para conciliación. La unicidad real frente a programa y periodo sigue pendiente de validación en Jachasun. |
-| Claves dimensionales futuras | `estudiante_sk`, `programa_sk`, `periodo_academico_sk`, `admision_sk`. |
+| Grano | Una fila por registro operativo de `public.postulantes`, identificado por `postulantes.id_alumno`, asociado al programa y periodo informados. |
+| Clave operacional de trazabilidad | `postulantes.id_alumno`, con `id_programa`, `id_gestion` e `id_periodo` conservados para conciliación. El DDL local declara `UNIQUE (id_alumno)`; la instancia real debe confirmarlo antes de producción. |
+| Claves dimensionales | `estudiante_sk`, `programa_sk`, `periodo_academico_sk`, `admision_sk`. |
 | Fuente y dependencias | Contrato 03 de DW-001 (`public.postulantes`), `DIM_ESTUDIANTE`, `DIM_PROGRAMA`, `DIM_PERIODO_ACADEMICO`, `DIM_ADMISION` y filtro de programas aprobado. |
 | Linaje técnico | `run_id` de la ejecución publicada y versión del contrato/manifiesto de origen. |
 | Restricción de agregación | No se une con calificaciones para producir un indicador a nivel de fila. Los embudos se calculan exclusivamente sobre este hecho. |
@@ -135,7 +141,7 @@ Los valores de estado desconocidos no se convierten en rechazo ni en admisión. 
 | Proceso | Intento de cursado y registro de calificación por materia. |
 | Grano | Una fila por `academico.notas_planilla.id_matricula`. |
 | Clave operacional de trazabilidad | `notas_planilla.id_matricula`; `grupo` se conserva como dimensión degenerada, porque identifica el paralelo dentro de la fila pero no requiere dimensión propia. |
-| Claves dimensionales futuras | `estudiante_sk`, `programa_sk`, `materia_sk`, `periodo_academico_sk`. |
+| Claves dimensionales | `estudiante_sk`, `programa_sk`, `materia_sk`, `periodo_academico_sk`. |
 | Fuente y dependencias | Contrato 06 de DW-001 (`academico.notas_planilla`), contratos de alumnos, programas y materias, y el filtro de programas aprobado. |
 | Linaje técnico | `run_id`, versión del contrato y manifiesto de snapshot. |
 | Restricción de agregación | Las tasas de desempeño se calculan con intentos de cursado; no se mezclan con postulación ni con snapshots de retención. |
@@ -148,7 +154,7 @@ Los valores de estado desconocidos no se convierten en rechazo ni en admisión. 
 | `conteo_aprobado`, `conteo_reprobado`, `conteo_abandono` | Flags derivados de `estado` y reglas de calificación aprobadas. | Aditiva por fila evaluable. | `SUM`; las tasas usan el denominador de intentos o evaluables declarado por DSA. |
 | `conteo_repeticion` | Derivado posterior de la secuencia de intentos de un estudiante en la misma materia, sin crear una métrica inventada cuando falte historia. | Aditiva por intento clasificado. | `SUM`; análisis de repetición por estudiante requiere identidad reconciliada. |
 
-DW-005 no congela códigos de `estado` como A/R/U/Z/T. DSA/TI debe validar el dominio vigente y el significado de notas complementarias antes de que DW-006/DW-007 implementen flags físicos.
+DW-005 no congela códigos de `estado` como A/R/U/Z/T. DSA/TI debe validar el dominio vigente y el significado de notas complementarias antes de implementar los flags del hecho y sus transformaciones Hop.
 
 ### `FACT_RETENCION_DESERCION`
 
@@ -157,7 +163,7 @@ DW-005 no congela códigos de `estado` como A/R/U/Z/T. DSA/TI debe validar el do
 | Proceso | Evaluación de permanencia para un estudiante y programa al cierre de un periodo académico. |
 | Grano | Un snapshot por estudiante, programa y periodo académico cerrado por DSA. |
 | Clave operacional de trazabilidad | Composición derivada de la identidad de estudiante, `id_programa` y `(gestion, periodo)`, junto con el cierre DSA y la ejecución que lo publicó. No sustituye las claves de `FACT_CURSADO`. |
-| Claves dimensionales futuras | `estudiante_sk`, `programa_sk`, `periodo_academico_sk`. |
+| Claves dimensionales | `estudiante_sk`, `programa_sk`, `periodo_academico_sk`. |
 | Fuente y dependencias | Derivación posterior a partir de cursado publicado, dimensiones conformadas y el calendario `etl_control.academic_period_closure`; no existe una extracción OLTP independiente para este hecho. |
 | Linaje técnico | `run_id`, cierre origen y manifiestos de cursado utilizados. |
 | Restricción de agregación | Representa estados en el tiempo. No se suman snapshots de periodos distintos como si fueran estudiantes únicos. |
@@ -174,9 +180,9 @@ DW-005 no congela códigos de `estado` como A/R/U/Z/T. DSA/TI debe validar el do
 
 #### Política de `NO_EVALUABLE` y egreso
 
-Si todavía no existe un periodo posterior cerrado por DSA, el snapshot se clasifica como `NO_EVALUABLE`, `es_desercion = NULL` y `conteo_evaluable = 0`. No participa en tasas de deserción/retención ni en entrenamiento de modelos. Cuando exista el periodo posterior autorizado, la derivación podrá comparar continuidad bajo las reglas aprobadas.
+DSA confirmó esta regla: con un siguiente cierre procesado, cursado del estudiante en ese cierre significa `RETENIDO`; sin cursado allí, menos de dos parciales rendidos en el periodo evaluado significa `DESERTOR`. Si el cierre siguiente aún no está procesado, fue reabierto o su orden temporal es ambiguo, el snapshot se clasifica como `NO_EVALUABLE`, `es_desercion = NULL` y `conteo_evaluable = 0`; no participa en tasas ni entrenamiento.
 
-Los casos con indicio de egreso conocido también quedan fuera del denominador hasta que DSA/TI valide la calidad y semántica de `estado` y `fec_egreso`. No se los etiqueta artificialmente como retenidos o desertores. La definición final de continuidad, deserción y egreso es una aprobación funcional previa a cualquier carga productiva.
+Los casos con indicio de egreso conocido también quedan fuera del denominador hasta que DSA/TI valide la calidad de `fec_egreso`; la fuente oficial futura indicada para graduación es `actas_graduacion.graduados`, fuera de los nueve contratos actuales. La población observable de este primer flujo requiere una fila de `notas_planilla` para el periodo: no se crean snapshots para estudiantes sin fila porque no hay padrón histórico por periodo en los contratos vigentes. Estos límites deben validarse antes de cargas productivas.
 
 ## Mapa de KPI a hechos
 
@@ -197,13 +203,13 @@ Cada KPI tiene un único hecho propietario. Los tableros que comparen procesos p
 
 | Decisión | Aplicación | Seguimiento |
 | --- | --- | --- |
-| Identidad centrada en persona | `id_ra` canónico cuando existe; `id_alumno` alterno y trazable. | DW-006 implementa miembros técnicos; DW-007 resuelve historización y reconciliación. |
+| Identidad centrada en persona | `id_ra` canónico cuando existe; `id_alumno` alterno y trazable. | DW-006 implementa miembros técnicos; `0008` incorpora vigencias SCD2; la reconciliación de identidades aún requiere aprobación DSA/TI. |
 | Filtro de programas único | Todos los hechos heredan el filtro autorizado por DW-001. | Validar con DSA/TI la lista y valores operativos antes de publicación. |
-| Unknown y No aplica | Se usarán únicamente como miembros técnicos explícitos; no ceros sustitutos. | Diseño físico en DW-006. |
+| Unknown y No aplica | Se usarán únicamente como miembros técnicos explícitos; no ceros sustitutos. | Miembros físicos en DW-006. |
 | Periodo posterior DSA | Retención sigue cierres autorizados, no aritmética sobre `periodo`. | Validar orden y criterios de continuidad con DSA. |
 | `NO_EVALUABLE` | Sin siguiente cierre DSA: `es_desercion = NULL`, fuera de tasa y entrenamiento. | Regla física y pruebas en la issue de transformación/retención. |
 | Egreso no validado | Excluir del denominador hasta validar `estado` y `fec_egreso`. | DSA/TI aprueban dominio y calidad. |
-| Linaje | `run_id` en hechos para auditoría, sin dimensión analítica de ejecución. | Implementación de publicación posterior a DW-004. |
+| Linaje | `run_id` en hechos para auditoría, sin dimensión analítica de ejecución. | FKs implementadas en `0009`; el workflow Hop aún debe registrar/publicar ejecuciones. |
 | Sin métricas inventadas | Datos ausentes mantienen nulabilidad o estado de calidad; no se fabrican notas, estados ni conteos. | Pruebas de calidad en ETL posterior. |
 
 ## Validación pendiente y aprobación DSA/TI
@@ -218,4 +224,4 @@ La especificación es apta para revisión. Antes de DDL o publicación productiv
 | Orden de periodos especiales. | DSA/TI | Cierres autorizados en `academic_period_closure` y orden operativo verificable. |
 | Cobertura de atributos y tipos. | TI/DBA | Validación contra Jachasun con el usuario de solo lectura definido en DW-001. |
 
-Una vez aprobados estos puntos, DW-006 podrá convertir el modelo lógico en dimensiones físicas sin modificar su grano, y DW-007 podrá definir SCD y vigencias sin alterar la propiedad de los KPI.
+Las dimensiones físicas ya existen en `0004`, las vigencias de estudiante en `0008` y los hechos en `0009`. Aprobar los puntos permite implementar la carga Hop sin modificar el grano ni la propiedad de los KPI. La existencia de tablas y documentos no equivale a validación productiva.

@@ -4,6 +4,8 @@
 
 DW-008 proporciona un entorno aislado y reproducible para validar contratos fuente, cierres académicos, ejecuciones y futuras cargas dimensionales sin depender de Jachasun ni de datos reales. El entorno es de integración: no sustituye las pruebas unitarias de migraciones de `infra/dw-schema` y no habilita conexiones hacia producción.
 
+Para el MVP de #133, el fixture pequeño de este documento valida los contratos y regresiones de integración. El flujo directo Jachasun → Hop → `dw` y las fases 6.1–6.7 tienen su propio estado en [el progreso de Req. 6](hop-req-6-progress.md). Para una demostración de mayor volumen usa [`historical-v2`](../../infra/dw-test-data/historical-v2/README.md), no el volumen persistente del perfil legado.
+
 ## Política de privacidad
 
 - El dataset versionado es sintético y no contiene nombres, documentos, teléfonos, correos, direcciones, fechas de nacimiento ni credenciales.
@@ -18,7 +20,7 @@ DW-008 proporciona un entorno aislado y reproducible para validar contratos fuen
 ```mermaid
 flowchart LR
     Fixtures[infra/dw-test-data/source] --> Source[(jachasun-fixture\nPostgreSQL sintético)]
-    Migrations[DW-001 a DW-006] --> Runner[integration-test]
+    Migrations[DW-001 a DW-MVP-001] --> Runner[integration-test]
     Runner --> Target[(dw-integration\nPostgreSQL temporal)]
     Source --> Runner[integration-test]
     Target --> Runner
@@ -26,7 +28,7 @@ flowchart LR
     Runner --> Result[Exit 0 + evidencia]
 ```
 
-El servicio fuente representa solo las tablas y columnas requeridas para probar contratos. El runner aplica las migraciones reales del DW sobre un PostgreSQL separado, consulta la fuente, verifica el destino y registra una ejecución sintética con manifiesto completo. No existe conexión hacia `jachasun` real, Neo4j ni servicios productivos.
+El servicio fuente representa solo las tablas y columnas requeridas para probar contratos. El runner aplica las migraciones reales del DW sobre un PostgreSQL separado, consulta la fuente, verifica el destino y registra una ejecución sintética con manifiesto completo. No existe conexión hacia `jachasun` real, Neo4j ni servicios productivos. Las migraciones `0008` y `0009` agregan SCD2 de estudiante y hechos; el harness debe incorporar los casos de estas nuevas estructuras antes de considerarlas validadas.
 
 ## Dataset y casos cubiertos
 
@@ -46,7 +48,7 @@ El catálogo de casos está separado por responsabilidad en `infra/dw-test-data/
 | Corrección tardía | Caso declarado con fecha efectiva anterior | Requiere reproceso autorizado y trazabilidad. |
 | Nota inválida | Caso esperado fuera de `[0,100]` | Se aísla como error de calidad. |
 
-Los casos de SCD2 y hechos se representan como observaciones fuente y expectativas; no se crean columnas SCD ni tablas de hechos antes de sus issues de implementación.
+La suite pequeña descrita aquí representa casos SCD2 y hechos como observaciones y expectativas; la publicación física del MVP se valida con los workflows Hop y sus pruebas de integración, descritos en el documento de progreso de Req. 6.
 
 ## Linaje y ejecución
 
@@ -77,17 +79,18 @@ La ejecución correcta muestra `integration-test` con `Exited (0)`. La restaurac
 
 - No se carga información histórica real.
 - No se habilita producción ni se modifica `docker-compose.yml` principal.
-- No se implementan SCD2, dimensiones de negocio, hechos, Apache Hop, Go, cron ni API.
+- No se implementan las cargas SCD2 ni de hechos, workflows Apache Hop, cron ni API en este entorno. Load Manager se conserva como regresión de la arquitectura anterior.
 - No se usa `session_replication_role = replica`.
 - Los datos de prueba no prueban la cardinalidad real de Jachasun; esa validación permanece en DW-001.
+- El perfil efímero anterior sigue aislado e inmutable. Para mayor volumen existe un PostgreSQL histórico sintético aislado y temporal en [`infra/dw-test-data/historical-v2/`](../../infra/dw-test-data/historical-v2/README.md). El perfil anterior [`historical/`](../../infra/dw-test-data/historical/README.md) queda solo como referencia y no debe cargarse de nuevo en el volumen persistente `jachasun`.
 
 ## Definition of Done
 
 - Dataset sintético versionado y revisado por privacidad.
 - Conteos y hashes declarados en un manifiesto.
 - Compose de integración separado del compose de migraciones unitarias.
-- Migraciones DW-001 a DW-006 aplicadas en una base temporal.
+- Migraciones de control, dimensiones, SCD2 y hechos aplicadas en una base temporal.
 - Fuente consultable mediante las columnas de los contratos.
 - Ejecución y manifiesto de prueba registrados con `run_id`.
 - Validación de repetición y restauración documentada.
-- Runner finaliza con código `0` sin datos persistentes fuera del entorno efímero.
+- Runner de integración finaliza con código `0` sin datos persistentes fuera de su entorno efímero; el perfil histórico local queda documentado por separado.
