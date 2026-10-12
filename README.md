@@ -1,5 +1,7 @@
 # DSS-DW-ML de la UATF
 
+![Banner del DSS-DW-ML de la UATF](assets/dss-uatf-banner.png)
+
 Plataforma de soporte a decisiones de la Universidad Autónoma Tomás Frías (UATF). El proyecto integra identidad, datos académicos y analítica para ofrecer información institucional con alcance según el contexto del usuario.
 
 > **Estado del repositorio:** contiene servicios implementados y componentes de la arquitectura objetivo que siguen en desarrollo o no están disponibles en este checkout. El `docker-compose.yml` raíz todavía referencia algunos contextos de build que no existen; por eso no se debe asumir que `docker compose up` levanta toda la plataforma.
