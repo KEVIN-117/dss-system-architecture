@@ -58,15 +58,15 @@ jobs:
 
       - name: Build auth-service
         working-directory: auth-service
-        run: ./mvnw --batch-mode --no-transfer-progress -DskipTests clean package
+        run: bash ./mvnw --batch-mode --no-transfer-progress -DskipTests clean package
 
       - name: Run architecture checks
         working-directory: auth-service
-        run: ./mvnw --batch-mode --no-transfer-progress -Dtest=ArchitectureTest test
+        run: bash ./mvnw --batch-mode --no-transfer-progress -Dtest=ArchitectureTest test
 
       - name: Run complete test suite
         working-directory: auth-service
-        run: ./mvnw --batch-mode --no-transfer-progress test
+        run: bash ./mvnw --batch-mode --no-transfer-progress test
 
       - name: Build container image
         run: docker build --tag dss-auth-service:${{ github.sha }} ./auth-service

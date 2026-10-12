@@ -62,6 +62,10 @@ jobs:
 
       - name: Run Apache Hop academic catalog sync regression
         run: |
+          mkdir -p etl-layer/apache-hop/jdbc
+          curl --fail --silent --show-error --location \
+            https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.11/postgresql-42.7.11.jar \
+            --output etl-layer/apache-hop/jdbc/postgresql-42.7.11.jar
           compose=(docker compose -p dss-dw-catalog-sync -f infra/dw-integration/dw-integration-test.yml)
           "${compose[@]}" up -d jachasun-fixture auth-catalog-fixture
           "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-initial-test
