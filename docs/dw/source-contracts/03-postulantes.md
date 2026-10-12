@@ -2,7 +2,7 @@
 
 ## Propósito y grano
 
-Intento de postulación/admisión. El grano es una fila por `public.postulantes.id_alumno`. El DDL local declara `UNIQUE (id_alumno)`, por lo que esta tabla no representa postulaciones repetidas por programa/periodo para la misma persona. El flujo 6.5 implementa ese grano; TI debe confirmar la restricción en Jachasun real antes de producción.
+Intento de postulación/admisión. El grano implementado es una fila por `public.postulantes.id_alumno`. El DDL versionado declara `UNIQUE (id_alumno)`, por lo que este contrato no representa postulaciones repetidas por programa/periodo para la misma persona. El flujo integrado aplica ese grano y detiene la carga si los datos contradicen la unicidad.
 
 ## Campos, claves y privacidad
 
@@ -21,4 +21,4 @@ Contiene datos personales indirectos. Joins autorizados: `id_ra` con `public.uat
 
 ## Snapshot y controles
 
-Para histórico y cargas semestrales, se acota por `(id_gestion, id_periodo)` hasta el cierre solicitado y se ordena por `id_gestion, id_periodo, id_alumno`. La validez de `public.postulantes`, frente a tablas homónimas de otros esquemas, es un bloqueo explícito de aprobación. El comentario del DDL local describe `A` como aprobado y `P` como reprobado; Hop mapea solo esos valores y deja códigos distintos/null como desconocidos hasta aprobación funcional DSA/TI.
+Para histórico y cargas por cierre, se acota por `(id_gestion, id_periodo)` y se ordena por `id_gestion, id_periodo, id_alumno`. La consulta califica explícitamente `public.postulantes`; no resuelve tablas homónimas de otros esquemas. La definición funcional recibida interpreta `A` como aprobado y `P` como reprobado; códigos distintos o nulos no se convierten en esos estados y permanecen desconocidos.

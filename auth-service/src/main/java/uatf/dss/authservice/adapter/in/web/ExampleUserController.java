@@ -2,6 +2,9 @@ package uatf.dss.authservice.adapter.in.web;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -12,6 +15,8 @@ import uatf.dss.authservice.domain.exception.ExampleUserAlreadyExistsException;
 
 @RestController
 @RequestMapping("/example-user")
+@Tag(name = "Demostración")
+@SecurityRequirement(name = "bearerAuth")
 public class ExampleUserController {
 
     private final RegisterExampleUserUseCase useCase;
@@ -21,6 +26,7 @@ public class ExampleUserController {
     }
 
     @PostMapping
+    @Operation(summary = "Registrar un usuario de ejemplo")
     public ResponseEntity<Void> register(@RequestBody RegisterExampleUserRequest request){
         RegisterExampleUserCommand command = new RegisterExampleUserCommand(request.id(), request.email());
 

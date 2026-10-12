@@ -1,6 +1,6 @@
-# Prompt: análisis integral de Jachasun para el DW
+# Registro histórico: análisis integral de Jachasun para el DW
 
-Usa el siguiente prompt cuando se vaya a ejecutar el análisis contra la instancia OLTP autorizada.
+**Estado: análisis realizado para la definición del MVP.** Este archivo conserva el prompt de investigación y no es una lista de trabajo pendiente. Las decisiones aplicadas están consolidadas en los contratos DW-001, el modelo dimensional y el informe de cierre del Req. 6. Para un cambio de alcance o de versión del origen, reutilizarlo como guía y guardar cualquier evidencia nueva fuera de rutas con datos sensibles.
 
 ---
 
@@ -55,7 +55,7 @@ No guardar resultados, logs, CSV ni dumps en carpetas versionadas. No hacer comm
 
 ### Forma de la respuesta final
 
-Entrega un resumen ejecutivo y una matriz con `tema`, `hallazgo`, `evidencia/CSV`, `impacto en el DW`, `decisión recomendada` y `pendiente de aprobación`. Separa claramente:
+Para un análisis futuro, entrega un resumen ejecutivo y una matriz con `tema`, `hallazgo`, `evidencia/CSV`, `impacto en el DW`, `decisión recomendada` y `aprobación requerida`. Separa claramente:
 
 - hechos confirmados por catálogo/datos;
 - inferencias estadísticas;

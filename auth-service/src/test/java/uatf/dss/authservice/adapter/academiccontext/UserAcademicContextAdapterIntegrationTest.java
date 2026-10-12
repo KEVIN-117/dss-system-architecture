@@ -15,6 +15,7 @@ import uatf.dss.authservice.domain.model.User;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -80,6 +81,24 @@ public class UserAcademicContextAdapterIntegrationTest {
         assertEquals(user.id(), foundOpt.get().userId());
         assertEquals(10, foundOpt.get().facultyId());
         assertEquals("025", foundOpt.get().careerId());
+    }
+
+    @Test
+    @DisplayName("Should atomically replace all academic contexts for a user")
+    void shouldReplaceAllContextsForUser() {
+        User user = createAndSaveTestUser("director.replace", "director.replace@uatf.edu.bo");
+        academicContextRepository.save(new UserAcademicContext(null, user.id(), 8, "015"));
+
+        List<UserAcademicContext> replacement = academicContextRepository.replaceAllForUser(user.id(),
+                List.of(new UserAcademicContext(null, user.id(), 10, "025")));
+
+        assertEquals(1, replacement.size());
+        assertEquals(10, replacement.getFirst().facultyId());
+        assertEquals("025", replacement.getFirst().careerId());
+        List<UserAcademicContext> persisted = academicContextRepository.findAllByUserId(user.id());
+        assertEquals(1, persisted.size());
+        assertEquals(10, persisted.getFirst().facultyId());
+        assertEquals("025", persisted.getFirst().careerId());
     }
 
     @Test

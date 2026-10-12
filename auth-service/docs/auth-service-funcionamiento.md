@@ -1,196 +1,190 @@
 # Funcionamiento interno de `auth-service`
 
-## Alcance y método
+**Revisión del código: 12 de octubre de 2026**
 
-Este informe describe la implementación que existe en `auth-service`, no una arquitectura propuesta. Se revisaron los controladores REST, los filtros y la configuración de seguridad, los casos de uso, el dominio, los adaptadores JPA, las migraciones Flyway, la configuración por perfil, el `pom.xml`, el `Dockerfile`, las pruebas y la documentación del servicio. No se ejecutaron pruebas ni se modificó código de aplicación.
+## Alcance
 
-El directorio `graphify-out` contiene un grafo anterior, generado el 6 de octubre de 2026, con foco en README y documentos de diseño. La consulta de ese grafo no se pudo ejecutar porque el lanzador Graphify falló al resolver la ruta de su script. Por ello, las conclusiones siguientes se verificaron directamente contra el código.
+Este informe resume la implementación encontrada en el código de `auth-service` y su integración directa con el Event Listener SPI de Keycloak. Se revisaron controladores, casos de uso, modelo de dominio, seguridad, adaptadores de persistencia y mensajería, migraciones, perfiles de configuración, pruebas existentes y cambios recientes. También se consultaron el publisher del módulo `keycloak-webhook` y los archivos de Apache Hop que mantienen el catálogo académico local.
 
-## Resumen
+No se leyeron valores de `.env`, no se modificó código de aplicación y no se ejecutaron pruebas. Las rutas, propiedades y procesos descritos son evidencia del código; no se verificó el despliegue en vivo.
 
-`auth-service` es una aplicación Java 21 con Spring Boot y arquitectura hexagonal. En ejecución cumple dos funciones principales:
+## Resumen ejecutivo
 
-1. Actúa como **OAuth2 Resource Server**: recibe JWT emitidos por Keycloak, valida firma, emisor y audiencia, y convierte roles del token en autoridades de Spring Security.
-2. Mantiene un perfil local asociado al `sub` de Keycloak: recibe sincronizaciones de usuario por webhook y expone `GET /auth/me` para devolver los datos locales junto con los contextos académicos asociados.
+`auth-service` es un servicio Java 21 con Spring Boot y arquitectura hexagonal. Sus responsabilidades actuales son:
 
-La autenticación interactiva ocurre en Keycloak y no en este servicio. No hay un endpoint de login ni el servicio consulta Keycloak Admin API para cargar perfiles: el mecanismo previsto para sincronizar el perfil es el endpoint webhook `POST /auth/sync`.
+1. Validar JWT emitidos por Keycloak como OAuth2 Resource Server y entregar un perfil local asociado al `sub` del token.
+2. Sincronizar perfiles y una selección de roles desde eventos administrativos de Keycloak transportados por RabbitMQ.
+3. Administrar los contextos académicos de un usuario, con autorización `SUPERADMIN`, validación por rol y referencias a facultades y programas activos.
 
-## Stack y arranque
+El inicio de sesión sigue ocurriendo en Keycloak. `auth-service` no contiene un endpoint de login ni llama a Keycloak Admin API para consultar usuarios. La sincronización ya no usa `POST /auth/sync`: se realiza en segundo plano por la cola `keycloak.user.events`.
 
-- **Java 21**, **Spring Boot 4.1.0**, Spring MVC, Spring Security, OAuth2 Resource Server, Spring Data JPA y PostgreSQL. Versiones declaradas en `pom.xml`.
-- **Flyway** ejecuta las migraciones de `src/main/resources/db/migration`; Hibernate usa `ddl-auto: validate`, de modo que valida el esquema, pero no lo crea ni lo actualiza.
-- **MapStruct 1.6.2** convierte modelos de dominio y entidades JPA. Lombok genera código accesorio.
-- `AuthServiceApplication` inicia Spring Boot. `server.servlet.context-path` establece `/api/${API_VERSION:v1}` y el puerto predeterminado es `8080`.
-- `SPRING_PROFILE_ACTIVE` selecciona el perfil; si no se define, `application.yaml` activa `dev`. `application-dev.yaml` configura conexión PostgreSQL, issuer y JWK Set URI de Keycloak, orígenes CORS locales y trazas SQL. `application-prod.yaml` toma conexión y orígenes CORS de variables de entorno y exige HTTPS para los orígenes permitidos.
-- El `Dockerfile` crea una imagen en dos etapas con Temurin 21; la etapa runtime usa JRE Alpine y el usuario no root `appuser`, y declara el puerto `8080`.
+## Tecnologías y arranque
 
-El `JwtDecoder` configurado en `SecurityConfig` consume `KEYCLOAK_JWK_SET_URI`, con tiempos de conexión y lectura de cinco segundos. Valida el `issuer` configurado y exige que `aud` contenga `KEYCLOAK_AUDIENCE` (o el identificador de recurso configurado). La configuración de producción debe proporcionar también `KEYCLOAK_JWK_SET_URI`, aunque no aparece como clave en `application-prod.yaml`.
+- Java 21 y Spring Boot 4.1.0; Spring MVC, Spring Security, OAuth2 Resource Server, Spring Data JPA y Spring AMQP.
+- PostgreSQL como base local IAM; Flyway aplica las migraciones y Hibernate está en modo `validate`.
+- MapStruct para mapear entidades y dominio, y `springdoc-openapi` para documentar la API.
+- RabbitMQ para recibir eventos de usuarios. El servicio declara una cola durable y una dead-letter queue (DLQ).
+- El `Dockerfile` construye con Temurin 21 y ejecuta con JRE Alpine bajo un usuario no root.
 
-## Arquitectura interna
+El contexto servlet por defecto es `/api/v1` y el puerto es `8080`. `SPRING_PROFILE_ACTIVE` selecciona el perfil, cuyo valor predeterminado es `dev`. Los perfiles `dev` y `prod` configuran PostgreSQL y el issuer de Keycloak; el perfil productivo toma las credenciales de variables de entorno y exige que los orígenes CORS permitidos usen HTTPS. No se inspeccionaron los valores de esas variables.
 
-El código organiza el sistema en cuatro zonas:
+`SecurityConfig` crea un `JwtDecoder` Nimbus a partir de `KEYCLOAK_JWK_SET_URI`. La validación comprueba firma, `issuer`, audiencia y vigencia. El decodificador usa tiempos de conexión y lectura de cinco segundos para obtener claves. La configuración productiva declara `issuer-uri` pero no `jwk-set-uri`; este último se suministra directamente al bean mediante `KEYCLOAK_JWK_SET_URI`.
 
-- **Dominio (`domain`)**: `User`, `Email`, `Role`, `UserAcademicContext`, `RoleType`, validaciones y excepciones. No depende de Spring ni de JPA.
-- **Aplicación (`application`)**: puertos de entrada y salida, comandos, DTO de perfil y servicios que implementan los casos de uso. Los servicios son Java sin anotaciones de Spring.
-- **Adaptadores (`adapter`)**: controladores REST de entrada y adaptadores de persistencia de salida. Los repositorios Spring Data, entidades y mappers quedan detrás de adaptadores por concepto (`user`, `role`, `useracademiccontext`, `exampleuser`).
-- **Configuración (`configuration`)**: conecta manualmente los casos de uso con los puertos de persistencia mediante beans; configura seguridad, JWT, CORS, webhook, Flyway y auditoría.
+## Organización interna
 
-La guía `ARCHITECTURE_GUIDE.md` describe esta separación como Ports and Adapters. `ArchitectureTest` contiene reglas ArchUnit para impedir dependencias desde dominio y aplicación hacia Spring, configuración o adaptadores, y para restringir dependencias de controladores a puertos de entrada.
+El servicio aplica Ports and Adapters:
 
-## API y controles de acceso
+- **Dominio (`domain`)**: modelos `User`, `Email`, `Role`, `UserAcademicContext`, el enum `RoleType`, validadores y excepciones. Define reglas de correo, identificadores y contextos académicos sin depender de Spring ni de JPA.
+- **Aplicación (`application`)**: puertos de entrada/salida, comandos y servicios para consultar perfiles, sincronizar usuarios, asignar contextos y registrar usuarios de ejemplo.
+- **Adaptadores de entrada (`adapter/in`)**: API REST y consumidor AMQP. Los controladores delegan en casos de uso; el consumidor convierte el mensaje de Keycloak en un comando.
+- **Adaptadores de salida (`adapter/out`)**: persistencia con Spring Data JPA, MapStruct y JDBC. Incluye acceso a usuarios/roles/contextos, catálogo académico y bandeja de eventos procesados.
+- **Configuración (`configuration`)**: composición de casos de uso, validación JWT, CORS, RabbitMQ, Flyway, OpenAPI y auditoría.
 
-Las rutas siguientes combinan el contexto `/api/v1` por defecto con los mappings de los controladores:
+Las pruebas incluyen reglas ArchUnit para conservar la separación de dependencias, además de pruebas unitarias y de integración. No se ejecutaron durante esta revisión.
 
-| Ruta | Acceso en la cadena de seguridad | Comportamiento |
+## Seguridad y API REST
+
+Las rutas combinan el contexto `/api/v1` con los mappings de cada controlador:
+
+| Ruta | Acceso | Función |
 |---|---|---|
-| `GET /api/v1/auth/me` | JWT válido requerido | Devuelve perfil local y contextos académicos del sujeto autenticado. |
-| `POST /api/v1/auth/sync` | `permitAll` de Spring Security, pero protegido por `WebhookSecretFilter` | Recibe perfil de usuario y sincroniza la fila local. Debe incluir `X-Webhook-Secret`. |
-| `GET /api/v1/demo/public` | Público | Endpoint demostrativo. |
-| `GET /api/v1/demo/admin` | JWT y rol `SUPERADMIN` | Endpoint demostrativo con `@PreAuthorize`. |
-| `GET /api/v1/demo/rector` | JWT y rol `RECTOR` | Endpoint demostrativo con `@PreAuthorize`. |
-| `GET /api/v1/demo/decano` | JWT y rol `DECANO` | Endpoint demostrativo con `@PreAuthorize`. |
-| `GET /api/v1/demo/director` | JWT y rol `DIRECTOR` | Endpoint demostrativo con `@PreAuthorize`. |
-| `POST /api/v1/example-user` | JWT requerido por la regla general | Registra un usuario de ejemplo; devuelve `201` o `409`. |
+| `GET /api/v1/auth/me` | JWT válido | Devuelve el perfil local del `sub` y sus contextos académicos. |
+| `PUT /api/v1/admin/users/{userId}/academic-contexts` | JWT con `ROLE_SUPERADMIN` | Reemplaza los contextos académicos del usuario indicado por su UUID local. |
+| `GET /api/v1/demo/public` | Pública | Ruta demostrativa. |
+| `GET /api/v1/demo/admin` | JWT y `SUPERADMIN` | Comprueba el control de acceso por rol. |
+| `GET /api/v1/demo/rector` | JWT y `RECTOR` | Comprueba el control de acceso por rol. |
+| `GET /api/v1/demo/decano` | JWT y `DECANO` | Comprueba el control de acceso por rol. |
+| `GET /api/v1/demo/director` | JWT y `DIRECTOR` | Comprueba el control de acceso por rol. |
+| `POST /api/v1/example-user` | JWT válido | Registra un usuario auxiliar de ejemplo; responde `201` o `409`. |
 
-La cadena es **stateless**, deshabilita CSRF y usa bearer tokens. CORS admite orígenes explícitos, métodos `GET` y `OPTIONS`, encabezados `Authorization` y `Content-Type`, y no permite credenciales de navegador. En producción comprueba que los orígenes usen HTTPS. Por tanto, el `POST /auth/sync` está planteado para tráfico servidor a servidor, no para llamadas browser cross-origin.
+La cadena de seguridad es stateless, deshabilita CSRF y requiere bearer JWT para toda ruta que no esté declarada pública. OpenAPI/Swagger también está permitido en la cadena; su disponibilidad se controla con `AUTH_API_DOCS_ENABLED` y su valor cambia por perfil. CORS permite explícitamente `GET`, `PUT` y `OPTIONS`, los encabezados `Authorization` y `Content-Type`, y no permite credenciales de navegador. Por ello, `POST /example-user` no está incluido en los métodos CORS actuales.
 
-`JwtConverter` combina las autoridades estándar derivadas de scopes con los roles del claim `resource_access[KEYCLOAK_RESOURCE_ID].roles`; estos últimos se convierten a `ROLE_<nombre>`. El nombre principal se obtiene del claim configurado, con fallback a `preferred_username` y después a `sub`. El controlador de perfil, sin embargo, busca al usuario por el `sub` UUID, no por ese nombre principal.
+`JwtConverter` agrega autoridades derivadas de scopes y roles del claim `resource_access[KEYCLOAK_RESOURCE_ID].roles`; convierte los roles a `ROLE_<nombre>`. El principal se obtiene del claim configurado, con fallback a `preferred_username` y luego `sub`. Para consultar el perfil, sin embargo, el controlador usa directamente el `sub` como UUID de Keycloak.
 
-## Flujos de ejecución
+## Flujo A: consulta del perfil
 
-### 1. Consulta del perfil autenticado
+1. El cliente llama a `GET /api/v1/auth/me` con un bearer token.
+2. Spring Security valida el token y crea el contexto de autenticación con `JwtConverter`.
+3. `UserProfileController` interpreta el `sub` como UUID y llama a `GetAuthUserProfileUseCase`.
+4. `GetAuthUserProfileService` busca el usuario local por `keycloak_id`. Si no existe, lanza `UserNotFoundException`.
+5. Consulta todos los registros asociados en `user_academic_contexts` y devuelve id local, username, correo, nombres, estado y contextos.
 
-1. El cliente DSS envía `GET /api/v1/auth/me` con `Authorization: Bearer <JWT>`.
-2. Spring Security usa el JWK Set de Keycloak para validar la firma y valida `issuer`, `audience` y vigencia del token.
-3. `JwtConverter` convierte el token a `JwtAuthenticationToken` y extrae authorities y principal.
-4. `UserProfileController` toma `jwt.getSubject()`, lo interpreta como UUID de Keycloak y llama a `GetAuthUserProfileUseCase`.
-5. `GetAuthUserProfileService` consulta `UserRepository.findByKeycloakId`; si no encuentra la fila, lanza `UserNotFoundException`.
-6. Consulta todos los contextos con `AcademicContextRepository.findAllByUserId` y arma `AuthUserProfile` con id local, username, correo, nombres, estado y contextos.
-7. `UserRepositoryAdapter` y `UserAcademicContextAdapter` delegan en Spring Data JPA; sus mappers traducen entidades y modelos de dominio.
+El endpoint no consulta Keycloak si el perfil local falta, no devuelve los roles y tampoco convierte los identificadores de facultad/programa a sus nombres. `isActive` se devuelve como dato, pero esta lectura no rechaza por sí misma a un usuario local inactivo; la autenticación depende de la validez del JWT.
 
-Si el usuario no está sincronizado, `GlobalExceptionHandler` responde `404` como `ProblemDetail`, con título `USER_NOT_SYNCED`. No existe una consulta a Keycloak para recuperar el perfil durante esta petición.
+## Flujo B: eventos de usuario y roles desde Keycloak
 
-### 2. Sincronización del perfil desde webhook
+### Emisión
 
-1. El emisor manda `POST /api/v1/auth/sync` con JSON y la cabecera `X-Webhook-Secret`.
-2. La regla HTTP permite pasar la petición sin JWT, pero `WebhookSecretFilter` limita la exención: solo valida el `POST` cuyo servlet path sea `/auth/sync`.
-3. El filtro rechaza la petición con `401` si falta el secreto o no coincide. Recorta espacios y compara los bytes usando `MessageDigest.isEqual`.
-4. `UserSyncController` valida `UserSyncRequest` y convierte su objeto `user` en `SyncUserCommand`. `username`, `email`, `firstName` y `lastName` deben ser no vacíos en el DTO; en cambio, el modelo `User.create` acepta nombres nulos si se invoca desde otro flujo.
-5. `SyncUserService.sync` corre dentro de una transacción. Busca por `keycloakId`: actualiza username, correo, nombres y estado si ya existe; si no, crea la fila. La unicidad de `keycloak_id`, `username` y `email` se impone también en PostgreSQL.
-6. El adaptador guarda el cambio y el servicio emite un evento estructurado `USER_SYNCED` al logger de auditoría.
+El módulo `keycloak-webhook` implementa un `EventListenerProvider` con id `uatf-webhook`. El listener examina eventos administrativos cuyo recurso sea `USER`:
 
-El DTO recibe `eventId`, `realmId`, `eventType` y `timestamp`, pero el controlador solo pasa los campos de `user` al caso de uso. El servicio no registra ni valida el evento; la repetición de una sincronización converge por la búsqueda del `keycloakId`. El estado `isActive` se copia, pero este flujo no elimina físicamente al usuario.
+- `CREATE` y `UPDATE` generan snapshots de perfil.
+- `CREATE` y `DELETE` bajo rutas de `role-mappings` generan `USER_ROLES_UPDATED`.
+- El callback de eventos de usuario final (`onEvent(Event)`) está vacío; el comportamiento observado depende de Admin Events.
+- No se maneja el borrado del usuario como evento de sincronización.
 
-### 3. Rutas demostrativas y usuario de ejemplo
+Para cada evento manejado, el provider obtiene al usuario de Keycloak y construye un JSON con `eventId` UUID, realm, tipo, timestamp, perfil habilitado y snapshot de roles. Publica el mensaje persistente en la cola `keycloak.user.events`, usando el exchange default; el `messageId` coincide con `eventId`. El publisher espera confirmación del broker, usa entrega obligatoria y realiza hasta tres intentos de publicación.
 
-`DemoEndpoint` demuestra autorización por rol con `@PreAuthorize`; no implementa todavía operaciones de negocio de dashboards. `ExampleUserController` y `RegisterExampleUserService` son un flujo auxiliar: verifica si ya existe un correo y persiste el registro en `example_users`. Ambos pertenecen al código ejecutable, aunque no forman parte del flujo principal de perfil/sincronización.
+### Consumo y persistencia
 
-## Modelo de datos y persistencia
+1. `KeycloakUserEventConsumer` recibe el JSON en `keycloak.user.events`; valida presencia de `eventId` y del UUID del usuario.
+2. En una transacción, `KeycloakEventInboxAdapter` inserta el identificador en `processed_keycloak_events`. Una clave primaria evita procesar dos veces el mismo `eventId`.
+3. Si el evento es nuevo, el consumer forma `SyncUserCommand` y llama a `SyncUserService`; si ya se procesó, retorna sin cambios.
+4. `SyncUserService` crea o actualiza el usuario por `keycloak_id`, usando las reglas de validación del dominio.
+5. Si el mensaje incluye snapshot de roles, el servicio descarta roles de cliente y conserva únicamente roles de realm que coinciden con `SUPERADMIN`, `RECTOR`, `DECANO` o `DIRECTOR`. Reemplaza la relación local de roles por ese conjunto. Si el snapshot de roles no viene, conserva la réplica previa.
+6. El inbox, el perfil y la actualización de roles se guardan con la transacción local. El listener AMQP trabaja con concurrencia máxima uno y prefetch uno; los fallos tienen hasta tres intentos y, agotados estos, no se reencolan y pasan a `keycloak.user.events.dlq`.
 
-Las migraciones actuales definen estas tablas:
+La deduplicación más entrega persistente proporciona procesamiento repetible para un mismo `eventId`; no es una transacción distribuida ni una garantía *exactly-once*. La DLQ es durable y requiere operación de inspección/reproceso que no forma parte del servicio analizado.
 
-- `users`: identidad local UUID, `keycloak_id` único, username y email únicos, nombres, `is_active` y timestamps. Un trigger actualiza `updated_at`.
-- `roles` y `user_roles`: catálogo y relación muchos a muchos.
-- `user_academic_contexts`: contextos vinculados a usuarios; `career_id` termina como `CHAR(3)` y una restricción exige facultad cuando hay carrera.
-- `academic_faculties` y `academic_programs`: snapshot local del catálogo académico. V3 crea claves foráneas hacia esos catálogos como `NOT VALID`.
-- `example_users`: tabla auxiliar del endpoint de ejemplo.
-- `revinfo` y `revchanges`: estructuras de revisiones presentes en V1.
+### Límite de fiabilidad observado
 
-V2 convierte `career_id` entero a `CHAR(3)` con ceros a la izquierda y aborta si encuentra valores fuera del rango 000–999. V3 documenta que el sistema académico sigue siendo fuente de verdad y que el catálogo será poblado por una carga futura; este servicio no contiene un proceso de carga de esas tablas.
+El listener de Keycloak captura las excepciones del publisher y solo las escribe en el log. Si no logra publicar después de los reintentos, la operación administrativa de Keycloak no se revierte y no se observa un outbox ni un proceso de reconciliación que recupere automáticamente ese evento perdido. Por tanto, la fila local puede quedar temporalmente o permanentemente desactualizada hasta que otro evento la actualice o se ejecute una recuperación externa.
 
-El perfil devuelve una lista de contextos académicos, pero el esquema y código no devuelven nombres de facultad/carrera ni una relación de roles en `AuthUserProfile`. `UserAcademicContext` comprueba id de facultad positivo, carrera de tres caracteres y que carrera requiera facultad. `AcademicContextValidator` define reglas de rol: Rector/Superadmin sin ámbito; Decano con facultad sin carrera; Director con facultad y carrera.
+## Flujo C: asignación del contexto académico
 
-## Autorización y contexto académico: límite real
+`AcademicContextAssignmentController` expone `PUT /api/v1/admin/users/{userId}/academic-contexts`. `userId` es el UUID local; el actor se identifica a partir del `sub` del JWT. `@PreAuthorize` exige `ROLE_SUPERADMIN` directamente desde las autoridades del token.
 
-El servicio valida roles del JWT y los aplica en las rutas demostrativas. El código revisado no implementa autorización por contexto académico en endpoints de datos, no configura RLS en PostgreSQL y no transmite un contexto de sesión a un Data Warehouse. `GET /auth/me` entrega los contextos locales al consumidor para que la arquitectura que los consuma pueda decidir cómo usarlos.
+El body contiene el conjunto completo a guardar:
 
-También hay una distinción entre reglas modeladas y operaciones expuestas: `AcademicContextValidator` tiene pruebas, pero no se invoca desde los casos de uso actuales. El repositorio de contextos ofrece lectura, guardado y borrado, pero no hay un caso de uso ni controlador para administrar esos contextos en este servicio.
+```json
+{
+  "contexts": [
+    { "facultyId": 12, "careerId": "025" }
+  ]
+}
+```
+
+El caso de uso ejecuta, en este orden, las verificaciones relevantes:
+
+1. Confirma que el usuario objetivo exista.
+2. Lee sus roles locales reconocidos, sincronizados desde Keycloak, y selecciona el de mayor precedencia: `SUPERADMIN`, `RECTOR`, `DECANO`, `DIRECTOR`.
+3. Exige cero contextos para `SUPERADMIN`/`RECTOR` y exactamente uno para `DECANO`/`DIRECTOR`.
+4. Valida la forma del contexto: rector y superadmin sin facultad/programa; decano con facultad y sin programa; director con facultad y programa.
+5. Comprueba que facultad y programa existan y estén activos en los catálogos locales; el programa debe pertenecer a la facultad indicada.
+6. Reemplaza el conjunto previo dentro de una transacción y registra `USER_ACADEMIC_CONTEXTS_REPLACED` con actor, objetivo, rol y cantidad de contextos.
+
+Un `contexts: []` elimina los contextos previos y solo es válido para rector o superadmin. Si falta el snapshot local de roles reconocido, la operación falla con conflicto (`409`); la autenticación del actor no se basa en esa réplica, sino en el JWT.
+
+### Catálogo académico
+
+`V3__create_academic_catalog.sql` crea `academic_faculties` y `academic_programs`, con estado activo y fecha de sincronización. La API consulta esas tablas mediante JDBC. El código de `auth-service` no extrae el catálogo de Jachasun: los artefactos revisados de Apache Hop definen un workflow separado que sincroniza primero facultades y luego programas mediante upserts. El script de provisión limita al usuario de Hop a `SELECT`/`INSERT`/`UPDATE` sobre esas tablas, sin `DELETE` ni DDL. Este flujo externo no fue ejecutado en esta revisión.
+
+## Persistencia local
+
+Las migraciones observadas definen:
+
+- `users`: UUID local, `keycloak_id` único, username/email únicos, perfil, estado y marcas de tiempo.
+- `roles` y `user_roles`: catálogo de roles reconocidos y relación de usuarios.
+- `user_academic_contexts`: asignaciones de facultad/programa, con reglas y referencias a catálogos.
+- `academic_faculties` y `academic_programs`: catálogo académico local, consumido por la API de asignación.
+- `processed_keycloak_events`: inbox de idempotencia, con `event_id` como clave primaria y timestamp de procesamiento.
+- `example_users`: tabla auxiliar de registro demostrativo.
+- `revinfo` y `revchanges`: tablas preexistentes en la migración inicial.
+
+V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los cuatro roles de aplicación. V5 crea la tabla inbox de eventos. Las tablas `revinfo`/`revchanges` no bastan para afirmar que el historial se registre: el `pom.xml` revisado no declara Hibernate Envers ni se encontraron entidades anotadas con `@Audited`.
+
+## Rutas auxiliares y límites funcionales
+
+- `DemoEndpoint` contiene rutas para probar acceso por rol; no implementa acciones DSS ni dashboards.
+- `ExampleUserController` y `RegisterExampleUserService` verifican correo duplicado y persisten un registro en `example_users`; son funcionalidad demostrativa.
+- Los roles locales sirven como snapshot consultado para reglas del contexto académico. La seguridad HTTP usa los roles presentes en el JWT.
+- No hay un endpoint en `auth-service` para conceder o revocar roles en Keycloak; el servicio recibe y replica snapshots de roles, pero la administración de esos roles ocurre en Keycloak.
+- El servicio no implementa autorización por facultad/programa sobre endpoints de analítica, no configura RLS y no propaga aquí un contexto de sesión al Data Warehouse.
+- `GET /auth/me` expone los contextos para que un cliente autorizado los consuma; la aplicación de ese alcance fuera de este servicio corresponde a otra capa.
 
 ## Errores, auditoría y operación
 
-- `WebhookSecretFilter` responde `401` para secretos ausentes o inválidos.
-- `GlobalExceptionHandler` traduce explícitamente `UserNotFoundException` a `404`; otros errores siguen el manejo predeterminado de Spring (por ejemplo, autorización `401/403` y validación HTTP).
-- `AUDIT_LOGGER` escribe JSON a consola. `SyncUserService` registra `USER_SYNCED`. `AuditLoggingListener` intenta registrar éxitos y fallos de autenticación para `/auth/me`, junto con roles e IP.
-- Hay una discrepancia en ese listener: compara `request.getRequestURI()` con `/auth/me`, mientras que `application.yaml` pone `/api/v1` como context path. En una petición servlet normal el URI incluye ese prefijo, por lo que el filtro de auditoría probablemente no reconoce la ruta real.
-- Para IP, el listener usa `remoteAddr` directamente salvo si parece una dirección privada/de loopback; en ese caso acepta `X-Real-IP`, `Forwarded` o `X-Forwarded-For`. La validez depende de que el servicio solo reciba esas cabeceras de proxies confiables.
-- Actuator expone `health`, `info` y `metrics`; el detalle de salud está condicionado por autorización.
+- `GlobalExceptionHandler` transforma `UserNotFoundException` en `404 USER_NOT_SYNCED` y las excepciones de dominio en el código HTTP definido por cada excepción. Spring Security responde `401/403` para autenticación/autorización.
+- `AUDIT_LOGGER` produce eventos estructurados. La sincronización registra `USER_SYNCED`; la sustitución de contexto registra actor y objetivo.
+- `AuditLoggingListener` observa eventos de autenticación asociados con `/auth/me`, roles e IP. La ruta servlet normalmente incluye el context path `/api/v1`, mientras que el listener compara el path completo con `/auth/me`; esa comparación parece no coincidir con el URI real y debe confirmarse en ejecución.
+- Cuando la conexión llega desde una dirección privada o loopback, la auditoría puede tomar IP de `X-Real-IP`, `Forwarded` o `X-Forwarded-For`. Estas cabeceras solo son fiables si el servicio está detrás de proxies confiables que las limpian y establecen.
+- Actuator expone `health`, `info` y `metrics`; el detalle de salud se limita a usuarios autorizados.
 
-## Diferencias entre documentación y código observado
+## Cambios frente a la revisión anterior
 
-1. **Secreto del webhook:** `docs/keycloak/keycloak_specification.md` muestra `Authorization: Bearer <webhook-shared-secret>`. `WebhookSecretFilter` exige `X-Webhook-Secret`. La integración debe alinear emisor y receptor antes de considerar el webhook operativo.
-2. **Listener de Keycloak:** la documentación describe un SPI que envía eventos `USER_CREATED`/`USER_UPDATED`, pero su implementación no aparece en este directorio. Aquí solo están el endpoint receptor, el filtro y el contrato DTO.
-3. **Eventos recibidos:** el DTO exige `eventType`, pero el servicio no diferencia `CREATE`, `UPDATE` u otros eventos; solo aplica los datos de `user` como upsert.
-4. **Roles locales:** existen tablas y entidades de roles, y un `RoleRepositoryAdapter` de consulta. Sin embargo, `AssignRoleRepository` no tiene implementación, no hay caso de uso/controlador para asignar roles y el modelo de dominio `User` no contiene roles. La autorización efectiva observada procede del JWT de Keycloak.
-5. **Validación académica por rol:** las reglas están implementadas y probadas en dominio, pero ningún servicio actual las invoca; tampoco se observa API para crear o cambiar contextos.
-6. **Estado local del usuario:** `/auth/me` devuelve `isActive`, pero no rechaza una fila inactiva por ese valor. El JWT aún debe superar su propia validación temporal y criptográfica.
-7. **Auditoría de acceso:** la comparación del URI descrita arriba no coincide con el context path configurado.
-8. **Documentación de stack:** README nombra Spring Boot 3.x y presenta Flyway/Liquibase; `pom.xml` fija Spring Boot 4.1.0 y solo incluye Flyway. También describe comandos Gradle aunque el proyecto usa Maven Wrapper.
-9. **Encapsulamiento JPA:** `ARCHITECTURE_GUIDE.md` recomienda entidades y repositorios Spring Data package-private; `UserEntity`, `RoleEntity` y los repositorios Spring Data observados son públicos.
-10. **Auditoría de entidades:** V1 crea `revinfo` y `revchanges` bajo un comentario de Hibernate Envers, pero no se encontró dependencia Envers en `pom.xml` ni anotaciones `@Audited` en el código. Las tablas por sí solas no demuestran que se estén registrando revisiones.
-
-Estas diferencias son hallazgos para contrastar antes de redactar el diagrama como arquitectura final; el informe no las cambia ni presupone cuál documento debe prevalecer.
-
-## Diagrama Mermaid: componentes internos
-
-Este C4 de componentes centra el contenedor `auth-service`. Los endpoints de demostración y el ejemplo se agrupan como API auxiliar para mantener visible el flujo principal sin ocultar su existencia. La integración de webhook del lado de Keycloak está respaldada por la especificación del repositorio; su SPI no está incluido en este código.
-
-```mermaid
-C4Component
-  title Componentes internos — auth-service
-
-  Container_Ext(spa, "Clientes DSS", "SPA / servicios", "Consumen el perfil y las API protegidas")
-  System_Ext(keycloak, "Keycloak", "Proveedor OIDC que emite los JWT")
-  System_Ext(keycloak_listener, "Keycloak Event Listener SPI", "Emisor de webhook descrito en la documentación; su código no está en este repositorio")
-  ContainerDb(iam_db, "Base de datos IAM", "PostgreSQL", "Usuarios, roles, contextos, catálogos y usuarios de ejemplo")
-
-  Container_Boundary(auth, "auth-service · Spring Boot / Java 21") {
-    Component(security, "Cadena de seguridad", "Spring Security", "Resource Server JWT; valida issuer y audiencia; extrae authorities; verifica secreto webhook")
-    Component(profile_api, "UserProfileController", "Spring MVC", "GET /auth/me; toma el sub UUID del JWT")
-    Component(sync_api, "UserSyncController", "Spring MVC", "POST /auth/sync; valida DTO y construye el comando de sincronización")
-    Component(aux_api, "API auxiliar", "Spring MVC", "Endpoints demo por rol y registro de example-user")
-    Component(profile_usecase, "GetAuthUserProfileService", "Java", "Busca usuario por keycloakId y obtiene todos sus contextos académicos")
-    Component(sync_usecase, "SyncUserService", "Java", "Crea o actualiza la fila de usuario por keycloakId dentro de una transacción")
-    Component(example_usecase, "RegisterExampleUserService", "Java", "Comprueba correo duplicado y registra example-user")
-    Component(domain, "Dominio", "Java puro", "User, Email, Role y UserAcademicContext con validaciones")
-    Component(persistence, "Adaptadores de persistencia", "Spring Data JPA / MapStruct", "Implementa puertos de usuario, rol, contexto académico y ejemplo")
-  }
-
-  Rel(spa, security, "Envía bearer JWT para recursos protegidos", "HTTPS")
-  Rel(keycloak, spa, "Emite tokens OIDC con roles de cliente", "OIDC")
-  Rel(keycloak_listener, sync_api, "Envía eventos de usuario; contrato documentado usa Authorization")
-  Rel(security, keycloak, "Obtiene claves públicas para validar firmas", "HTTPS / JWKS")
-  Rel(security, profile_api, "Autoriza la petición y proporciona el JWT")
-  Rel(security, sync_api, "Permite POST /auth/sync tras X-Webhook-Secret")
-  Rel(security, aux_api, "Aplica autenticación y roles a las rutas auxiliares")
-  Rel(profile_api, profile_usecase, "Ejecuta consulta de perfil", "Puerto de entrada")
-  Rel(sync_api, sync_usecase, "Envía SyncUserCommand", "Puerto de entrada")
-  Rel(aux_api, example_usecase, "Ejecuta el registro del usuario de ejemplo")
-  Rel(example_usecase, domain, "Crea ExampleUser y valida correo duplicado")
-  Rel(profile_usecase, domain, "Construye AuthUserProfile con modelos de dominio")
-  Rel(sync_usecase, domain, "Normaliza y valida username/email")
-  Rel(profile_usecase, persistence, "Consulta usuario y contextos", "Puertos de salida")
-  Rel(sync_usecase, persistence, "Busca y guarda perfil local", "Puerto de salida")
-  Rel(example_usecase, persistence, "Busca por correo y guarda example_users", "Puerto de salida")
-  Rel(persistence, iam_db, "Lee y escribe registros", "JDBC / JPA")
-```
+1. Se eliminaron `UserSyncController`, `UserSyncRequest` y `WebhookSecretFilter`; ya no existe el endpoint HTTP `POST /auth/sync` ni el secreto `X-Webhook-Secret` para sincronizar Keycloak.
+2. Se incorporaron el consumidor RabbitMQ, publisher de Keycloak, cola durable, DLQ, confirmaciones de publicación, reintentos e inbox de eventos deduplicados.
+3. Los eventos sincronizan snapshots de rol además del perfil; se agregaron roles iniciales mediante Flyway V4.
+4. Se implementó `PUT /admin/users/{userId}/academic-contexts`, la validación de su contexto según rol, y comprobaciones contra facultades/programas activos.
+5. Apache Hop ahora cuenta con artefactos de sincronización del catálogo local usados por la API de contextos; `auth-service` solo consulta ese catálogo.
 
 ## Evidencia revisada
 
-| Área | Archivos representativos |
+El diagrama C4 de componentes actualizado está en [auth-service-componentes.mmd](auth-service-componentes.mmd). Muestra el flujo de consulta y administración, además de la sincronización asíncrona desde Keycloak.
+
+| Área | Archivos principales |
 |---|---|
-| Arranque y dependencias | `AuthServiceApplication.java`, `pom.xml`, `Dockerfile` |
-| Configuración | `application.yaml`, `application-dev.yaml`, `application-prod.yaml`, `ApplicationConfig.java`, `FlywayConfig.java` |
-| Seguridad JWT y webhook | `SecurityConfig.java`, `JwtConverter.java`, `WebhookSecretFilter.java` |
-| REST | `UserProfileController.java`, `UserSyncController.java`, `UserSyncRequest.java`, `DemoEndpoint.java`, `ExampleUserController.java`, `GlobalExceptionHandler.java` |
-| Casos de uso y puertos | `GetAuthUserProfileService.java`, `SyncUserService.java`, `RegisterExampleUserService.java`, `application/port/in`, `application/port/out` |
-| Dominio | `User.java`, `Email.java`, `UserAcademicContext.java`, `RoleType.java`, `AcademicContextValidator.java` |
-| Persistencia y esquema | `adapter/out/persistence`, `V1__init_schema.sql`, `V2__init_schema.sql`, `V3__create_academic_catalog.sql` |
-| Auditoría y pruebas | `AuditLoggingListener.java`, `AuthenticationEventPublisherConfig.java`, `logback-spring.xml`, `src/test/java` |
-| Contratos documentados | `README.md`, `ARCHITECTURE_GUIDE.md`, `docs/keycloak/keycloak_specification.md`, `docs/database/improved_erd.md` |
+| Build y ejecución | `auth-service/pom.xml`, `auth-service/Dockerfile`, `auth-service/src/main/java/uatf/dss/authservice/AuthServiceApplication.java` |
+| API, seguridad y configuración | `adapter/in/web/*Controller.java`, `SecurityConfig.java`, `JwtConverter.java`, `application*.yaml`, `OpenApiConfig.java` |
+| Eventos | `adapter/in/messaging/KeycloakUserEventConsumer.java`, `RabbitMessagingConfiguration.java`, módulo `keycloak-webhook/src/main/java/uatf/keycloak/*` |
+| Casos de uso | `GetAuthUserProfileService.java`, `SyncUserService.java`, `SetUserAcademicContextsService.java`, `RegisterExampleUserService.java` |
+| Dominio | `User.java`, `UserAcademicContext.java`, `RoleType.java`, `AcademicContextValidator.java`, excepciones de dominio |
+| Persistencia | `adapter/out/persistence/*`, `V1__init_schema.sql`–`V5__create_keycloak_event_inbox.sql` |
+| Catálogo académico | `V3__create_academic_catalog.sql`, `auth-service/ops/database/provision-hop-academic-catalog.sql`, workflow y pipelines `etl-layer/apache-hop/projects/dss-uatf-etl` |
+| Auditoría y contratos | `configuration/audit/*`, `logback-spring.xml`, `docs/keycloak/keycloak_specification.md` |
 
-## Alcance no comprobado
+## Aspectos no verificados
 
-- No se inspeccionaron valores de `.env` ni secretos.
-- No se verificó el comportamiento contra una instancia viva de Keycloak o PostgreSQL.
-- No se ejecutaron las pruebas automatizadas.
-- El código del listener SPI de Keycloak y el despliegue Compose referido por la documentación no están en el directorio `auth-service` revisado.
+- No se ejecutó la suite de pruebas ni el flujo integrado con RabbitMQ, Keycloak, PostgreSQL y Apache Hop.
+- No se inspeccionaron secretos ni contenido de archivos `.env`.
+- No se comprobó en un entorno activo el destino de mensajes rechazados, el reproceso de DLQ, la disponibilidad del catálogo ni la ruta exacta que observa el auditor HTTP.
+- El código no demuestra alta disponibilidad de RabbitMQ ni un mecanismo para reparar automáticamente eventos de Keycloak que el publisher no alcance a publicar.

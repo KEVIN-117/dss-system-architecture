@@ -136,8 +136,8 @@ Utilizado por el Resource Server de Spring Boot para validación y, si fuera nec
 
 ---
 
-## 5. Mecanismo de Sincronización Webhook (Admin Events)
-Para sincronizar las altas y modificaciones de usuarios realizadas en la consola administrativa de Keycloak hacia `auth-service`, se implementará un flujo de eventos asíncrono.
+## 5. Sincronización de usuarios con RabbitMQ (Admin Events)
+El listener SPI publica snapshots de altas, cambios de perfil y cambios de roles en la cola durable `keycloak.user.events`. `auth-service` consume los mensajes y actualiza su modelo local. Esta integración reemplaza el webhook HTTP.
 
 ```text
 Consola Admin Keycloak
@@ -149,18 +149,17 @@ Consola Admin Keycloak
 Generación de AdminEvent (USER - CREATE/UPDATE)
          |
          v
-Custom Event Listener SPI (uatf-keycloak-webhook)
+Custom Event Listener SPI (uatf-webhook)
          |
-         +--> [POST HTTP] --> http://auth-service:8080/api/v1/auth/sync
+         +--> [AMQP persistent + publisher confirm] --> RabbitMQ: keycloak.user.events
+                                                            |
+                                                            +--> auth-service consumer
 ```
 
-### Contrato del Webhook (`POST /api/v1/auth/sync`)
+### Contrato del mensaje
+La publicación usa el exchange default y la routing key/cola `keycloak.user.events`. El cuerpo es JSON UTF-8, el mensaje es persistente y `messageId` replica `eventId`. El publisher espera un confirm del broker; el consumer procesa un evento por vez, reintenta hasta tres veces y envía fallos agotados a `keycloak.user.events.dlq`.
 
-#### Headers Obligatorios:
-*   `Content-Type: application/json`
-*   `Authorization: Bearer <webhook-shared-secret>` (Llave compartida y configurada mediante variables de entorno para evitar accesos no autorizados al endpoint).
-
-#### Payload del Evento (Ejemplo `USER_CREATED`):
+Ejemplo:
 ```json
 {
   "eventId": "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb50",
@@ -173,28 +172,16 @@ Custom Event Listener SPI (uatf-keycloak-webhook)
     "email": "krodriguez@uatf.edu.bo",
     "firstName": "Kevin",
     "lastName": "Rodriguez",
-    "isActive": true
+    "isActive": true,
+    "roles": [
+      {"id": "role-id", "name": "DECANO", "description": "Rol académico", "clientRole": false, "containerId": "realm-id"}
+    ]
   }
 }
 ```
+La tabla `processed_keycloak_events` hace idempotente el consumo por `eventId` dentro de la misma transacción que persiste el usuario y roles. La garantía es *at-least-once* con deduplicación, no *exactly-once*. La cola y la DLQ son durables, pero el Compose actual usa un broker de un solo nodo y no aporta alta disponibilidad ante pérdida del host.
 
-#### Payload del Evento (Ejemplo `USER_UPDATED`):
-```json
-{
-  "eventId": "87c4f4a3-448f-4ee6-85fb-5b12da6f23e4",
-  "realmId": "uatf-realm",
-  "eventType": "USER_UPDATED",
-  "timestamp": 1786582755000,
-  "user": {
-    "keycloakId": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
-    "username": "krodriguez",
-    "email": "kevin.rodriguez.upd@uatf.edu.bo",
-    "firstName": "Kevin",
-    "lastName": "Rodriguez",
-    "isActive": true
-  }
-}
-```
+El provider incluye en cada snapshot los roles realm y client que Keycloak devuelve para el usuario. `auth-service` conserva solo roles realm cuyo nombre corresponde a un `RoleType` local conocido; los client roles y nombres no reconocidos se descartan. Por eso `users`/`roles`/`user_roles` representan el snapshot local de roles de aplicación reconocidos, no un espejo de todos los roles de Keycloak. La autorización de las rutas sigue validando los roles del JWT; estas tablas se usan para el modelo y las reglas de contexto académico, no como autoridad de autorización HTTP.
 
 ---
 
@@ -215,4 +202,6 @@ Esto grabará el archivo en el volumen local `./infra/keycloak/realm/uatf-realm-
 ## 7. Criterios de Aceptación y Checklist (Definition of Done)
 1. **Infraestructura Reproducible**: Al hacer `docker compose down -v` y `docker compose up -d`, Keycloak debe levantar automáticamente, importar el realm `uatf-realm`, configurar los clientes (`uatf-dss-spa`, `uatf-auth-service`) y definir los 4 roles globales (`SUPERADMIN`, `RECTOR`, `DECANO`, `DIRECTOR`) sin requerir intervención manual.
 2. **Definición de Roles**: Los roles globales existen, tienen nombres en mayúsculas estrictas y descripciones microscópicas en español que describen con precisión su alcance académico.
-3. **Webhook Activo**: La creación de un usuario en Keycloak a través de la consola administrativa dispara el listener HTTP que invoca el endpoint de sincronización del `auth-service`.
+3. **Mensajería Activa**: Crear, actualizar o asignar roles a un usuario produce un mensaje en `keycloak.user.events`; auth-service lo procesa una sola vez y conserva el snapshot de roles reconocidos.
+4. **Resiliencia**: Con auth-service detenido, los eventos confirmados permanecen en la cola durable. Después de tres fallos de procesamiento, el evento se conserva en la DLQ para inspección y reproceso operativo.
+5. **Seguridad de transporte**: Keycloak y auth-service usan credenciales internas de RabbitMQ; no existe secreto HTTP `X-Webhook-Secret` para esta integración.

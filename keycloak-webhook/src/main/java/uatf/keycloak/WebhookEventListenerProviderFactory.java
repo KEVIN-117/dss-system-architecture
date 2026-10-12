@@ -8,27 +8,29 @@ import org.keycloak.models.KeycloakSessionFactory;
 
 public class WebhookEventListenerProviderFactory implements EventListenerProviderFactory {
 
-    private String webhookUrl;
-    private String webhookSecret;
+    private RabbitMqUserEventPublisher publisher;
 
     @Override
     public EventListenerProvider create(KeycloakSession session) {
-        return new WebhookEventListenerProvider(session, webhookUrl, webhookSecret);
+        return new WebhookEventListenerProvider(session, publisher);
     }
 
     @Override
     public void init(Config.Scope config) {
-        // Obtener configuración desde variables de entorno del contenedor
-        this.webhookUrl = System.getenv("KEYCLOAK_WEBHOOK_URL");
-        this.webhookSecret = System.getenv("KEYCLOAK_WEBHOOK_SECRET");
+        String host = requiredEnv("RABBITMQ_HOST");
+        int port = Integer.parseInt(requiredEnv("RABBITMQ_PORT"));
+        String username = requiredEnv("RABBITMQ_USERNAME");
+        String password = requiredEnv("RABBITMQ_PASSWORD");
+        String virtualHost = System.getenv().getOrDefault("RABBITMQ_VHOST", "/");
+        this.publisher = new RabbitMqUserEventPublisher(host, port, username, password, virtualHost);
+    }
 
-        // Valores por defecto para desarrollo local si no están configurados
-        if (this.webhookUrl == null || this.webhookUrl.trim().isEmpty()) {
-            this.webhookUrl = "http://127.0.0.1:8000/api/v1/auth/sync";
+    private static String requiredEnv(String name) {
+        String value = System.getenv(name);
+        if (value == null || value.isBlank()) {
+            throw new IllegalStateException(name + " must be configured for the Keycloak RabbitMQ event publisher");
         }
-        if (this.webhookSecret == null || this.webhookSecret.trim().isEmpty()) {
-            this.webhookSecret = "dss-webhook-secret-xyz123";
-        }
+        return value;
     }
 
     @Override
@@ -38,7 +40,13 @@ public class WebhookEventListenerProviderFactory implements EventListenerProvide
 
     @Override
     public void close() {
-        // No se requieren recursos para cerrar
+        if (publisher != null) {
+            try {
+                publisher.close();
+            } catch (Exception e) {
+                throw new IllegalStateException("No se pudo cerrar la conexión del publisher RabbitMQ", e);
+            }
+        }
     }
 
     @Override

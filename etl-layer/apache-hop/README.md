@@ -17,7 +17,7 @@ apache-hop/
         │   ├── integration-env.json
         │   ├── integration-test.json
         │   └── prod-env.json
-        ├── metadata/rdbms/       # connection objects OLTP db / DSS DW
+        ├── metadata/rdbms/       # connection objects OLTP db / DSS DW / Auth Service DB
         ├── workflows/
         ├── pipelines/
         │   ├── control/
@@ -53,7 +53,7 @@ Para `prod`, parte de `environments/prod-env.example.json` y entrega el archivo 
 
 ## Metadata y drivers
 
-Las conexiones existentes en `metadata/rdbms` son `OLTP db` y `DSS DW`; se conservan esos nombres porque ya fueron abiertos y comprobados en Hop Web. Los objetos de metadata apuntan únicamente a `OLTP_DB_*`/`DSS_DW_*`; los valores finales se mantienen sincronizados en `dev-env.json`, `integration-env.json` y `prod-env.json`. `integration-test.json` es una configuración separada con credenciales sintéticas exclusivas del smoke Docker. El layout `metadata/rdbms` es el formato estándar del metadata relacional de Hop. Coloca los drivers JDBC aprobados en `jdbc/` localmente; no versionar JARs ni cambiar versiones de driver sin validación.
+Las conexiones de `metadata/rdbms` son `OLTP db`, `DSS DW` y `Auth Service DB`. Sus objetos usan, respectivamente, `OLTP_DB_*`, `DSS_DW_*` y `AUTH_CATALOG_DB_*`. El usuario de Hop para `Auth Service DB` debe tener privilegios mínimos para sincronizar el catálogo académico; sus credenciales se guardan en el archivo local ignorado o en el gestor de secretos aprobado, nunca en los ejemplos versionados. Los ambientes que ejecuten pipelines que usen esta conexión deben definir las seis variables del catálogo. `integration-test.json` mantiene credenciales sintéticas exclusivas del smoke Docker y debe apuntar a una base de catálogo de prueba disponible en esa red antes de ejecutar pipelines que la utilicen. El layout `metadata/rdbms` es el formato estándar del metadata relacional de Hop. Coloca los drivers JDBC aprobados en `jdbc/` localmente; no versionar JARs ni cambiar versiones de driver sin validación.
 
 Antes de empezar una sesión de desarrollo, valida la estructura y los mapeos sin conectarte ni imprimir secretos:
 
@@ -61,8 +61,8 @@ Antes de empezar una sesión de desarrollo, valida la estructura y los mapeos si
 python etl-layer/apache-hop/scripts/validate_project.py
 ```
 
-El proyecto incluye un smoke vertical para `public.uatf_datos` y el workflow `wf_hop_publish_staged_run.hwf`. Este último solo publica un run preparado con nueve manifiestos y ocho lotes sellados; usa el publisher SQL atómico y aborta el workflow después de auditar cualquier fallo. Ejecuta `scripts/run_hop_vertical.ps1` desde la raíz para validar el smoke con fixtures. Las pipelines de extracción de otras fuentes y las transformaciones de dimensiones/hechos siguen pendientes para el Req. 6.
+El proyecto incluye `wf_vertical_uatf_datos_smoke.hwf`, que integra las nueve fuentes, cinco dimensiones, SCD2 de estudiante, los tres hechos, gates y publicación SQL atómica. `wf_hop_publish_staged_run.hwf` conserva además una prueba enfocada del publisher con nueve manifiestos y ocho lotes sellados. Ejecuta `scripts/run_hop_vertical.ps1` desde la raíz para la prueba con fixtures. La implementación del MVP está completa; la configuración y autorización de una operación productiva siguen siendo actividades de despliegue, no una dependencia de desarrollo del Req. 6.
 
-## Alcance del esqueleto
+## Alcance implementado
 
-Los directorios de workflows, pipelines y datasets están preparados para la implementación incremental de la issue vigente; esta estructura por sí sola no afirma que existan cargas operativas ni que el despliegue productivo esté listo. Las credenciales, TLS/autenticación y valores productivos se configuran fuera del repositorio.
+El proyecto contiene los workflows y pipelines del MVP directo y las pruebas de integración correspondientes. La configuración productiva (secretos, TLS/autenticación, cuentas runtime, red y autorizaciones de corte) se suministra fuera del repositorio y debe revisarse antes de cada despliegue; la existencia del proyecto no habilita por sí sola una carga productiva.

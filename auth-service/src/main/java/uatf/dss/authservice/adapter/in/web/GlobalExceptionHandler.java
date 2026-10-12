@@ -4,6 +4,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import uatf.dss.authservice.domain.exception.DomainException;
 import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
 
 @RestControllerAdvice
@@ -16,6 +17,14 @@ public class GlobalExceptionHandler {
                 "El perfil del usuario aún no se ha sincronizado desde Keycloak."
         );
         problemDetail.setTitle("USER_NOT_SYNCED");
+        return problemDetail;
+    }
+
+    @ExceptionHandler(DomainException.class)
+    public ProblemDetail handleDomainException(DomainException ex) {
+        ProblemDetail problemDetail = ProblemDetail.forStatusAndDetail(
+                HttpStatus.valueOf(ex.getHttpStatus()), ex.getMessage());
+        problemDetail.setTitle(ex.getClass().getSimpleName());
         return problemDetail;
     }
 }

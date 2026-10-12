@@ -40,6 +40,27 @@ services:
       retries: 15
       start_period: 2s
 
+  auth-catalog-fixture:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: auth_catalog_test
+      POSTGRES_USER: auth_test_admin
+      POSTGRES_PASSWORD: auth_test_admin
+    tmpfs:
+      - /var/lib/postgresql/data
+    volumes:
+      - ../../auth-service/src/main/resources/db/migration/V1__init_schema.sql:/docker-entrypoint-initdb.d/010-V1__init_schema.sql:ro
+      - ../../auth-service/src/main/resources/db/migration/V2__init_schema.sql:/docker-entrypoint-initdb.d/020-V2__init_schema.sql:ro
+      - ../../auth-service/src/main/resources/db/migration/V3__create_academic_catalog.sql:/docker-entrypoint-initdb.d/030-V3__create_academic_catalog.sql:ro
+      - ./init/040-create-hop-catalog-fixture-writer.sql:/docker-entrypoint-initdb.d/040-create-hop-catalog-fixture-writer.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U auth_test_admin -d auth_catalog_test"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+      start_period: 5s
+    restart: "no"
+
   integration-test:
     image: postgres:15-alpine
     depends_on:
@@ -160,6 +181,94 @@ services:
         -DDB_TX_HOST=jachasun-fixture
         -DDB_TX_PORT=5432
         -DDB_TX_NAME=jachasun_test
+    restart: "no"
+
+  hop-catalog-initial-test:
+    image: apache/hop:2.19.0
+    profiles: ["academic-catalog-sync"]
+    depends_on:
+      auth-catalog-fixture:
+        condition: service_healthy
+    volumes:
+      - ../../etl-layer/apache-hop/projects/dss-uatf-etl:/files/project:ro
+      - ../../etl-layer/apache-hop/jdbc:/files/jdbc:ro
+    environment:
+      HOP_PROJECT_NAME: dss-uatf-etl
+      HOP_PROJECT_FOLDER: /files/project
+      HOP_PROJECT_CONFIG_FILE_NAME: project-config.json
+      HOP_ENVIRONMENT_NAME: integration-test
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/integration-test.example.json
+      HOP_SHARED_JDBC_FOLDERS: /files/jdbc
+      HOP_FILE_PATH: /files/project/workflows/wf_sync_academic_catalog.hwf
+      HOP_RUN_CONFIG: local
+      HOP_OPTIONS: >-
+        -DDB_DW_HOST=postgres-dw
+        -DDB_DW_PORT=5432
+        -DDB_DW_NAME=dw_integration
+        -DDB_TX_HOST=jachasun-fixture
+        -DDB_TX_PORT=5432
+        -DDB_TX_NAME=jachasun_test
+    restart: "no"
+
+  hop-catalog-initial-assert:
+    image: postgres:15-alpine
+    profiles: ["academic-catalog-sync"]
+    depends_on:
+      auth-catalog-fixture:
+        condition: service_healthy
+    environment:
+      PGHOST: auth-catalog-fixture
+      PGPORT: "5432"
+      PGDATABASE: auth_catalog_test
+      PGUSER: auth_test_admin
+      PGPASSWORD: auth_test_admin
+    volumes:
+      - ./tests/assert_hop_academic_catalog.sql:/tests/assert_hop_academic_catalog.sql:ro
+    entrypoint: ["/bin/sh", "-c", "psql -X -v ON_ERROR_STOP=1 -f /tests/assert_hop_academic_catalog.sql"]
+    restart: "no"
+
+  hop-catalog-replay-test:
+    image: apache/hop:2.19.0
+    profiles: ["academic-catalog-sync"]
+    depends_on:
+      auth-catalog-fixture:
+        condition: service_healthy
+    volumes:
+      - ../../etl-layer/apache-hop/projects/dss-uatf-etl:/files/project:ro
+      - ../../etl-layer/apache-hop/jdbc:/files/jdbc:ro
+    environment:
+      HOP_PROJECT_NAME: dss-uatf-etl
+      HOP_PROJECT_FOLDER: /files/project
+      HOP_PROJECT_CONFIG_FILE_NAME: project-config.json
+      HOP_ENVIRONMENT_NAME: integration-test
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/integration-test.example.json
+      HOP_SHARED_JDBC_FOLDERS: /files/jdbc
+      HOP_FILE_PATH: /files/project/workflows/wf_sync_academic_catalog.hwf
+      HOP_RUN_CONFIG: local
+      HOP_OPTIONS: >-
+        -DDB_DW_HOST=postgres-dw
+        -DDB_DW_PORT=5432
+        -DDB_DW_NAME=dw_integration
+        -DDB_TX_HOST=jachasun-fixture
+        -DDB_TX_PORT=5432
+        -DDB_TX_NAME=jachasun_test
+    restart: "no"
+
+  hop-catalog-replay-assert:
+    image: postgres:15-alpine
+    profiles: ["academic-catalog-sync"]
+    depends_on:
+      auth-catalog-fixture:
+        condition: service_healthy
+    environment:
+      PGHOST: auth-catalog-fixture
+      PGPORT: "5432"
+      PGDATABASE: auth_catalog_test
+      PGUSER: auth_test_admin
+      PGPASSWORD: auth_test_admin
+    volumes:
+      - ./tests/assert_hop_academic_catalog.sql:/tests/assert_hop_academic_catalog.sql:ro
+    entrypoint: ["/bin/sh", "-c", "psql -X -v ON_ERROR_STOP=1 -f /tests/assert_hop_academic_catalog.sql"]
     restart: "no"
 
   hop-source-query-contract-test:
