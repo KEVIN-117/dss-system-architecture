@@ -90,6 +90,7 @@ Los workflows se activan en cambios de sus rutas y en solicitudes de integració
 
 ## Documentación
 
+- [Catálogo de variables de entorno](docs/envs/README.md): índice global y guías detalladas por servicio y ambiente.
 - [Documentación del Data Warehouse](docs/dw/README.md): arquitectura MVP, contratos, modelo, control de ejecuciones y pruebas.
 - [Diagrama C4 de contexto](docs/c4/diagrama-contexto-dss.md).
 - [Diagrama C4 de contenedores y evidencias de implementación](docs/c4/diagrama-contenedores-dss.md).
