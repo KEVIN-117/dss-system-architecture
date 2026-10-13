@@ -24,16 +24,16 @@ El flujo académico carga el DW desde fuentes operacionales mediante Apache Hop.
 
 ## Componentes
 
-| Ruta | Responsabilidad | Estado documentado |
-|---|---|---|
-| [`auth-service/`](auth-service/README.md) | API IAM, validación de tokens y gestión de usuarios, roles y contexto académico. | Servicio Spring Boot implementado. |
-| [`keycloak-webhook/`](keycloak-webhook/) | Provider de Keycloak para publicar eventos de usuario y roles en RabbitMQ. | Integración implementada; consulta su `pom.xml` y pruebas. |
-| [`etl-layer/apache-hop/`](etl-layer/apache-hop/README.md) | Extracción y carga de Jachasun al DW, incluida la sincronización del catálogo académico. | Proyecto Hop y flujos de integración documentados. La habilitación productiva requiere configuración operativa y secretos externos. |
-| [`etl-layer/loadmanager/`](etl-layer/loadmanager/README.md) | Extractor Go para snapshots OLTP hacia staging. | Servicio pausado para el MVP actual; no confundir con el flujo activo directo Jachasun → Hop → DW. |
-| [`infra/dw-schema/`](infra/dw-schema/) | Migraciones, roles y esquemas del almacén analítico. | Base de datos y regresiones de integración. |
-| [`olap-service/`](olap-service/) | API y consultas analíticas multidimensionales. | Ver documentación y código del servicio. |
-| [`prediction-service/`](prediction-service/) | API de análisis predictivo. | La arquitectura C4 describe su alcance y límites actuales. |
-| `etl-service/`, `saiku-ui/` y otros servicios | Componentes conservados en el repositorio o parte de la arquitectura objetivo. | Su estado y relación con el flujo vigente se describen en la documentación específica. |
+| Ruta                                                        | Responsabilidad                                                                          | Estado documentado                                                                                                                  |
+| ----------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| [`auth-service/`](auth-service/README.md)                   | API IAM, validación de tokens y gestión de usuarios, roles y contexto académico.         | Servicio Spring Boot implementado.                                                                                                  |
+| [`keycloak-webhook/`](keycloak-webhook/)                    | Provider de Keycloak para publicar eventos de usuario y roles en RabbitMQ.               | Integración implementada; consulta su `pom.xml` y pruebas.                                                                          |
+| [`etl-layer/apache-hop/`](etl-layer/apache-hop/README.md)   | Extracción y carga de Jachasun al DW, incluida la sincronización del catálogo académico. | Proyecto Hop y flujos de integración documentados. La habilitación productiva requiere configuración operativa y secretos externos. |
+| [`etl-layer/loadmanager/`](etl-layer/loadmanager/README.md) | Extractor Go para snapshots OLTP hacia staging.                                          | Servicio pausado para el MVP actual; no confundir con el flujo activo directo Jachasun → Hop → DW.                                  |
+| [`infra/dw-schema/`](infra/dw-schema/)                      | Migraciones, roles y esquemas del almacén analítico.                                     | Base de datos y regresiones de integración.                                                                                         |
+| [`olap-service/`](olap-service/)                            | API y consultas analíticas multidimensionales.                                           | Ver documentación y código del servicio.                                                                                            |
+| [`prediction-service/`](prediction-service/)                | API de análisis predictivo.                                                              | La arquitectura C4 describe su alcance y límites actuales.                                                                          |
+| `etl-service/`, `saiku-ui/` y otros servicios               | Componentes conservados en el repositorio o parte de la arquitectura objetivo.           | Su estado y relación con el flujo vigente se describen en la documentación específica.                                              |
 
 ## Requisitos
 

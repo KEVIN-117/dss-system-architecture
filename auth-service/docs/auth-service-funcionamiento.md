@@ -95,6 +95,8 @@ Para cada evento manejado, el provider obtiene al usuario de Keycloak y construy
 
 La deduplicación más entrega persistente proporciona procesamiento repetible para un mismo `eventId`; no es una transacción distribuida ni una garantía *exactly-once*. La DLQ es durable y requiere operación de inspección/reproceso que no forma parte del servicio analizado.
 
+El diagrama de extremo a extremo, con reintentos y límites de recuperación, está centralizado en [Diagramas de secuencia — auth-service](../../docs/sequence-diagrams/auth-service.md#flujo-implementado--eventos-keycloak-rabbitmq-y-persistencia-iam).
+
 ### Límite de fiabilidad observado
 
 El listener de Keycloak captura las excepciones del publisher y solo las escribe en el log. Si no logra publicar después de los reintentos, la operación administrativa de Keycloak no se revierte y no se observa un outbox ni un proceso de reconciliación que recupere automáticamente ese evento perdido. Por tanto, la fila local puede quedar temporalmente o permanentemente desactualizada hasta que otro evento la actualice o se ejecute una recuperación externa.
@@ -124,9 +126,13 @@ El caso de uso ejecuta, en este orden, las verificaciones relevantes:
 
 Un `contexts: []` elimina los contextos previos y solo es válido para rector o superadmin. Si falta el snapshot local de roles reconocido, la operación falla con conflicto (`409`); la autenticación del actor no se basa en esa réplica, sino en el JWT.
 
+El diagrama de validación y reemplazo transaccional está centralizado en [Diagramas de secuencia — auth-service](../../docs/sequence-diagrams/auth-service.md#flujo-implementado--asignacion-de-contexto-academico).
+
 ### Catálogo académico
 
 `V3__create_academic_catalog.sql` crea `academic_faculties` y `academic_programs`, con estado activo y fecha de sincronización. La API consulta esas tablas mediante JDBC. El código de `auth-service` no extrae el catálogo de Jachasun: los artefactos revisados de Apache Hop definen un workflow separado que sincroniza primero facultades y luego programas mediante upserts. El script de provisión limita al usuario de Hop a `SELECT`/`INSERT`/`UPDATE` sobre esas tablas, sin `DELETE` ni DDL. Este flujo externo no fue ejecutado en esta revisión.
+
+La secuencia de sincronización del catálogo está centralizada en [Diagramas de secuencia — auth-service](../../docs/sequence-diagrams/auth-service.md#flujo-integrado--sincronizacion-del-catalogo-por-apache-hop). El [README de Apache Hop](../../etl-layer/apache-hop/README.md) describe la configuración y operación del workflow.
 
 ## Persistencia local
 
