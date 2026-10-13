@@ -1,3 +1,9 @@
+springdoc:
+  api-docs:
+    enabled: ${AUTH_API_DOCS_ENABLED:true}
+  swagger-ui:
+    enabled: ${AUTH_API_DOCS_ENABLED:true}
+
 spring:
   datasource:
     url: ${DB_URI}
@@ -19,7 +25,6 @@ spring:
           jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
 app:
   security:
-    webhook-secret: ${KEYCLOAK_WEBHOOK_SECRET}
     jwt-audience: ${KEYCLOAK_AUDIENCE:${KEYCLOAK_RESOURCE_ID}}
     cors:
       allowed-origins: ${AUTH_CORS_ALLOWED_ORIGINS:http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004,http://localhost:3005}

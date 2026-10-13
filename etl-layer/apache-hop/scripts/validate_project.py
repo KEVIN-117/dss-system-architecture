@@ -41,9 +41,14 @@ CONSISTENT_FINAL_VALUES = (
     "DSS_DW_USERNAME", "DSS_DW_PASSWORD", "DSS_DW_URL",
     "OLTP_DB_USERNAME", "OLTP_DB_PASSWORD", "OLTP_DB_URL",
 )
+CATALOG_ENV_VALUES = (
+    "AUTH_CATALOG_DB_HOSTNAME", "AUTH_CATALOG_DB_PORT", "AUTH_CATALOG_DB_DATABASE",
+    "AUTH_CATALOG_DB_USERNAME", "AUTH_CATALOG_DB_PASSWORD", "AUTH_CATALOG_DB_URL",
+)
 CONNECTIONS = {
     "OLTP db": ("OLTP db.json", "OLTP_DB"),
     "DSS DW": ("DSS DW.json", "DSS_DW"),
+    "Auth Service DB": ("Auth Service DB.json", "AUTH_CATALOG_DB"),
 }
 REQUIRED_DIRS = (
     "metadata/rdbms",
@@ -52,6 +57,7 @@ REQUIRED_DIRS = (
     "pipelines/control",
     "pipelines/source",
     "pipelines/source/sql",
+    "pipelines/catalog",
     "pipelines/dimensions",
     "pipelines/facts",
     "pipelines/quality",
@@ -92,7 +98,7 @@ def validate() -> list[str]:
         if not (PROJECT / relative).is_dir():
             errors.append(f"Missing project directory: {relative}")
 
-    expected_names = set(EXPECTED_ENV["dev"]) | set(CONSISTENT_FINAL_VALUES)
+    expected_names = set(EXPECTED_ENV["dev"]) | set(CONSISTENT_FINAL_VALUES) | set(CATALOG_ENV_VALUES)
     for env_name in ("dev", "integration", "prod"):
         # Validate only sanitized, versioned templates. Active environment files
         # are intentionally ignored and may contain developer-specific endpoints.
@@ -110,6 +116,7 @@ def validate() -> list[str]:
             if not isinstance(value, str) or not (
                 value.startswith("REPLACE_WITH_")
                 or "REPLACE_WITH_" in value
+                or value.startswith("INJECT_FROM_")
                 or value == "INJECT_FROM_INTEGRATION_SECRET_STORE"
                 or value == "INJECT_FROM_PRODUCTION_SECRET_STORE"
             ):
@@ -155,7 +162,13 @@ def validate() -> list[str]:
         if docker_test_values.get("DSS_DW_HOSTNAME") != "postgres-dw" \
                 or docker_test_values.get("DSS_DW_USERNAME") != "hop_vertical_test" \
                 or docker_test_values.get("OLTP_DB_HOSTNAME") != "jachasun-fixture" \
-                or docker_test_values.get("OLTP_DB_USERNAME") != "dw_fixture_reader":
+                or docker_test_values.get("OLTP_DB_USERNAME") != "dw_fixture_reader" \
+                or docker_test_values.get("AUTH_CATALOG_DB_HOSTNAME") != "auth-catalog-fixture" \
+                or docker_test_values.get("AUTH_CATALOG_DB_PORT") != "5432" \
+                or docker_test_values.get("AUTH_CATALOG_DB_DATABASE") != "auth_catalog_test" \
+                or docker_test_values.get("AUTH_CATALOG_DB_USERNAME") != "hop_academic_catalog" \
+                or docker_test_values.get("AUTH_CATALOG_DB_PASSWORD") != "hop_catalog_fixture" \
+                or docker_test_values.get("AUTH_CATALOG_DB_URL") != "jdbc:postgresql://auth-catalog-fixture:5432/auth_catalog_test":
             errors.append("Docker integration environment must target only the isolated fixture services")
 
     compose_path = PROJECT.parents[3] / "docker-compose.yml"
@@ -220,6 +233,37 @@ def validate() -> list[str]:
             errors.append("The OLTP source query must declare its columns explicitly")
         if "ORDER BY id_ra ASC" not in source_query:
             errors.append("The UATF source snapshot must keep deterministic id_ra ordering")
+
+    # The Auth Service catalog sync is deliberately separate from the DW
+    # vertical snapshot and may write only through the dedicated DB metadata.
+    catalog_workflow = PROJECT / "workflows" / "wf_sync_academic_catalog.hwf"
+    catalog_faculties = PROJECT / "pipelines" / "catalog" / "pl_sync_academic_faculties.hpl"
+    catalog_programs = PROJECT / "pipelines" / "catalog" / "pl_sync_academic_programs.hpl"
+    for required in (catalog_workflow, catalog_faculties, catalog_programs):
+        if not required.is_file():
+            errors.append(f"Missing academic catalog sync artifact: {required.relative_to(PROJECT)}")
+    if catalog_workflow.is_file():
+        workflow_text = catalog_workflow.read_text(encoding="utf-8")
+        if "pl_sync_academic_faculties.hpl" not in workflow_text \
+                or "pl_sync_academic_programs.hpl" not in workflow_text:
+            errors.append("The academic catalog workflow must execute both upsert pipelines")
+        if workflow_text.index("pl_sync_academic_faculties.hpl") > workflow_text.index("pl_sync_academic_programs.hpl"):
+            errors.append("The workflow must synchronize faculties before programs")
+    for pipeline_path in (catalog_faculties, catalog_programs):
+        if not pipeline_path.is_file():
+            continue
+        pipeline_text = pipeline_path.read_text(encoding="utf-8")
+        if "Auth Service DB" not in pipeline_text or "ON CONFLICT" not in pipeline_text:
+            errors.append(f"{pipeline_path.name} must upsert through Auth Service DB")
+        if re.search(r"\b(DELETE|TRUNCATE)\b", pipeline_text, re.I):
+            errors.append(f"{pipeline_path.name} must not delete catalog rows")
+        if "Abort invalid source" not in pipeline_text:
+            errors.append(f"{pipeline_path.name} must block writes on invalid source data")
+    if catalog_programs.is_file():
+        programs_text = catalog_programs.read_text(encoding="utf-8")
+        for required_text in ("'CAR'", "'PRO'", "'TES'", "'TEM'", "'1'", "'S'", "'Y'", "is_active"):
+            if required_text not in programs_text:
+                errors.append(f"Academic programs sync is missing required catalog rule: {required_text}")
     if source_pipeline.is_file():
         source_xml = source_pipeline.read_text(encoding="utf-8")
         if "<resultType>hexadecimal</resultType>" not in source_xml:

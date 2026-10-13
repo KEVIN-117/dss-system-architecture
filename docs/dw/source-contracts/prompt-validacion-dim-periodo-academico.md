@@ -1,6 +1,6 @@
-# Prompt: validación definitiva de `DIM_PERIODO_ACADEMICO`
+# Registro histórico: investigación de `DIM_PERIODO_ACADEMICO`
 
-Prompt independiente para investigar el calendario académico de Jachasun antes de cerrar la dimensión temporal académica del DW.
+**Estado: análisis completado para el MVP.** Este archivo conserva el prompt original como registro de cómo se evaluó `academico.dct_asignaciones`; no es un pendiente vigente ni cambia la fuente de verdad implementada. La dimensión del MVP usa `(gestion, periodo)` de los contratos factuales y los cierres de `etl_control` para ordenar cortes. `dct_asignaciones` se identificó como fuente candidata de catálogo histórico, pero no se incorporó a las nueve fuentes del MVP.
 
 ---
 

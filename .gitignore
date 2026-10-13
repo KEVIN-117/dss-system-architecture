@@ -164,6 +164,11 @@ node_modules/
 **/.next/
 out/
 **/out/
+# Hexagonal architecture source packages must remain versioned despite the generic build-output ignore.
+!auth-service/src/main/java/uatf/dss/authservice/adapter/out/
+!auth-service/src/main/java/uatf/dss/authservice/adapter/out/**
+!auth-service/src/main/java/uatf/dss/authservice/application/port/out/
+!auth-service/src/main/java/uatf/dss/authservice/application/port/out/**
 dist/
 **/dist/
 build/

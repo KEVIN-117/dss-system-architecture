@@ -2,27 +2,27 @@
 
 ## Estado
 
-**Estado actual: pendiente de validación en Jachasun.** Los contratos se derivaron del DDL local `infra/postgres-tx/ddl/ddl_jachasun.sql` y de los documentos de mapeo. Esta evidencia estática no autoriza el cierre de DW-001.
+**Estado del MVP: contratos integrados y validados en las pruebas sintéticas de la issue #133.** Los contratos parten del DDL versionado `infra/postgres-tx/ddl/ddl_jachasun.sql`, los análisis de datos compartidos por el responsable y las decisiones funcionales recibidas de DSA. La cuenta de solo lectura para Jachasun fue confirmada por el responsable del proyecto. La issue #133 está cerrada; este registro no afirma una carga productiva ni sustituye la autorización de un futuro despliegue.
 
 El DDL local es la fuente de verdad para los tipos, longitudes, nulabilidad y claves de los contratos estáticos y validadores Hop. Los fixtures reutilizados por pruebas deben reproducir esos atributos para las columnas extraídas; una discrepancia con una instancia real se registra como hallazgo de validación, no se resuelve relajando el contrato basado en el fixture.
 
-## Hallazgos estáticos
+## Hallazgos y resolución en el MVP
 
-| ID | Hallazgo | Riesgo | Acción de validación real |
-| --- | --- | --- | --- |
-| V-01 | Existen tablas `postulantes` en varios esquemas. | Extraer postulaciones desde una tabla incorrecta. | Confirmar `public.postulantes` con DSA/TI, propietario, conteo de muestra y tipos. |
-| V-02 | `notas_planilla.id_materia` figura como `smallint`; `pln_materias.id_materia`, como `integer`. | Incompatibilidad de join o truncamiento histórico. | Verificar tipos y valores máximos; no ocultar la discrepancia con casts silenciosos en la lectura contractual. |
-| V-03 | `_fecha_registro` de alumnos y `_fecha_creacion` de notas no prueban captura de actualizaciones. | Pérdida de rectificaciones con carga incremental. | Mantener snapshot por cierre y confirmar comportamiento operativo. |
-| V-04 | `uatf_datos.id_loc` y los catálogos geográficos requieren confirmación de cardinalidad. | Enriquecimiento geográfico incompleto. | Medir nulos y huérfanos con muestra acotada. |
+| ID | Hallazgo | Resolución / tratamiento |
+| --- | --- | --- |
+| V-01 | Hay objetos homónimos `postulantes` en varios esquemas. | El contrato del MVP consulta explícitamente `public.postulantes`; no usa resolución implícita de esquema. |
+| V-02 | `notas_planilla.id_materia` y `pln_materias.id_materia` pueden diferir de tipo en el DDL. | El contrato conserva las columnas de origen y el join se prueba en el ambiente de integración; el DDL versionado sigue siendo la referencia para el mapeo y no se introduce cast silencioso en la extracción. |
+| V-03 | Los timestamps de alumnos/notas no garantizan captura completa de modificaciones. | Se mantiene snapshot completo por cierre; los timestamps son metadatos, no watermarks de completitud. |
+| V-04 | Las relaciones geográficas pueden ser nulas o huérfanas. | El flujo valida y trata la ausencia según la política de calidad y los miembros técnicos; no corrige filas fuente ni las omite de forma silenciosa. |
 
-## Protocolo de validación en producción
+## Controles antes de una ejecución productiva
 
-1. Ejecutar con usuario temporal de solo lectura y transacción `READ ONLY`, con `statement_timeout` acordado con TI.
-2. Comprobar `CONNECT`, `USAGE` y `SELECT` exclusivamente sobre las nueve fuentes.
-3. Para cada contrato, validar existencia, columnas, tipos, PK/índice, muestra limitada, plan `EXPLAIN` y conteo aproximado autorizado.
-4. Registrar fecha, responsable, entorno, versión del contrato, resultados y discrepancias; no almacenar PII en la evidencia.
-5. DSA valida semántica y filtro de programas; TI/DBA valida acceso, rendimiento y fuente operativa.
+1. Usar la cuenta OLTP de solo lectura y comprobar `current_user` y grants mediante consultas de catálogo de solo lectura.
+2. Confirmar que el endpoint productivo contiene las fuentes/columnas esperadas por el DDL y los contratos versionados.
+3. Acordar con TI límites de tiempo, planes y volumen antes de una extracción histórica; no ejecutar conteos o joins masivos sin autorización.
+4. Registrar fecha, responsable, ambiente, versión de contrato, resultados y discrepancias; no almacenar PII en evidencia.
+5. DSA autoriza el cierre/corte y TI/DBA valida conectividad, privilegios y capacidad de operación del ambiente.
 
 ## Criterio de aprobación
 
-Cada fuente debe contar con evidencia de los pasos anteriores y aprobación DSA/TI. Las discrepancias se convierten en una corrección de contrato o una issue nueva; no se silencian mediante transformaciones en la extracción.
+El MVP y sus contratos no tienen trabajo de implementación abierto en la issue #133. Estos controles se ejecutan como checklist de despliegue al apuntar a un ambiente productivo; cualquier diferencia real con el DDL debe corregirse mediante una nueva versión aprobada del contrato, no mediante una relajación silenciosa.

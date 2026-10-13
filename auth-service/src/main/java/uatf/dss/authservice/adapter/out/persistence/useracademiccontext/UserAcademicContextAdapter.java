@@ -1,5 +1,6 @@
 package uatf.dss.authservice.adapter.out.persistence.useracademiccontext;
 
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.stereotype.Repository;
 import uatf.dss.authservice.application.port.out.AcademicContextRepository;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
@@ -33,6 +34,14 @@ public class UserAcademicContextAdapter implements AcademicContextRepository {
         UserAcademicContextEntity entity = mapper.toEntity(context);
         UserAcademicContextEntity savedEntity = academicContextRepository.save(entity);
         return mapper.toDomain(savedEntity);
+    }
+
+    @Override
+    @Transactional
+    public List<UserAcademicContext> replaceAllForUser(UUID userId, List<UserAcademicContext> contexts) {
+        academicContextRepository.deleteAllByUserId(userId);
+        List<UserAcademicContextEntity> entities = contexts.stream().map(mapper::toEntity).toList();
+        return academicContextRepository.saveAll(entities).stream().map(mapper::toDomain).toList();
     }
 
     @Override

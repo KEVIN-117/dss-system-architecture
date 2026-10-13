@@ -12,6 +12,7 @@ on:
       - "infra/dw-schema/**"
       - "infra/dw-integration/**"
       - "infra/dw-test-data/**"
+      - "auth-service/src/main/resources/db/migration/**"
   push:
     branches: [main]
     paths:
@@ -23,6 +24,7 @@ on:
       - "infra/dw-schema/**"
       - "infra/dw-integration/**"
       - "infra/dw-test-data/**"
+      - "auth-service/src/main/resources/db/migration/**"
 
 permissions:
   contents: read
@@ -57,6 +59,23 @@ jobs:
 
       - name: Run PostgreSQL DW regression suite
         run: docker compose -f infra/dw-schema/dw-test-docker.yml up --build --exit-code-from dw-schema-test
+
+      - name: Run Apache Hop academic catalog sync regression
+        run: |
+          mkdir -p etl-layer/apache-hop/jdbc
+          curl --fail --silent --show-error --location \
+            https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.11/postgresql-42.7.11.jar \
+            --output etl-layer/apache-hop/jdbc/postgresql-42.7.11.jar
+          compose=(docker compose -p dss-dw-catalog-sync -f infra/dw-integration/dw-integration-test.yml)
+          "${compose[@]}" up -d jachasun-fixture auth-catalog-fixture
+          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-initial-test
+          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-initial-assert
+          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-replay-test
+          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-replay-assert
+
+      - name: Stop academic catalog test containers
+        if: always()
+        run: docker compose -p dss-dw-catalog-sync -f infra/dw-integration/dw-integration-test.yml down --volumes --remove-orphans
 
       - name: Stop test containers
         if: always()

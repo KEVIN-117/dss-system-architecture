@@ -2,15 +2,15 @@
 
 ## Propósito y alcance
 
-Este documento define el modelo lógico del primer Data Warehouse relacional de Jachasun: una constelación de hechos para admisión, cursado y retención/deserción. El DDL correspondiente está en la migración `0009`; aquí se fijan significados, granos y agregaciones para las cargas posteriores.
+Este documento define el modelo lógico del primer Data Warehouse relacional de Jachasun: una constelación de hechos para admisión, cursado y retención/deserción. El DDL está en `0009` y las preparaciones de carga en migraciones posteriores; aquí se fijan significados, granos y agregaciones implementados por el MVP.
 
-Este documento no ejecuta DDL ni cargas. DW-006 ya materializa las dimensiones y sus miembros técnicos en [conformed-dimensions.md](conformed-dimensions.md); DW-007 documenta la política SCD, aún pendiente de implementación física. La issue #133 adopta Jachasun → Apache Hop → `dw`, sin dependencia del Load Manager en Go ni de su staging RAW. Se conserva el buffer privado `etl_work` usado por el publisher atómico de Hop. Las fuentes continúan siendo de solo lectura y DW-001 es la referencia de campos y filtros autorizados.
+Este documento no ejecuta DDL ni cargas por sí mismo. DW-006 materializa las dimensiones y miembros técnicos en [conformed-dimensions.md](conformed-dimensions.md); la política SCD2 de estudiante se implementó en `0008`, `0014` y el flujo Hop. La issue #133 adopta y entrega Jachasun → Apache Hop → `dw`, sin dependencia del Load Manager en Go ni de su staging RAW. Se conserva el buffer privado `etl_work` del publisher atómico. DW-001 es la referencia de campos y filtros autorizados.
 
 ### Alcance consolidado del MVP
 
 Se conservan únicamente `dw.fact_admision`, `dw.fact_cursado` y `dw.fact_retencion_desercion`. Su DDL está en `infra/dw-schema/migrations/0009_create_constellation_facts.sql`; `0008_add_student_scd2_versions.sql` proporciona la vigencia requerida para resolver la surrogate key temporal del estudiante. No se recrean las dimensiones de `0004` ni las entidades de control de `0001`–`0003`.
 
-`fact_enrollment` queda para una ampliación futura. `fact_graduation` también queda fuera del DDL y las cargas del MVP: se registra `actas_graduacion.graduados` como fuente oficial para su análisis posterior, pendiente de resolver semántica del evento/estado y correspondencia temporal con el periodo académico. Ambas fuentes quedan fuera de los nueve contratos actuales. Esta decisión no cambia silenciosamente las reglas de egreso ni los denominadores de retención. Véase [la base consolidada](mvp-direct-hop.md).
+`fact_enrollment` queda para una ampliación futura. `fact_graduation` también queda fuera del DDL y las cargas del MVP: `actas_graduacion.graduados` es la fuente oficial identificada para una futura issue, que deberá fijar el grano, el evento de graduación y su correspondencia temporal. Ambas fuentes quedan fuera de los nueve contratos actuales. Esta decisión no cambia silenciosamente las reglas de egreso ni los denominadores de retención. Véase [la base consolidada](mvp-direct-hop.md).
 
 ## Principios de diseño
 
@@ -35,7 +35,7 @@ Se conservan únicamente `dw.fact_admision`, `dw.fact_cursado` y `dw.fact_retenc
 
 `DIM_ESTUDIANTE` está centrada en persona, no en una matrícula. Cuando `id_ra` esté presente, representa la identidad canónica y permite conciliar las fuentes autorizadas. `id_alumno` se conserva como identificador académico alterno y como clave de trazabilidad para cursado y postulación. Si una fuente trae solo `id_alumno`, se podrá representar temporalmente al estudiante mediante ese identificador; la reconciliación posterior con `id_ra` no deberá crear dos personas analíticas.
 
-Si faltan ambos identificadores, el hecho no se atribuye a una persona artificial ni se rellena con cero: se aplicará el miembro `UNKNOWN` y se registrará la incidencia de calidad. Colegio y localidad no son dimensiones independientes en esta primera constelación, porque describen al estudiante y no habilitan un proceso de negocio con grano propio.
+Si faltan ambos identificadores o no es posible resolver la identidad, el hecho no se atribuye a una persona artificial ni se rellena con cero: el flujo usa el miembro `UNKNOWN` y registra la incidencia de calidad. Colegio y localidad no son dimensiones independientes en esta primera constelación, porque describen al estudiante y no habilitan un proceso de negocio con grano propio.
 
 ### Periodos y sucesión temporal
 
@@ -120,7 +120,7 @@ Las líneas del diagrama representan relaciones uno-a-muchos desde una dimensió
 | --- | --- |
 | Proceso | Postulación y resultado de admisión a un programa. |
 | Grano | Una fila por registro operativo de `public.postulantes`, identificado por `postulantes.id_alumno`, asociado al programa y periodo informados. |
-| Clave operacional de trazabilidad | `postulantes.id_alumno`, con `id_programa`, `id_gestion` e `id_periodo` conservados para conciliación. El DDL local declara `UNIQUE (id_alumno)`; la instancia real debe confirmarlo antes de producción. |
+| Clave operacional de trazabilidad | `postulantes.id_alumno`, con `id_programa`, `id_gestion` e `id_periodo` conservados para conciliación, conforme al grano adoptado e implementado en el MVP. |
 | Claves dimensionales | `estudiante_sk`, `programa_sk`, `periodo_academico_sk`, `admision_sk`. |
 | Fuente y dependencias | Contrato 03 de DW-001 (`public.postulantes`), `DIM_ESTUDIANTE`, `DIM_PROGRAMA`, `DIM_PERIODO_ACADEMICO`, `DIM_ADMISION` y filtro de programas aprobado. |
 | Linaje técnico | `run_id` de la ejecución publicada y versión del contrato/manifiesto de origen. |
@@ -132,7 +132,7 @@ Las líneas del diagrama representan relaciones uno-a-muchos desde una dimensió
 | `conteo_admitido` | Derivado de `estado` solo después de aprobar su dominio funcional. | Aditiva si el flag es evaluable. | `SUM`; tasa de admisión = `SUM(conteo_admitido) / SUM(conteo_postulacion)` sobre el mismo filtro. |
 | `puntaje_examen` | `postulantes.nota`. | No aditiva. | `AVG`, mínimo, máximo o percentiles; nunca `SUM`. |
 
-Los valores de estado desconocidos no se convierten en rechazo ni en admisión. Se conservan como incidencia de calidad hasta que DSA/TI apruebe el mapeo de dominio.
+La regla funcional comunicada por DSA interpreta `postulantes.estado = 'A'` como aprobado y `'P'` como reprobado. Otros valores se conservan como desconocidos/incidencia de calidad; no se convierten silenciosamente a admisión o rechazo.
 
 ### `FACT_CURSADO`
 
@@ -149,12 +149,12 @@ Los valores de estado desconocidos no se convierten en rechazo ni en admisión. 
 | Medida o flag | Origen o derivación posterior | Tipo de aditividad | Agregación válida |
 | --- | --- | --- | --- |
 | `conteo_intento` | Constante `1` por `id_matricula`. | Aditiva. | `SUM`. |
-| `nota_final`, `nota_complementaria`, `nota_examen_mesa` | `nota`, `nota_2da`, `nota_ex_mesa`; los nombres físicos se confirmarán durante implementación. | No aditiva. | `AVG`, mínimo, máximo o percentiles, ignorando valores no evaluables. |
+| `nota_final`, `nota_complementaria`, `nota_examen_mesa` | `nota`, `nota_2da`, `nota_ex_mesa`, respectivamente. | No aditiva. | `AVG`, mínimo, máximo o percentiles, ignorando valores no evaluables. |
 | `nota_parcial_1` a `nota_parcial_4` | `pparcial`, `sparcial`, `tparcial`, `cparcial`. | No aditiva. | `AVG` y distribución; nunca `SUM`. |
-| `conteo_aprobado`, `conteo_reprobado`, `conteo_abandono` | Flags derivados de `estado` y reglas de calificación aprobadas. | Aditiva por fila evaluable. | `SUM`; las tasas usan el denominador de intentos o evaluables declarado por DSA. |
+| `conteo_aprobado`, `conteo_reprobado` | Derivados de la mejor nota final/complementaria cuando la fila es evaluable. | Aditiva por fila evaluable. | `SUM`; las tasas usan el denominador explícito de intentos o evaluables. |
 | `conteo_repeticion` | Derivado posterior de la secuencia de intentos de un estudiante en la misma materia, sin crear una métrica inventada cuando falte historia. | Aditiva por intento clasificado. | `SUM`; análisis de repetición por estudiante requiere identidad reconciliada. |
 
-DW-005 no congela códigos de `estado` como A/R/U/Z/T. DSA/TI debe validar el dominio vigente y el significado de notas complementarias antes de implementar los flags del hecho y sus transformaciones Hop.
+El MVP conserva el estado fuente y determina aprobación/reprobación con la mejor nota (`GREATEST(nota, nota_2da)`) cuando es evaluable. El abandono se calcula en `FACT_RETENCION_DESERCION` según la regla de parciales y el cierre siguiente; no se infiere como una propiedad aislada de una nota/materia. Códigos sin semántica confirmada no se reclasifican.
 
 ### `FACT_RETENCION_DESERCION`
 
@@ -180,16 +180,16 @@ DW-005 no congela códigos de `estado` como A/R/U/Z/T. DSA/TI debe validar el do
 
 #### Política de `NO_EVALUABLE` y egreso
 
-DSA confirmó esta regla: con un siguiente cierre procesado, cursado del estudiante en ese cierre significa `RETENIDO`; sin cursado allí, menos de dos parciales rendidos en el periodo evaluado significa `DESERTOR`. Si el cierre siguiente aún no está procesado, fue reabierto o su orden temporal es ambiguo, el snapshot se clasifica como `NO_EVALUABLE`, `es_desercion = NULL` y `conteo_evaluable = 0`; no participa en tasas ni entrenamiento.
+DSA confirmó esta regla, implementada en el MVP: con un siguiente cierre procesado, cursado del estudiante en ese cierre significa `RETENIDO`; si no hay cursado allí y se rindieron menos de dos parciales en el periodo evaluado, se clasifica como `DESERTOR`. Si el cierre siguiente aún no está procesado, fue reabierto o su orden temporal es ambiguo, el snapshot se clasifica como `NO_EVALUABLE`, `es_desercion = NULL` y `conteo_evaluable = 0`; no participa en tasas ni entrenamiento.
 
-Los casos con indicio de egreso conocido también quedan fuera del denominador hasta que DSA/TI valide la calidad de `fec_egreso`; la fuente oficial futura indicada para graduación es `actas_graduacion.graduados`, fuera de los nueve contratos actuales. La población observable de este primer flujo requiere una fila de `notas_planilla` para el periodo: no se crean snapshots para estudiantes sin fila porque no hay padrón histórico por periodo en los contratos vigentes. Estos límites deben validarse antes de cargas productivas.
+Los casos con indicio de egreso conocido quedan fuera del denominador; no se usa `fec_egreso` como sustituto de un evento oficial de graduación. La fuente futura identificada para graduación es `actas_graduacion.graduados`, fuera de los nueve contratos actuales. La población observable del MVP requiere una fila de `notas_planilla` para el periodo: no se crean snapshots para estudiantes sin fila porque los contratos actuales no aportan un padrón histórico por periodo. Son límites funcionales conocidos del alcance, no defectos pendientes del MVP.
 
 ## Mapa de KPI a hechos
 
 | Necesidad de Features e informe técnico | Hecho propietario | Dimensiones de análisis | Regla de agregación o límite |
 | --- | --- | --- | --- |
 | Demanda y volumen de postulaciones | `FACT_ADMISION` | Programa, periodo, modalidad, estudiante | `SUM(conteo_postulacion)`. |
-| Admisiones y tasa de admisión | `FACT_ADMISION` | Programa, periodo, modalidad | Numerador y denominador del mismo hecho; estado pendiente de aprobación. |
+| Admisiones y tasa de admisión | `FACT_ADMISION` | Programa, periodo, modalidad | Numerador y denominador del mismo hecho; `A` = aprobado y `P` = reprobado según definición funcional recibida. |
 | Puntaje de ingreso | `FACT_ADMISION` | Programa, periodo, modalidad | `AVG(puntaje_examen)`, no suma. |
 | Aprobación, reprobación y abandono por materia | `FACT_CURSADO` | Programa, materia, periodo, grupo | Suma de flags y tasas sobre intentos/evaluables del mismo hecho. |
 | Rendimiento en notas finales o complementarias | `FACT_CURSADO` | Programa, materia, periodo, estudiante | Promedios y distribuciones de notas; no se combina con examen de admisión. |
@@ -203,25 +203,25 @@ Cada KPI tiene un único hecho propietario. Los tableros que comparen procesos p
 
 | Decisión | Aplicación | Seguimiento |
 | --- | --- | --- |
-| Identidad centrada en persona | `id_ra` canónico cuando existe; `id_alumno` alterno y trazable. | DW-006 implementa miembros técnicos; `0008` incorpora vigencias SCD2; la reconciliación de identidades aún requiere aprobación DSA/TI. |
-| Filtro de programas único | Todos los hechos heredan el filtro autorizado por DW-001. | Validar con DSA/TI la lista y valores operativos antes de publicación. |
+| Identidad centrada en persona | `id_ra` canónico cuando existe; `id_alumno` alterno y trazable. | Dimensión SCD2 y resolución de identidad implementadas; identidad irresoluble usa `UNKNOWN` conforme a los casos cubiertos por `0017`–`0018`. |
+| Filtro de programas único | Todos los hechos heredan el filtro definido en los contratos DW-001. | Aplicado en extracción/preparación del MVP. |
 | Unknown y No aplica | Se usarán únicamente como miembros técnicos explícitos; no ceros sustitutos. | Miembros físicos en DW-006. |
-| Periodo posterior DSA | Retención sigue cierres autorizados, no aritmética sobre `periodo`. | Validar orden y criterios de continuidad con DSA. |
-| `NO_EVALUABLE` | Sin siguiente cierre DSA: `es_desercion = NULL`, fuera de tasa y entrenamiento. | Regla física y pruebas en la issue de transformación/retención. |
-| Egreso no validado | Excluir del denominador hasta validar `estado` y `fec_egreso`. | DSA/TI aprueban dominio y calidad. |
-| Linaje | `run_id` en hechos para auditoría, sin dimensión analítica de ejecución. | FKs implementadas en `0009`; el workflow Hop aún debe registrar/publicar ejecuciones. |
-| Sin métricas inventadas | Datos ausentes mantienen nulabilidad o estado de calidad; no se fabrican notas, estados ni conteos. | Pruebas de calidad en ETL posterior. |
+| Periodo posterior DSA | Retención sigue cierres autorizados, no aritmética sobre `periodo`. | Implementado y probado con cierres de fixture. |
+| `NO_EVALUABLE` | Sin siguiente cierre procesado: `es_desercion = NULL`, fuera de tasa y entrenamiento. | Implementado y cubierto por las pruebas de retención. |
+| Egreso | No inferir graduación desde `fec_egreso`; casos con indicio conocido no entran al denominador del MVP. | `actas_graduacion.graduados` queda como extensión futura con contrato propio. |
+| Linaje | `run_id` en hechos para auditoría, sin dimensión analítica de ejecución. | FKs, workflow y publisher atómico implementados. |
+| Sin métricas inventadas | Datos ausentes mantienen nulabilidad o estado de calidad; no se fabrican notas, estados ni conteos. | Regla aplicada en las transformaciones y pruebas de integración. |
 
-## Validación pendiente y aprobación DSA/TI
+## Estado de decisiones y límites conocidos
 
-La especificación es apta para revisión. Antes de DDL o publicación productiva, DSA/TI debe registrar evidencia para los siguientes puntos:
+Las decisiones funcionales principales se incorporaron al MVP y la integración fue probada con fixtures. La siguiente tabla documenta el estado de las decisiones, no bloquea el cierre de la issue #133:
 
 | Validación | Responsable principal | Evidencia requerida |
 | --- | --- | --- |
-| `public.postulantes` es la fuente operativa y el grano por `id_alumno` es suficiente frente a programa y periodo. | TI/DBA con DSA | Consulta acotada, cardinalidades y aprobación del contrato 03 de DW-001. |
-| Dominio y significado de `postulantes.estado`, `notas_planilla.estado` y notas complementarias. | DSA | Tabla de mapeo funcional aprobada, con tratamiento de valores no reconocidos. |
-| Regla de continuidad, deserción y egreso. | DSA | Criterio aprobado para periodo posterior, `estado` y `fec_egreso`. |
-| Orden de periodos especiales. | DSA/TI | Cierres autorizados en `academic_period_closure` y orden operativo verificable. |
-| Cobertura de atributos y tipos. | TI/DBA | Validación contra Jachasun con el usuario de solo lectura definido en DW-001. |
+| `public.postulantes` y grano de admisión | El contrato usa explícitamente la fuente pública y el grano implementado por `id_alumno`; el DDL y la extracción se prueban con fixture. |
+| Estado de admisión | DSA comunicó `A` = aprobado y `P` = reprobado; otros valores no se fuerzan a esos estados. |
+| Retención/deserción | DSA confirmó continuidad por cursado en el siguiente cierre y abandono con menos de dos parciales; implementado con `NO_EVALUABLE` cuando no existe cierre posterior procesado. |
+| Orden de periodos | Lo determina `academic_period_closure.effective_at`, no `periodo + 1`; integrado con el control de cierres. |
+| Esquema y tipos | Contratos y fixtures se alinean con el DDL versionado; antes de producción se confirma el catálogo y los grants del endpoint objetivo. |
 
-Las dimensiones físicas ya existen en `0004`, las vigencias de estudiante en `0008` y los hechos en `0009`. Aprobar los puntos permite implementar la carga Hop sin modificar el grano ni la propiedad de los KPI. La existencia de tablas y documentos no equivale a validación productiva.
+Las dimensiones, vigencias SCD2, tres hechos y carga Hop están implementados. La integración sintética valida el comportamiento del MVP; una ejecución real sigue su propio proceso de despliegue y autorización, y no se presenta como evidencia ya completada.

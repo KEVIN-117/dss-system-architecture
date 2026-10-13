@@ -45,7 +45,6 @@ sequenceDiagram
     end
     H->>H: transformación y validación
     H->>C: adquirir lease + begin_hop_publication
-    H->>C: adquirir lease + begin_hop_publication
     H->>D: publish_hop_staged_run (transacción con fencing token)
     alt publicación válida
         D-->>H: commit DW + EXITOSA + lease liberado
@@ -81,15 +80,12 @@ El manifiesto guarda versión de contrato, SHA-256 de SQL canónico y esquema ob
 
 La migración 0010 agrega lease global `dw:mvp-publication` con adquisición, renovación y liberación transaccionales. Al recuperar un lease vencido, se registra el error y la ejecución activa anterior se marca fallida antes de adquirir un nuevo lease. El futuro publisher debe revalidar el token dentro de la transacción de publicación para impedir que un propietario antiguo publique después de vencer su lease.
 
-El rol `dw_hop_runtime` es `NOLOGIN`, puede consultar evidencia de ejecución y ejecutar solo las funciones listadas. No recibe DML directo en `etl_control` ni `dw`, ni permisos de finalización exitosa. TI/DBA crea un LOGIN por ambiente y lo asigna al grupo fuera del repositorio. No utilizar `dw_owner`, el login migrador ni `dw_staging_writer`. Los secretos nunca se versionan. La lectura OLTP de solo lectura real todavía debe validarse con TI/DBA.
+El rol `dw_hop_runtime` es `NOLOGIN`, puede consultar evidencia de ejecución y ejecutar solo las funciones listadas. No recibe DML directo en `etl_control` ni `dw`, ni permisos de finalización exitosa. TI/DBA crea un LOGIN por ambiente y lo asigna al grupo fuera del repositorio. No utilizar `dw_owner`, el login migrador ni `dw_staging_writer`. Los secretos nunca se versionan. El responsable confirmó el login OLTP de solo lectura; al desplegar cada ambiente se verifican sus grants efectivos y endpoint.
 
 En cualquier fallo, el workflow debe registrar paso/error saneado y llamar `fail_hop_etl_execution` con timeout de limpieza. No registrar datos personales, secretos ni SQL con valores sensibles. Un fallo al auditar también debe formar parte del resultado operativo.
 
-## Alcance implementado y pendientes del siguiente requerimiento
+## Estado implementado y operación
 
-1. Req. 5 establece el contrato, funciones autorizadas, zona de preparación por ejecución, publisher atómico, fencing token y workflows separados de éxito/fallo.
-2. Req. 6 debe construir workflows/pipelines de las nueve fuentes, dimensiones y tres hechos, respetando contratos, granularidades, SCD2 y miembros técnicos.
-3. Probar con cuentas runtime por ambiente los privilegios efectivos junto con el usuario OLTP real de solo lectura; no usar dw_owner ni el migrador.
-4. Ejecutar flujo completo de éxito/fallos por fase, reintentos con otro `run_id`, rechazo de cierres no elegibles, manifiestos incompletos y conservación de la publicación previa. La prueba SQL de Req. 5 cubre publisher y rollback, no el flujo ETL completo.
+El contrato está implementado en las migraciones y workflows de la issue #133. La integración Docker ejecuta el flujo E2E de nueve fuentes, transformaciones, cinco dimensiones, tres hechos, gates y publicación atómica; las pruebas también cubren rutas de fallo y regresiones del publisher. La issue fue fusionada en la PR #142 y cerrada.
 
-La implementación del publisher no significa que el ETL productivo esté terminado; el end-to-end semántico y su validación corresponden al requerimiento 6.
+El acceso OLTP de solo lectura fue confirmado por el responsable del proyecto. Antes de ejecutar en un ambiente productivo, TI/DBA provisiona las credenciales runtime restringidas y valida endpoint/grants; DSA autoriza el cierre o la carga histórica correspondiente. No se debe usar el usuario migrador ni inferir que el entorno de pruebas constituye autorización productiva.

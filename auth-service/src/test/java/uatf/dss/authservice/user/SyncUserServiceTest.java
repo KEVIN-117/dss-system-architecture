@@ -7,6 +7,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import uatf.dss.authservice.application.port.in.SyncUserCommand;
+import uatf.dss.authservice.application.port.in.KeycloakRoleSnapshot;
 import uatf.dss.authservice.application.port.out.UserRepository;
 import uatf.dss.authservice.application.service.SyncUserService;
 import uatf.dss.authservice.domain.model.User;
@@ -14,6 +15,8 @@ import uatf.dss.authservice.domain.model.Email;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
+import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -37,7 +40,10 @@ public class SyncUserServiceTest {
                 "krodriguez@uatf.edu.bo",
                 "Kevin",
                 "Rodriguez",
-                true
+                true,
+                List.of(new KeycloakRoleSnapshot("DIRECTOR", false),
+                        new KeycloakRoleSnapshot("default-roles-uatf-dss-realm", false),
+                        new KeycloakRoleSnapshot("CLIENT_ADMIN", true))
         );
 
         when(userRepository.findByKeycloakId(keycloakId)).thenReturn(Optional.empty());
@@ -63,6 +69,7 @@ public class SyncUserServiceTest {
         assertEquals("Kevin", result.firstName());
         assertEquals("Rodriguez", result.lastName());
         assertTrue(result.isActive());
+        verify(userRepository).replaceRoleSnapshot(savedUser.id(), Set.of("DIRECTOR"));
 
         verify(userRepository).findByKeycloakId(keycloakId);
         
@@ -87,7 +94,8 @@ public class SyncUserServiceTest {
                 "krodriguez.upd@uatf.edu.bo",
                 "Kevin Upd",
                 "Rodriguez Upd",
-                false
+                false,
+                List.of(new KeycloakRoleSnapshot("RECTOR", false))
         );
 
         User existingUser = User.create(
@@ -121,6 +129,7 @@ public class SyncUserServiceTest {
         assertEquals("krodriguez.updated", result.username());
         assertEquals("krodriguez.upd@uatf.edu.bo", result.email().email());
         assertFalse(result.isActive());
+        verify(userRepository).replaceRoleSnapshot(localId, Set.of("RECTOR"));
 
         verify(userRepository).findByKeycloakId(keycloakId);
 
@@ -131,5 +140,47 @@ public class SyncUserServiceTest {
         assertEquals(keycloakId, capturedUser.keycloakId());
         assertEquals("krodriguez.updated", capturedUser.username());
         assertEquals("krodriguez.upd@uatf.edu.bo", capturedUser.email().email());
+    }
+
+    @Test
+    public void shouldClearLocalApplicationRolesWhenSnapshotHasNoRecognizedRoles() {
+        UUID keycloakId = UUID.randomUUID();
+        UUID localId = UUID.randomUUID();
+        SyncUserCommand command = new SyncUserCommand(
+                keycloakId,
+                "user",
+                "user@uatf.edu.bo",
+                "User",
+                "Test",
+                true,
+                List.of(new KeycloakRoleSnapshot("default-roles-uatf-dss-realm", false)));
+        User existingUser = User.create(localId, keycloakId, "user", "user@uatf.edu.bo", "User", "Test", true);
+        when(userRepository.findByKeycloakId(keycloakId)).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(any(User.class))).thenReturn(existingUser);
+
+        syncUserService.sync(command);
+
+        verify(userRepository).replaceRoleSnapshot(localId, Set.of());
+    }
+
+    @Test
+    public void shouldPreserveLocalRolesWhenRoleSnapshotIsOmitted() {
+        UUID keycloakId = UUID.randomUUID();
+        UUID localId = UUID.randomUUID();
+        SyncUserCommand command = new SyncUserCommand(
+                keycloakId,
+                "user.updated",
+                "user@uatf.edu.bo",
+                "User",
+                "Updated",
+                true,
+                null);
+        User existingUser = User.create(localId, keycloakId, "user", "user@uatf.edu.bo", "User", "Test", true);
+        when(userRepository.findByKeycloakId(keycloakId)).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(any(User.class))).thenReturn(existingUser);
+
+        syncUserService.sync(command);
+
+        verify(userRepository, never()).replaceRoleSnapshot(any(), any());
     }
 }

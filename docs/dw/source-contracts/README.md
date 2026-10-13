@@ -6,7 +6,7 @@ Este directorio define los campos, claves, tipos y filtros autorizados para extr
 
 - **Carga inicial:** se extrae todo el historial disponible de las fuentes transaccionales y un snapshot completo de los catálogos.
 - **Cargas recurrentes:** se extrae un snapshot completo al cierre académico configurado. `academico.alumnos` y `academico.notas_planilla` no usan watermark como criterio de completitud.
-- **Consistencia:** las lecturas serán de solo lectura y con tiempos acotados. La implementación Hop deberá demostrar la consistencia entre fuentes: varias conexiones `REPEATABLE READ` y un `run_id` común no garantizan un snapshot compartido. Inicio, corte, conteos y hashes se registran en `etl_control`.
+- **Consistencia:** las lecturas son de solo lectura y con tiempos acotados. Varias conexiones `REPEATABLE READ` y un `run_id` común no garantizan un snapshot distribuido entre fuentes; el MVP registra en `etl_control` el inicio, corte, conteos y hashes de cada extracción, y controla la publicación por cierre autorizado.
 - **Transformaciones:** no se permiten joins analíticos, SCD, limpieza, flags ni métricas en las consultas fuente. Esas responsabilidades pertenecen a Hop, sin capa RAW persistente obligatoria.
 
 ## Fuentes incluidas
@@ -39,4 +39,4 @@ Las referencias a RAW y a la consulta canónica del extractor DW-011 describen c
 
 La conexión usa exclusivamente `DB_TX_HOST`, `DB_TX_PORT`, `DB_TX_NAME`, `DB_TX_USER` y `DB_TX_PASS`. La cuenta productiva debe tener únicamente `CONNECT` a la base, `USAGE` sobre `public` y `academico`, y `SELECT` sobre las nueve tablas aprobadas. No se conceden `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `CREATE`, `ALTER` ni acceso por defecto a otros esquemas.
 
-El responsable técnico de aprobación es TI/DBA de Jachasun; el responsable funcional es DSA. La aprobación definitiva requiere completar [validation-dw-001.md](validation-dw-001.md) contra la instancia real.
+Los contratos están implementados y consumidos por el flujo del MVP. TI/DBA administra conectividad/grants del ambiente y DSA autoriza los cortes; para una futura operación productiva se aplica el checklist de [validation-dw-001.md](validation-dw-001.md). Ese paso de operación no mantiene abierta la issue #133.

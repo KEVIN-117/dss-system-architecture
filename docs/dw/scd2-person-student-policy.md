@@ -2,9 +2,9 @@
 
 ## Propósito y alcance
 
-Este documento define la política aprobable para conservar la historia de la persona y del estudiante en el Data Warehouse. Complementa el modelo lógico de DW-005 y las dimensiones físicas de DW-006. La preparación SCD2 para `dim_estudiante` se implementa en la migración `0014` y el flujo de Apache Hop de la fase 6.4; los fixtures validan su comportamiento, pero la aprobación DSA/TI y la validación con Jachasun siguen pendientes.
+Este documento registra la política SCD2 aplicada a la historia de persona/estudiante en el Data Warehouse. Complementa el modelo lógico de DW-005 y las dimensiones físicas de DW-006. La preparación SCD2 se apoya en las migraciones `0008` y `0014` y en el flujo Apache Hop de la fase 6.4; el comportamiento pasó las pruebas de integración sintéticas. La issue #133 está cerrada; estas pruebas no se presentan como una carga productiva contra Jachasun.
 
-La prioridad es preservar la interpretación histórica de los hechos: una fila publicada debe poder resolverse contra la versión de estudiante vigente para el cierre académico correspondiente. La política se aplica inicialmente a `dw.dim_estudiante`; las dimensiones de programa, materia, periodo y admisión conservan sus propias decisiones cuando una issue posterior las requiera.
+La prioridad es preservar la interpretación histórica de los hechos: una fila publicada debe poder resolverse contra la versión de estudiante vigente para el cierre académico correspondiente. En el MVP, SCD2 aplica a `dw.dim_estudiante`; programa, materia, periodo y admisión se cargan conforme a sus contratos y al comportamiento implementado, sin atribuirles historización SCD2 no aprobada.
 
 ## Principios normativos
 
@@ -28,7 +28,7 @@ La prioridad es preservar la interpretación histórica de los hechos: una fila 
 | `id_ra` nulo e `id_alumno` presente | `ALUMNO:<id_alumno>` | Crear una identidad académica provisional, sin afirmar equivalencia personal. |
 | Ambos presentes | `RA:<id_ra>` y asociación verificable con `id_alumno` | Conservar ambos identificadores y auditar la asociación. |
 | Ambos nulos | Ninguna | No crear estudiante estándar; enrutar a `UNKNOWN` y registrar excepción. |
-| Un `id_alumno` asociado a varios `id_ra` | Ambigua | Bloquear reconciliación automática y requerir revisión DSA/TI. |
+| Un `id_alumno` asociado a varios `id_ra` | Ambigua | El pipeline bloquea la identidad conflictiva; DSA debe resolver el caso de datos antes de su reproceso. |
 
 La aparición posterior de un `id_ra` para una fila que antes solo tenía `id_alumno` no debe crear automáticamente una segunda persona ni cambiar retrospectivamente la clave natural. Una reconciliación aprobada debe registrar la evidencia, el `run_id`, el actor y el alcance temporal del cambio. La implementación de un catálogo de identidades o de una tabla puente queda fuera de DW-007 y deberá ser definida antes de resolver fusiones.
 
@@ -36,7 +36,7 @@ La surrogate key (`estudiante_sk`) identifica una versión física del DW, no re
 
 ## Clasificación de atributos
 
-La siguiente matriz es la propuesta normativa para aprobación DSA/TI. Los atributos técnicos (`created_at`, `updated_at`, `source_run_id`) no son atributos de negocio y nunca participan del hash SCD2.
+La siguiente matriz es la política aplicada por el MVP a los atributos versionados. Los atributos técnicos (`created_at`, `updated_at`, `source_run_id`) no son atributos de negocio y nunca participan del hash SCD2.
 
 | Atributo de `dim_estudiante` | Clasificación | Regla de cambio |
 | --- | --- | --- |
@@ -94,7 +94,7 @@ La implementación usa un intervalo semiabierto:
 - No se permiten intervalos solapados ni `valid_to <= valid_from`.
 - El orden de periodos no se infiere mediante `periodo + 1`; se usa la secuencia de cierres DSA de DW-002.
 
-Para snapshots repetidos con el mismo `valid_from`, el desempate se realiza por el orden de procesamiento y `run_id`. Si dos ejecuciones tienen valores distintos para la misma identidad y fecha efectiva, el caso se bloquea como conflicto hasta que DSA/TI determine cuál observación es válida.
+Para snapshots repetidos con el mismo `valid_from`, se conserva el orden de procesamiento y `run_id`. Si dos ejecuciones contienen valores distintos para la misma identidad y fecha efectiva, el caso se bloquea como conflicto para que DSA resuelva la observación antes de reprocesar; no se elige un valor automáticamente.
 
 ## Reglas de carga conceptual
 
@@ -134,7 +134,7 @@ La rutina `etl_control.prepare_hop_student_scd2(run_id, student_json)` valida la
 - Identidad ambigua, discrepancia entre RA y alumno, perfil demográfico faltante para un RA o corte fuera de orden: bloquea la preparación.
 - La ausencia de un estudiante en una extracción no cierra su versión; la expiración por ausencia requiere una política explícita posterior.
 
-Las pruebas de integración verifican tanto las operaciones preparadas como una publicación transaccional sintética de cambios, con rollback al terminar. El workflow smoke general mantiene desactivada la publicación deliberadamente; ni estos fixtures ni esa prueba sustituyen la validación DSA/TI en Jachasun.
+Las pruebas de integración verifican las operaciones preparadas y la publicación transaccional de cambios sobre fixtures, incluyendo rollback de los datos de prueba. El workflow vertical del MVP también ejecuta el publisher atómico. Para una futura ejecución productiva se mantienen las autorizaciones de corte, los permisos runtime y los controles de cambio propios del ambiente.
 
 ## Correcciones tardías y duplicados
 
@@ -187,19 +187,11 @@ La cuenta de extracción sigue siendo de solo lectura. El publicador futuro debe
 | Miembro `UNKNOWN` o `NOT_APPLICABLE` | Permanece técnico y no es actualizado como estudiante real. |
 | Ejecución sin manifiesto completo | No crea ni publica nuevas versiones. |
 
-## Validación y aprobación
+## Estado de implementación y baseline
 
-DW-007 estará lista para cierre cuando DSA/TI aprueben la matriz y los casos anteriores, y exista evidencia documental de:
+La política SCD2, el hash canónico, la preparación de transiciones desde Hop y la publicación atómica se implementaron como parte de la issue #133 y se probaron con fixtures. Las pruebas cubren atributos, vigencias semiabiertas, replays, cambios, identidades conflictivas, orden temporal y rollback.
 
-- clasificación completa de atributos;
-- serialización y hash reproducibles;
-- intervalos semiabiertos sin solapamiento;
-- tratamiento de repetición, duplicados y correcciones tardías;
-- separación entre fecha efectiva y fecha observada;
-- uso de `run_id`, cierre DSA y manifiestos;
-- límites explícitos con DW-006, DW-019 y los hechos DW-020 a DW-022.
-
-La migración `0008_add_student_scd2_versions.sql` incorpora columnas, índices de versión vigente y una protección transaccional contra solapamientos. Aún falta demostrar el cálculo reproducible del hash desde Hop, el manejo de snapshots/reprocesos y aprobar la matriz funcional con DSA/TI. Las filas estándar que ya existían reciben `created_at` como baseline técnico con hash nulo; no se afirma que esa fecha sea la vigencia OLTP. Antes de cargar hechos históricos, se debe reconciliar esa línea base.
+Las filas estándar preexistentes reciben `created_at` como baseline técnico con hash nulo; esa fecha no se interpreta como vigencia histórica OLTP. En un nuevo ambiente productivo, el primer baseline debe definirse de acuerdo con el corte autorizado y sus datos disponibles antes de publicar hechos históricos. Esto es una condición de carga inicial del ambiente, no una tarea de implementación pendiente del MVP.
 
 ## Límites y dependencias
 
@@ -208,5 +200,5 @@ La migración `0008_add_student_scd2_versions.sql` incorpora columnas, índices 
 - DW-004 aporta `run_id`, eventos, manifiestos, métricas y errores.
 - DW-005 define la constelación y el grano de los hechos.
 - DW-006 aporta las dimensiones físicas y los miembros técnicos.
-- Para el MVP de #133, la carga directa desde Jachasun con Apache Hop deberá respetar esta política, sin exigir RAW ni Load Manager. `0008` materializa vigencias e identidad temporal; `0009` crea los hechos. Hop aún debe calcular el hash, usar effective_at del cierre y resolver la versión aplicable a cada hecho.
+- Para el MVP de #133, la carga directa desde Jachasun con Apache Hop respeta esta política, sin exigir RAW ni Load Manager. `0008` materializa vigencias e identidad temporal; `0014` prepara cambios SCD2; el workflow calcula el hash, usa `effective_at` del cierre y deja al publisher resolver/aplicar las operaciones en forma atómica.
 - DW-007 no implementa extracción, transformación Apache Hop, Go, cron, API, hechos ni modelos ML.

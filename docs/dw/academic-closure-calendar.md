@@ -59,4 +59,4 @@ El entorno no publica puertos ni persiste datos: PostgreSQL usa almacenamiento t
 
 TI/DBA puede aplicar los mismos archivos en un entorno administrado con `psql -v ON_ERROR_STOP=1`; la prueba abre una transacción y finaliza en `ROLLBACK`, por lo que no conserva registros de prueba.
 
-`dw_control_operator` conserva las rutinas de cierres. TI/DBA provisiona cuentas externas y restringe la escritura directa; no se espera al Load Manager para operar el calendario. La adaptación de permisos de la cuenta Hop queda pendiente y no debe otorgarle administración ni autoridad DSA implícita. Véase [la base consolidada](mvp-direct-hop.md).
+`dw_control_operator` conserva las rutinas de cierres. TI/DBA provisiona cuentas externas y restringe la escritura directa; el calendario funciona sin Load Manager. El runtime Hop usa el grupo dedicado y las funciones autorizadas del MVP: no recibe administración ni autoridad DSA implícita. En producción, TI/DBA debe provisionar la cuenta del ambiente y DSA autorizar cada corte. Véase [la base consolidada](mvp-direct-hop.md).

@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Arquitectura de seguridad · auth-service · horizontal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Geist:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet">
+  <style>
+    :root { --paper:#f1f5f4; --panel:#e9f0ef; --ink:#173d45; --muted:#526e74; --soft:#6c8589; --teal:#168f9a; --blue:#187ea2; --wash:#dcefee; --white:#fff; --sans:'Geist',system-ui,sans-serif; --mono:'Geist Mono',ui-monospace,monospace; }
+    *,*::before,*::after { box-sizing:border-box; }
+    html,body { margin:0; background:var(--paper); color:var(--ink); }
+    body { padding:12px; font-family:var(--sans); }
+    main { width:min(100%, 960px); margin:0 auto; }
+    .canvas { width:100%; overflow-x:auto; }
+    svg { display:block; width:100%; min-width:880px; height:auto; }
+    @media print { @page { size:letter landscape; margin:0.55in; } body { padding:0; background:#fff; } main { width:100%; max-width:none; } .canvas { overflow:visible; } svg { min-width:0; width:100%; } }
+  </style>
+</head>
+<body>
+<main>
+  <div class="canvas">
+    <svg viewBox="0 0 880 480" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="security-horizontal-title security-horizontal-desc">
+      <title id="security-horizontal-title">Arquitectura de seguridad de auth-service</title>
+      <desc id="security-horizontal-desc">Vista horizontal compacta de clientes DSS, Keycloak, RabbitMQ, auth-service y PostgreSQL IAM con siete relaciones dirigidas principales.</desc>
+      <defs>
+        <marker id="security-horizontal-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0 0 8 3 0 6Z" fill="#526e74"/></marker>
+        <marker id="security-horizontal-arrow-blue" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0 0 8 3 0 6Z" fill="#187ea2"/></marker>
+        <marker id="security-horizontal-arrow-teal" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><path d="M0 0 8 3 0 6Z" fill="#168f9a"/></marker>
+      </defs>
+      <rect width="880" height="480" fill="#f1f5f4"/>
+
+      <!-- Zonas lógicas; no representan segmentos de red verificados. -->
+      <rect x="280" y="64" width="468" height="172" rx="8" fill="#e9f0ef" stroke="#d2dedd" stroke-width="1"/>
+      <rect x="292" y="68" width="198" height="12" rx="2" fill="#e9f0ef"/>
+      <text x="391" y="77" text-anchor="middle" fill="#6c8589" font-family="'Geist Mono',monospace" font-size="8" font-weight="500" letter-spacing=".8">IDENTIDAD · MENSAJERÍA</text>
+      <rect x="304" y="284" width="556" height="156" rx="8" fill="#e9f0ef" stroke="#d2dedd" stroke-width="1"/>
+      <rect x="316" y="288" width="154" height="12" rx="2" fill="#e9f0ef"/>
+      <text x="393" y="297" text-anchor="middle" fill="#6c8589" font-family="'Geist Mono',monospace" font-size="8" font-weight="500" letter-spacing=".8">SERVICIO · DATOS IAM</text>
+
+      <!-- Relaciones ortogonales, dibujadas detrás de las tarjetas. -->
+      <line x1="220" y1="144" x2="300" y2="144" stroke="#187ea2" stroke-width="1.5" marker-end="url(#security-horizontal-arrow-blue)"/>
+      <line x1="300" y1="176" x2="220" y2="176" stroke="#6c8589" stroke-width="1.3" marker-end="url(#security-horizontal-arrow)"/>
+      <path d="M136 212 V252 Q136 260 144 260 H376 Q384 260 384 268 V328" fill="none" stroke="#187ea2" stroke-width="1.5" marker-end="url(#security-horizontal-arrow-blue)"/>
+      <path d="M456 328 V220" fill="none" stroke="#168f9a" stroke-width="1.3" marker-end="url(#security-horizontal-arrow-teal)"/>
+      <line x1="480" y1="144" x2="568" y2="144" stroke="#526e74" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#security-horizontal-arrow)"/>
+      <path d="M652 212 V252 Q652 260 644 260 H544 Q536 260 536 268 V348 Q536 356 528 356 H524" fill="none" stroke="#526e74" stroke-width="1.2" stroke-dasharray="4 3" marker-end="url(#security-horizontal-arrow)"/>
+      <line x1="524" y1="396" x2="620" y2="396" stroke="#526e74" stroke-width="1.2" marker-end="url(#security-horizontal-arrow)"/>
+
+      <!-- Etiquetas con máscara opaca y separación de los trazos. -->
+      <rect x="240" y="124" width="40" height="12" rx="2" fill="#f1f5f4"/><text x="260" y="133" text-anchor="middle" fill="#187ea2" font-family="'Geist Mono',monospace" font-size="8" font-weight="500">OIDC</text>
+      <rect x="240" y="180" width="40" height="12" rx="2" fill="#f1f5f4"/><text x="260" y="189" text-anchor="middle" fill="#526e74" font-family="'Geist Mono',monospace" font-size="8" font-weight="500">JWT</text>
+      <rect x="144" y="224" width="72" height="12" rx="2" fill="#f1f5f4"/><text x="180" y="233" text-anchor="middle" fill="#187ea2" font-family="'Geist Mono',monospace" font-size="7.5" font-weight="500">BEARER JWT</text>
+      <rect x="464" y="256" width="40" height="12" rx="2" fill="#e9f0ef"/><text x="484" y="265" text-anchor="middle" fill="#168f9a" font-family="'Geist Mono',monospace" font-size="8" font-weight="500">JWKS</text>
+      <rect x="496" y="124" width="80" height="12" rx="2" fill="#e9f0ef"/><text x="536" y="133" text-anchor="middle" fill="#526e74" font-family="'Geist Mono',monospace" font-size="7.5" font-weight="500">EVENTOS ADMIN</text>
+      <rect x="660" y="224" width="44" height="12" rx="2" fill="#f1f5f4"/><text x="682" y="233" text-anchor="middle" fill="#526e74" font-family="'Geist Mono',monospace" font-size="8" font-weight="500">AMQP</text>
+      <rect x="552" y="376" width="40" height="12" rx="2" fill="#e9f0ef"/><text x="572" y="385" text-anchor="middle" fill="#526e74" font-family="'Geist Mono',monospace" font-size="8" font-weight="500">JDBC</text>
+
+      <!-- Clientes DSS -->
+      <rect x="48" y="112" width="172" height="100" rx="6" fill="#fff" stroke="#6c8589" stroke-width="1.2"/>
+      <rect x="121" y="124" width="26" height="18" rx="2" fill="none" stroke="#526e74" stroke-width="1.4"/><path d="M117 146 H151 M126 146 L124 149 H144 L142 146" fill="none" stroke="#526e74" stroke-width="1.3" stroke-linejoin="round"/>
+      <text x="134" y="176" text-anchor="middle" fill="#173d45" font-family="'Geist',sans-serif" font-size="12" font-weight="600">Clientes DSS</text>
+      <text x="134" y="196" text-anchor="middle" fill="#526e74" font-family="'Geist Mono',monospace" font-size="8.5">SPA · servicios</text>
+
+      <!-- Keycloak -->
+      <rect x="300" y="112" width="180" height="100" rx="6" fill="#fff" stroke="#168f9a" stroke-width="1.3"/>
+      <g transform="translate(378 122) scale(.88)" fill="#168f9a"><path d="m18.742 1.182-12.493.002C4.155 4.784 2.079 8.393 0 12.002c2.071 3.612 4.162 7.214 6.252 10.816l12.49-.004 3.089-5.404h2.158v-.002H24L23.996 6.59h-2.168zM8.327 4.792h2.081l1.04 1.8-3.12 5.413 3.117 5.403-1.035 1.81H8.327a2047.566 2047.566 0 0 0-4.168-7.204C5.547 9.606 6.937 7.2 8.327 4.792Zm6.241 0 2.086.003c1.393 2.405 2.78 4.813 4.166 7.222l-4.167 7.2h-2.08c-.382-.562-1.038-1.808-1.038-1.808l3.123-5.405-3.124-5.413z"/></g>
+      <text x="390" y="176" text-anchor="middle" fill="#173d45" font-family="'Geist',sans-serif" font-size="12" font-weight="600">Keycloak</text>
+      <text x="390" y="196" text-anchor="middle" fill="#526e74" font-family="'Geist Mono',monospace" font-size="8.5">OIDC · JWT</text>
+
+      <!-- RabbitMQ: icono lineal genérico de mensajería. -->
+      <rect x="568" y="112" width="180" height="100" rx="6" fill="#fff" stroke="#187ea2" stroke-width="1.2"/>
+      <rect x="633" y="124" width="12" height="10" rx="2" fill="none" stroke="#187ea2" stroke-width="1.3"/><rect x="649" y="124" width="12" height="10" rx="2" fill="none" stroke="#187ea2" stroke-width="1.3"/><rect x="641" y="138" width="12" height="10" rx="2" fill="none" stroke="#187ea2" stroke-width="1.3"/><path d="M645 134v4m8-4-5 4" fill="none" stroke="#187ea2" stroke-width="1.1"/>
+      <text x="658" y="176" text-anchor="middle" fill="#173d45" font-family="'Geist',sans-serif" font-size="12" font-weight="600">RabbitMQ</text>
+      <text x="658" y="196" text-anchor="middle" fill="#526e74" font-family="'Geist Mono',monospace" font-size="8.5">Eventos · DLQ</text>
+
+      <!-- auth-service -->
+      <rect x="324" y="328" width="200" height="96" rx="6" fill="#fff" stroke="#168f9a" stroke-width="1.4"/>
+      <rect x="412" y="340" width="24" height="18" rx="3" fill="none" stroke="#168f9a" stroke-width="1.3"/><path d="M417 346h14m-14 6h10" stroke="#168f9a" stroke-width="1.2" stroke-linecap="round"/>
+      <text x="424" y="388" text-anchor="middle" fill="#173d45" font-family="'Geist',sans-serif" font-size="12" font-weight="600">auth-service</text>
+      <text x="424" y="408" text-anchor="middle" fill="#526e74" font-family="'Geist Mono',monospace" font-size="8.5">API · sync IAM</text>
+
+      <!-- PostgreSQL IAM: icono de base de datos lineal. -->
+      <rect x="620" y="328" width="224" height="96" rx="6" fill="#fff" stroke="#168f9a" stroke-width="1.3"/>
+      <ellipse cx="732" cy="344" rx="13" ry="4.5" fill="none" stroke="#168f9a" stroke-width="1.3"/><path d="M719 344v13c0 2.5 5.8 4.5 13 4.5s13-2 13-4.5v-13 M719 350c0 2.5 5.8 4.5 13 4.5s13-2 13-4.5" fill="none" stroke="#168f9a" stroke-width="1.3"/>
+      <text x="732" y="388" text-anchor="middle" fill="#173d45" font-family="'Geist',sans-serif" font-size="12" font-weight="600">PostgreSQL IAM</text>
+      <text x="732" y="408" text-anchor="middle" fill="#526e74" font-family="'Geist Mono',monospace" font-size="8.5">Perfiles · roles · contextos</text>
+    </svg>
+  </div>
+</main>
+</body>
+</html>

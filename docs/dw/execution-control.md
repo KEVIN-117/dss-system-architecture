@@ -2,7 +2,7 @@
 
 DW-004 convierte `etl_control` en la bitácora técnica de cada carga del Data Warehouse. No ejecuta consultas contra Jachasun, no transforma datos y no publica dimensiones o hechos: conserva únicamente evidencia y aplica las reglas que impiden declarar exitosa una carga incompleta.
 
-Para la issue #133, Apache Hop reutiliza este modelo en el flujo directo Jachasun → Hop → `dw`. No se crean tablas paralelas `etl_run`, `etl_log` ni `etl_error`. Véase [la base consolidada del MVP](mvp-direct-hop.md). Las migraciones 0010–0012 añaden gates, rol `dw_hop_runtime`, landing privado por ejecución, publisher atómico y aborto auditado. El workflow de publicación está implementado; los workflows de extracción y transformación son el siguiente requerimiento.
+Para la issue #133, Apache Hop reutiliza este modelo en el flujo directo Jachasun → Hop → `dw`. No se crean tablas paralelas `etl_run`, `etl_log` ni `etl_error`. Véase [la base consolidada del MVP](mvp-direct-hop.md). Las migraciones 0010–0020 añaden gates, rol `dw_hop_runtime`, landing privado por ejecución, publisher atómico, aborto auditado y endurecimiento de lotes/casos límite. El workflow completo de extracción y transformación está implementado y probado con fixtures.
 
 La interfaz y el preflight se especifican en el [contrato de ejecución Hop](hop-execution-contract.md). `create_hop_etl_execution` valida cierres, reintentos, mismo alcance y evita dos ejecuciones activas por cierre; `begin_hop_publication` exige lease vigente y exactamente los nueve manifiestos.
 
@@ -57,7 +57,7 @@ Los hashes SHA-256 son hexadecimales en minúscula. Las URI de artefactos no pue
 
 ## Roles y operación
 
-La matriz describe los grants existentes de DW-004. No implica que Hop deba asumir todos los roles históricos: se definirán por nueva migración los permisos estrictamente necesarios de su cuenta, preservando la separación con la autorización DSA de cierres.
+La matriz distingue los grants históricos del grupo dedicado `dw_hop_runtime`. Hop no asume todos los roles; la cuenta del ambiente se asigna al grupo runtime restringido y la autorización funcional DSA de cierres se conserva separada.
 
 | Rol de grupo | Acceso DW-004 |
 | --- | --- |
@@ -74,7 +74,7 @@ El login de Hop no debe recibir DML directo sobre tablas de control o DW. `dw_ho
 
 DW-004 define la entidad lock; 0010 añade lease con adquisición, renovación, liberación y recuperación de expirados. 0011 revalida y bloquea el lease dentro de la transacción de publicación; 0012 audita la salida fallida y libera el lease mediante token. No depende del coordinador Go. Cron, API/BFF y Load Manager quedan fuera del MVP.
 
-El gate SQL Hop comprueba el catálogo de nueve fuentes y los reintentos usan otro `run_id`. El publisher sustituye hechos/dimensiones dentro de una sola transacción; un rechazo en cualquier paso revierte la publicación completa y mantiene visible la versión anterior. Las pruebas SQL cubren éxito, fallo por restricción, recuperación del estado y conservación de la publicación previa. Falta probar el flujo ETL integral contra Hop en el requerimiento 6.
+El gate SQL Hop comprueba los nueve manifiestos y los reintentos usan otro `run_id`. El publisher sustituye hechos/dimensiones dentro de una sola transacción; un rechazo revierte la publicación completa y mantiene visible la versión anterior. Las pruebas SQL y la integración Hop cubren éxito, fallos, auditoría y preservación de la publicación previa. El flujo integral ya no es un requerimiento pendiente.
 
 ## Validación local
 

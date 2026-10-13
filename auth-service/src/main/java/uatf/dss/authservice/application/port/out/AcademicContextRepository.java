@@ -10,5 +10,6 @@ public interface AcademicContextRepository {
     Optional<UserAcademicContext> findByUserId(UUID userId);
     List<UserAcademicContext> findAllByUserId(UUID userId);
     UserAcademicContext save(UserAcademicContext context);
+    List<UserAcademicContext> replaceAllForUser(UUID userId, List<UserAcademicContext> contexts);
     Optional<UserAcademicContext> delete(UUID id);
 }

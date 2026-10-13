@@ -1,6 +1,6 @@
 # DW-006 — Dimensiones conformadas y miembros técnicos
 
-DW-006 implementa la base física de las dimensiones conformadas definidas por DW-005. La migración `0004_create_conformed_dimensions.sql` crea únicamente estructura, restricciones, auditoría técnica y miembros de reserva; no lee Jachasun, no carga datos de negocio y no crea hechos.
+DW-006 implementó la base física de las dimensiones conformadas definidas por DW-005. La migración `0004_create_conformed_dimensions.sql` crea estructura, restricciones, auditoría técnica y miembros de reserva; las cargas MVP se realizan después mediante Apache Hop y el publisher atómico, no por la migración.
 
 ## Alcance físico
 
@@ -50,7 +50,7 @@ Los atributos provienen exclusivamente de los contratos DW-001. No se almacenan 
 | Periodo académico | Gestión, periodo, `closure_id` y fecha efectiva opcional del cierre DSA. |
 | Admisión | Solo `id_acceso`; no existe aún un catálogo aprobado para una descripción de modalidad. |
 
-La relación de materia con programa o materia padre no se declara como FK en esta issue: los contratos notifican posibles referencias huérfanas y la compatibilidad de tipos entre materias y notas sigue pendiente de validación real. Asimismo, colegio, localidad y facultad son atributos y no dimensiones adicionales en esta primera publicación.
+La relación de materia con programa o materia padre no se declara como FK dimensional: los contratos detectan referencias huérfanas y los filtros de calidad deciden su tratamiento. Colegio, localidad y facultad son atributos, no dimensiones adicionales en esta primera publicación.
 
 ## Auditoría y permisos
 
@@ -67,11 +67,11 @@ La migración repite los `REVOKE` y `GRANT` explícitos para que la seguridad no
 
 ## Límites con las siguientes issues
 
-- DW-007 documenta vigencias y versiones; la [política SCD de persona/estudiante](scd2-person-student-policy.md) se materializa en `0008_add_student_scd2_versions.sql`. La migración agrega integridad temporal, pero la carga/hash en Hop sigue pendiente.
+- La [política SCD de persona/estudiante](scd2-person-student-policy.md) se materializa en `0008_add_student_scd2_versions.sql` y en el pipeline Hop de SCD2; sus cambios se publican junto con el resto del corte mediante el publisher atómico.
 - Para el MVP de #133, Hop lee directamente las fuentes contractuales; el staging RAW del Load Manager en Go está pausado. Las dimensiones preparadas se guardan en el buffer privado `etl_work` para la publicación atómica existente; no es una zona RAW ni de consumo. DW-006 no inserta datos OLTP ni interpreta códigos de estado.
 - `0008_add_student_scd2_versions.sql` agrega vigencias a estudiante; `0009_create_constellation_facts.sql` crea los tres hechos con FKs a estas dimensiones. No se recrean dimensiones con nombres en inglés. Los campos de notas, conteos, PPA, retención, deserción y grupo permanecen fuera de estas tablas.
 - Matrícula y graduación quedan fuera del MVP; véase [la base consolidada de DW y ETL_CONTROL](mvp-direct-hop.md).
-- La validación de `public.postulantes`, los dominios de estado, la semántica de egreso y los joins OLTP continúan bajo la aprobación DSA/TI definida en DW-001 y DW-005.
+- Los contratos, transformaciones, miembros técnicos y publicación de las dimensiones forman parte del MVP integrado y probado. Antes de una futura carga productiva se vuelven a verificar endpoint, grants y compatibilidad del esquema del ambiente; esa validación operativa no es una fase de implementación pendiente.
 
 ## Validación local
 

@@ -1,5 +1,6 @@
 package uatf.dss.authservice.application.port.in;
 
+import java.util.List;
 import java.util.UUID;
 
 public record SyncUserCommand(
@@ -8,5 +9,10 @@ public record SyncUserCommand(
     String email,
     String firstName,
     String lastName,
-    boolean isActive
-) {}
+    boolean isActive,
+    List<KeycloakRoleSnapshot> roles
+) {
+    public SyncUserCommand {
+        roles = roles == null ? null : List.copyOf(roles);
+    }
+}

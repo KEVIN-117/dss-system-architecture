@@ -8,6 +8,7 @@ import org.mapstruct.factory.Mappers;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import uatf.dss.authservice.adapter.out.persistence.role.RoleEntity;
+import uatf.dss.authservice.adapter.out.persistence.role.SpringDataRoleRepository;
 import uatf.dss.authservice.adapter.out.persistence.user.SpringDataUserRepository;
 import uatf.dss.authservice.adapter.out.persistence.user.UserEntity;
 import uatf.dss.authservice.adapter.out.persistence.user.UserPersistenceMapper;
@@ -18,6 +19,8 @@ import uatf.dss.authservice.domain.model.User;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Set;
+import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -30,12 +33,15 @@ class UserRepositoryAdapterTest {
     @Mock
     private SpringDataUserRepository springDataRepository;
 
+    @Mock
+    private SpringDataRoleRepository springDataRoleRepository;
+
     private UserRepositoryAdapter adapter;
 
     @BeforeEach
     void setUp() {
         UserPersistenceMapper mapper = Mappers.getMapper(UserPersistenceMapper.class);
-        adapter = new UserRepositoryAdapter(springDataRepository, mapper);
+        adapter = new UserRepositoryAdapter(springDataRepository, springDataRoleRepository, mapper);
     }
 
     @Test
@@ -119,6 +125,40 @@ class UserRepositoryAdapterTest {
         assertSame(localContext, existingEntity.getAcademicContexts().getFirst());
         verify(springDataRepository).findById(userId);
         verify(springDataRepository, never()).save(any(UserEntity.class));
+    }
+
+    @Test
+    @DisplayName("Should replace user role snapshot with seeded application roles")
+    void shouldReplaceRoleSnapshot() {
+        UUID userId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        RoleEntity oldRole = new RoleEntity(3, "DECANO", "Decano", null);
+        user.getRoles().add(oldRole);
+        RoleEntity newRole = new RoleEntity(4, "DIRECTOR", "Director", null);
+
+        when(springDataRepository.findById(userId)).thenReturn(Optional.of(user));
+        when(springDataRoleRepository.findAllByNameIn(Set.of("DIRECTOR"))).thenReturn(List.of(newRole));
+
+        adapter.replaceRoleSnapshot(userId, Set.of("DIRECTOR"));
+
+        assertEquals(Set.of(newRole), user.getRoles());
+        verify(springDataRoleRepository).findAllByNameIn(Set.of("DIRECTOR"));
+    }
+
+    @Test
+    @DisplayName("Should clear local roles when Keycloak snapshot has no application roles")
+    void shouldClearRoleSnapshotWhenEmpty() {
+        UUID userId = UUID.randomUUID();
+        UserEntity user = new UserEntity();
+        user.setId(userId);
+        user.getRoles().add(new RoleEntity(3, "DECANO", "Decano", null));
+        when(springDataRepository.findById(userId)).thenReturn(Optional.of(user));
+
+        adapter.replaceRoleSnapshot(userId, Set.of());
+
+        assertTrue(user.getRoles().isEmpty());
+        verifyNoInteractions(springDataRoleRepository);
     }
 
     @Test

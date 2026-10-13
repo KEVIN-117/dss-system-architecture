@@ -1,6 +1,6 @@
 # DW-003 — Fundamentos de la plataforma analítica
 
-DW-003 establece los esquemas y controles de acceso de la base analítica. DW-004 incorpora el control de ejecuciones, DW-005 documenta el modelo dimensional lógico y DW-006 materializa sus dimensiones conformadas. Para el MVP de la issue #133, la ruta activa será **Jachasun → Apache Hop → dw**, con `etl_control` como control lateral. La [base consolidada del MVP](mvp-direct-hop.md) distingue los objetos existentes de las cargas y migraciones aún pendientes. Load Manager y el aterrizaje RAW se conservan como implementación futura, no como dependencias del MVP.
+DW-003 estableció los esquemas y controles de acceso; DW-004 el control de ejecuciones; DW-005 el modelo dimensional; y DW-006 las dimensiones conformadas. El MVP de la issue #133 está implementado y fusionado: la ruta activa es **Jachasun → Apache Hop → dw**, con `etl_control` como control lateral. La [base consolidada del MVP](mvp-direct-hop.md) describe el estado entregado. Load Manager y el aterrizaje RAW se conservan como evolución futura, no como dependencias del MVP.
 
 ## Capas
 
@@ -15,11 +15,11 @@ flowchart LR
     PUB -. valida lock y registra resultado .-> CTRL
 ```
 
-El diagrama representa la ruta directa del MVP. Hop extrae, valida y transforma; guarda el lote preparado por `run_id` en `etl_work`, que funciona únicamente como buffer privado del publisher, no como staging de extracción ni como almacenamiento de negocio consumible. El publisher aplica el lote en `dw` de forma atómica. `etl_control` registra autorización, locks y evidencia. Las pipelines cuentan con pruebas sintéticas; la validación con Jachasun real sigue pendiente. El esquema `staging` de la integración Go/RAW está pausado; `staging`, `etl_work` y `ml_workspace` se conservan físicamente y no se eliminan.
+El diagrama representa la ruta directa implementada. Hop extrae, valida y transforma; guarda el lote preparado por `run_id` en `etl_work`, que funciona únicamente como buffer privado del publisher, no como staging de extracción ni como almacenamiento de negocio consumible. El publisher aplica el lote en `dw` de forma atómica. `etl_control` registra autorización, locks y evidencia. La ruta integral tiene pruebas Docker/CI con fixtures sintéticos; estas no equivalen a ejecutar el histórico real en producción. El esquema `staging` de la integración Go/RAW está pausado; `staging`, `etl_work` y `ml_workspace` se conservan físicamente y no se eliminan.
 
 ## Roles de grupo
 
-Los roles son `NOLOGIN`; TI/DBA crea las cuentas de usuario o servicio por ambiente, las asigna al grupo correspondiente y conserva las credenciales fuera del repositorio. La matriz siguiente describe los privilegios de la base histórica, no una recomendación de asignar todos esos roles a Hop. Los grants mínimos para su ruta directa deberán adaptarse por migración y probarse antes de operar.
+Los roles de grupo son `NOLOGIN`; TI/DBA provisiona cuentas por ambiente, las asigna al grupo correspondiente y mantiene credenciales fuera del repositorio. `dw_hop_runtime` es el grupo dedicado al MVP directo; no se asigna a Hop el conjunto de roles históricos ni permisos directos de publicación.
 
 | Rol | Acceso permitido |
 | --- | --- |
@@ -45,7 +45,7 @@ En Docker, `dw-migrator` espera a que `postgres-dw` esté saludable y finaliza t
 
 ## Operación y rollback
 
-Las cinco dimensiones proceden de `0004`; `0008` añade vigencias SCD2 de estudiante, `0009` crea los tres hechos, `0015` prepara admisión/cursado y `0016` prepara retención para Hop, según [la base consolidada](mvp-direct-hop.md). No se agrega un segundo modelo de dimensiones ni de auditoría. El runtime Hop conserva contrato de control y publicación atómica. El flujo de 6.2–6.7 pasó la regresión Docker con fixtures sintéticos; esto no sustituye la validación real de Jachasun ni la aprobación operativa pendiente de DSA/TI.
+Las cinco dimensiones proceden de `0004`; `0008` añade vigencias SCD2 de estudiante; `0009` crea los tres hechos; `0010`–`0016` implementan controles, publisher y preparación Hop; y `0017`–`0020` corrigen casos límite encontrados en la integración. No se agrega un segundo modelo dimensional ni de auditoría. El runtime Hop conserva control y publicación atómica. El flujo completo pasó la regresión Docker/CI con fixtures sintéticos. Una futura ejecución productiva requiere la configuración y autorización propias de ese ambiente, no cambios pendientes al modelo base.
 
 Para una validación aislada:
 

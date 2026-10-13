@@ -1,14 +1,14 @@
 # Data Warehouse — documentación del MVP
 
-La decisión vigente para la issue #133 es **Jachasun → Apache Hop → dw**, con `etl_control` como control lateral. La [base consolidada](mvp-direct-hop.md) es el punto de entrada para alcance, objetos existentes, migraciones pendientes y orden de implementación.
+La issue #133 está implementada, fusionada en `main` y cerrada. La arquitectura entregada del MVP es **Jachasun → Apache Hop → dw**, con `etl_control` como control lateral. La [base consolidada](mvp-direct-hop.md) es el punto de entrada para alcance, arquitectura y estado final.
 
-El [contrato de ejecución Hop](hop-execution-contract.md) define parámetros y la API/gates SQL. El flujo vertical de nueve fuentes, cinco dimensiones, tres hechos y publicación atómica pasó su regresión Docker con fixtures sintéticos; la validación contra Jachasun real sigue pendiente.
+El [contrato de ejecución Hop](hop-execution-contract.md) define parámetros y la API/gates SQL. El flujo vertical completo —nueve fuentes, cinco dimensiones, tres hechos y publicación atómica— fue ejecutado con éxito en el entorno de integración Docker y sus regresiones están en CI. Esto valida el MVP con fixtures; no equivale a una carga productiva ni a autorización para operar contra producción.
 
-El seguimiento incremental de la implementación Req. 6 está en [hop-req-6-progress.md](hop-req-6-progress.md); el avance de las consultas y pruebas de fuente no equivale al ETL completo.
+El [informe de cierre del Req. 6](hop-req-6-progress.md) registra la implementación y evidencia de integración. Las tareas futuras de activación productiva se administran como operación/despliegue, no como trabajo pendiente para completar la issue #133.
 
 ## Especificaciones vigentes
 
-- [Contratos de las nueve fuentes](source-contracts/README.md) y [validación pendiente DSA/TI](source-contracts/validation-dw-001.md).
+- [Contratos de las nueve fuentes](source-contracts/README.md) y [registro de evidencia y límites de validación](source-contracts/validation-dw-001.md).
 - [Modelo lógico: admisión, cursado y retención/deserción](dimensional-model.md).
 - [Dimensiones físicas de `0004` y SCD2 de estudiante en `0008`](conformed-dimensions.md) y [política SCD2](scd2-person-student-policy.md).
 - [Calendario de cierres DSA](academic-closure-calendar.md).

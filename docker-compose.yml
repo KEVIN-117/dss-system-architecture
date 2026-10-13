@@ -65,14 +65,6 @@ services:
     networks:
       - dss-net
 
-  neo4j:
-    build: ./data-layer/neo4j
-    ports:
-      - "7474:7474"
-      - "7687:7687"
-    networks:
-      - dss-net
-
   keycloak:
     build:
       context: ./infra/keycloak
@@ -95,9 +87,12 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
-      KEYCLOAK_WEBHOOK_URL: ${KEYCLOAK_WEBHOOK_URL}
-      KEYCLOAK_WEBHOOK_SECRET: ${KEYCLOAK_WEBHOOK_SECRET}
       KEYCLOAK_BFF_CLIENT_SECRET: ${KEYCLOAK_BFF_CLIENT_SECRET:?KEYCLOAK_BFF_CLIENT_SECRET must be set}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
     volumes:
       - ./infra/keycloak/realm:/opt/keycloak/data/import
       #- ./infra/keycloak/providers:/opt/keycloak/providers
@@ -107,10 +102,12 @@ services:
     depends_on:
       auth-service-db:
         condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     networks:
       - dss-net
     healthcheck:
-      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\n\r\n' >&3 && cat <&3 | grep -q '\"status\":\"UP\"'"]
+      test: ["CMD-SHELL", "curl --fail --silent --show-error http://localhost:9000/health/ready | grep -q '\"status\"[[:space:]]*:[[:space:]]*\"UP\"'"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -122,12 +119,18 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_DEFAULT_PASS}
     ports:
-      - "5672:5672" # AMQP
-      - "15672:15672" # Web UI
+      - "127.0.0.1:5672:5672" # AMQP local development only
+      - "127.0.0.1:15672:15672" # Web UI local development only
     volumes:
       - ./infra/rabbitmq/data:/var/lib/rabbitmq
     networks:
       - dss-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
   hop-web:
     image: apache/hop-web:${HOP_WEB_VERSION:-2.19.0}
     container_name: dss-hop-web
@@ -164,7 +167,10 @@ services:
   auth-service:
     build: ./auth-service
     depends_on:
-      - auth-service-db
+      auth-service-db:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
     restart: on-failure
     environment:
       - SPRING_PROFILE_ACTIVE=${AUTH_SPRING_PROFILE_ACTIVE}
@@ -174,7 +180,11 @@ services:
       - DB_PASSWORD=${AUTH_DB_PASSWORD}
       - KEYCLOAK_ISSUER_URI=${AUTH_KEYCLOAK_ISSUER_URI}
       - KEYCLOAK_JWK_SET_URI=${AUTH_KEYCLOAK_JWK_SET_URI}
-      - KEYCLOAK_WEBHOOK_SECRET=${KEYCLOAK_WEBHOOK_SECRET}
+      - RABBITMQ_HOST=${RABBITMQ_HOST:-rabbitmq}
+      - RABBITMQ_PORT=${RABBITMQ_PORT:-5672}
+      - RABBITMQ_USERNAME=${RABBITMQ_DEFAULT_USER}
+      - RABBITMQ_PASSWORD=${RABBITMQ_DEFAULT_PASS}
+      - RABBITMQ_VHOST=${RABBITMQ_VHOST:-/}
       - KEYCLOAK_RESOURCE_ID=${AUTH_KEYCLOAK_RESOURCE_ID}
       - KEYCLOAK_AUDIENCE=${AUTH_KEYCLOAK_AUDIENCE:-${AUTH_KEYCLOAK_RESOURCE_ID}}
       - KEYCLOAK_PRINCIPAL_ATTRIBUTE=${AUTH_KEYCLOAK_PRINCIPAL_ATTRIBUTE}

@@ -1,4 +1,15 @@
+springdoc:
+  api-docs:
+    enabled: true
+  swagger-ui:
+    enabled: true
+
 spring:
+  rabbitmq:
+    dynamic: false
+    listener:
+      simple:
+        auto-startup: false
   # using @ServiceConnection for datasource
   flyway:
     enabled: true

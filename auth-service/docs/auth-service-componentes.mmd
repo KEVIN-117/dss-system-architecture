@@ -1,0 +1,40 @@
+C4Component
+  title Componentes internos — auth-service
+
+  Container_Ext(clientes, "Clientes DSS", "SPA / servicios", "Consumen el perfil y la API administrativa protegida")
+  Container_Ext(keycloak, "Keycloak + uatf-webhook SPI", "Keycloak / Event Listener Provider", "Autentica por OIDC y publica snapshots de Admin Events")
+  ContainerQueue(rabbitmq, "RabbitMQ", "AMQP", "Cola durable keycloak.user.events y DLQ keycloak.user.events.dlq")
+  ContainerDb(iam_db, "Base de datos IAM", "PostgreSQL", "Perfiles, roles, contextos académicos, catálogos e inbox de eventos")
+
+  Container_Boundary(auth, "auth-service · Spring Boot / Java 21") {
+    Component(security, "SecurityConfig + JwtConverter", "Spring Security", "Valida JWT, issuer y audiencia; crea authorities desde roles del token")
+    Component(profile_api, "UserProfileController", "Spring MVC", "GET /auth/me; obtiene el UUID de Keycloak desde el sub")
+    Component(context_api, "AcademicContextAssignmentController", "Spring MVC", "PUT /admin/users/{userId}/academic-contexts; requiere ROLE_SUPERADMIN")
+    Component(aux_api, "API demostrativa", "Spring MVC", "Rutas de prueba por rol y registro de example-user")
+    Component(event_consumer, "KeycloakUserEventConsumer", "Spring AMQP", "Valida y deduplica snapshots; los convierte en SyncUserCommand")
+    Component(profile_service, "GetAuthUserProfileService", "Caso de uso", "Busca el perfil local y sus contextos académicos")
+    Component(sync_service, "SyncUserService", "Caso de uso", "Crea/actualiza el perfil y sustituye el snapshot de roles reconocidos")
+    Component(context_service, "SetUserAcademicContextsService", "Caso de uso", "Valida rol, forma del contexto y catálogos activos; reemplaza contextos transaccionalmente")
+    Component(example_service, "RegisterExampleUserService", "Caso de uso", "Verifica correo duplicado y guarda el usuario de ejemplo")
+    Component(persistence, "Adaptadores de persistencia", "JPA / JDBC / MapStruct", "Accede a usuarios, roles, contextos, catálogos e inbox de eventos")
+  }
+
+  Rel(clientes, keycloak, "Inicia sesión y obtiene JWT", "OIDC")
+  Rel(clientes, profile_api, "Consulta el perfil", "HTTPS + bearer JWT")
+  Rel(clientes, context_api, "Asigna contextos completos", "HTTPS + bearer JWT")
+  Rel(clientes, aux_api, "Usa rutas de demostración", "HTTPS + bearer JWT")
+  Rel(keycloak, rabbitmq, "Publica eventos de usuario y roles", "AMQP persistente + publisher confirm")
+  Rel(rabbitmq, event_consumer, "Entrega eventos; los fallos agotados van a DLQ", "AMQP")
+  Rel(security, keycloak, "Obtiene claves públicas para validar firma", "HTTPS / JWKS")
+  Rel(security, profile_api, "Protege la ruta y entrega la autenticación")
+  Rel(security, context_api, "Autoriza SUPERADMIN desde el JWT")
+  Rel(security, aux_api, "Aplica autenticación y roles")
+  Rel(profile_api, profile_service, "Solicita datos del usuario autenticado")
+  Rel(context_api, context_service, "Envía el conjunto de contextos a reemplazar")
+  Rel(event_consumer, sync_service, "Envía el perfil y snapshot de roles")
+  Rel(aux_api, example_service, "Solicita registrar example-user")
+  Rel(profile_service, persistence, "Lee perfil y contextos")
+  Rel(sync_service, persistence, "Upsert de perfil y snapshot de roles")
+  Rel(context_service, persistence, "Lee usuario/roles/catálogos y reemplaza contextos")
+  Rel(example_service, persistence, "Busca correo y guarda usuario de ejemplo")
+  Rel(persistence, iam_db, "Lee y escribe", "JDBC / JPA")

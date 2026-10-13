@@ -4,7 +4,7 @@
 
 DW-008 proporciona un entorno aislado y reproducible para validar contratos fuente, cierres académicos, ejecuciones y futuras cargas dimensionales sin depender de Jachasun ni de datos reales. El entorno es de integración: no sustituye las pruebas unitarias de migraciones de `infra/dw-schema` y no habilita conexiones hacia producción.
 
-Para el MVP de #133, el fixture pequeño de este documento valida los contratos y regresiones de integración. El flujo directo Jachasun → Hop → `dw` y las fases 6.1–6.7 tienen su propio estado en [el progreso de Req. 6](hop-req-6-progress.md). Para una demostración de mayor volumen usa [`historical-v2`](../../infra/dw-test-data/historical-v2/README.md), no el volumen persistente del perfil legado.
+Para el MVP de #133, este fixture pequeño valida casos de borde y regresiones de integración; la ejecución E2E completa se documenta en el [informe de cierre del Req. 6](hop-req-6-progress.md). Para una demostración histórica de mayor volumen usa [`historical-v2`](../../infra/dw-test-data/historical-v2/README.md), no el volumen persistente del perfil legado.
 
 ## Política de privacidad
 
