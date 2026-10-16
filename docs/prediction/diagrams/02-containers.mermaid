@@ -1,0 +1,25 @@
+C4Container
+  title Contenedores del flujo predictivo DSS-UATF
+  Person(authority, "Autoridad académica", "Consulta información según sus ámbitos autorizados")
+  System_Boundary(dss, "DSS-UATF") {
+    Container(portal, "Portal DSS", "Next.js / React", "Interfaz académica existente")
+    Container(bff, "BFF DSS", "Next.js, TypeScript", "Sesión Keycloak, autorización y proxy REST")
+    Container(pred_api, "Prediction API", "Python, FastAPI", "Contrato de inferencia y control de trabajos; hoy /predict está simulado")
+    Container(pred_worker, "Prediction Worker", "Python; propuesto", "Entrenamiento/evaluación aislados y scoring poblacional asíncrono")
+    ContainerDb(dw_db, "PostgreSQL DW", "PostgreSQL 15", "Esquemas dw, etl_control y ml_workspace")
+    Container(olap, "Servicio OLAP", "Java / Saiku", "Consultas multidimensionales sobre el DW")
+  }
+  System_Ext(keycloak, "Keycloak", "OIDC, tokens y JWKS")
+  System_Ext(auth, "auth-service", "Perfil y academicContexts")
+  Rel(authority, portal, "Consulta tableros")
+  Rel(portal, bff, "Llama rutas de negocio", "HTTPS")
+  Rel(bff, keycloak, "Autentica sesión", "OIDC / HTTPS")
+  Rel(bff, auth, "Valida perfil activo", "HTTPS/JSON")
+  Rel(bff, pred_api, "Reenvía petición y bearer", "REST/JSON; propuesto")
+  Rel(pred_api, keycloak, "Verifica firma, issuer, audience y expiración", "JWKS / HTTPS")
+  Rel(pred_api, auth, "Resuelve contextos de acceso", "HTTPS/JSON; propuesto")
+  Rel(pred_api, dw_db, "Lee features/corte; consulta artefacto aprobado", "PostgreSQL; permisos por confirmar")
+  Rel(pred_api, pred_worker, "Despacha/consulta trabajos", "Mecanismo pendiente")
+  Rel(pred_worker, dw_db, "Lee snapshots y guarda artefactos ML", "PostgreSQL/ML workspace; propuesto")
+  Rel(pred_worker, dw_db, "Publica lotes según contrato de analítica", "Esquema/grants por definir")
+  Rel(olap, dw_db, "Consulta predicciones publicadas", "PostgreSQL")

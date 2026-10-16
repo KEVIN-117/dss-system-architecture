@@ -1,4 +1,5 @@
 from fastapi import FastAPI
+from config import settings
 
 # Crear instancia de la aplicación FastAPI
 app = FastAPI(
@@ -22,9 +23,7 @@ def predict(data: dict):
     Endpoint para realizar predicciones.
     Recibe datos en formato JSON y devuelve una predicción simulada.
     """
-    # Aquí iría la lógica de machine learning real
-    # Por ahora, devolvemos una respuesta simulada
-    print(f"Datos recibidos para predicción: {data}")
+    # Aquí iría la lógica de machine learning real. Esta respuesta es temporal.
     
     # Simular una predicción
     result = {
@@ -39,4 +38,11 @@ def predict(data: dict):
 # Ejecutar el servidor con uvicorn
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run(app, host="[IP_ADDRESS]", port=8000, reload=True)
+
+    uvicorn.run(
+        "main:app" if settings.reload else app,
+        host=settings.host,
+        port=settings.port,
+        log_level=settings.log_level,
+        reload=settings.reload,
+    )

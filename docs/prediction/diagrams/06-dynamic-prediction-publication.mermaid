@@ -1,0 +1,10 @@
+C4Dynamic
+  title Flujo dinámico propuesto de scoring y publicación poblacional
+  Container(worker, "Prediction Worker", "Python", "Scoring poblacional asíncrono")
+  ContainerDb(dw, "PostgreSQL DW", "PostgreSQL", "Features, versiones activas y relación de salida")
+  Container(olap, "Servicio OLAP", "Java / Saiku", "Consulta analítica publicada")
+  RelIndex(1, worker, dw, "Lee el snapshot autorizado del corte y su población", "PostgreSQL")
+  RelIndex(2, worker, dw, "Carga exactamente una versión aprobada", "Workspace ML")
+  RelIndex(3, worker, worker, "Valida elegibilidad, construye features point-in-time y calcula predicciones")
+  RelIndex(4, worker, dw, "Publica lote trazable; confirma completo solo tras finalizar", "Contrato DW por definir")
+  RelIndex(5, olap, dw, "Consulta lotes publicados con corte y versión explícitos", "PostgreSQL")

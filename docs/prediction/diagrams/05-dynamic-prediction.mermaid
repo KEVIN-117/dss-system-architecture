@@ -1,0 +1,15 @@
+C4Dynamic
+  title Flujo dinámico propuesto de inferencia individual
+  Person(authority, "Autoridad académica", "Consulta dentro de su ámbito")
+  Container(portal, "Portal DSS", "Next.js / React", "Interfaz")
+  Container(bff, "BFF DSS", "Next.js", "Autenticación y proxy")
+  Container(api, "Prediction API", "FastAPI", "Inferencia individual")
+  ContainerDb(dw, "PostgreSQL DW", "PostgreSQL", "Features, modelos y publicación analítica")
+  RelIndex(1, authority, portal, "Abre consulta de riesgo")
+  RelIndex(2, portal, bff, "Solicita inferencia o resultados")
+  RelIndex(3, bff, api, "Reenvía bearer y solicitud", "REST/JSON; propuesto")
+  RelIndex(4, api, api, "Valida identidad, ámbito, estudiante y corte")
+  RelIndex(5, api, dw, "Lee features de corte permitido", "PostgreSQL")
+  RelIndex(6, api, dw, "Carga una única versión aprobada", "ML workspace")
+  RelIndex(7, api, bff, "Devuelve clase, probabilidad disponible, corte y versión")
+  RelIndex(8, bff, portal, "Entrega resultado autorizado")

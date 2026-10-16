@@ -201,6 +201,13 @@ services:
 
   prediction-service:
     build: ./prediction-service
+    restart: on-failure
+    environment:
+      PREDICTION_ENV: ${PREDICTION_ENV:-production}
+      PREDICTION_HOST: 0.0.0.0
+      PREDICTION_PORT: ${PREDICTION_PORT:-8000}
+      PREDICTION_LOG_LEVEL: ${PREDICTION_LOG_LEVEL:-info}
+      PREDICTION_RELOAD: ${PREDICTION_RELOAD:-false}
     networks:
       - dss-net
 

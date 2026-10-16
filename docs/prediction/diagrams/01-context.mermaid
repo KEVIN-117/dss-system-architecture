@@ -1,0 +1,23 @@
+C4Context
+  title Contexto C4 del motor predictivo DSS-UATF
+  Person(authority, "Autoridad académica", "Consulta el riesgo dentro de su ámbito institucional")
+  Person(ml_operator, "Operador ML", "Solicita entrenamiento tras autorización DSA/IAM; rol aún por definir")
+  Enterprise_Boundary(dss, "DSS-UATF") {
+    System(portal, "Portal DSS", "Presenta tableros y consultas")
+    System(bff, "BFF DSS", "Autentica sesiones y enruta solicitudes servidor a servidor")
+    System(prediction, "Motor Predictivo", "Entrena candidatos y genera inferencias trazables")
+    System(dw, "Data Warehouse", "Publica datos académicos y resultados analíticos")
+    System(olap, "Servicio OLAP", "Consulta el DW para análisis multidimensional")
+  }
+  System_Ext(keycloak, "Keycloak", "Emite tokens de acceso DSS")
+  System_Ext(auth, "auth-service", "Devuelve perfil activo y contextos académicos")
+  Rel(authority, portal, "Consulta indicadores")
+  Rel(ml_operator, bff, "Solicita operación ML autorizada")
+  Rel(portal, bff, "Solicita vistas y operaciones", "HTTPS")
+  Rel(bff, keycloak, "Completa autenticación OIDC", "HTTPS")
+  Rel(bff, auth, "Consulta perfil y ámbitos", "HTTPS/JSON")
+  Rel(bff, prediction, "Solicita inferencia o trabajo", "REST/JSON + bearer; propuesto")
+  Rel(prediction, keycloak, "Valida tokens mediante JWKS", "HTTPS")
+  Rel(prediction, auth, "Resuelve perfil y contextos de autorización", "HTTPS/JSON; propuesto")
+  Rel(prediction, dw, "Lee cortes autorizados y publica por contrato", "PostgreSQL; publicación por definir")
+  Rel(olap, dw, "Consulta datos y predicciones publicadas", "PostgreSQL")
