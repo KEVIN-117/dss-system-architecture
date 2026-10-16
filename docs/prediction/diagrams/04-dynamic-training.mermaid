@@ -1,0 +1,16 @@
+C4Dynamic
+  title Flujo dinámico propuesto de entrenamiento y promoción
+  Person(ml_operator, "Operador ML autorizado", "Rol pendiente de aprobación")
+  Container(bff, "BFF DSS", "Next.js", "Autenticación y control de permiso")
+  Container(api, "Prediction API", "FastAPI", "Control de trabajos")
+  Container(worker, "Prediction Worker", "Python", "Entrenamiento y evaluación aislados")
+  ContainerDb(dw, "PostgreSQL DW", "PostgreSQL", "Fuentes académicas y ML workspace")
+  RelIndex(1, ml_operator, bff, "Solicita entrenamiento")
+  RelIndex(2, bff, api, "POST /v1/training-jobs con bearer", "REST/JSON; propuesto")
+  RelIndex(3, api, api, "Valida contrato, autorización y crea job_id")
+  RelIndex(4, api, worker, "Despacha job sin esperar su terminación", "Mecanismo por decidir")
+  RelIndex(5, worker, dw, "Lee solo snapshot/corte autorizado", "PostgreSQL")
+  RelIndex(6, worker, worker, "Valida datos, crea particiones temporales, entrena RF/XGBoost y evalúa")
+  RelIndex(7, worker, dw, "Guarda manifiesto, candidato e informe; no lo activa", "Workspace por aprobar")
+  RelIndex(8, bff, api, "Consulta estado del job", "REST/JSON; polling u otro mecanismo por decidir")
+  RelIndex(9, api, bff, "Devuelve estado y error saneado")
