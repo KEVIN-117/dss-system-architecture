@@ -1,0 +1,204 @@
+contract_version: "1.0"
+contract_name: "uatf-prepared-academic-dataset"
+status: "draft"
+description: >-
+  Contrato para un snapshot analítico preparado desde el DW. No declara aprobado
+  el evento de riesgo, el horizonte ni la población objetivo.
+
+manifest:
+  required:
+    - dataset_id
+    - snapshot_ref
+    - source
+    - grain
+    - academic_cut
+    - schema_version
+    - created_at
+    - row_count
+    - exclusions
+    - fields
+    - feature_fields
+    - content_digest
+    - population_definition_ref
+    - target_definition_ref
+  properties:
+    dataset_id: {type: uuid}
+    snapshot_ref: {type: string, max_length: 256}
+    source:
+      system: dw
+      contract_ref: {type: string}
+      run_id: {type: uuid, nullable: true}
+    grain: student_program_academic_cut
+    academic_cut:
+      closure_id: {type: integer}
+      gestion: {type: integer}
+      periodo: {type: integer}
+      effective_at: {type: datetime}
+      status: PROCESADO
+    schema_version: {type: string}
+    created_at: {type: datetime}
+    row_count: {type: integer, minimum: 0}
+    exclusions:
+      type: map<string, integer>
+      description: Conteos por causa; no reemplazar casos ambiguos por exclusiones silenciosas.
+    content_digest:
+      algorithm: sha256
+      format: lowercase_hex_64
+      canonicalization: JSONL UTF-8; JSON keys sorted; records ordered by student_ref, program_ref, cut_id
+    population_definition_ref: {type: string, nullable: true}
+    target_definition_ref: {type: string, nullable: true}
+    target_definition: {type: object, nullable: true}
+    target_field: {type: string, nullable: true}
+    feature_fields:
+      type: array<string>
+      description: Predictores aprobados; vacío hasta demostrar disponibilidad en el corte.
+    fields:
+      type: array<FieldDefinition>
+      description: Esquema exacto de registros materializados; no se aceptan campos adicionales.
+    eligibility_approved: {type: boolean, default: false}
+    target_approved: {type: boolean, default: false}
+
+record:
+  required:
+    - student_ref
+    - program_ref
+    - cut_id
+    - academic_year
+    - academic_period
+    - source_run_id
+    - population_status
+    - resultado_retencion
+    - es_desercion
+    - conteo_snapshot
+    - conteo_evaluable
+    - conteo_desercion
+  conditional_required:
+    target_class: target_approved
+  grain_key: [student_ref, program_ref, cut_id]
+  fields:
+    student_ref:
+      logical_type: string
+      role: identifier
+      sensitivity: personal
+      constraints: [pseudonymized, stable_across_student_scd2_versions, never_log]
+      source_mapping: approved_extraction_only
+    program_ref:
+      logical_type: string
+      role: identifier
+      source_mapping: dw.fact_retencion_desercion.programa_sk
+    cut_id:
+      logical_type: string
+      role: identifier
+      source_mapping: dw.fact_retencion_desercion.closure_id
+    academic_year:
+      logical_type: integer
+      role: audit
+      source_mapping: etl_control.academic_period_closure.gestion
+    academic_period:
+      logical_type: integer
+      role: audit
+      source_mapping: etl_control.academic_period_closure.periodo
+    source_run_id:
+      logical_type: uuid
+      role: audit
+      source_mapping: dw.fact_retencion_desercion.run_id
+    population_status:
+      logical_type: category
+      role: audit
+      values: [ELIGIBLE, OUT_OF_SCOPE, AMBIGUOUS, UNRESOLVED]
+      source_mapping: approved_population_policy
+    materias_cursadas:
+      logical_type: integer
+      role_candidate: feature
+      nullable: true
+      source_mapping: dw.fact_retencion_desercion.materias_cursadas
+      available_at_cut: unverified
+    materias_aprobadas:
+      logical_type: integer
+      role_candidate: feature
+      nullable: true
+      source_mapping: dw.fact_retencion_desercion.materias_aprobadas
+      available_at_cut: unverified
+    materias_reprobadas:
+      logical_type: integer
+      role_candidate: feature
+      nullable: true
+      source_mapping: dw.fact_retencion_desercion.materias_reprobadas
+      available_at_cut: unverified
+    materias_arrastradas:
+      logical_type: integer
+      role_candidate: feature
+      nullable: true
+      source_mapping: dw.fact_retencion_desercion.materias_arrastradas
+      current_preparation: null
+      available_at_cut: unverified
+    ppa_acumulado:
+      logical_type: number
+      role_candidate: feature
+      nullable: true
+      source_mapping: dw.fact_retencion_desercion.ppa_acumulado
+      current_preparation: null
+      available_at_cut: unverified
+    resultado_retencion:
+      logical_type: category
+      role: observed_outcome_audit
+      values: [RETENIDO, DESERTOR, NO_EVALUABLE]
+      never_use_as_feature: true
+    es_desercion:
+      logical_type: boolean
+      role: observed_outcome_audit
+      nullable: true
+      consistency:
+        NO_EVALUABLE: null
+        RETENIDO: false
+        DESERTOR: true
+      never_use_as_feature: true
+    conteo_snapshot:
+      logical_type: integer
+      role: audit
+      values: [1]
+      source_mapping: dw.fact_retencion_desercion.conteo_snapshot
+    conteo_evaluable:
+      logical_type: integer
+      role: audit
+      values: [0, 1]
+      source_mapping: dw.fact_retencion_desercion.conteo_evaluable
+    conteo_desercion:
+      logical_type: integer
+      role: audit
+      values: [0, 1]
+      consistency:
+        NO_EVALUABLE: 0
+        RETENIDO: 0
+        DESERTOR: 1
+      source_mapping: dw.fact_retencion_desercion.conteo_desercion
+    target_class:
+      logical_type: category
+      role: target
+      nullable: false
+      conditional_required_when: target_approved
+      description: Campo presente solo después de aprobar la definición de target.
+
+target_definition:
+  default: null
+  required_when_approved: [event_code, positive_class, negative_class, horizon_ref, label_source]
+
+validation_gates:
+  structural_validity:
+    - manifest_schema_and_digest_valid
+    - row_count_matches_manifest
+    - unique_grain_key
+    - field_types_and_required_values_valid
+    - result_semantics_match_dw_constraints
+    - unknown_student_or_program_members_excluded_and_reported
+    - out_of_scope_and_ambiguous_rows_excluded_and_counted
+  preparation_ready:
+    - target_approved
+    - eligibility_approved
+    - target_definition_ref_non_null
+    - population_definition_ref_non_null
+    - every_feature_has_available_at_cut_proof
+    - no_target_or_future_field_in_feature_roles
+    - both_target_classes_observed
+  failure_state: BLOCKED_OR_INSUFFICIENT_EVIDENCE
+
