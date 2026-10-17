@@ -18,3 +18,7 @@ Documentación de las issues PRED-001 y PRED-002 del motor predictivo. Los contr
 ## Estado
 
 PRED-001 está fusionada. PRED-002 tiene evidencia estática del esquema DW, contrato, validador estructural y un fixture DW-shaped sintético que permanece bloqueado mientras falten aprobaciones. No se ha recibido ni perfilado una extracción institucional autorizada; evento, horizonte y elegibilidad continúan pendientes de DSA. No se ha declarado viable ni entrenado un modelo.
+<<<<<<< HEAD
+=======
+
+>>>>>>> fa8a720 (feat(prediction): add PRED-002 dataset validation)

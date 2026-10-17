@@ -42,3 +42,7 @@
 
 El perfil de filas, cardinalidades, cobertura por periodo/programa, prevalencia, faltantes y exclusiones queda pendiente. Hay CSV/XLSX locales bajo `dss-uatf/dataset/data/out_oltp`; no se han abierto ni usado porque su autorización, anonimización y relación con el snapshot DW no están confirmadas. No se usan datos generados o fuentes OLTP como reemplazo de una extracción autorizada del DW.
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> fa8a720 (feat(prediction): add PRED-002 dataset validation)
