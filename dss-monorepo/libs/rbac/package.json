@@ -28,6 +28,7 @@
   },
   "dependencies": {
     "@dss-monorepo/auth-models": "workspace:*",
-    "@dss-monorepo/auth": "workspace:*"
+    "@dss-monorepo/auth": "workspace:*",
+    "@dss-monorepo/rbac-server": "workspace:*"
   }
 }

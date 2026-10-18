@@ -6,6 +6,16 @@
   "tags": ["type:app", "scope:public"],
   "// targets": "to see all targets run: nx show project @dss-monorepo/landing --web",
   "targets": {
+    "build": {
+      "command": "next build --webpack",
+      "parallelism": false,
+      "options": {
+        "cwd": "apps/landing",
+        "env": {
+          "NODE_ENV": "production"
+        }
+      }
+    },
     "dev": {
       "options": {
         "port": 3000

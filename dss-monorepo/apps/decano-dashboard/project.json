@@ -5,6 +5,16 @@
   "sourceRoot": "apps/decano-dashboard/src",
   "tags": ["type:app", "scope:decano"],
   "targets": {
+    "build": {
+      "command": "next build --webpack",
+      "parallelism": false,
+      "options": {
+        "cwd": "apps/decano-dashboard",
+        "env": {
+          "NODE_ENV": "production"
+        }
+      }
+    },
     "dev": {
       "options": {
         "port": 3002

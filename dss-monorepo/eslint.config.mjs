@@ -66,7 +66,7 @@ export default [
               sourceTag: 'type:bff',
               onlyDependOnLibsWithTags: [
                 'type:connector',
-                'type:feature',
+                'type:domain',
                 'type:util',
               ],
             },

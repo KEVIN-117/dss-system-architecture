@@ -17,6 +17,9 @@ secreto OIDC ni la URL de `auth-service`.
   sesión BFF válida.
 - `GET /api/auth/logout`: elimina la sesión BFF y redirige al logout OIDC si
   tiene un ID token disponible.
+- `GET|POST /api/graphql`: endpoint Apollo Server protegido por la misma sesión
+  BFF o Bearer token. El esquema inicial expone `Query.ping`; la identidad
+  autenticada queda disponible en el contexto de los resolvers.
 
 La cookie de sesión es `HttpOnly`, `SameSite=Lax`, `Secure` en producción y
 contiene un JWE que solo puede descifrar el BFF. No persiste el refresh token.
@@ -50,6 +53,22 @@ BFF_DEFAULT_POST_LOGIN_REDIRECT_URI=http://localhost:3000/auth/callback
 BFF_SESSION_SECRET=<al-menos-32-caracteres-no-versionados>
 ```
 
+### Ejecución local
+
+El flujo de login necesita que `auth-service` esté disponible: después de
+validar los tokens, el callback consulta `/api/v1/auth/me` para confirmar que el
+perfil exista y esté activo. `nx run-many -t dev --projects="tag:type:app,tag:type:bff"`
+no inicia este servicio Spring. Desde la raíz de `dss-system-architecture`,
+inicia `auth-service` y sus dependencias con:
+
+```bash
+docker compose up -d auth-service
+```
+
+Luego inicia los portales y el BFF con Nx. Si el callback vuelve a fallar, los
+logs del BFF indican la etapa del fallo sin registrar códigos, cookies ni
+tokens.
+
 Los URI de callback, logout y los orígenes deben coincidir con el cliente
 confidencial `dss-bff` del realm. En producción se usan URL HTTPS y secretos
 distintos por entorno. El import del realm ocurre solo en una instalación
@@ -60,6 +79,15 @@ No existe una ruta de intercambio de tokens para el navegador. El único flujo
 soportado es `/api/auth/login` y su callback OIDC; los portales nunca reciben ni
 envían access tokens. Los callers de servidor de confianza pueden usar el
 encabezado Bearer en las rutas protegidas del BFF cuando su contrato lo requiera.
+
+Las consultas GraphQL requieren una sesión válida y respetan `BFF_ALLOWED_ORIGINS`
+para CORS. Ejemplo de una consulta autenticada desde un portal con cookie de sesión:
+
+```graphql
+query HealthCheck {
+  ping
+}
+```
 
 ## Verificación E2E
 

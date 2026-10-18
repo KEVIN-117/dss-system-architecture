@@ -5,6 +5,16 @@
   "sourceRoot": "apps/rector-dashboard/src",
   "tags": ["type:app", "scope:rector"],
   "targets": {
+    "build": {
+      "command": "next build --webpack",
+      "parallelism": false,
+      "options": {
+        "cwd": "apps/rector-dashboard",
+        "env": {
+          "NODE_ENV": "production"
+        }
+      }
+    },
     "dev": {
       "options": {
         "port": 3004

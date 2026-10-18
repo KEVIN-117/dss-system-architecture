@@ -5,6 +5,14 @@
   "sourceRoot": "apps/bff/src",
   "tags": ["type:bff", "scope:infrastructure"],
   "targets": {
+    "build": {
+      "parallelism": false,
+      "options": {
+        "env": {
+          "NODE_ENV": "production"
+        }
+      }
+    },
     "dev": {
       "options": {
         "port": 3006

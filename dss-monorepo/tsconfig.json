@@ -77,6 +77,9 @@
     },
     {
       "path": "./libs/shared/olap-data-access"
+    },
+    {
+      "path": "./libs/shared/rbac-server"
     }
   ]
 }

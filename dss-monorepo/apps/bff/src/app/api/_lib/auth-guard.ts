@@ -9,7 +9,7 @@ import {
   isRbacAllowed,
   type DSSPermission,
   type RoleMatch,
-} from '@dss-monorepo/rbac/server';
+} from '@dss-monorepo/rbac-server';
 import { NextResponse } from 'next/server';
 
 import {
