@@ -5,7 +5,7 @@ export interface AcademicContext {
   id: string;
   userId: string;
   facultyId: number | null;
-  careerId: number | null;
+  careerId: string | null;
 }
 
 /**
@@ -41,12 +41,12 @@ export function isAuthUserProfile(value: unknown): value is AuthUserProfile {
     value.academicContexts.every(isAcademicContext);
 }
 
-function isAcademicContext(value: unknown): value is AcademicContext {
+export function isAcademicContext(value: unknown): value is AcademicContext {
   return isRecord(value) &&
     isUuid(value.id) &&
     isUuid(value.userId) &&
     isNullablePositiveInteger(value.facultyId) &&
-    isNullablePositiveInteger(value.careerId);
+    isNullableCareerId(value.careerId);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -63,4 +63,8 @@ function isUuid(value: unknown): value is string {
 
 function isNullablePositiveInteger(value: unknown): value is number | null {
   return value === null || (typeof value === 'number' && Number.isInteger(value) && value > 0);
+}
+
+function isNullableCareerId(value: unknown): value is string | null {
+  return value === null || (typeof value === 'string' && value.length === 3 && value.trim() === value);
 }

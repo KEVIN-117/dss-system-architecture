@@ -1,6 +1,12 @@
 export {
   AuthServiceClientError,
   fetchUserProfile,
+  isAcademicContextAssignmentRequest,
+  replaceUserAcademicContexts,
+} from './clients/auth-service-client.js';
+export type {
+  AcademicContextAssignment,
+  ReplaceUserAcademicContextsRequest,
 } from './clients/auth-service-client.js';
 export {
   extractDssRoles,

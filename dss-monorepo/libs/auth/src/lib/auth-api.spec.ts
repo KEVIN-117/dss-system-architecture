@@ -20,7 +20,7 @@ const profile = {
     id: CONTEXT_ID,
     userId: USER_ID,
     facultyId: 3,
-    careerId: 12,
+    careerId: 'INF',
   }],
 };
 

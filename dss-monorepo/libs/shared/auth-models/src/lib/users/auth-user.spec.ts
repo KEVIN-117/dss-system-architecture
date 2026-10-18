@@ -13,7 +13,7 @@ const profile = {
     id: '7f4f3174-98f1-4d5a-a8c8-4f3e2022b2c3',
     userId: '6acb7476-663d-4c94-b3bd-9e5ac6db7f31',
     facultyId: 2,
-    careerId: 8,
+    careerId: 'INF',
   }],
 };
 

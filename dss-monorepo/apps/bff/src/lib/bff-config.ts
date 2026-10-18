@@ -30,20 +30,51 @@ export class BffConfigurationError extends Error {
   }
 }
 
-export function getOlapServiceUrl(environment: Environment = process.env): string {
+export function getOlapServiceUrl(
+  environment: Environment = process.env,
+): string {
   return requiredHttpUrl(environment, 'OLAP_SERVICE_URL');
+}
+
+export function getPredictionServiceUrl(
+  environment: Environment = process.env,
+): string {
+  const value = requiredHttpUrl(environment, 'PREDICTION_SERVICE_URL');
+  const url = new URL(value);
+  if (url.username || url.password || url.search || url.hash) {
+    throw new BffConfigurationError(
+      'PREDICTION_SERVICE_URL must not contain credentials, query parameters, or a fragment',
+    );
+  }
+  return url.toString().replace(/\/$/, '');
 }
 
 /**
  * The BFF is the only layer allowed to read environment variables. Connector
  * functions receive this resolved, typed configuration as arguments.
  */
-export function getBffAuthConfig(environment: Environment = process.env): BffAuthConfig {
+export function getBffAuthConfig(
+  environment: Environment = process.env,
+): BffAuthConfig {
   const allowedOrigins = getAllowedOrigins(environment);
-  const defaultPostLoginRedirectUri = requiredHttpUrl(environment, 'BFF_DEFAULT_POST_LOGIN_REDIRECT_URI');
-  const postLogoutRedirectUri = requiredHttpUrl(environment, 'KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI');
-  assertPortalRedirect(defaultPostLoginRedirectUri, allowedOrigins, 'BFF_DEFAULT_POST_LOGIN_REDIRECT_URI');
-  assertPortalRedirect(postLogoutRedirectUri, allowedOrigins, 'KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI');
+  const defaultPostLoginRedirectUri = requiredHttpUrl(
+    environment,
+    'BFF_DEFAULT_POST_LOGIN_REDIRECT_URI',
+  );
+  const postLogoutRedirectUri = requiredHttpUrl(
+    environment,
+    'KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI',
+  );
+  assertPortalRedirect(
+    defaultPostLoginRedirectUri,
+    allowedOrigins,
+    'BFF_DEFAULT_POST_LOGIN_REDIRECT_URI',
+  );
+  assertPortalRedirect(
+    postLogoutRedirectUri,
+    allowedOrigins,
+    'KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI',
+  );
 
   return {
     authServiceUrl: requiredHttpUrl(environment, 'AUTH_SERVICE_URL'),
@@ -66,7 +97,9 @@ export function getBffAuthConfig(environment: Environment = process.env): BffAut
   };
 }
 
-export function getBffSessionConfig(environment: Environment = process.env): BffSessionConfig {
+export function getBffSessionConfig(
+  environment: Environment = process.env,
+): BffSessionConfig {
   const ttl = environment.BFF_SESSION_TTL_SECONDS?.trim();
   const ttlSeconds = ttl ? Number(ttl) : DEFAULT_SESSION_TTL_SECONDS;
 
@@ -78,12 +111,16 @@ export function getBffSessionConfig(environment: Environment = process.env): Bff
 
   const secret = requiredValue(environment, 'BFF_SESSION_SECRET');
   if (secret.length < 32) {
-    throw new BffConfigurationError('BFF_SESSION_SECRET must contain at least 32 characters');
+    throw new BffConfigurationError(
+      'BFF_SESSION_SECRET must contain at least 32 characters',
+    );
   }
 
   const cookieName = getBffSessionCookieName(environment);
   if (!/^[A-Za-z0-9_-]+$/.test(cookieName)) {
-    throw new BffConfigurationError('BFF_SESSION_COOKIE contains invalid characters');
+    throw new BffConfigurationError(
+      'BFF_SESSION_COOKIE contains invalid characters',
+    );
   }
 
   return {
@@ -94,17 +131,24 @@ export function getBffSessionConfig(environment: Environment = process.env): Bff
   };
 }
 
-export function getBffSessionCookieName(environment: Environment = process.env): string {
+export function getBffSessionCookieName(
+  environment: Environment = process.env,
+): string {
   return environment.BFF_SESSION_COOKIE?.trim() || DEFAULT_SESSION_COOKIE_NAME;
 }
 
-export function getAllowedOrigins(environment: Environment = process.env): readonly string[] {
-  const configuredOrigins = environment.BFF_ALLOWED_ORIGINS?.split(',')
-    .map((origin) => origin.trim())
-    .filter(Boolean) ?? [];
+export function getAllowedOrigins(
+  environment: Environment = process.env,
+): readonly string[] {
+  const configuredOrigins =
+    environment.BFF_ALLOWED_ORIGINS?.split(',')
+      .map((origin) => origin.trim())
+      .filter(Boolean) ?? [];
 
   if (configuredOrigins.length === 0) {
-    throw new BffConfigurationError('BFF_ALLOWED_ORIGINS must configure at least one portal origin');
+    throw new BffConfigurationError(
+      'BFF_ALLOWED_ORIGINS must configure at least one portal origin',
+    );
   }
 
   return configuredOrigins.map((origin) => {
@@ -115,7 +159,9 @@ export function getAllowedOrigins(environment: Environment = process.env): reado
       }
       return parsed.origin;
     } catch {
-      throw new BffConfigurationError('BFF_ALLOWED_ORIGINS must contain valid HTTP(S) origins');
+      throw new BffConfigurationError(
+        'BFF_ALLOWED_ORIGINS must contain valid HTTP(S) origins',
+      );
     }
   });
 }
@@ -126,7 +172,9 @@ function assertPortalRedirect(
   variableName: string,
 ): void {
   if (!allowedOrigins.includes(new URL(redirectUri).origin)) {
-    throw new BffConfigurationError(`${variableName} must use an origin in BFF_ALLOWED_ORIGINS`);
+    throw new BffConfigurationError(
+      `${variableName} must use an origin in BFF_ALLOWED_ORIGINS`,
+    );
   }
 }
 

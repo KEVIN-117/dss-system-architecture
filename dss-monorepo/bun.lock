@@ -101,6 +101,7 @@
         "@as-integrations/next": "^4.1.0",
         "@dss-monorepo/auth-connector": "workspace:*",
         "@dss-monorepo/auth-models": "workspace:*",
+        "@dss-monorepo/ml-connector": "workspace:*",
         "@dss-monorepo/rbac-server": "workspace:*",
         "graphql": "^16.11.0",
         "jose": "^6.2.12",
@@ -249,6 +250,16 @@
       "dependencies": {
         "@dss-monorepo/olap-models": "workspace:*",
         "apache-arrow": "^21.2.0",
+        "tslib": "^2.3.0",
+      },
+      "devDependencies": {
+        "vitest": "~4.1.0",
+      },
+    },
+    "libs/connectors/ml-connector": {
+      "name": "@dss-monorepo/ml-connector",
+      "version": "0.0.1",
+      "dependencies": {
         "tslib": "^2.3.0",
       },
     },
@@ -684,6 +695,8 @@
     "@dss-monorepo/landing-e2e": ["@dss-monorepo/landing-e2e@workspace:apps/landing-e2e"],
 
     "@dss-monorepo/olap-connector": ["@dss-monorepo/olap-connector@workspace:libs/connectors/olap-connector"],
+
+    "@dss-monorepo/ml-connector": ["@dss-monorepo/ml-connector@workspace:libs/connectors/ml-connector"],
 
     "@dss-monorepo/olap-data-access": ["@dss-monorepo/olap-data-access@workspace:libs/shared/olap-data-access"],
 
