@@ -20,7 +20,7 @@
   "include": ["src/**/*.ts"],
   "references": [
     {
-      "path": "../olap-models"
+      "path": "../olap-models/tsconfig.lib.json"
     },
     {
       "path": "../../connectors/olap-connector/tsconfig.lib.json"

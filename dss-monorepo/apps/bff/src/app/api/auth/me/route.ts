@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { resolvePermissions } from '@dss-monorepo/rbac/server';
+import { resolvePermissions } from '@dss-monorepo/rbac-server';
 
 import { authenticateRequest } from '../../_lib/auth-guard';
 import { withCors } from '../../../../lib/cors';

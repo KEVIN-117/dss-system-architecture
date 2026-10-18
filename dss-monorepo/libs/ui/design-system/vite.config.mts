@@ -4,6 +4,29 @@ import dts from 'vite-plugin-dts';
 import tailwindcss from '@tailwindcss/vite';
 import * as path from 'path';
 
+const externalPackages = [
+  'react',
+  'react-dom',
+  '@base-ui/react',
+  '@dss-monorepo/dashboard-engine',
+  '@dss-monorepo/olap-models',
+  '@fontsource-variable/geist',
+  '@monaco-editor/react',
+  '@xyflow/react',
+  'class-variance-authority',
+  'cn',
+  'date-fns',
+  'lucide-react',
+  'next-themes',
+  'radix-ui',
+  'react-day-picker',
+  'react-grid-layout',
+  'react-resizable',
+  'shadcn',
+  'sonner',
+  'tw-animate-css',
+];
+
 export default defineConfig(() => ({
   root: import.meta.dirname,
   cacheDir: '../../../node_modules/.vite/libs/ui/design-system',
@@ -41,23 +64,9 @@ export default defineConfig(() => ({
       // External packages that should not be bundled into your library.
       // Keeping the UI dependencies external also prevents Vite/Rolldown from
       // embedding their CommonJS React shims (which use dynamic require()).
-      external: [
-        'react',
-        'react-dom',
-        'react/jsx-runtime',
-        '@base-ui/react',
-        '@fontsource-variable/geist',
-        'class-variance-authority',
-        'cn',
-        'date-fns',
-        'lucide-react',
-        'next-themes',
-        'radix-ui',
-        'react-day-picker',
-        'shadcn',
-        'sonner',
-        'tw-animate-css',
-      ],
+      external: (id) => externalPackages.some(
+        (packageName) => id === packageName || id.startsWith(`${packageName}/`),
+      ),
       output: {
         // Next.js consumes the package as a Client Component boundary. Vite's
         // library output otherwise drops the source directive.

@@ -62,7 +62,7 @@
   ],
   "references": [
     {
-      "path": "../../libs/rbac"
+      "path": "../../libs/shared/rbac-server"
     },
     {
       "path": "../../libs/shared/auth-models"

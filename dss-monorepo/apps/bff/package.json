@@ -3,10 +3,13 @@
   "version": "0.0.1",
   "private": true,
   "dependencies": {
+    "@apollo/server": "^5.5.1",
+    "@as-integrations/next": "^4.1.0",
     "@dss-monorepo/auth-connector": "workspace:*",
     "@dss-monorepo/auth-models": "workspace:*",
-    "@dss-monorepo/rbac": "workspace:*",
+    "@dss-monorepo/rbac-server": "workspace:*",
     "jose": "^6.2.12",
+    "graphql": "^16.11.0",
     "next": "~16.1.6",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"

@@ -5,6 +5,16 @@
   "sourceRoot": "apps/admin-portal/src",
   "tags": ["type:app", "scope:admin"],
   "targets": {
+    "build": {
+      "command": "next build --webpack",
+      "parallelism": false,
+      "options": {
+        "cwd": "apps/admin-portal",
+        "env": {
+          "NODE_ENV": "production"
+        }
+      }
+    },
     "dev": {
       "options": {
         "port": 3001

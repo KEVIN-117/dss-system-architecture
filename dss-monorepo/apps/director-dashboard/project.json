@@ -5,6 +5,16 @@
   "sourceRoot": "apps/director-dashboard/src",
   "tags": ["type:app", "scope:director"],
   "targets": {
+    "build": {
+      "command": "next build --webpack",
+      "parallelism": false,
+      "options": {
+        "cwd": "apps/director-dashboard",
+        "env": {
+          "NODE_ENV": "production"
+        }
+      }
+    },
     "dev": {
       "options": {
         "port": 3003

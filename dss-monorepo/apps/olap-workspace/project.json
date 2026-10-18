@@ -5,9 +5,21 @@
   "sourceRoot": "apps/olap-workspace/src",
   "tags": ["type:app", "scope:olap"],
   "targets": {
-    "dev": {
+    "build": {
+      "command": "next build --webpack",
+      "parallelism": false,
       "options": {
-        "port": 3007
+        "cwd": "apps/olap-workspace",
+        "env": {
+          "NODE_ENV": "production"
+        }
+      }
+    },
+    "dev": {
+      "command": "next dev --webpack",
+      "options": {
+        "port": 3007,
+        "cwd": "apps/olap-workspace"
       }
     },
     "serve": {

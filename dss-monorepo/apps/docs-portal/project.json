@@ -5,6 +5,14 @@
   "sourceRoot": "apps/docs-portal/src",
   "tags": ["type:app", "scope:shared"],
   "targets": {
+    "build": {
+      "parallelism": false,
+      "options": {
+        "env": {
+          "NODE_ENV": "production"
+        }
+      }
+    },
     "dev": {
       "options": {
         "port": 3005
