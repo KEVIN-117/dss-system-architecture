@@ -60,23 +60,40 @@ export async function authenticateRequest(
     };
   } catch (error) {
     if (error instanceof BffConfigurationError) {
-      console.error('[bff] invalid authentication configuration', error.message);
+      console.error(
+        '[bff] invalid authentication configuration',
+        error.message,
+      );
       return {
         authenticated: false,
-        response: NextResponse.json({ error: 'BFF authentication is unavailable' }, { status: 500 }),
+        response: NextResponse.json(
+          { error: 'BFF authentication is unavailable' },
+          { status: 500 },
+        ),
       };
     }
 
-    if (!(error instanceof JwtVerificationError) && !(error instanceof AuthServiceClientError)) {
+    if (error instanceof AuthServiceClientError && error.status >= 500) {
+      return {
+        authenticated: false,
+        response: NextResponse.json(
+          { error: 'Authentication service is unavailable' },
+          { status: error.status === 504 ? 504 : 503 },
+        ),
+      };
+    }
+
+    if (
+      !(error instanceof JwtVerificationError) &&
+      !(error instanceof AuthServiceClientError)
+    ) {
       console.error('[bff] unexpected authentication failure', error);
     }
     return unauthorized('Invalid or expired access token');
   }
 }
 
-async function resolveRequestToken(
-  request: Request,
-): Promise<string | null> {
+async function resolveRequestToken(request: Request): Promise<string | null> {
   const bearerToken = extractBearerToken(request.headers.get('authorization'));
   if (bearerToken) {
     return bearerToken;
@@ -123,7 +140,12 @@ export function requirePermissions(
   requiredPermissions: readonly DSSPermission[],
   match: RoleMatch = 'any',
 ): NextResponse | null {
-  if (isRbacAllowed(authentication.roles, { permissions: requiredPermissions, match })) {
+  if (
+    isRbacAllowed(authentication.roles, {
+      permissions: requiredPermissions,
+      match,
+    })
+  ) {
     return null;
   }
 

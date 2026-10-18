@@ -9,6 +9,14 @@ export default defineConfig(() => ({
   resolve: {
     alias: {
       '@': join(import.meta.dirname, './src'),
+      '@dss-monorepo/auth-connector': join(
+        import.meta.dirname,
+        '../../libs/connectors/auth-connector/src/index.ts',
+      ),
+      '@dss-monorepo/ml-connector': join(
+        import.meta.dirname,
+        '../../libs/connectors/ml-connector/src/index.ts',
+      ),
     },
   },
   test: {

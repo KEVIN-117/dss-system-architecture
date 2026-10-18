@@ -17,9 +17,21 @@ secreto OIDC ni la URL de `auth-service`.
   sesión BFF válida.
 - `GET /api/auth/logout`: elimina la sesión BFF y redirige al logout OIDC si
   tiene un ID token disponible.
+- `PUT /api/admin/users/:userId/academic-contexts`: reemplaza los contextos
+  académicos del usuario. Requiere `SUPERADMIN` en el BFF y conserva la
+  validación `ROLE_SUPERADMIN` de `auth-service` como segunda barrera.
 - `GET|POST /api/graphql`: endpoint Apollo Server protegido por la misma sesión
   BFF o Bearer token. El esquema inicial expone `Query.ping`; la identidad
   autenticada queda disponible en el contexto de los resolvers.
+- `/api/olap/rest/saiku/*`: proxy autenticado a `olap-service`, incluido su
+  endpoint GraphQL real en `/api/olap/rest/saiku/api/graphql`. El BFF valida la
+  sesión y reenvía el access token; Keycloak debe incluir la audiencia
+  `olap-service` en los tokens solicitados por `dss-bff`.
+- `/api/prediction/v1/predictions` y `/api/prediction/v1/training-jobs*`:
+  fachada autenticada para inferencias y trabajos de entrenamiento. Solo
+  permite las operaciones declaradas en Prediction API v1 y reenvía el token
+  validado a `prediction-service`; el servicio debe aplicar permisos ML y
+  ámbitos académicos. La URL del servicio solo se lee en el BFF.
 
 La cookie de sesión es `HttpOnly`, `SameSite=Lax`, `Secure` en producción y
 contiene un JWE que solo puede descifrar el BFF. No persiste el refresh token.
@@ -48,10 +60,19 @@ KEYCLOAK_BFF_CLIENT_SECRET=<secreto-no-versionado>
 KEYCLOAK_BFF_REDIRECT_URI=http://localhost:3006/api/auth/callback
 KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI=http://localhost:3000/login
 AUTH_SERVICE_URL=http://localhost:8000
+PREDICTION_SERVICE_URL=http://prediction-service:8000
 BFF_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
 BFF_DEFAULT_POST_LOGIN_REDIRECT_URI=http://localhost:3000/auth/callback
 BFF_SESSION_SECRET=<al-menos-32-caracteres-no-versionados>
 ```
+
+La URL `http://prediction-service:8000` aplica cuando BFF y Prediction Service
+comparten la red `dss-net`; configura una dirección alcanzable desde el runtime
+del BFF en desarrollo local. El conector ML y estas rutas siguen el borrador
+[prediction-api-v1.yaml](../../../docs/prediction/contracts/prediction-api-v1.yaml). El servicio actual aún no
+implementa ese contrato: hasta que lo haga y se aprueben sus decisiones de
+audiencia/roles y dominio, las rutas no representan una integración ML lista
+para producción.
 
 ### Ejecución local
 

@@ -80,6 +80,9 @@
     },
     {
       "path": "./libs/shared/rbac-server"
+    },
+    {
+      "path": "./libs/connectors/ml-connector"
     }
   ]
 }
