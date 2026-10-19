@@ -19,7 +19,7 @@
             order ="0" />
 
     <context:property-placeholder
-            location="file:///${ext.prop.dir}saiku-beans.properties"
+            location="${ext.prop.dir}saiku-beans.properties"
             ignore-resource-not-found="true"
             ignore-unresolvable="true"
             order ="-1" />
@@ -489,7 +489,10 @@
     <!-- saiku#906: AI audit log. Append-only JSONL at ${saiku.home}/logs/
          ai-audit.jsonl; resolves ai.audit.enabled (default ON) + ai.audit.file
          at boot. Written by aiAuditFilter, read by aiAuditResource. -->
-    <bean id="aiAuditLog" class="org.saiku.service.olap.ai.audit.AiAuditLog"/>
+    <bean id="aiAuditLog" class="org.saiku.service.olap.ai.audit.AiAuditLog">
+        <constructor-arg value="${ai.audit.enabled:true}" />
+        <constructor-arg value="${ai.audit.file:${saiku.home}/logs/ai-audit.jsonl}" />
+    </bean>
 
     <!-- saiku#906: the audit backbone — a JAX-RS provider that records one entry
          per /saiku/api/ai/* call (registered explicitly in SaikuJerseyApplication

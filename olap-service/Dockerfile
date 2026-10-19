@@ -1,4 +1,4 @@
-# Saiku demo image — bundles the launcher (REST + UI + native MCP on :8080)
+# Saiku OLAP API image — bundles the launcher (REST + XMLA + native MCP on :8080)
 # in a single container. Since #878 the MCP endpoint lives inside saiku-api
 # at /rest/saiku/api/mcp; MCP hosts (Claude Desktop, Cursor, …) authenticate
 # with per-user Basic credentials over the same chain as the AI REST API.
@@ -112,8 +112,8 @@ EXPOSE 8080
 # credentials are needed. Use HEAD (--head): InfoResource added a dedicated
 # HEAD handler in saiku#866 precisely for monitors — a GET walks the plugin
 # directory. curl ships in the Ubuntu-noble base (already used above to fetch
-# the OTel agent). start-period is generous: first boot seeds saiku-home + runs
-# the H2 FoodMart bootstrap (~30s, ~200MB) before the port answers.
+# the OTel agent). The start period allows the empty repository and API context
+# to initialize on first boot.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=120s --retries=3 \
   CMD curl -fsS -o /dev/null --head http://localhost:8080/rest/saiku/info || exit 1
 

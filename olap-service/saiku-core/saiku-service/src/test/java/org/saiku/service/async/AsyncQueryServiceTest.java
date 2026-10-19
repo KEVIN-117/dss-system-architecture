@@ -233,7 +233,7 @@ public class AsyncQueryServiceTest {
         } catch (java.util.concurrent.RejectedExecutionException expected) {
             // rejected handle must NOT linger in the map.
             assertEquals(1, svc.size());
-            assertEquals(blocking.getStatus(), svc.get(blocking.getId()).getStatus());
+            assertSame("the only retained handle must be the blocking submission", blocking, svc.get(blocking.getId()));
         } finally {
             stub.block.countDown();
         }

@@ -6,12 +6,12 @@ El launcher configura `external.properties.file` como `${saiku.home}/conf/dataso
 
 Ejemplo de descriptor sin secretos en `<saiku-home>/repository/data/unknown/datasources/uatf-dw.sds`:
 
-El nombre `uatf-dw.xml` representa un catálogo Mondrian que debe existir en `<saiku-home>/datasources/`; el repositorio aún no trae un catálogo UATF de integración listo para consultas.
+El catálogo UATF base está versionado en [`infra/olap/schemas/uatf-rendimiento-academico.xml`](../../infra/olap/schemas/uatf-rendimiento-academico.xml). Debe instalarse en `<saiku-home>/datasources/uatf-rendimiento-academico.xml`. El XML espera que la conexión JDBC seleccione el esquema PostgreSQL `dw` (`currentSchema=dw`). La definición no sustituye la conexión ni la carga de datos.
 
 ```xml
 <dataSource>
   <driver>mondrian.olap4j.MondrianOlap4jDriver</driver>
-  <location>jdbc:mondrian:Jdbc=jdbc:postgresql://postgres-dw:5432/dw_integration;Catalog=mondrian://datasources/uatf-dw.xml;JdbcDrivers=org.postgresql.Driver;</location>
+  <location>jdbc:mondrian:Jdbc=jdbc:postgresql://postgres-dw:5432/dw_integration?currentSchema=dw;Catalog=mondrian://datasources/uatf-rendimiento-academico.xml;JdbcDrivers=org.postgresql.Driver;</location>
   <name>uatf-dw</name>
   <propertyKey>uatf_dw</propertyKey>
   <type>OLAP</type>
@@ -22,7 +22,7 @@ El archivo externo correspondiente lleva las mismas propiedades, con credenciale
 
 ```properties
 datasource.uatf_dw.driver=mondrian.olap4j.MondrianOlap4jDriver
-datasource.uatf_dw.location=jdbc:mondrian:Jdbc=jdbc:postgresql://postgres-dw:5432/dw_integration?connectTimeout=5&socketTimeout=60;Catalog=mondrian://datasources/uatf-dw.xml;JdbcDrivers=org.postgresql.Driver;
+datasource.uatf_dw.location=jdbc:mondrian:Jdbc=jdbc:postgresql://postgres-dw:5432/dw_integration?currentSchema=dw&connectTimeout=5&socketTimeout=60;Catalog=mondrian://datasources/uatf-rendimiento-academico.xml;JdbcDrivers=org.postgresql.Driver;
 datasource.uatf_dw.username=<valor inyectado desde secretos>
 datasource.uatf_dw.password=<valor inyectado desde secretos>
 ```

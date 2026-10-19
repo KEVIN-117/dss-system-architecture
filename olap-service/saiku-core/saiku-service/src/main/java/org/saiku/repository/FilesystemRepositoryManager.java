@@ -749,6 +749,14 @@ public class FilesystemRepositoryManager implements IRepositoryManager {
             }
 
             f = this.createNode(filename);
+            File parent = f.getParentFile();
+            if (parent != null) {
+                try {
+                    Files.createDirectories(parent.toPath());
+                } catch (IOException e) {
+                    throw new RepositoryException("Could not create parent folder for internal file " + path, e);
+                }
+            }
             FileWriter fileWriter;
             try {
                 fileWriter = new FileWriter(f);
