@@ -18,6 +18,23 @@ on:
       - "infra/dw-integration/**"
       - "infra/dw-test-data/**"
       - "docs/dw/**"
+  workflow_dispatch:
+    inputs:
+      publish_keycloak:
+        description: Republish the current Keycloak release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_olap:
+        description: Republish the current OLAP service release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_apache_hop:
+        description: Republish the current Apache Hop release from the manifest
+        required: false
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -63,18 +80,34 @@ jobs:
       auth_major: ${{ steps.release.outputs['auth-service--major'] }}
       auth_minor: ${{ steps.release.outputs['auth-service--minor'] }}
       keycloak_release_created: ${{ steps.release.outputs['infra/keycloak--release_created'] }}
-      keycloak_version: ${{ steps.release.outputs['infra/keycloak--version'] }}
-      keycloak_major: ${{ steps.release.outputs['infra/keycloak--major'] }}
-      keycloak_minor: ${{ steps.release.outputs['infra/keycloak--minor'] }}
+      keycloak_version: ${{ steps.release.outputs['infra/keycloak--version'] || steps.manifest.outputs.keycloak_version }}
+      keycloak_major: ${{ steps.release.outputs['infra/keycloak--major'] || steps.manifest.outputs.keycloak_major }}
+      keycloak_minor: ${{ steps.release.outputs['infra/keycloak--minor'] || steps.manifest.outputs.keycloak_minor }}
       olap_release_created: ${{ steps.release.outputs['olap-service--release_created'] }}
-      olap_version: ${{ steps.release.outputs['olap-service--version'] }}
-      olap_major: ${{ steps.release.outputs['olap-service--major'] }}
-      olap_minor: ${{ steps.release.outputs['olap-service--minor'] }}
+      olap_version: ${{ steps.release.outputs['olap-service--version'] || steps.manifest.outputs.olap_version }}
+      olap_major: ${{ steps.release.outputs['olap-service--major'] || steps.manifest.outputs.olap_major }}
+      olap_minor: ${{ steps.release.outputs['olap-service--minor'] || steps.manifest.outputs.olap_minor }}
       hop_release_created: ${{ steps.release.outputs['etl-layer/apache-hop--release_created'] }}
-      hop_version: ${{ steps.release.outputs['etl-layer/apache-hop--version'] }}
-      hop_major: ${{ steps.release.outputs['etl-layer/apache-hop--major'] }}
-      hop_minor: ${{ steps.release.outputs['etl-layer/apache-hop--minor'] }}
+      hop_version: ${{ steps.release.outputs['etl-layer/apache-hop--version'] || steps.manifest.outputs.hop_version }}
+      hop_major: ${{ steps.release.outputs['etl-layer/apache-hop--major'] || steps.manifest.outputs.hop_major }}
+      hop_minor: ${{ steps.release.outputs['etl-layer/apache-hop--minor'] || steps.manifest.outputs.hop_minor }}
     steps:
+      - uses: actions/checkout@v4
+      - name: Read current component versions
+        id: manifest
+        shell: bash
+        run: |
+          while IFS=' ' read -r output component; do
+            version="$(jq -r --arg component "$component" '.[$component]' .release-please-manifest.json)"
+            IFS='.' read -r major minor _ <<< "$version"
+            echo "${output}_version=$version" >> "$GITHUB_OUTPUT"
+            echo "${output}_major=$major" >> "$GITHUB_OUTPUT"
+            echo "${output}_minor=$minor" >> "$GITHUB_OUTPUT"
+          done <<'VERSIONS'
+          keycloak infra/keycloak
+          olap olap-service
+          hop etl-layer/apache-hop
+          VERSIONS
       - name: Require release automation token
         env:
           RELEASE_PLEASE_TOKEN: ${{ secrets.RELEASE_PLEASE_TOKEN }}
@@ -124,7 +157,9 @@ jobs:
 
   publish-keycloak:
     name: Publish Keycloak
-    if: needs.release-please.outputs.keycloak_release_created == 'true'
+    if: >-
+      needs.release-please.outputs.keycloak_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_keycloak && needs.release-please.outputs.keycloak_version != '0.0.0')
     needs: [verify-keycloak, release-please]
     runs-on: ubuntu-latest
     permissions:
@@ -164,7 +199,9 @@ jobs:
 
   publish-olap-service:
     name: Publish OLAP service
-    if: needs.release-please.outputs.olap_release_created == 'true'
+    if: >-
+      needs.release-please.outputs.olap_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_olap && needs.release-please.outputs.olap_version != '0.0.0')
     needs: [verify-olap-service, release-please]
     runs-on: ubuntu-latest
     permissions:
@@ -204,7 +241,9 @@ jobs:
 
   publish-apache-hop:
     name: Publish Apache Hop
-    if: needs.release-please.outputs.hop_release_created == 'true'
+    if: >-
+      needs.release-please.outputs.hop_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_apache_hop && needs.release-please.outputs.hop_version != '0.0.0')
     needs: [verify-apache-hop, release-please]
     runs-on: ubuntu-latest
     permissions:
