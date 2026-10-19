@@ -15,7 +15,11 @@ RUN chmod +x ./mvnw
 
 # 3. Descargar dependencias offline.
 # Esta capa se cacheará a menos que pom.xml cambie, ahorrando minutos de red.
-RUN ./mvnw dependency:go-offline -B
+# Reintentar fallos HTTP transitorios de Maven Central durante la descarga.
+RUN ./mvnw -B \
+    -Daether.transport.http.retryHandler.count=5 \
+    -Dmaven.wagon.http.retryHandler.count=5 \
+    dependency:go-offline
 
 # 4. Copiar el código fuente y compilar
 COPY src ./src
