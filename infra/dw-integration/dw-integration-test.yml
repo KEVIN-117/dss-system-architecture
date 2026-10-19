@@ -32,7 +32,7 @@ services:
     tmpfs:
       - /var/lib/postgresql/data
     volumes:
-      - ./init:/docker-entrypoint-initdb.d:ro
+      - ./init/010-olap-role.sql:/docker-entrypoint-initdb.d/010-olap-role.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U dw_test -d dw_integration"]
       interval: 2s

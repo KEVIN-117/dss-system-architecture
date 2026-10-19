@@ -426,7 +426,9 @@ public class RepositoryDatasourceManagerTest {
         // A `..` segment that normalises outside the datadir must be refused outright rather
         // than interpolated into the model JSON as an out-of-root read target.
         try {
-            addCsvDatasource("c://temp/repo/workspace/../../../../etc/passwd", "MOCK_CSV_TRAVERSAL");
+            // Use enough parent segments to leave the configured data directory on both
+            // Windows (where c:/temp/repo is absolute) and POSIX (where it is relative).
+            addCsvDatasource("c://temp/repo/workspace/../../../../../etc/passwd", "MOCK_CSV_TRAVERSAL");
             fail("a CSV location escaping the datadir must be rejected");
         } catch (IllegalArgumentException expected) {
             // Fail closed.

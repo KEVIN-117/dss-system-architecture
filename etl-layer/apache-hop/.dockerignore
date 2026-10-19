@@ -1,0 +1,10 @@
+# Never place machine-specific connection credentials in the image.
+projects/dss-uatf-etl/environments/dev-env.json
+projects/dss-uatf-etl/environments/test-env.json
+projects/dss-uatf-etl/environments/integration-env.json
+projects/dss-uatf-etl/environments/integration-test.json
+projects/dss-uatf-etl/environments/prod-env.json
+
+# Local JDBC files are excluded; the image fetches its pinned driver with a
+# verified SHA-256 digest from Maven Central.
+jdbc/*

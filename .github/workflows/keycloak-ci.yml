@@ -1,0 +1,55 @@
+name: Keycloak CI
+
+on:
+  workflow_call:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/keycloak-ci.yml"
+      - ".github/workflows/container-release.yml"
+      - "infra/keycloak/**"
+      - "keycloak-webhook/**"
+      - "auth-service/**"
+      - "docker-compose.yml"
+      - ".env.example"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: Test provider and build Keycloak image
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+          cache-dependency-path: keycloak-webhook/pom.xml
+
+      - name: Test and package Keycloak provider
+        run: mvn --batch-mode --no-transfer-progress -f keycloak-webhook/pom.xml verify
+
+      - name: Stage tested provider in image context
+        run: cp keycloak-webhook/target/uatf-keycloak-webhook.jar infra/keycloak/providers/uatf-keycloak-webhook.jar
+
+      - name: Validate realm import JSON
+        run: python -m json.tool infra/keycloak/realm/uatf-dss-realm-realm.json > /dev/null
+
+      - name: Build Keycloak image
+        run: docker build --tag dss-keycloak:${{ github.sha }} infra/keycloak
+
+      - name: Upload tested Keycloak provider
+        uses: actions/upload-artifact@v4
+        with:
+          name: keycloak-provider
+          path: keycloak-webhook/target/uatf-keycloak-webhook.jar
+          if-no-files-found: error
+          retention-days: 1
