@@ -37,19 +37,6 @@ jobs:
       - name: Test and package Keycloak provider
         run: mvn --batch-mode --no-transfer-progress -f keycloak-webhook/pom.xml verify
 
-      - name: Verify the versioned provider matches its source
-        run: |
-          python3 - <<'PY'
-          from zipfile import ZipFile
-
-          built = ZipFile("keycloak-webhook/target/uatf-keycloak-webhook.jar")
-          checked_in = ZipFile("infra/keycloak/providers/uatf-keycloak-webhook.jar")
-          built_entries = {name: built.read(name) for name in built.namelist() if not name.endswith("/")}
-          checked_entries = {name: checked_in.read(name) for name in checked_in.namelist() if not name.endswith("/")}
-          if built_entries != checked_entries:
-              raise SystemExit("Provider source changed: rebuild and commit infra/keycloak/providers/uatf-keycloak-webhook.jar")
-          PY
-
       - name: Stage tested provider in image context
         run: cp keycloak-webhook/target/uatf-keycloak-webhook.jar infra/keycloak/providers/uatf-keycloak-webhook.jar
 

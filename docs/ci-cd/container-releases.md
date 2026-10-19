@@ -25,7 +25,7 @@ The initial release baseline is the commit recorded as `bootstrap-sha` in `.gith
 
 Use Conventional Commit messages with component scopes, for example `feat(apache-hop): add publication workflow` or `fix(auth-service): handle missing role`. A `BREAKING CHANGE:` footer or `!` marker requests a major version. Keep changes to a component under its configured path so Release Please can attribute them correctly.
 
-The Keycloak provider JAR is checked into `infra/keycloak/providers/` because it is part of the local image build context. When changing `keycloak-webhook/`, rebuild and commit that JAR with the source change; CI compares its contents with the Maven build and uses the tested artifact for Docker Hub.
+The Keycloak provider JAR is checked into `infra/keycloak/providers/` for local image builds. When changing `keycloak-webhook/`, rebuild and commit that JAR with the source change so Release Please sees a change under `infra/keycloak/`. CI runs the provider's Maven tests, builds the image using the JAR produced by that build, and publishes that tested artifact.
 
 For OLAP CI, the launcher JAR produced by `mvn verify` is uploaded as a short-lived workflow artifact and reused by the image publishing job. Apache Hop's PostgreSQL JDBC driver is downloaded at a fixed version and checked against its SHA-256 before image builds.
 
