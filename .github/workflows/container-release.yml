@@ -114,7 +114,6 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: auth-service
-          file: Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -155,7 +154,6 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: infra/keycloak
-          file: Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -196,7 +194,6 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: olap-service
-          file: Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
@@ -232,7 +229,6 @@ jobs:
       - uses: docker/build-push-action@v6
         with:
           context: etl-layer/apache-hop
-          file: Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
