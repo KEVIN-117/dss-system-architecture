@@ -1,0 +1,32 @@
+#!/usr/bin/env sh
+set -eu
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+run_vertical_test=false
+while read -r local_ref local_sha remote_ref remote_sha; do
+  case "$local_sha" in
+    0000000000000000000000000000000000000000) continue ;;
+  esac
+
+  case "$remote_sha" in
+    0000000000000000000000000000000000000000)
+      base_sha="$(git merge-base origin/main "$local_sha")"
+      ;;
+    *)
+      base_sha="$remote_sha"
+      ;;
+  esac
+
+  if git diff --name-only "$base_sha" "$local_sha" |
+    grep -Eq '^(etl-layer/apache-hop/|infra/dw-(integration|schema)/|\.github/workflows/dw-hop-ci\.yml$)'; then
+    run_vertical_test=true
+    break
+  fi
+done
+
+if [ "$run_vertical_test" = true ]; then
+  echo "Apache Hop / DW changes detected; running the local vertical regression."
+  exec "$repo_root/infra/dw-integration/run-local-vertical.sh"
+fi

@@ -29,6 +29,10 @@ The Keycloak provider JAR is checked into `infra/keycloak/providers/` for local 
 
 For OLAP CI, the launcher JAR produced by `mvn verify` is uploaded as a short-lived workflow artifact and reused by the image publishing job. Apache Hop's PostgreSQL JDBC driver is downloaded at a fixed version and checked against its SHA-256 before image builds.
 
+## Local Apache Hop regression
+
+Install the repository's optional pre-push hook with `git config core.hooksPath .githooks`. Pushes that change Apache Hop or the DW integration/schema files then run the vertical workflow regression locally. To run it directly, execute `infra/dw-integration/run-local-vertical.sh` from Git Bash. The script uses disposable containers, temporary volumes, and host ports 55432/55433 by default; it prints the PostgreSQL fixture logs if a service exits early and removes the test containers and volumes afterward. Override `DW_INTEGRATION_SOURCE_PORT` or `DW_INTEGRATION_TARGET_PORT` if those ports are already in use.
+
 ## Deployment
 
 Set `DOCKERHUB_USERNAME` and the desired image versions in the deployment `.env`. Use the version tags from the corresponding GitHub Releases, then run `docker compose pull` and `docker compose up -d --no-build`. Keep production database credentials and the Hop production environment file in the deployment secret store; do not add them to the image or `.env.example`.
