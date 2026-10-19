@@ -66,6 +66,7 @@ services:
       - dss-net
 
   keycloak:
+    image: ${DOCKERHUB_USERNAME:-local}/dss-keycloak:${KEYCLOAK_VERSION:-local}
     build:
       context: ./infra/keycloak
       dockerfile: Dockerfile
@@ -93,9 +94,6 @@ services:
       RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
       RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
       RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
-    volumes:
-      - ./infra/keycloak/realm:/opt/keycloak/data/import
-      #- ./infra/keycloak/providers:/opt/keycloak/providers
     ports:
       - "127.0.0.1:8080:8080"   # Solo loopback, nunca 0.0.0.0
       - "127.0.0.1:9000:9000"   # Health/metrics (interno)
@@ -132,7 +130,10 @@ services:
       retries: 12
       start_period: 15s
   hop-web:
-    image: apache/hop-web:${HOP_WEB_VERSION:-2.19.0}
+    image: ${DOCKERHUB_USERNAME:-local}/dss-apache-hop:${APACHE_HOP_VERSION:-local}
+    build:
+      context: ./etl-layer/apache-hop
+      dockerfile: Dockerfile
     container_name: dss-hop-web
     depends_on:
       dw-migrator:
@@ -141,7 +142,6 @@ services:
       - "127.0.0.1:${HOP_WEB_PORT:-8081}:8080"
     volumes:
       - ./etl-layer/apache-hop/projects/dss-uatf-etl:/files/project:rw
-      - ./etl-layer/apache-hop/jdbc:/files/jdbc:ro
       - ./etl-layer/apache-hop/scripts:/files/scripts:ro
     entrypoint: ["/bin/bash", "/files/scripts/start-hop-web.sh"]
     command: []
@@ -165,6 +165,7 @@ services:
   # MICROSERVICIOS PROPIOS
   # ==========================================
   auth-service:
+    image: ${DOCKERHUB_USERNAME:-local}/dss-auth-service:${AUTH_SERVICE_VERSION:-local}
     build: ./auth-service
     depends_on:
       auth-service-db:
@@ -195,7 +196,7 @@ services:
       - dss-net
 
   olap-service:
-    image: dss-olap-service:local
+    image: ${DOCKERHUB_USERNAME:-local}/dss-olap-service:${OLAP_SERVICE_VERSION:-local}
     build:
       context: ./olap-service
       dockerfile: Dockerfile
@@ -232,7 +233,7 @@ services:
   # Runtime DB credentials come from the ignored root .env and are written
   # only to the private datasource properties file inside the named volume.
   olap-home-init:
-    image: dss-olap-service:local
+    image: ${DOCKERHUB_USERNAME:-local}/dss-olap-service:${OLAP_SERVICE_VERSION:-local}
     entrypoint: ["/bin/sh", "/docker/initialize-academic-olap.sh"]
     user: "0:0"
     restart: "no"

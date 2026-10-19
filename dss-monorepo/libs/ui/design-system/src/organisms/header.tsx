@@ -1,8 +1,8 @@
 'use client';
+
 import * as React from 'react';
 import { cn } from 'cn';
-import { Search, Bell, Menu, Terminal, User } from 'lucide-react';
-
+import { Search, Bell, Menu, GraduationCap, LogOut, User } from 'lucide-react';
 import { Button } from '../atoms/button';
 import {
   InputGroup,
@@ -21,157 +21,206 @@ import {
 } from '../atoms/popover';
 
 export interface HeaderProps extends React.HTMLAttributes<HTMLElement> {
-  user?: {
-    name: string;
-    email: string;
-    avatarUrl?: string;
-  };
+  appName?: string;
+  contextLabel?: string;
+  user?: { name: string; email: string; avatarUrl?: string };
+  notificationCount?: number;
   onMenuClick?: () => void;
   onSearch?: (query: string) => void;
+  onNotificationsClick?: () => void;
+  onProfileClick?: () => void;
+  onSignIn?: () => void;
   onDisconnect?: () => void;
 }
 
 export function Header({
   className,
+  appName = 'DSS académico',
+  contextLabel,
   user,
+  notificationCount = 0,
   onMenuClick,
   onSearch,
+  onNotificationsClick,
+  onProfileClick,
+  onSignIn,
   onDisconnect,
   ...props
 }: HeaderProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
-
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setSearchQuery(e.target.value);
-    if (onSearch) {
-      onSearch(e.target.value);
-    }
-  };
+  const searchId = React.useId();
+  const unreadCount = Number.isFinite(notificationCount)
+    ? Math.max(0, Math.floor(notificationCount))
+    : 0;
+  const initials = user?.name
+    .trim()
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((part) => part.charAt(0))
+    .join('');
 
   return (
     <header
       className={cn(
-        'sticky top-0 z-50 flex w-full h-16 items-center justify-between px-4 sm:px-6 lg:px-8',
-        'bg-background/80 backdrop-blur-md border-b border-primary/20',
-        'shadow-[0_0_5px_theme(colors.primary.DEFAULT/20%)]',
+        'sticky top-0 z-30 grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 border-b border-border bg-card px-4 py-3 text-foreground sm:px-6 md:grid-cols-[minmax(0,1fr)_minmax(14rem,28rem)_minmax(0,1fr)]',
+        '[&_:focus-visible]:outline-2 [&_:focus-visible]:outline-offset-2 [&_:focus-visible]:outline-foreground [&_[data-slot=avatar]::after]:shadow-none [&_[data-slot=avatar]::after]:border-border [&_[data-slot=avatar]::after]:mix-blend-normal',
         className,
       )}
       {...props}
     >
-      {/* Left: Logo & Mobile Menu */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={onMenuClick}
-          className="lg:hidden text-primary hover:text-primary hover:bg-primary/20"
-        >
-          <Menu className="h-5 w-5" />
-          <span className="sr-only">Toggle menu</span>
-        </Button>
-        <div className="flex items-center gap-2 font-bold text-lg text-primary tracking-widest uppercase">
-          <Terminal className="h-6 w-6 text-primary drop-shadow-[0_0_5px_theme(colors.primary.DEFAULT)]" />
-          <span className="hidden sm:inline-block drop-shadow-[0_0_5px_theme(colors.primary.DEFAULT)]">
-            SYS.ADMIN
-          </span>
+      <div className="flex min-w-0 items-center gap-3">
+        {onMenuClick && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onMenuClick}
+            className="size-11 lg:hidden"
+            aria-label="Abrir menú de navegación"
+          >
+            <Menu aria-hidden="true" />
+          </Button>
+        )}
+        <GraduationCap
+          className="size-7 shrink-0 text-primary"
+          aria-hidden="true"
+        />
+        <div className="min-w-0">
+          <p className="truncate text-base font-semibold leading-6">
+            {appName}
+          </p>
+          {contextLabel && (
+            <p className="truncate text-sm leading-5 text-muted-foreground">
+              {contextLabel}
+            </p>
+          )}
         </div>
       </div>
 
-      {/* Middle: Search/Command */}
-      <div className="flex-1 max-w-md mx-4 hidden md:block">
-        <InputGroup className="bg-background/50 border-primary/30 focus-within:border-primary focus-within:shadow-[0_0_10px_theme(colors.primary.DEFAULT/30%)] transition-all">
+      <div
+        role="search"
+        aria-label="Búsqueda académica"
+        className="order-3 col-span-2 min-w-0 md:order-none md:col-span-1"
+      >
+        <label htmlFor={searchId} className="sr-only">
+          Buscar en el espacio académico
+        </label>
+        <InputGroup className="min-h-11 bg-background">
           <InputGroupAddon>
-            <Search className="h-4 w-4 text-primary/70" />
+            <Search
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
           </InputGroupAddon>
           <InputGroupInput
-            placeholder="Search commands or data..."
+            id={searchId}
+            type="search"
+            placeholder="Buscar informes, cubos o recursos…"
             value={searchQuery}
-            onChange={handleSearchChange}
-            className="text-primary placeholder:text-primary/50"
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              onSearch?.(event.target.value);
+            }}
+            className="text-foreground placeholder:text-muted-foreground"
           />
-          <InputGroupAddon align="inline-end">
-            <kbd className="hidden sm:inline-flex h-5 items-center gap-1 rounded border border-primary/30 bg-primary/10 px-1.5 font-mono text-[10px] font-medium text-primary">
-              <span className="text-xs">⌘</span>K
-            </kbd>
-          </InputGroupAddon>
         </InputGroup>
       </div>
 
-      {/* Right: Notifications & Profile */}
-      <div className="flex items-center gap-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          className="relative text-primary hover:text-primary hover:bg-primary/20"
-        >
-          <Bell className="h-5 w-5" />
-          <Badge
-            variant="destructive"
-            className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center animate-pulse border-none"
+      <div className="flex min-w-0 items-center justify-end gap-2 md:order-3">
+        {onNotificationsClick && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={onNotificationsClick}
+            className="relative size-11 text-muted-foreground"
+            aria-label={
+              unreadCount
+                ? `Notificaciones: ${unreadCount} sin leer`
+                : 'Notificaciones'
+            }
           >
-            3
-          </Badge>
-          <span className="sr-only">Notifications</span>
-        </Button>
-
+            <Bell aria-hidden="true" />
+            {unreadCount > 0 && (
+              <Badge
+                aria-hidden="true"
+                variant="destructive"
+                className="absolute right-0 top-0 flex min-w-4 items-center justify-center px-1 text-xs tabular-nums"
+              >
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Badge>
+            )}
+          </Button>
+        )}
         {user ? (
           <Popover>
             <PopoverTrigger asChild>
               <Button
+                type="button"
                 variant="ghost"
-                className="relative h-8 w-8 rounded-full p-0"
+                aria-label={`Cuenta de ${user.name}`}
+                className="h-11 min-w-11 gap-2 px-1.5 lg:px-2"
               >
-                <Avatar className="h-8 w-8 ring-2 ring-primary/50 shadow-[0_0_10px_theme(colors.primary.DEFAULT/30%)] hover:ring-primary transition-all">
+                <Avatar className="size-8">
                   {user.avatarUrl && (
-                    <AvatarImage src={user.avatarUrl} alt={user.name} />
+                    <AvatarImage src={user.avatarUrl} alt="" />
                   )}
-                  <AvatarFallback className="bg-primary/20 text-primary">
-                    {user.name.charAt(0)}
+                  <AvatarFallback className="bg-secondary font-medium text-secondary-foreground">
+                    {initials}
                   </AvatarFallback>
                 </Avatar>
+                <span className="hidden max-w-36 truncate lg:inline">
+                  {user.name}
+                </span>
               </Button>
             </PopoverTrigger>
             <PopoverContent
-              className="w-56 border-primary/30 bg-background/95 backdrop-blur-md shadow-[0_0_15px_theme(colors.primary.DEFAULT/20%)]"
               align="end"
+              className="w-72 max-w-[calc(100vw-2rem)] p-4"
+              aria-label="Cuenta de usuario"
             >
               <PopoverHeader>
-                <PopoverTitle className="text-primary">
+                <PopoverTitle className="break-words text-base font-semibold">
                   {user.name}
                 </PopoverTitle>
-                <PopoverDescription className="text-primary/70">
+                <PopoverDescription className="break-all leading-6">
                   {user.email}
                 </PopoverDescription>
               </PopoverHeader>
-              <div className="mt-2 flex flex-col gap-1 border-t border-primary/20 pt-2">
-                <Button
-                  variant="ghost"
-                  className="justify-start text-primary hover:bg-primary/20"
-                >
-                  Profile Settings
-                </Button>
-                <Button
-                  variant="ghost"
-                  className="justify-start text-primary hover:bg-primary/20"
-                >
-                  System Logs
-                </Button>
-                <Button
-                  variant="ghost"
-                  onClick={onDisconnect}
-                  className="justify-start text-destructive hover:bg-destructive/20 mt-1"
-                >
-                  Disconnect
-                </Button>
-              </div>
+              {(onProfileClick || onDisconnect) && (
+                <div className="mt-2 flex flex-col gap-1 border-t border-border pt-3">
+                  {onProfileClick && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={onProfileClick}
+                      className="min-h-11 justify-start"
+                    >
+                      <User aria-hidden="true" />
+                      Mi perfil
+                    </Button>
+                  )}
+                  {onDisconnect && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={onDisconnect}
+                      className="min-h-11 justify-start text-destructive"
+                    >
+                      <LogOut aria-hidden="true" />
+                      Cerrar sesión
+                    </Button>
+                  )}
+                </div>
+              )}
             </PopoverContent>
           </Popover>
-        ) : (
-          <Button className="bg-primary/20 text-primary border border-primary/50 hover:bg-primary hover:text-primary-foreground shadow-[0_0_10px_theme(colors.primary.DEFAULT/30%)] transition-all">
-            <User className="h-4 w-4 mr-2" />
-            INITIALIZE
+        ) : onSignIn ? (
+          <Button type="button" onClick={onSignIn} className="min-h-11">
+            <User aria-hidden="true" />
+            Iniciar sesión
           </Button>
-        )}
+        ) : null}
       </div>
     </header>
   );

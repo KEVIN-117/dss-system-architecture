@@ -1,0 +1,28 @@
+{
+  "bootstrap-sha": "e3aef998238d4efdd2fd344932fa90a53ddcdf60",
+  "separate-pull-requests": true,
+  "include-component-in-tag": true,
+  "tag-separator": "-",
+  "packages": {
+    "auth-service": {
+      "release-type": "simple",
+      "component": "auth-service",
+      "package-name": "dss-auth-service"
+    },
+    "infra/keycloak": {
+      "release-type": "simple",
+      "component": "keycloak",
+      "package-name": "dss-keycloak"
+    },
+    "olap-service": {
+      "release-type": "simple",
+      "component": "olap-service",
+      "package-name": "dss-olap-service"
+    },
+    "etl-layer/apache-hop": {
+      "release-type": "simple",
+      "component": "apache-hop",
+      "package-name": "dss-apache-hop"
+    }
+  }
+}

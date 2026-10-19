@@ -11,8 +11,9 @@ ENV KC_METRICS_ENABLED=true
 # Copiar el provider SPI del webhook
 COPY providers/ /opt/keycloak/providers/
 COPY themes/ /opt/keycloak/themes/
+COPY realm/ /opt/keycloak/data/import/
 
-# Ejecutar build de Quarkus (pre-compila, reduce startup de ~15s a ~2s)S
+# Ejecutar build de Quarkus para preparar la imagen optimizada.
 
 RUN /opt/keycloak/bin/kc.sh build
 

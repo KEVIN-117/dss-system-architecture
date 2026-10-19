@@ -1,27 +1,33 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, fn, within } from 'storybook/test';
 import { Header } from './header';
 
-const meta: Meta<typeof Header> = {
+const meta = {
   title: 'Organisms/Header',
   component: Header,
-  parameters: {
-    layout: 'fullscreen',
-    backgrounds: {
-      default: 'dark',
-      values: [
-        { name: 'dark', value: '#09090b' },
-        { name: 'light', value: '#ffffff' },
-      ],
-    },
-  },
   tags: ['autodocs'],
+  parameters: { layout: 'fullscreen', a11y: { test: 'error' } },
+  args: {
+    appName: 'DSS académico',
+    contextLabel: 'Espacio institucional',
+    onMenuClick: fn(),
+    onSearch: fn(),
+    onDisconnect: fn(),
+    onProfileClick: fn(),
+    onNotificationsClick: fn(),
+  },
   decorators: [
     (Story) => (
-      <div className="min-h-screen bg-background">
+      <div className="bg-background text-foreground">
         <Story />
-        <div className="p-8 text-primary/50 text-sm">
-          Content area below header...
-        </div>
+        <main className="px-4 py-8 sm:px-6">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Resumen académico
+          </h1>
+          <p className="mt-2 max-w-prose text-base leading-7 text-muted-foreground">
+            Consulta informes y explora los resultados de tu ámbito académico.
+          </p>
+        </main>
       </div>
     ),
   ],
@@ -32,34 +38,51 @@ type Story = StoryObj<typeof meta>;
 
 export const LoggedIn: Story = {
   args: {
-    user: {
-      name: 'Neo Anderson',
-      email: 'neo@matrix.sys',
-      avatarUrl: 'https://github.com/shadcn.png',
-    },
-    onMenuClick: () => console.log('Menu clicked'),
-    onSearch: (q) => console.log('Searching:', q),
-    onDisconnect: () => console.log('Disconnecting...'),
+    user: { name: 'María Fernández', email: 'maria.fernandez@example.edu' },
+    notificationCount: 3,
+  },
+  play: async ({ canvasElement, args, userEvent }) => {
+    const canvas = within(canvasElement);
+    const previewBody = (
+      canvasElement as HTMLElement & { ownerDocument: { body: HTMLElement } }
+    ).ownerDocument.body;
+    const page = within(previewBody);
+    await userEvent.type(
+      canvas.getByRole('searchbox', { name: 'Buscar en el espacio académico' }),
+      'rendimiento',
+    );
+    await expect(args.onSearch).toHaveBeenLastCalledWith('rendimiento');
+    await userEvent.click(
+      canvas.getByRole('button', { name: 'Cuenta de María Fernández' }),
+    );
+    await expect(page.getByText('maria.fernandez@example.edu')).toBeVisible();
+    await userEvent.click(page.getByRole('button', { name: 'Cerrar sesión' }));
+    await expect(args.onDisconnect).toHaveBeenCalled();
+    await userEvent.keyboard('{Escape}');
+    await expect(
+      canvas.getByRole('button', { name: 'Cuenta de María Fernández' }),
+    ).toHaveFocus();
   },
 };
 
 export const Guest: Story = {
+  args: { onSignIn: fn(), onNotificationsClick: undefined },
+};
+
+export const LongIdentity: Story = {
   args: {
-    onMenuClick: () => console.log('Menu clicked'),
-    onSearch: (q) => console.log('Searching:', q),
+    contextLabel:
+      'Facultad de Ciencias Económicas, Financieras y Administrativas',
+    user: {
+      name: 'María Fernanda Fernández Rodríguez',
+      email: 'maria.fernanda.fernandez.rodriguez@example.edu',
+    },
+    notificationCount: 120,
   },
 };
 
-export const CyberpunkTerminal: Story = {
-  args: {
-    user: {
-      name: 'Case',
-      email: 'case@sprawl.net',
-    },
-    onMenuClick: () => console.log('Menu clicked'),
-    onSearch: (q) => console.log('Searching:', q),
-  },
-  parameters: {
-    // Customization specific to this story could go here
-  },
+export const DarkMode: Story = {
+  ...LoggedIn,
+  globals: { colorMode: 'dark' },
+  play: undefined,
 };

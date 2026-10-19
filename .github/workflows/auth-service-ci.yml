@@ -1,18 +1,8 @@
 name: Auth Service CI
 
 on:
+  workflow_call:
   pull_request:
-    branches: [main]
-    paths:
-      - ".github/workflows/auth-service-ci.yml"
-      - ".env.example"
-      - "docker-compose.yml"
-      - "auth-service/**"
-      - "infra/keycloak/realm/**"
-      - "infra/rabbitmq/**"
-      - "keycloak-webhook/pom.xml"
-      - "keycloak-webhook/src/**"
-  push:
     branches: [main]
     paths:
       - ".github/workflows/auth-service-ci.yml"
@@ -78,4 +68,3 @@ jobs:
           path: auth-service/target/auth-service-*.jar
           if-no-files-found: error
           retention-days: 7
-
