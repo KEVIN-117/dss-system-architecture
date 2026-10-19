@@ -154,6 +154,13 @@ All notable changes to Saiku are documented here. This project follows
   `securityContext: { runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001 }` on
   the pod so the mounted volume is group-owned by the runtime user.
 
+## 1.0.0 (2026-10-19)
+
+
+### Features
+
+* refine academic Header and automate container releases ([#165](https://github.com/KEVIN-117/dss-system-architecture/issues/165)) ([e726525](https://github.com/KEVIN-117/dss-system-architecture/commit/e7265250c3c217c5cdc3a247a01180eb625e8225))
+
 ## 4.8.0 — 2026-09-15
 
 Minor release, and a **security release** — nine hardening fixes close an
