@@ -2,5 +2,5 @@
   "auth-service": "0.0.0",
   "infra/keycloak": "0.0.0",
   "olap-service": "0.0.0",
-  "etl-layer/apache-hop": "0.0.0"
+  "etl-layer/apache-hop": "1.0.0"
 }
