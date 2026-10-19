@@ -74,12 +74,23 @@ public class CredentialPolicyTest {
 
     @Test
     public void overrideReadsSystemProperty() {
+        assertTrue(ServeCommand.allowDefaultAdmin(null, "true"));
+        assertFalse(ServeCommand.allowDefaultAdmin(null, "false"));
+        assertTrue("the environment opt-in takes precedence", ServeCommand.allowDefaultAdmin("true", "false"));
+
+        boolean envOverride = Boolean.parseBoolean(System.getenv("SAIKU_ALLOW_DEFAULT_ADMIN"));
         String prev = System.getProperty("saiku.allowDefaultAdmin");
         try {
             System.setProperty("saiku.allowDefaultAdmin", "true");
             assertTrue(ServeCommand.allowDefaultAdmin());
             System.setProperty("saiku.allowDefaultAdmin", "false");
-            assertFalse(ServeCommand.allowDefaultAdmin());
+            if (envOverride) {
+                assertTrue(
+                        "the environment opt-in cannot be disabled by a system property",
+                        ServeCommand.allowDefaultAdmin());
+            } else {
+                assertFalse(ServeCommand.allowDefaultAdmin());
+            }
         } finally {
             if (prev == null) {
                 System.clearProperty("saiku.allowDefaultAdmin");

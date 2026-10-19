@@ -1,12 +1,14 @@
 # Saiku — runnable distribution
 
-Self-contained Saiku build. Java 21+ is the only prerequisite.
+Self-contained Saiku OLAP API distribution. It exposes the REST and XMLA APIs
+plus API documentation; the Saiku workspace UI is deployed separately. Java
+21+ is the only prerequisite.
 
 ## What's in the zip
 
 ```
 saiku-<version>.jar    Fat JAR: Picocli CLI + embedded Jetty + the saiku
-                       webapp + Calcite-backend Mondrian + a seeded H2
+                       API webapp + Calcite-backend Mondrian + a seeded H2
                        FoodMart dataset.
 run.sh                 Convenience wrapper (macOS / Linux).
 run.bat                Convenience wrapper (Windows).
@@ -254,7 +256,7 @@ to a 7-day idle timeout).
 
 ## Project links
 
-- Saiku UI + REST: <https://github.com/spiculedata/saiku>
+- Saiku API project: <https://github.com/spiculedata/saiku>
 - Mondrian (Spicule fork, Calcite backend): <https://github.com/spiculedata/mondrian-saiku>
 - olap4j (Spicule fork): <https://github.com/spiculedata/olap4j>
 - olap4j-xmlaserver: <https://github.com/spiculedata/olap4j-xmlaserver>

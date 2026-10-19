@@ -58,7 +58,7 @@ public class SaikuLauncher implements Callable<Integer> {
         return 0;
     }
 
-    @Command(name = "serve", description = "Start the Saiku web server.")
+    @Command(name = "serve", description = "Start the Saiku OLAP API server.")
     public static class ServeCommand implements Callable<Integer> {
 
         @Option(
@@ -99,11 +99,11 @@ public class SaikuLauncher implements Callable<Integer> {
             int actualPort = ((ServerConnector) server.getConnectors()[0]).getLocalPort();
             String base = "http://" + host + ":" + actualPort + contextPath;
             if (!base.endsWith("/")) base = base + "/";
-            System.out.println("Saiku ready:");
-            System.out.println("  Workspace : " + base + "ui/");
-            System.out.println("  Admin     : " + base + "ui/admin");
-            System.out.println("  REST API  : " + base + "rest/saiku/");
-            System.out.println("  Swagger  : " + base + "swagger-ui.html");
+            System.out.println("Saiku API server started:");
+            System.out.println("  REST API     : " + base + "rest/saiku/");
+            System.out.println("  XMLA         : " + base + "xmla/");
+            System.out.println("  OpenAPI spec : " + base + "rest/openapi.json");
+            System.out.println("  Swagger UI   : " + base + "swagger-ui.html");
             printDefaultCredentialWarning();
             server.join();
             return 0;
@@ -127,8 +127,12 @@ public class SaikuLauncher implements Callable<Integer> {
             Files.createDirectories(saikuHome.resolve("repository").resolve("data"));
             Files.createDirectories(saikuHome.resolve("logs"));
             Files.createDirectories(saikuHome.resolve("plugins"));
+            Path configDir = saikuHome.resolve("conf");
+            Files.createDirectories(configDir);
 
             System.setProperty("saiku.home", saikuHome.toString());
+            String configUri = configDir.toUri().toString();
+            System.setProperty("ext.prop.dir", configUri.endsWith("/") ? configUri : configUri + "/");
             // Expose the running fat-JAR's version so InfoResource can stamp
             // it into the DXT manifest + the eventual /info/version endpoint.
             // Implementation-Version comes from the shade-plugin manifest
@@ -170,22 +174,14 @@ public class SaikuLauncher implements Callable<Integer> {
             }
             System.out.println("Saiku home: " + saikuHome);
 
-            stageSeedAssets(dataDir);
-
-            stageDefaultDatasource(saikuHome);
-            // #1394 demos: TPC-DS + Flights Ossie datasources with H2 fixtures.
-            // Auto-provisioned on first boot so a fresh container has three Ossie
-            // datasources ready to poke at via /ai/ossie/models. Idempotent —
-            // stageResource + stageOssieDemoDatasource both no-op when the target
-            // exists, so operator edits survive container restarts.
-            stageOssieDemoDatasources(saikuHome);
-            // saiku#1245: in demo mode, also stage a "Welcome" dashboard
-            // under /dashboards/ so a fresh demo container has something
-            // ready-to-look-at at first login instead of an empty list.
-            // The file is idempotent (stageResource only writes when
-            // missing) so operator edits survive container restarts.
             if (isDemoModeActive()) {
+                stageSeedAssets(dataDir);
+                stageDefaultDatasource(saikuHome);
+                // Sample datasources and datasets are opt-in with SAIKU_DEMO=true.
+                stageOssieDemoDatasources(saikuHome);
                 stageDemoDashboards(saikuHome);
+            } else {
+                System.out.println("Demo content seeding disabled (SAIKU_DEMO is not true).");
             }
 
             Path warPath = extractApiWar();
@@ -481,9 +477,13 @@ public class SaikuLauncher implements Callable<Integer> {
         /** True when {@code SAIKU_ALLOW_DEFAULT_ADMIN=true} (env) or
          *  {@code -Dsaiku.allowDefaultAdmin=true} (system property) is set. */
         static boolean allowDefaultAdmin() {
-            String env = System.getenv("SAIKU_ALLOW_DEFAULT_ADMIN");
+            return allowDefaultAdmin(
+                    System.getenv("SAIKU_ALLOW_DEFAULT_ADMIN"), System.getProperty("saiku.allowDefaultAdmin", "false"));
+        }
+
+        static boolean allowDefaultAdmin(String env, String property) {
             if (env != null && Boolean.parseBoolean(env.trim())) return true;
-            return Boolean.parseBoolean(System.getProperty("saiku.allowDefaultAdmin", "false"));
+            return Boolean.parseBoolean(property == null ? "false" : property.trim());
         }
 
         /**

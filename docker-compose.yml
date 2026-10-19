@@ -195,7 +195,56 @@ services:
       - dss-net
 
   olap-service:
-    build: ./olap-service
+    image: dss-olap-service:local
+    build:
+      context: ./olap-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres-dw:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy
+      olap-home-init:
+        condition: service_completed_successfully
+    environment:
+      SAIKU_HOME: /app/saiku-home
+      # This deployment is an empty OLAP API; demo fixtures are intentionally disabled.
+      SAIKU_DEMO: "false"
+      # Local development only: BFF analytics return aggregates, with k=5 cell suppression.
+      SAIKU_AI_POLICY: aggregated
+      SAIKU_AI_KANONYMITY: "5"
+      # Keep the default-admin guard enabled; provide a strong value in the ignored local .env.
+      SAIKU_ADMIN_PASSWORD: ${SAIKU_ADMIN_PASSWORD:-}
+      KEYCLOAK_ISSUER_URI: ${AUTH_KEYCLOAK_ISSUER_URI:-http://localhost:8080/realms/uatf-dss-realm}
+      KEYCLOAK_JWK_SET_URI: ${AUTH_KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs}
+      KEYCLOAK_OLAP_AUDIENCE: ${OLAP_KEYCLOAK_AUDIENCE:-olap-service}
+      KEYCLOAK_OLAP_CLIENT_ID: ${OLAP_KEYCLOAK_CLIENT_ID:-olap-service}
+    ports:
+      - "127.0.0.1:${OLAP_PORT:-8088}:8080"
+    volumes:
+      # Start with a clean repository. The previous olap_home volume is left intact as a backup.
+      - olap_home_empty:/app/saiku-home
+    networks:
+      - dss-net
+
+  # Installs the approved academic catalog into the persistent Saiku home.
+  # Runtime DB credentials come from the ignored root .env and are written
+  # only to the private datasource properties file inside the named volume.
+  olap-home-init:
+    image: dss-olap-service:local
+    entrypoint: ["/bin/sh", "/docker/initialize-academic-olap.sh"]
+    user: "0:0"
+    restart: "no"
+    environment:
+      OLAP_DB_USER: ${OLAP_DB_USER:-dw_olap_runtime}
+      OLAP_DB_PASSWORD: ${OLAP_DB_PASSWORD:-}
+      OLAP_DB_NAME: ${POSTGRES_DW_NAME:-}
+    volumes:
+      - olap_home_empty:/app/saiku-home
+      - ./docker/initialize-academic-olap.sh:/docker/initialize-academic-olap.sh:ro
+      - ./infra/olap/datasources/uatf-dw.sds:/source/uatf-dw.sds:ro
+      - ./infra/olap/schemas/uatf-rendimiento-academico.xml:/source/uatf-rendimiento-academico.xml:ro
     networks:
       - dss-net
 
@@ -250,3 +299,4 @@ networks:
 
 volumes:
   postgres_data:
+  olap_home_empty:

@@ -60,20 +60,24 @@ public class Database {
     public void init() throws SQLException {
         initDB();
         loadUsers();
-        try {
-            loadFoodmart();
-        } catch (Exception e) {
-            log.warn("Foodmart sample data not loaded: {}", e.getMessage());
-        }
-        try {
-            loadBank();
-        } catch (Exception e) {
-            log.warn("Bank (bridge demo) sample data not loaded: {}", e.getMessage());
-        }
-        try {
-            loadEarthquakes();
-        } catch (Exception e) {
-            log.warn("Earthquakes sample data not loaded: {}", e.getMessage());
+        if (Boolean.parseBoolean(System.getProperty("saiku.demo", "false"))) {
+            try {
+                loadFoodmart();
+            } catch (Exception e) {
+                log.warn("Foodmart sample data not loaded: {}", e.getMessage());
+            }
+            try {
+                loadBank();
+            } catch (Exception e) {
+                log.warn("Bank (bridge demo) sample data not loaded: {}", e.getMessage());
+            }
+            try {
+                loadEarthquakes();
+            } catch (Exception e) {
+                log.warn("Earthquakes sample data not loaded: {}", e.getMessage());
+            }
+        } else {
+            log.info("Demo dataset loading disabled (saiku.demo=false).");
         }
         loadLegacyDatasources();
         // saiku#1223: rebuild the workspace datasource cache from disk after the demo
@@ -310,6 +314,16 @@ public class Database {
     }
 
     private void loadEarthquakes() throws SQLException {
+        String script = dsm.getEarthquakeDir() == null ? null : dsm.getEarthquakeDir() + "/earthquakes.sql";
+        String schemaFile = dsm.getEarthquakeSchema();
+        if (script == null
+                || schemaFile == null
+                || !Files.isRegularFile(Paths.get(script))
+                || !Files.isRegularFile(Paths.get(schemaFile))) {
+            log.debug("Skipping optional Earthquakes sample: its SQL or schema seed is not installed.");
+            return;
+        }
+
         String url = servletContext.getInitParameter("earthquakes.url");
         String user = servletContext.getInitParameter("earthquakes.user");
         String pword = servletContext.getInitParameter("earthquakes.password");

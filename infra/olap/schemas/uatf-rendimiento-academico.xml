@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  UATF academic performance cube for the Mondrian 4 engine used by Saiku.
+  The datasource must set PostgreSQL currentSchema=dw.
+
+  The fact grain is one row per enrollment attempt (dw.fact_cursado).
+  Academic Program is the analytical hierarchy; the two additional scope
+  dimensions let the BFF apply faculty/career authorization without colliding
+  with a user's requested Academic Program rows or columns.
+-->
+<Schema name="UATF_DW" metamodelVersion="4.0">
+  <PhysicalSchema>
+    <Table name="fact_cursado" />
+    <Table name="dim_programa">
+      <Key>
+        <Column name="programa_sk" />
+      </Key>
+    </Table>
+    <Table name="dim_periodo_academico">
+      <Key>
+        <Column name="periodo_academico_sk" />
+      </Key>
+    </Table>
+    <Link source="dim_programa" target="fact_cursado">
+      <ForeignKey>
+        <Column name="programa_sk" />
+      </ForeignKey>
+    </Link>
+    <Link source="dim_periodo_academico" target="fact_cursado">
+      <ForeignKey>
+        <Column name="periodo_academico_sk" />
+      </ForeignKey>
+    </Link>
+  </PhysicalSchema>
+
+  <Dimension name="Academic Program" table="dim_programa" key="Program SK">
+    <Attributes>
+      <Attribute name="Program SK" keyColumn="programa_sk" hasHierarchy="false" />
+      <Attribute name="Faculty" keyColumn="id_facultad" nameColumn="facultad" />
+      <Attribute name="Career" keyColumn="id_programa" nameColumn="programa" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Program">
+        <Level attribute="Faculty" />
+        <Level attribute="Career" />
+      </Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
+  <Dimension name="Academic Faculty Scope" table="dim_programa" key="Program SK">
+    <Attributes>
+      <Attribute name="Program SK" keyColumn="programa_sk" hasHierarchy="false" />
+      <Attribute name="Faculty" keyColumn="id_facultad" nameColumn="facultad" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Faculty Scope">
+        <Level attribute="Faculty" />
+      </Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
+  <Dimension name="Academic Career Scope" table="dim_programa" key="Program SK">
+    <Attributes>
+      <Attribute name="Program SK" keyColumn="programa_sk" hasHierarchy="false" />
+      <Attribute name="Career" keyColumn="id_programa" nameColumn="programa" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Career Scope">
+        <Level attribute="Career" />
+      </Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
+  <Dimension name="Academic Period" table="dim_periodo_academico" key="Period SK">
+    <Attributes>
+      <Attribute name="Period SK" keyColumn="periodo_academico_sk" hasHierarchy="false" />
+      <Attribute name="Academic Year" keyColumn="gestion" nameColumn="gestion" />
+      <Attribute name="Period Number" keyColumn="periodo" nameColumn="periodo" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Academic Period">
+        <Level attribute="Academic Year" />
+        <Level attribute="Period Number" />
+      </Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
+  <Cube name="Academic Performance" defaultMeasure="Enrollment Attempts">
+    <Dimensions>
+      <Dimension source="Academic Program" />
+      <Dimension source="Academic Faculty Scope" />
+      <Dimension source="Academic Career Scope" />
+      <Dimension source="Academic Period" />
+    </Dimensions>
+    <MeasureGroups>
+      <MeasureGroup name="Coursework" table="fact_cursado">
+        <Measures>
+          <Measure name="Enrollment Attempts" column="conteo_intento" aggregator="sum" formatString="#,##0" />
+          <!-- Used internally by the BFF to apply Saiku's k-anonymity mask to every aggregate. -->
+          <Measure name="Attempt Count" column="fact_cursado_id" aggregator="count" formatString="#,##0" />
+          <Measure name="Average Final Grade" column="nota_final" aggregator="avg" formatString="#,##0.00" />
+          <Measure name="Graded Attempts" column="nota_final" aggregator="count" formatString="#,##0" />
+        </Measures>
+        <DimensionLinks>
+          <ForeignKeyLink dimension="Academic Program" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Faculty Scope" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Career Scope" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Period" foreignKeyColumn="periodo_academico_sk" />
+        </DimensionLinks>
+      </MeasureGroup>
+    </MeasureGroups>
+  </Cube>
+</Schema>

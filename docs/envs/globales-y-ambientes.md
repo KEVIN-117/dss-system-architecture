@@ -33,6 +33,7 @@ Docker Compose carga `.env` para interpolar `docker-compose.yml`; no es automát
 | `AUTH_KEYCLOAK_RESOURCE_ID`, `AUTH_KEYCLOAK_AUDIENCE` | Sí / opcional | Identificador de recurso y audiencia JWT. Si no se indica la segunda, Compose la deriva del resource ID. |
 | `AUTH_KEYCLOAK_PRINCIPAL_ATTRIBUTE` | Sí | Claim usado como principal; en el ejemplo `preferred_username`. |
 | `AUTH_CORS_ALLOWED_ORIGINS` | Perfil según ambiente | Orígenes exactos de navegador separados por coma. En producción deben ser HTTPS y no usar `*`. |
+| `OLAP_PORT` | Opcional | Puerto local de Saiku publicado por Compose; default 8088 porque Keycloak usa 8080. El bind se limita a `127.0.0.1`. |
 
 ## Perfiles
 

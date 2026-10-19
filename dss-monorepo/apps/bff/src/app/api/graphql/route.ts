@@ -4,18 +4,23 @@ import { NextRequest } from 'next/server';
 
 import { createGraphQLContext, type GraphQLContext } from './context';
 import { withCors } from '../../../lib/cors';
+import { analyticsTypeDefs, createAnalyticsResolvers } from './analytics';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+const analyticsResolvers = createAnalyticsResolvers();
 
 const server = new ApolloServer<GraphQLContext>({
   typeDefs: `#graphql
     type Query {
       ping: String!
     }
-  `,
+  ` + analyticsTypeDefs,
   resolvers: {
+    ...analyticsResolvers,
     Query: {
+      ...analyticsResolvers.Query,
       ping: () => 'pong',
     },
   },

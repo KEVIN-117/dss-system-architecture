@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Saiku datasource descriptor for the UATF academic-performance Mondrian
+  catalog. Install under saiku-home/repository/data/unknown/datasources/.
+  Inject datasource.uatf_dw.username/password via datasources.properties;
+  do not add credentials to this file.
+-->
+<dataSource>
+  <driver>mondrian.olap4j.MondrianOlap4jDriver</driver>
+  <location>jdbc:mondrian:Jdbc=jdbc:postgresql://postgres-dw:5432/dw_integration?currentSchema=dw&amp;connectTimeout=5&amp;socketTimeout=60;Catalog=mondrian://datasources/uatf-rendimiento-academico.xml;JdbcDrivers=org.postgresql.Driver;</location>
+  <name>uatf-dw</name>
+  <propertyKey>uatf_dw</propertyKey>
+  <type>OLAP</type>
+</dataSource>

@@ -8,6 +8,12 @@
   "types": "./dist/index.d.ts",
   "exports": {
     "./package.json": "./package.json",
+    "./server": {
+      "@dss-monorepo/source": "./src/lib/server.ts",
+      "types": "./dist/lib/server.d.ts",
+      "import": "./dist/lib/server.js",
+      "default": "./dist/lib/server.js"
+    },
     ".": {
       "@dss-monorepo/source": "./src/index.ts",
       "types": "./dist/index.d.ts",

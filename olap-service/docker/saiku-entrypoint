@@ -3,7 +3,7 @@
 #
 # Dispatches the container's argv to the bundled launcher JAR:
 #
-#   serve            -> saiku launcher (REST + UI + native MCP on :8080)
+#   serve            -> saiku OLAP API (REST + XMLA + native MCP on :8080)
 #                       Forwards any extra args to the launcher's
 #                       Picocli `serve` subcommand.
 #   <anything else>  -> exec'd verbatim, useful for `docker run --rm

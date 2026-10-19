@@ -14,7 +14,8 @@ El BFF es el límite servidor para OAuth/OIDC, sesión web y llamadas a auth/OLA
 | `KEYCLOAK_BFF_REDIRECT_URI` | Sí | Callback `/api/auth/callback` registrado exactamente en Keycloak. |
 | `KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI` | Sí | URL de retorno permitida al cerrar sesión; su origin debe estar en allowlist. |
 | `AUTH_SERVICE_URL` | Sí | Origin/base HTTP del auth-service; ruta/versionado según cliente. |
-| `OLAP_SERVICE_URL` | Según uso OLAP | URL de OLAP, requerido al invocar `getOlapServiceUrl`; ejemplo local 8080. |
+| `OLAP_SERVICE_URL` | Según uso OLAP | URL de OLAP, requerido al invocar `getOlapServiceUrl`; ejemplo local `http://localhost:8088` con el Compose raíz. |
+| `OLAP_ACADEMIC_SCOPE_FILTERS` | Sí para análisis de Decano/Director | JSON que traduce `facultyId`/`careerId` autenticados a los miembros del esquema Mondrian UATF; sincronizado con `infra/olap/schemas/uatf-rendimiento-academico.xml`. No contiene secretos. |
 | `BFF_ALLOWED_ORIGINS` | Sí | Origins HTTP(S) separados por comas. Debe contener orígenes de redirect/post-logout; sin `*`. |
 | `BFF_DEFAULT_POST_LOGIN_REDIRECT_URI` | Sí | URL por defecto después de login; su origin debe estar allowlisted. |
 | `BFF_SESSION_SECRET` | Sí, secreto | Clave de sesión de al menos 32 caracteres. No reutilizar secretos de OIDC. |

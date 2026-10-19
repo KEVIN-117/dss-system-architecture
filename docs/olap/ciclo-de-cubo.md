@@ -187,7 +187,7 @@ El ER es conceptual: `DW_TABLE`, `DW_COLUMN` y `DW_FOREIGN_KEY` representan resu
 
 ## Activar y consumir el esquema generado
 
-Guardar el XML en el repositorio es un paso de autoría, no prueba suficiente de que el datasource activo lo esté usando. La definición del datasource debe apuntar al catálogo/esquema Mondrian correspondiente (la convención del proyecto usa `mondrian://...`), después refrescarse o redescubrirse, y finalmente ejecutar una consulta pequeña. Esto confirma resolución del catálogo, acceso JDBC y validez de la definición.
+Guardar el XML en el repositorio es un paso de autoría, no prueba suficiente de que el datasource activo lo esté usando. La primera definición UATF versionada está en [`infra/olap/schemas/uatf-rendimiento-academico.xml`](../../infra/olap/schemas/uatf-rendimiento-academico.xml). Debe instalarse en `<saiku-home>/datasources/`, y el datasource debe apuntar al catálogo con `mondrian://datasources/uatf-rendimiento-academico.xml`. Después hay que refrescarlo o redescubrirlo y ejecutar una consulta pequeña. Esto confirma resolución del catálogo, acceso JDBC y validez de la definición.
 
 ## API Cube Designer
 

@@ -114,7 +114,7 @@ jobs:
         run: mvn -B -ntp -DskipTests=false verify
 
       - name: mvn package (launcher)
-        # saiku-launcher hosts both the REST + UI on :8080 AND the native
+        # saiku-launcher hosts the REST + XMLA APIs on :8080 AND the native
         # MCP endpoint at /rest/saiku/api/mcp (issue #878). The standalone
         # saiku-mcp stdio binary is gone — MCP hosts now hit the launcher
         # directly with per-user Basic auth.

@@ -8,6 +8,7 @@
     "@dss-monorepo/auth-connector": "workspace:*",
     "@dss-monorepo/auth-models": "workspace:*",
     "@dss-monorepo/ml-connector": "workspace:*",
+    "@dss-monorepo/olap-connector": "workspace:*",
     "@dss-monorepo/rbac-server": "workspace:*",
     "jose": "^6.2.12",
     "graphql": "^16.11.0",
