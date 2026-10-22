@@ -889,7 +889,8 @@ public class FilesystemRepositoryManager implements IRepositoryManager {
                             log.warn("Ignoring schema outside the repository data directory: {}", file.getName());
                             continue;
                         }
-                        String relativePath = datadirPath.relativize(schemaFilePath)
+                        String relativePath = datadirPath
+                                .relativize(schemaFilePath)
                                 .toString()
                                 .replace(File.separatorChar, '/');
                         ms.setPath("/" + relativePath);
