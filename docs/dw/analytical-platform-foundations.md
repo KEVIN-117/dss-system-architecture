@@ -35,6 +35,8 @@ Los roles de grupo son `NOLOGIN`; TI/DBA provisiona cuentas por ambiente, las as
 
 Las funciones de cierre no están disponibles para `PUBLIC`. Las operaciones que deben escribir la bitácora se ejecutan como `dw_owner` mediante funciones `SECURITY DEFINER` con `search_path` fijo; así `dw_control_operator` no recibe permisos directos de actualización. El rol SQL no sustituye la autorización funcional DSA: en el MVP se registrará mediante operación manual autorizada; la futura API/BFF podrá automatizar su comprobación.
 
+La propuesta de API, permisos de aplicación y roles PostgreSQL para `dw-control-service` está documentada en [DW-CONTROL-001](dw-control-service-architecture.md), junto con su [contrato OpenAPI v1](contracts/dw-control-service-v1.yaml). Esa matriz es objetivo documental: no modifica las concesiones actuales de la base hasta que las issues de implementación entreguen y apliquen una migración.
+
 ## Migraciones
 
 `infra/dw-schema/scripts/apply-migrations.sh` aplica archivos `NNNN_nombre.sql` en orden léxico. Para cada archivo normaliza CRLF/LF, calcula SHA-256 y contrasta el valor con `etl_control.schema_migration` antes de omitir una migración ya aplicada.
