@@ -1,0 +1,435 @@
+openapi: 3.1.0
+info:
+  title: DW Control Service API
+  version: 1.0.0-draft
+  description: >-
+    Contrato documental para la administración de cierres académicos y la
+    consulta de ejecuciones ETL. No inicia ni reintenta ejecuciones.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Academic closures
+  - name: ETL executions
+paths:
+  /academic-closures:
+    get:
+      tags: [Academic closures]
+      operationId: listAcademicClosures
+      summary: Lista cierres académicos
+      x-required-permission: DW_CLOSURE_READ
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - name: gestion
+          in: query
+          schema: { type: integer, minimum: 2000 }
+        - name: periodo
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/ClosureStatus' }
+      responses:
+        '200':
+          description: Página de cierres.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClosurePage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Academic closures]
+      operationId: createAcademicClosure
+      summary: Crea un cierre pendiente
+      x-required-permission: DW_CLOSURE_MANAGE
+      description: Actor obtenido del subject del JWT; no se acepta actor en el body.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateClosureRequest' }
+      responses:
+        '201':
+          description: Cierre creado en estado PENDIENTE.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcademicClosure' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /academic-closures/{closureId}:
+    parameters:
+      - name: closureId
+        in: path
+        required: true
+        schema: { type: integer, format: int64, minimum: 1 }
+    get:
+      tags: [Academic closures]
+      operationId: getAcademicClosure
+      summary: Obtiene un cierre académico
+      x-required-permission: DW_CLOSURE_READ
+      responses:
+        '200':
+          description: Detalle del cierre.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcademicClosure' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /academic-closures/{closureId}/events:
+    parameters:
+      - name: closureId
+        in: path
+        required: true
+        schema: { type: integer, format: int64, minimum: 1 }
+      - $ref: '#/components/parameters/Page'
+      - $ref: '#/components/parameters/Size'
+    get:
+      tags: [Academic closures]
+      operationId: listAcademicClosureEvents
+      summary: Consulta la bitácora del cierre
+      x-required-permission: DW_CLOSURE_READ
+      responses:
+        '200':
+          description: Eventos inmutables, del más reciente al más antiguo.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ClosureEventPage' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /academic-closures/{closureId}/close:
+    post:
+      tags: [Academic closures]
+      operationId: closeAcademicPeriod
+      summary: Autoriza el cierre de un periodo
+      x-required-permission: DW_CLOSURE_MANAGE
+      parameters:
+        - name: closureId
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ClosureCommand' }
+      responses:
+        '200':
+          description: El cierre quedó en CERRADO.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcademicClosure' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /academic-closures/{closureId}/reopen:
+    post:
+      tags: [Academic closures]
+      operationId: reopenAcademicPeriod
+      summary: Reabre un periodo cerrado o procesado
+      x-required-permission: DW_CLOSURE_MANAGE
+      parameters:
+        - name: closureId
+          in: path
+          required: true
+          schema: { type: integer, format: int64, minimum: 1 }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReopenClosureRequest' }
+      responses:
+        '200':
+          description: El cierre quedó en REABIERTO.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcademicClosure' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/executions:
+    get:
+      tags: [ETL executions]
+      operationId: listEtlExecutions
+      summary: Lista ejecuciones ETL registradas por Hop
+      x-required-permission: DW_ETL_MONITOR_READ
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [SOLICITADA, EN_EJECUCION, PUBLICANDO, EXITOSA, FALLIDA, CANCELADA]
+        - name: executionKind
+          in: query
+          schema:
+            type: string
+            enum: [HISTORICA, CIERRE_ACADEMICO, REPROCESO]
+        - name: gestion
+          in: query
+          schema: { type: integer, minimum: 2000 }
+        - name: periodo
+          in: query
+          schema: { type: integer, minimum: 1 }
+        - name: closureId
+          in: query
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        '200':
+          description: Página de ejecuciones.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExecutionPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/executions/{runId}:
+    get:
+      tags: [ETL executions]
+      operationId: getEtlExecution
+      summary: Consulta ejecución, pasos, métricas y errores saneados
+      x-required-permission: DW_ETL_MONITOR_READ
+      parameters:
+        - name: runId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '200':
+          description: Detalle de ejecución.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ExecutionDetail' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    Page:
+      name: page
+      in: query
+      schema: { type: integer, minimum: 0, default: 0 }
+    Size:
+      name: size
+      in: query
+      schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+  responses:
+    BadRequest:
+      description: Petición inválida.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Token ausente, inválido o vencido.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: El usuario no tiene el permiso requerido.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Recurso inexistente.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Duplicado o transición incompatible con el estado actual.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ServerError:
+      description: Error interno con detalle seguro.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ServiceUnavailable:
+      description: Dependencia de base de datos temporalmente no disponible.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    ClosureStatus:
+      type: string
+      enum: [PENDIENTE, CERRADO, REABIERTO, PROCESADO]
+    AcademicClosure:
+      type: object
+      required: [closureId, gestion, periodo, status, version, createdBySubject, closureReason, createdAt, updatedAt]
+      properties:
+        closureId: { type: integer, format: int64 }
+        gestion: { type: integer, minimum: 2000 }
+        periodo: { type: integer, minimum: 1 }
+        status: { $ref: '#/components/schemas/ClosureStatus' }
+        effectiveAt: { type: [string, 'null'], format: date-time }
+        authorizedBySubject: { type: [string, 'null'] }
+        createdBySubject: { type: string }
+        closureReason: { type: string }
+        version: { type: integer, minimum: 1 }
+        processedRunId: { type: [string, 'null'], format: uuid }
+        processedAt: { type: [string, 'null'], format: date-time }
+        createdAt: { type: string, format: date-time }
+        updatedAt: { type: string, format: date-time }
+    CreateClosureRequest:
+      type: object
+      additionalProperties: false
+      required: [gestion, periodo, reason]
+      properties:
+        gestion: { type: integer, minimum: 2000 }
+        periodo: { type: integer, minimum: 1 }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+    ClosureCommand:
+      type: object
+      additionalProperties: false
+      required: [effectiveAt, reason]
+      properties:
+        effectiveAt: { type: string, format: date-time }
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+    ReopenClosureRequest:
+      type: object
+      additionalProperties: false
+      required: [reason]
+      properties:
+        reason: { type: string, minLength: 1, maxLength: 2000 }
+    ClosureEvent:
+      type: object
+      required: [eventId, closureId, toStatus, actorSubject, reason, occurredAt]
+      properties:
+        eventId: { type: integer, format: int64 }
+        closureId: { type: integer, format: int64 }
+        fromStatus: { type: [string, 'null'] }
+        toStatus: { $ref: '#/components/schemas/ClosureStatus' }
+        actorSubject: { type: string }
+        reason: { type: string }
+        runId: { type: [string, 'null'], format: uuid }
+        occurredAt: { type: string, format: date-time }
+    ClosurePage:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/AcademicClosure' }
+    ClosureEventPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/ClosureEvent' }
+    PageMetadata:
+      type: object
+      required: [page, size, totalElements, totalPages]
+      properties:
+        page: { type: integer, minimum: 0 }
+        size: { type: integer, minimum: 1, maximum: 100 }
+        totalElements: { type: integer, minimum: 0 }
+        totalPages: { type: integer, minimum: 0 }
+    ExecutionSummary:
+      type: object
+      required: [runId, executionKind, status, requestedBy, requestedAt]
+      properties:
+        runId: { type: string, format: uuid }
+        executionKind: { type: string, enum: [HISTORICA, CIERRE_ACADEMICO, REPROCESO] }
+        status: { type: string, enum: [SOLICITADA, EN_EJECUCION, PUBLICANDO, EXITOSA, FALLIDA, CANCELADA] }
+        closureId: { type: [integer, 'null'], format: int64 }
+        requestedGestion: { type: [integer, 'null'] }
+        requestedPeriodo: { type: [integer, 'null'] }
+        requestedBy: { type: string }
+        requestedAt: { type: string, format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        endedAt: { type: [string, 'null'], format: date-time }
+    ExecutionStep:
+      type: object
+      properties:
+        stepCode: { type: string }
+        phase: { type: string }
+        status: { type: string }
+        stepOrder: { type: integer }
+        startedAt: { type: [string, 'null'], format: date-time }
+        endedAt: { type: [string, 'null'], format: date-time }
+    ExecutionMetric:
+      type: object
+      properties:
+        name: { type: string }
+        value: { type: number }
+        unit: { type: string }
+        measuredAt: { type: string, format: date-time }
+    SanitizedExecutionError:
+      type: object
+      required: [severity, code, message, occurredAt]
+      properties:
+        severity: { type: string, enum: [INFO, WARN, ERROR, CRITICAL] }
+        code: { type: string }
+        message: { type: string, maxLength: 1000 }
+        stepCode: { type: [string, 'null'] }
+        occurredAt: { type: string, format: date-time }
+    ExecutionDetail:
+      allOf:
+        - $ref: '#/components/schemas/ExecutionSummary'
+        - type: object
+          properties:
+            steps:
+              type: array
+              items: { $ref: '#/components/schemas/ExecutionStep' }
+            metrics:
+              type: array
+              items: { $ref: '#/components/schemas/ExecutionMetric' }
+            errors:
+              type: array
+              items: { $ref: '#/components/schemas/SanitizedExecutionError' }
+    ExecutionPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/ExecutionSummary' }
+    Problem:
+      type: object
+      required: [type, title, status]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string, description: Texto seguro sin datos internos sensibles. }
+        instance: { type: string, format: uri-reference }
+        code: { type: string, description: Código estable consumible por clientes. }
