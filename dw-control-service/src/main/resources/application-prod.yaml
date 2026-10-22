@@ -1,0 +1,10 @@
+springdoc:
+  api-docs:
+    enabled: ${DW_CONTROL_OPENAPI_ENABLED:false}
+  swagger-ui:
+    enabled: ${DW_CONTROL_OPENAPI_ENABLED:false}
+
+management:
+  endpoint:
+    health:
+      show-details: never
