@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/keycloak-v1.1.0...keycloak-v1.2.0) (2026-10-22)
+
+
+### Features
+
+* **dw-control:** establish secure service foundation ([#188](https://github.com/KEVIN-117/dss-system-architecture/issues/188)) ([153be4b](https://github.com/KEVIN-117/dss-system-architecture/commit/153be4bf4dc2c6d91b99ed7dd6c05f52c2d64b64))
+
 ## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/keycloak-v1.0.0...keycloak-v1.1.0) (2026-10-22)
 
 
