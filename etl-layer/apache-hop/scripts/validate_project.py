@@ -261,7 +261,7 @@ def validate() -> list[str]:
             errors.append(f"{pipeline_path.name} must block writes on invalid source data")
     if catalog_programs.is_file():
         programs_text = catalog_programs.read_text(encoding="utf-8")
-        for required_text in ("'CAR'", "'PRO'", "'TES'", "'TEM'", "'1'", "'S'", "'Y'", "is_active"):
+        for required_text in ("'CAR'", "'PRO'", "'TES'", "'TEM'", "'A'", "is_active"):
             if required_text not in programs_text:
                 errors.append(f"Academic programs sync is missing required catalog rule: {required_text}")
     if source_pipeline.is_file():

@@ -871,6 +871,7 @@ public class FilesystemRepositoryManager implements IRepositoryManager {
             testFile.mkdirs();
         }
 
+        Path datadirPath = Paths.get(datadir).toAbsolutePath().normalize();
         Collection<File> files = FileUtils.listFiles(new File(datadir + "datasources"), extensions, true);
         List<MondrianSchema> schema = new ArrayList<>();
 
@@ -883,11 +884,16 @@ public class FilesystemRepositoryManager implements IRepositoryManager {
                     if (line.contains("<Schema")) {
                         MondrianSchema ms = new MondrianSchema();
                         ms.setName(file.getName());
-
-                        ms.setPath(file.getPath()
-                                .substring(
-                                        this.getDatadir().length() - 2,
-                                        file.getPath().length()));
+                        Path schemaFilePath = file.toPath().toAbsolutePath().normalize();
+                        if (!schemaFilePath.startsWith(datadirPath)) {
+                            log.warn("Ignoring schema outside the repository data directory: {}", file.getName());
+                            continue;
+                        }
+                        String relativePath = datadirPath
+                                .relativize(schemaFilePath)
+                                .toString()
+                                .replace(File.separatorChar, '/');
+                        ms.setPath("/" + relativePath);
                         schema.add(ms);
                         break;
                     }

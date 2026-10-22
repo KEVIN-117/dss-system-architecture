@@ -8,6 +8,9 @@ import uatf.dss.authservice.domain.model.UserAcademicContext;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Collection;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Repository
 public class UserAcademicContextAdapter implements AcademicContextRepository {
@@ -27,6 +30,14 @@ public class UserAcademicContextAdapter implements AcademicContextRepository {
     @Override
     public List<UserAcademicContext> findAllByUserId(UUID userId) {
         return academicContextRepository.findAllByUserId(userId).stream().map(mapper::toDomain).toList();
+    }
+
+    @Override
+    public Map<UUID, List<UserAcademicContext>> findAllByUserIds(Collection<UUID> userIds) {
+        if (userIds.isEmpty()) return Map.of();
+        return academicContextRepository.findAllByUserIdIn(List.copyOf(userIds)).stream()
+                .map(mapper::toDomain)
+                .collect(Collectors.groupingBy(UserAcademicContext::userId));
     }
 
     @Override

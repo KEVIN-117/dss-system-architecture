@@ -45,7 +45,7 @@ export function isAcademicContext(value: unknown): value is AcademicContext {
   return isRecord(value) &&
     isUuid(value.id) &&
     isUuid(value.userId) &&
-    isNullablePositiveInteger(value.facultyId) &&
+    isNullableNonNegativeInteger(value.facultyId) &&
     isNullableCareerId(value.careerId);
 }
 
@@ -61,8 +61,8 @@ function isUuid(value: unknown): value is string {
   return isString(value) && /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
 }
 
-function isNullablePositiveInteger(value: unknown): value is number | null {
-  return value === null || (typeof value === 'number' && Number.isInteger(value) && value > 0);
+function isNullableNonNegativeInteger(value: unknown): value is number | null {
+  return value === null || (typeof value === 'number' && Number.isInteger(value) && value >= 0);
 }
 
 function isNullableCareerId(value: unknown): value is string | null {

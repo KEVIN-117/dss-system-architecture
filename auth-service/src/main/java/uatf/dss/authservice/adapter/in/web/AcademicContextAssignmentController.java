@@ -17,6 +17,7 @@ import uatf.dss.authservice.application.port.in.SetUserAcademicContextsUseCase;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -38,7 +39,7 @@ public class AcademicContextAssignmentController {
             @PathVariable UUID userId,
             @Valid @RequestBody AcademicContextAssignmentRequest request,
             JwtAuthenticationToken authentication) {
-        UUID actorKeycloakId = UUID.fromString(authentication.getToken().getSubject());
+        UUID actorKeycloakId = UUID.fromString(Objects.requireNonNull(authentication.getToken().getSubject()));
         List<SetUserAcademicContextsCommand.AcademicContextInput> contexts = request.contexts().stream()
                 .map(context -> new SetUserAcademicContextsCommand.AcademicContextInput(
                         context.facultyId(), context.careerId()))

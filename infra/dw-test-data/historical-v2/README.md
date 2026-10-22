@@ -47,14 +47,14 @@ Mantén las credenciales del DW en sus variables propias; no intercambies los us
 
 ## Cierres ficticios en el DW
 
-Después de aplicar las migraciones DW, se puede cargar el fixture independiente de 52 cierres (`gestion` 2000–2025, periodos 1 y 2):
+Después de aplicar las migraciones DW, se puede cargar el seed de cierres históricos basado en los 93 pares distintos válidos de `jachasun_academico_dct_asignaciones.csv` (gestiones 2000–2022). Incluye todos los códigos positivos observados, también los atípicos; no deduce etiquetas de semestre ni periodicidad:
 
 ```powershell
 Get-Content -Raw "infra/dw-test-data/historical-v2/seed_dw_test_closures.sql" |
   docker compose exec -T postgres-dw sh -c 'PGOPTIONS="-c dw_test.allow_synthetic_closures=on" psql -X -U "$POSTGRES_USER" -d "$POSTGRES_DB" -v ON_ERROR_STOP=1 -f -'
 ```
 
-El script crea únicamente cortes faltantes, registra el evento inicial y los cierra mediante `etl_control.transition_academic_period_closure`; no modifica filas existentes. Por seguridad exige el GUC explícito y rechaza las bases OLTP. **No ejecutarlo en producción:** `effective_at` y las autorizaciones son ficticias, no una decisión de DSA. Los cortes se quedan `CERRADO`; solo el flujo ETL puede marcarlos `PROCESADO` tras una publicación exitosa.
+El script crea únicamente cortes faltantes, registra el evento inicial y los cierra mediante `etl_control.transition_academic_period_closure`; no modifica filas existentes. Por seguridad exige el GUC explícito y rechaza las bases OLTP. Para este seed de prueba se asume que esos periodos históricos ya cerraron; `effective_at` se aproxima uniformemente al 15 de diciembre de cada gestión en `America/La_Paz`. Esa fecha es una **estimación de prueba**, no un registro oficial ni una fecha académica de inicio/fin. El actor `test:dct-asignaciones-historical-seed` también identifica que el registro es de prueba. **No ejecutar en producción.** Los cortes se quedan `CERRADO`; solo el flujo ETL puede marcarlos `PROCESADO` tras una publicación exitosa.
 
 Para probar retención con evidencia de continuidad, procesa primero los cierres posteriores necesarios y vuelve a ejecutar el cierre anterior cuando corresponda; sin un cierre siguiente `PROCESADO`, la clasificación esperada es `NO_EVALUABLE`.
 
@@ -62,13 +62,13 @@ Para probar retención con evidencia de continuidad, procesa primero los cierres
 
 El seed se cargó y validó en Docker: 6.000 identidades, 4.154 alumnos, 6.857 postulaciones, 107.971 filas de cursado, cobertura en las 26 gestiones 2000–2025, periodos 1–2, cero referencias huérfanas y cero atributos personales poblados. El rol `dw_fixture_reader` puede consultar las tablas fuente y no tiene permiso `INSERT`.
 
-En la base local `dss_dw` se crearon 52 cierres sintéticos `CERRADO` y 104 eventos de auditoría. `dw.dim_periodo_academico` aún tiene **cero miembros estándar**: los cierres no cargan la dimensión por sí mismos; falta ejecutar el workflow ETL para poblarla.
+En la base local `dss_dw`, el seed histórico crea 93 cierres `CERRADO` y 186 eventos de auditoría cuando se aplica sobre una base limpia. `dw.dim_periodo_academico` aún tiene **cero miembros estándar** tras aplicar solo las migraciones: los cierres no cargan la dimensión por sí mismos; hay que ejecutar el workflow ETL para poblarla. El CSV disponible llega hasta 2022, por lo que no aporta cierres 2023–2025.
 
 Los conteos se registran en [`manifest.yml`](manifest.yml). El flujo completo de Hop con este volumen todavía debe ejecutarse y verificarse en la interfaz antes de considerar validada la demostración extremo a extremo.
 
 ## Límites
 
 - El paquete se derivó de la revisión sintética v2 y del DDL local; no certifica tipos, distribución, periodos oficiales ni reglas de Jachasun productivo.
-- Los 52 cierres de prueba representan una secuencia ficticia por año/periodo, no fueron extraídos de `dct_asignaciones` ni de `public.gestion_periodo`.
+- Los 93 pares de prueba proceden del CSV extraído de `dct_asignaciones`, pero su estado cerrado y fecha del 15 de diciembre siguen siendo supuestos de prueba; no equivalen a fechas o autorizaciones oficiales verificadas.
 - Los datos son sintéticos y no certifican la cardinalidad, semántica ni distribución de Jachasun productivo.
 - `seed_v2.sql` es one-shot para una base limpia. Para repetir, crear otra instancia aislada; no borrar ni truncar el volumen persistente de desarrollo.

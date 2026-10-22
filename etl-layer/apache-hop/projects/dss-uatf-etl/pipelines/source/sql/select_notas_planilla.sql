@@ -1,4 +1,4 @@
--- Contract 06 v1: all attempts through the requested academic cut.
+-- Contract 06 v2: all attempts through the requested academic cut.
 -- JDBC parameters: gestion (smallint) for the null check, then gestion/periodo (smallint).
 SELECT
     id_matricula,
@@ -17,8 +17,7 @@ SELECT
     estado,
     observacion,
     tipo,
-    _fecha_creacion,
-    _hash
+    _fecha_creacion
 FROM academico.notas_planilla
 WHERE (?::smallint IS NULL OR (id_gestion, id_periodo) <= (?::smallint, ?::smallint))
 ORDER BY id_gestion ASC, id_periodo ASC, id_matricula ASC;

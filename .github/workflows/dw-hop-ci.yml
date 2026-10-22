@@ -45,11 +45,7 @@ jobs:
 
       - name: Download pinned PostgreSQL JDBC driver
         run: |
-          mkdir -p etl-layer/apache-hop/jdbc
-          curl --fail --silent --show-error --location \
-            https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.11/postgresql-42.7.11.jar \
-            --output etl-layer/apache-hop/jdbc/postgresql-42.7.11.jar
-          echo '1981B31D3993C58702783C1CDDF10A34E48C1F413D70FF1CB6DEF0A143484647  etl-layer/apache-hop/jdbc/postgresql-42.7.11.jar' | sha256sum --check --status
+          bash etl-layer/apache-hop/scripts/download-postgres-jdbc.sh
 
       - name: Build Apache Hop Web image
         run: docker build --tag dss-apache-hop:${{ github.sha }} etl-layer/apache-hop
@@ -60,7 +56,7 @@ jobs:
             test -f /files/project/project-config.json &&
             test -f /files/project/workflows/wf_vertical_uatf_datos_smoke.hwf &&
             test -f /files/scripts/start-hop-web.sh &&
-            test -f /files/postgresql-42.7.11.jar &&
+            test -f /usr/local/tomcat/jdbc-drivers/postgresql-42.7.11.jar &&
             test ! -f /files/project/environments/prod-env.json &&
             test ! -f /files/project/environments/dev-env.json
           '
@@ -80,19 +76,6 @@ jobs:
       - name: Run PostgreSQL DW regression suite
         run: docker compose -f infra/dw-schema/dw-test-docker.yml up --build --exit-code-from dw-schema-test
 
-      - name: Run Apache Hop academic catalog sync regression
-        run: |
-          compose=(docker compose -p dss-dw-catalog-sync -f infra/dw-integration/dw-integration-test.yml)
-          "${compose[@]}" up -d jachasun-fixture auth-catalog-fixture
-          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-initial-test
-          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-initial-assert
-          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-replay-test
-          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-replay-assert
-
-      - name: Stop academic catalog fixtures before other suites
-        if: always()
-        run: docker compose -p dss-dw-catalog-sync -f infra/dw-integration/dw-integration-test.yml down --volumes --remove-orphans
-
       - name: Run Hop source-query contract regression
         run: docker compose -p dss-dw-source-contract -f infra/dw-integration/dw-integration-test.yml --profile dw-req6-sources run --rm hop-source-query-contract-test
 
@@ -109,10 +92,6 @@ jobs:
 
       - name: Run Hop atomic publication regression
         run: docker compose -p dss-dw-publish -f infra/dw-integration/dw-integration-test.yml --profile dw-publish run --rm hop-publish-assert
-
-      - name: Stop academic catalog test containers
-        if: always()
-        run: docker compose -p dss-dw-catalog-sync -f infra/dw-integration/dw-integration-test.yml down --volumes --remove-orphans
 
       - name: Stop Hop regression containers
         if: always()

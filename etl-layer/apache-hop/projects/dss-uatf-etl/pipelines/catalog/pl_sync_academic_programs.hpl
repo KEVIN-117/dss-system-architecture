@@ -4,7 +4,7 @@
     <name>pl_sync_academic_programs</name>
     <name_sync_with_filename>Y</name_sync_with_filename>
     <description>Valida y aplica upsert de programas académicos en Auth Service</description>
-    <extended_description>Sincroniza únicamente programas CAR, PRO, TES y TEM activos según el contrato aprobado (S/1/Y). Valores auxiliares o no reconocidos quedan fuera del snapshot y nunca causan borrados ni cambios por ausencia. El upsert de la FK compuesta puede bloquear un cambio de facultad si hay contextos de usuario que lo referencian.</extended_description>
+    <extended_description>Sincroniza únicamente programas CAR, PRO, TES y TEM marcados como activos con A, según el contrato aprobado por Jachasun. Valores auxiliares o no reconocidos quedan fuera del snapshot y nunca causan borrados ni cambios por ausencia. El upsert de la FK compuesta puede bloquear un cambio de facultad si hay contextos de usuario que lo referencian.</extended_description>
     <pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type>
     <parameters/>
     <capture_transform_performance>N</capture_transform_performance><transform_performance_capturing_delay>1000</transform_performance_capturing_delay><transform_performance_capturing_size_limit>100</transform_performance_capturing_size_limit>
@@ -23,7 +23,7 @@
     <sql><![CDATA[WITH expected(column_name, udt_name, char_length, is_nullable) AS (
     VALUES
         ('id_programa', 'bpchar', 3, 'NO'),
-        ('programa', 'varchar', NULL::integer, 'NO'),
+        ('programa', 'varchar', 50, 'NO'),
         ('id_facultad', 'int2', NULL::integer, 'NO'),
         ('id_nivel', 'int2', NULL::integer, 'NO'),
         ('nivel', 'varchar', 45, 'YES'),
@@ -49,7 +49,7 @@
     SELECT id_programa, programa, id_facultad, _tipo_academico, activo
     FROM academico.alm_programas
     WHERE upper(btrim(_tipo_academico)) IN ('CAR','PRO','TES','TEM')
-      AND upper(btrim(coalesce(activo,''))) IN ('1','S','Y')
+      AND upper(btrim(coalesce(activo,''))) = 'A'
 ), data_ok AS (
     SELECT count(*) > 0 AND NOT EXISTS (
         SELECT 1 FROM relevant p
@@ -76,7 +76,7 @@ FROM schema_ok CROSS JOIN data_ok]]></sql>
     <abort_option>ABORT_WITH_ERROR</abort_option><always_log_rows>N</always_log_rows><message>El contrato del catálogo de programas no coincide o contiene filas inválidas</message><row_threshold>0</row_threshold><attributes/><GUI><xloc>640</xloc><yloc>32</yloc></GUI>
   </transform>
   <transform>
-    <name>Read program snapshot</name><type>TableInput</type><description>Lee solo CAR/PRO/TES/TEM activos (S/1/Y), el mismo filtro contractual del DW</description>
+    <name>Read program snapshot</name><type>TableInput</type><description>Lee solo CAR/PRO/TES/TEM activos (A), el mismo filtro contractual del DW</description>
     <distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection>
     <sql><![CDATA[SELECT btrim(id_programa)::char(3) AS career_id,
        id_facultad::integer AS faculty_id,
@@ -86,7 +86,7 @@ FROM schema_ok CROSS JOIN data_ok]]></sql>
 FROM academico.alm_programas
 WHERE ? = 1
   AND upper(btrim(_tipo_academico)) IN ('CAR','PRO','TES','TEM')
-  AND upper(btrim(coalesce(activo,''))) IN ('1','S','Y')
+  AND upper(btrim(coalesce(activo,''))) = 'A'
 ORDER BY id_programa ASC]]></sql>
     <limit>0</limit><lookup>Contract accepted?</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>640</xloc><yloc>224</yloc></GUI>
   </transform>

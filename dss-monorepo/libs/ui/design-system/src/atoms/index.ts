@@ -17,6 +17,7 @@ export {
 } from './popover';
 export * from './radio';
 export * from './select';
+export * from './sheet';
 export * from './skeleton';
 export * from './switch';
 export * from './textarea';

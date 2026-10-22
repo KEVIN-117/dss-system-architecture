@@ -92,3 +92,12 @@ El desarrollo de este servicio ha sido granularizado en Épicas e Issues detalla
 ## 🔐 Seguridad y Privacidad (RNF4.1)
 
 Este servicio implementa las reglas de negocio de la UATF para garantizar la privacidad de los datos académicos. Un Decano solo tendrá contexto para ver la información de su respectiva Facultad, y un Director de Carrera, la de su Carrera. Este contexto es gestionado localmente por este microservicio tras verificar la identidad global autenticada en Keycloak.
+
+## Directorio administrativo de usuarios
+
+Las rutas de administración requieren un JWT válido con autoridad `ROLE_SUPERADMIN`:
+
+- `GET /admin/users`: listado paginado (por defecto `page=0`, `size=20`; máximo `size=100`). Admite `q` (búsqueda parcial por usuario, correo, nombre o apellido), `active`, `role`, `facultyId` y `careerId` (código de tres caracteres). La ordenación es estable por username y UUID local.
+- `GET /admin/users/{userId}`: detalle por UUID local.
+
+Ambos endpoints devuelven username, correo, nombre, apellido, estado, roles y contextos académicos. No devuelven contraseñas, tokens ni identificadores internos de Keycloak. Los filtros de contexto académico solo consideran usuarios con un contexto que coincida con los filtros proporcionados.

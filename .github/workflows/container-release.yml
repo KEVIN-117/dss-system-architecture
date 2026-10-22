@@ -250,6 +250,8 @@ jobs:
       contents: read
     steps:
       - uses: actions/checkout@v4
+      - name: Download pinned PostgreSQL JDBC driver
+        run: bash etl-layer/apache-hop/scripts/download-postgres-jdbc.sh
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:

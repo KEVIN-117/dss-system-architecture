@@ -142,11 +142,11 @@ DO $$
 BEGIN
     BEGIN
         INSERT INTO dw.dim_estudiante (
-            member_type, id_ra, attribute_hash_scd2, valid_from, is_current
+            member_type, id_ra, id_alumno, attribute_hash_scd2, valid_from, is_current
         ) VALUES (
-            'STANDARD', 'RA-DW006', repeat('b', 64)::char(64), DATE '2034-02-01', TRUE
+            'STANDARD', 'RA-OTHER', 960001, repeat('b', 64)::char(64), DATE '2034-02-01', TRUE
         );
-        RAISE EXCEPTION 'Duplicado de id_ra no fue rechazado';
+        RAISE EXCEPTION 'Duplicado temporal de id_alumno no fue rechazado';
     EXCEPTION WHEN exclusion_violation THEN
         NULL;
     END;

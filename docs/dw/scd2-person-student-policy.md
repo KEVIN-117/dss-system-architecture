@@ -20,17 +20,16 @@ La prioridad es preservar la interpretación histórica de los hechos: una fila 
 
 ### Identidad canónica
 
-`id_ra` es la identidad canónica de persona cuando está presente y validada. `id_alumno` es el identificador académico alterno para una observación de estudiante. Para comparar snapshots se utiliza una clave lógica de resolución:
+`id_alumno` es la identidad histórica canónica de estudiante, conforme a la confirmación de DSA/TI. `id_ra` enlaza con el perfil personal, pero no es único en el conjunto académico y no debe fusionar registros. Para comparar snapshots se utiliza `ALUMNO:<id_alumno>`:
 
 | Situación | Clave lógica propuesta | Acción |
 | --- | --- | --- |
-| `id_ra` presente | `RA:<id_ra>` | Usar como identidad principal. |
-| `id_ra` nulo e `id_alumno` presente | `ALUMNO:<id_alumno>` | Crear una identidad académica provisional, sin afirmar equivalencia personal. |
-| Ambos presentes | `RA:<id_ra>` y asociación verificable con `id_alumno` | Conservar ambos identificadores y auditar la asociación. |
-| Ambos nulos | Ninguna | No crear estudiante estándar; enrutar a `UNKNOWN` y registrar excepción. |
-| Un `id_alumno` asociado a varios `id_ra` | Ambigua | El pipeline bloquea la identidad conflictiva; DSA debe resolver el caso de datos antes de su reproceso. |
+| `id_alumno` presente, con o sin `id_ra` | `ALUMNO:<id_alumno>` | Identidad canónica; `id_ra` enriquece y se historiza como atributo. |
+| Varios `id_alumno` comparten `id_ra` | Una identidad por `id_alumno` | Permitido; no se fusionan alumnos por el perfil compartido. |
+| `id_alumno` nulo | Ninguna identidad histórica confiable | No crear estándar; enrutar a `UNKNOWN` o bloquear según el contrato del hecho. |
+| El mismo `id_alumno` cambia de `id_ra` | Se conserva `ALUMNO:<id_alumno>` | Cambio de atributo sujeto al corte autorizado SCD2. |
 
-La aparición posterior de un `id_ra` para una fila que antes solo tenía `id_alumno` no debe crear automáticamente una segunda persona ni cambiar retrospectivamente la clave natural. Una reconciliación aprobada debe registrar la evidencia, el `run_id`, el actor y el alcance temporal del cambio. La implementación de un catálogo de identidades o de una tabla puente queda fuera de DW-007 y deberá ser definida antes de resolver fusiones.
+`id_ra` puede faltar o compartirse; en ninguno de esos casos cambia la identidad académica `id_alumno`. Una dimensión de persona que consolide varios `id_alumno` queda fuera del MVP y requeriría otra regla de identidad aprobada.
 
 La surrogate key (`estudiante_sk`) identifica una versión física del DW, no reemplaza la identidad natural ni debe reutilizarse entre personas. Los miembros técnicos no tienen clave natural.
 
@@ -40,8 +39,8 @@ La siguiente matriz es la política aplicada por el MVP a los atributos versiona
 
 | Atributo de `dim_estudiante` | Clasificación | Regla de cambio |
 | --- | --- | --- |
-| `id_ra` | SCD0 / identidad | No se sustituye por otro valor dentro de la misma identidad sin reconciliación aprobada. |
-| `id_alumno` | SCD0 / identidad alterna | Se conserva como evidencia académica; una reasignación requiere revisión. |
+| `id_alumno` | SCD0 / identidad canónica | No se reutiliza para otra identidad; la unicidad temporal se valida sobre este atributo. |
+| `id_ra` | SCD2 / atributo de perfil | Se conserva el valor observado por corte; puede repetirse entre alumnos distintos. |
 | `id_sexo` | SCD2 | Un cambio observado genera nueva versión efectiva desde el corte autorizado. |
 | `estado_civil` | SCD2 | Se conserva la evolución observada; `NULL` no se convierte en una categoría inventada. |
 | `nac_pais` | SCD2 | Cambio historizable, sujeto a validación de catálogo. |
@@ -87,7 +86,7 @@ La implementación usa un intervalo semiabierto:
 [valid_from, valid_to)
 ```
 
-- La versión actual tiene `valid_to = NULL` y los índices SCD2 permiten una sola versión actual por `id_ra` y por `id_alumno`; un trigger serializa las escrituras y rechaza intervalos solapados por cualquiera de los identificadores.
+- La versión actual tiene `valid_to = NULL` y el índice SCD2 permite una sola versión actual por `id_alumno`; un trigger serializa escrituras y rechaza intervalos solapados únicamente por esa identidad. No hay unicidad temporal por `id_ra`.
 - `valid_from` representa la fecha/hora efectiva del cierre que observó el cambio, no el momento en que el ETL terminó.
 - `observed_at` o el timestamp de procesamiento se conserva como metadato de auditoría separado.
 - Al detectar un cambio SCD2, la versión anterior se cierra en el mismo instante efectivo que inicia la nueva versión.
@@ -126,12 +125,12 @@ Si la identidad no existe, se crea su primera versión. Si existe y el hash SCD2
 
 El pipeline `pl_dim_estudiante_scd2_mvp.hpl` obtiene el snapshot de `academico.alumnos` y lo enriquece con los campos aprobados de `public.uatf_datos`, colegios y localidades. La ejecución debe corresponder a un cierre académico elegible; `effective_at` del cierre determina `valid_from`, no el reloj del contenedor.
 
-La rutina `etl_control.prepare_hop_student_scd2(run_id, student_json)` valida la ejecución y el cierre, resuelve la clave `RA:<id_ra>` o provisional `ALUMNO:<id_alumno>`, serializa los atributos SCD2 de forma canónica y compara el hash con la versión vigente. La rutina no publica directamente: solo registra operaciones `INSERT` o `CLOSE` mediante `stage_hop_publication_row`, para que el publisher las aplique atómicamente con el resto de la carga.
+La rutina `etl_control.prepare_hop_student_scd2(run_id, student_json)` valida la ejecución y el cierre, resuelve siempre `ALUMNO:<id_alumno>`, serializa los atributos SCD2 —incluido `id_ra` como atributo— y compara el hash con la versión vigente. La rutina no publica directamente: solo registra operaciones `INSERT` o `CLOSE` mediante `stage_hop_publication_row`, para que el publisher las aplique atómicamente con el resto de la carga.
 
 - Primera observación: prepara un `INSERT` de versión estándar.
 - Hash sin cambios: no prepara una nueva versión.
 - Cambio de atributos: prepara el cierre de la versión vigente y el `INSERT` de la nueva versión con el mismo corte efectivo.
-- Identidad ambigua, discrepancia entre RA y alumno, perfil demográfico faltante para un RA o corte fuera de orden: bloquea la preparación.
+- Falta de `id_alumno`, perfil demográfico faltante para un RA informado o corte fuera de orden: bloquea la preparación. Un `id_ra` compartido no es conflicto.
 - La ausencia de un estudiante en una extracción no cierra su versión; la expiración por ausencia requiere una política explícita posterior.
 
 Las pruebas de integración verifican las operaciones preparadas y la publicación transaccional de cambios sobre fixtures, incluyendo rollback de los datos de prueba. El workflow vertical del MVP también ejecuta el publisher atómico. Para una futura ejecución productiva se mantienen las autorizaciones de corte, los permisos runtime y los controles de cambio propios del ambiente.

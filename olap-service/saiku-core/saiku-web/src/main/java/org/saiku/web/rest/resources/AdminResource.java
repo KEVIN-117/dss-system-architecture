@@ -438,22 +438,25 @@ public class AdminResource {
         if (!userService.isAdmin()) {
             return Response.status(Response.Status.FORBIDDEN).build();
         }
-        String p = "";
         for (MondrianSchema s : datasourceService.getAvailableSchema()) {
             if (s.getName().equals(id)) {
-
                 try {
-                    p = repositoryDatasourceManager.getInternalFileData(s.getPath());
+                    String xml = repositoryDatasourceManager.getInternalFileData(s.getPath());
+                    if (xml == null || xml.isBlank()) {
+                        return Response.status(Response.Status.NOT_FOUND).build();
+                    }
+                    byte[] xmlBytes = xml.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+                    return Response.ok(xmlBytes, MediaType.APPLICATION_XML)
+                            .header("content-disposition", "attachment; filename = " + id)
+                            .build();
                 } catch (RepositoryException e) {
-                    Response.serverError().entity(e.getLocalizedMessage()).build();
+                    return Response.serverError()
+                            .entity(e.getLocalizedMessage())
+                            .build();
                 }
-                break;
             }
         }
-
-        return Response.ok(p.getBytes(), MediaType.APPLICATION_OCTET_STREAM)
-                .header("content-disposition", "attachment; filename = " + id)
-                .build();
+        return Response.status(Response.Status.NOT_FOUND).build();
     }
 
     /**

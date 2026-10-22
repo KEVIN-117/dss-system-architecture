@@ -33,6 +33,7 @@ class AuthServiceApplicationTests {
                 .andExpect(status().isOk())
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(content().string(containsString("/auth/me")))
+                .andExpect(content().string(containsString("/admin/users")))
                 .andExpect(content().string(containsString("bearerAuth")));
     }
 

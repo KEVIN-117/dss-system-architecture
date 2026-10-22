@@ -1,17 +1,19 @@
 'use client';
 
 import * as React from 'react';
+import { useRouter } from 'next/navigation';
 import {
   AdminSchemas,
   type AdminSchemaRecord,
 } from '@dss-monorepo/design-system';
 import {
-  deleteSaikuSchema,
-  listSaikuSchemas,
-  uploadSaikuSchema,
-} from '../data-access/saiku-admin';
+  deleteOlapSchema,
+  listOlapSchemas,
+  uploadOlapSchema,
+} from '../data-access/olap-admin';
 
 export function AdminSchemasPage() {
+  const router = useRouter();
   const [schemas, setSchemas] = React.useState<AdminSchemaRecord[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
@@ -19,7 +21,7 @@ export function AdminSchemasPage() {
     setLoading(true);
     setError(null);
     try {
-      const records = await listSaikuSchemas();
+      const records = await listOlapSchemas();
       setSchemas(
         records.map(({ id, name, path, type }) => ({ id, name, path, type })),
       );
@@ -35,12 +37,12 @@ export function AdminSchemasPage() {
   }, [refresh]);
 
   const upload = async (name: string, xml: string) => {
-    await uploadSaikuSchema(name, xml);
+    await uploadOlapSchema(name, xml);
     await refresh();
   };
   const remove = async (schema: AdminSchemaRecord) => {
     const id = schema.id ?? schema.name;
-    await deleteSaikuSchema(id);
+    await deleteOlapSchema(id);
     await refresh();
   };
 
@@ -50,6 +52,9 @@ export function AdminSchemasPage() {
       loading={loading}
       error={error}
       onRefresh={() => void refresh()}
+      onView={(schema) =>
+        router.push(`/schemas/${encodeURIComponent(schema.name)}`)
+      }
       onUpload={upload}
       onDelete={remove}
     />

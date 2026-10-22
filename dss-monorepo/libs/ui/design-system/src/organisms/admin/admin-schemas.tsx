@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Database, FileUp, RefreshCw, Search, Trash2 } from 'lucide-react';
+import { Database, Eye, FileUp, RefreshCw, Search, Trash2 } from 'lucide-react';
 import { Badge } from '../../atoms/badge';
 import { Button } from '../../atoms/button';
 import { Input } from '../../atoms/input';
@@ -31,6 +31,7 @@ export interface AdminSchemasProps {
   loading?: boolean;
   error?: string | null;
   onRefresh?: () => void;
+  onView?: (schema: AdminSchemaRecord) => void;
   onUpload: (name: string, xml: string) => void | Promise<void>;
   onDelete: (schema: AdminSchemaRecord) => void | Promise<void>;
 }
@@ -44,6 +45,7 @@ export function AdminSchemas({
   loading = false,
   error,
   onRefresh,
+  onView,
   onUpload,
   onDelete,
 }: AdminSchemasProps) {
@@ -113,16 +115,17 @@ export function AdminSchemas({
         <div>
           <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
             <Database className="size-4" />
-            OLAP metadata
+            OLAP administration
           </div>
           <h1
             id="admin-schemas-title"
             className="text-2xl font-semibold tracking-tight"
           >
-            Schemas
+            OLAP schemas
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Upload and manage XML schemas used by Saiku data sources.
+            Manage XML schemas for configured OLAP data sources. Requests are
+            sent through the authenticated BFF.
           </p>
         </div>
         <div className="flex gap-2">
@@ -195,7 +198,7 @@ export function AdminSchemas({
                 <TableHead>Name</TableHead>
                 <TableHead>Repository path</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="w-20 text-right">Actions</TableHead>
+                <TableHead className="w-28 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -216,7 +219,18 @@ export function AdminSchemas({
                     )}
                   </TableCell>
                   <TableCell>
-                    <div className="flex justify-end">
+                    <div className="flex justify-end gap-1">
+                      {onView && (
+                        <Button
+                          aria-label={`View ${schema.name}`}
+                          title="Ver esquema"
+                          variant="ghost"
+                          size="icon-sm"
+                          onClick={() => onView(schema)}
+                        >
+                          <Eye className="size-4" aria-hidden="true" />
+                        </Button>
+                      )}
                       <Button
                         aria-label={`Delete ${schema.name}`}
                         variant="ghost"

@@ -1,0 +1,462 @@
+<!doctype html>
+<html lang="es">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <title>Arquitectura de despliegue | DSS UATF</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@400;500;600&family=Geist+Mono:wght@400;500;600&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #F4F4F0;
+      --paper-2: #EAE8E3;
+      --ink: #111111;
+      --muted: #5C5C5C;
+      --soft: #5C5C5C;
+      --rule: rgba(17, 17, 17, .12);
+      --rule-solid: #B8B6AE;
+      --accent: #C1121F;
+      --accent-tint: rgba(193, 18, 31, .08);
+      --link: #1F6C9F;
+      --sans: 'Geist', system-ui, sans-serif;
+      --serif: 'Instrument Serif', 'Noto Serif', serif;
+      --mono: 'Geist Mono', ui-monospace, monospace;
+    }
+
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+    }
+
+    html {
+      background: var(--paper);
+      color: var(--ink);
+    }
+
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: var(--sans);
+      font-size: 16px;
+      line-height: 1.55;
+      -webkit-font-smoothing: antialiased;
+      text-rendering: optimizeLegibility;
+    }
+
+    .page {
+      max-width: 1440px;
+      margin: 0 auto;
+      padding: 48px 40px 64px;
+    }
+
+    .eyebrow,
+    .section-kicker {
+      color: var(--muted);
+      font: 500 11px/1.4 var(--mono);
+      letter-spacing: .12em;
+      text-transform: uppercase;
+    }
+
+    h1,
+    h2,
+    h3,
+    p {
+      margin: 0;
+    }
+
+    h1 {
+      max-width: 18ch;
+      margin-top: 12px;
+      font: 400 42px/1.04 var(--serif);
+      letter-spacing: -.02em;
+    }
+
+    .lede {
+      max-width: 76ch;
+      margin-top: 16px;
+      color: var(--muted);
+      font-size: 15px;
+    }
+
+    .release-line {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px 20px;
+      margin-top: 22px;
+    }
+
+    .release-line code,
+    code {
+      color: var(--ink);
+      font: 400 12px/1.5 var(--mono);
+      overflow-wrap: anywhere;
+    }
+
+    .release-line span {
+      display: inline-flex;
+      gap: 7px;
+      align-items: baseline;
+    }
+
+    .release-line b {
+      color: var(--muted);
+      font: 500 11px/1.5 var(--mono);
+    }
+
+    .diagram-section {
+      margin-top: 56px;
+    }
+
+    .section-head {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(240px, .8fr);
+      align-items: end;
+      gap: 24px;
+      margin-bottom: 18px;
+      padding-bottom: 16px;
+      border-bottom: 1px solid var(--rule-solid);
+    }
+
+    h2 {
+      margin-top: 5px;
+      font: 400 30px/1.08 var(--serif);
+    }
+
+    .section-head p {
+      max-width: 58ch;
+      justify-self: end;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .diagram-container {
+      width: 100%;
+      min-width: 0;
+      overflow-x: auto;
+    }
+
+    svg {
+      display: block;
+      width: 100%;
+      min-width: 1280px;
+      height: auto;
+    }
+
+    .diagram-bg {
+      fill: var(--paper);
+    }
+
+    .zone {
+      fill: rgba(17, 17, 17, .025);
+      stroke: rgba(17, 17, 17, .15);
+      stroke-width: 1;
+    }
+
+    .zone-mask {
+      fill: var(--paper);
+    }
+
+    .zone-label {
+      fill: var(--soft);
+      font: 500 8px var(--mono);
+      letter-spacing: .14em;
+    }
+
+    .connector {
+      fill: none;
+      stroke: var(--muted);
+      stroke-width: 1.4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .connector-link {
+      fill: none;
+      stroke: var(--link);
+      stroke-width: 1.5;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .connector-async {
+      fill: none;
+      stroke: var(--muted);
+      stroke-width: 1.2;
+      stroke-dasharray: 5 4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .connector-once {
+      fill: none;
+      stroke: var(--soft);
+      stroke-width: 1.2;
+      stroke-dasharray: 5 4;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .label-mask {
+      fill: var(--paper);
+    }
+
+    .arrow-label {
+      fill: var(--soft);
+      font: 400 8px var(--mono);
+      letter-spacing: .06em;
+    }
+
+    .node-mask {
+      fill: var(--paper);
+    }
+
+    .node {
+      fill: #FFFFFF;
+      stroke: var(--ink);
+      stroke-width: 1;
+    }
+
+    .node-store {
+      fill: var(--paper-2);
+      stroke: var(--muted);
+      stroke-width: 1;
+    }
+
+    .node-external {
+      fill: var(--paper-2);
+      stroke: rgba(17, 17, 17, .42);
+      stroke-width: 1;
+    }
+
+    .node-queue {
+      fill: #FFFFFF;
+      stroke: var(--muted);
+      stroke-width: 1;
+      stroke-dasharray: 5 4;
+    }
+
+    .node-focal {
+      fill: var(--accent-tint);
+      stroke: var(--accent);
+      stroke-width: 1.5;
+    }
+
+    .node-type {
+      fill: var(--paper);
+      stroke: rgba(17, 17, 17, .42);
+      stroke-width: .8;
+    }
+
+    .node-type-accent {
+      fill: var(--paper);
+      stroke: rgba(193, 18, 31, .58);
+      stroke-width: .8;
+    }
+
+    .node-type-text {
+      fill: var(--muted);
+      font: 500 7px var(--mono);
+      letter-spacing: .08em;
+    }
+
+    .node-type-text-accent {
+      fill: var(--accent);
+      font: 500 7px var(--mono);
+      letter-spacing: .08em;
+    }
+
+    .node-name {
+      fill: var(--ink);
+      font: 600 12px var(--sans);
+    }
+
+    .node-sub {
+      fill: var(--muted);
+      font: 400 9px var(--mono);
+    }
+
+    .legend-rule {
+      stroke: var(--rule);
+      stroke-width: 1;
+    }
+
+    .legend-text {
+      fill: var(--muted);
+      font: 400 9px var(--mono);
+      letter-spacing: .02em;
+    }
+
+    .legend-dot-red {
+      fill: var(--accent);
+    }
+
+    .legend-dot-blue {
+      fill: var(--link);
+    }
+
+    .legend-dot-gray {
+      fill: var(--muted);
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1.12fr .88fr;
+      gap: 28px;
+      margin-top: 18px;
+    }
+
+    .detail-block {
+      padding-top: 14px;
+      border-top: 1px solid var(--rule);
+    }
+
+    .detail-block h3 {
+      margin-bottom: 7px;
+      font: 600 13px/1.35 var(--sans);
+    }
+
+    .detail-block p,
+    .detail-block li {
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .detail-block ul {
+      display: grid;
+      gap: 6px;
+      margin: 0;
+      padding-left: 18px;
+    }
+
+    .detail-block code {
+      font-size: 11px;
+    }
+
+    .footnote {
+      margin-top: 22px;
+      padding-top: 14px;
+      border-top: 1px solid var(--rule-solid);
+      color: var(--muted);
+      font-size: 12px;
+    }
+
+    a {
+      color: var(--link);
+      text-underline-offset: 3px;
+    }
+
+    @media (max-width: 760px) {
+      .page {
+        padding: 32px 20px 48px;
+      }
+
+      h1 {
+        font-size: 36px;
+      }
+
+      .section-head,
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .section-head p {
+        justify-self: start;
+      }
+
+      .diagram-section {
+        margin-top: 42px;
+      }
+    }
+
+    @media print {
+      .page {
+        max-width: none;
+        padding: 18px;
+      }
+
+      .diagram-container {
+        overflow-x: visible;
+      }
+
+      svg {
+        min-width: 0;
+      }
+
+      .diagram-section {
+        break-inside: avoid;
+      }
+    }
+
+  </style>
+</head>
+
+<body>
+  <main class="page">
+  <header>
+      <p class="eyebrow">DSS UATF · Arquitectura de despliegue</p>
+      <h1>Servicios de identidad, ETL y análisis</h1>
+      <p class="lede">Topología de ejecución para las imágenes versionadas de Docker Hub. Las flechas muestran quién
+        inicia cada conexión; en operaciones de lectura, los resultados regresan al consumidor.</p>
+      <div class="release-line" aria-label="Imágenes publicadas">
+        <span><b>IAM</b><code>kevin117rodriguez/dss-auth-service:1.0.0</code></span>
+        <span><b>IDP</b><code>kevin117rodriguez/dss-keycloak:1.0.0</code></span>
+        <span><b>ETL</b><code>kevin117rodriguez/dss-apache-hop:1.0.0</code></span>
+        <span><b>OLAP</b><code>kevin117rodriguez/dss-olap-service:1.0.0</code></span>
+      </div>
+
+    </header>
+
+    <section class="diagram-section" aria-labelledby="identity-heading">
+      <div class="section-head"><div><p class="section-kicker">Vista 01 · Acceso e identidad</p><h2 id="identity-heading">OIDC, datos IAM y eventos de usuario</h2></div><p>El proxy termina HTTPS y enruta OIDC y API. Keycloak y auth-service comparten la base IAM con esquemas y credenciales separados; RabbitMQ desacopla los eventos.</p></div>
+      <div class="diagram-container">
+        <svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="arquitectura-deploy-uatf-identidad-title arquitectura-deploy-uatf-identidad-desc">
+          <title id="arquitectura-deploy-uatf-identidad-title">Identidad y eventos del DSS UATF</title>
+          <desc id="arquitectura-deploy-uatf-identidad-desc">Los portales se conectan por HTTPS al proxy, que enruta hacia Keycloak y auth-service; ambos usan PostgreSQL IAM y Keycloak publica eventos que auth-service consume por RabbitMQ.</desc>
+          <defs><marker id="identidad-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5C5C5C"/></marker><marker id="identidad-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1F6C9F"/></marker></defs>
+          <rect class="diagram-bg" width="1280" height="720"/>
+          <rect class="zone" x="32" y="56" width="288" height="208" rx="8"/><rect class="zone-mask" x="52" y="60" width="82" height="12" rx="2"/><text class="zone-label" x="93" y="69" text-anchor="middle">CLIENTES</text>
+          <rect class="zone" x="336" y="56" width="256" height="208" rx="8"/><rect class="zone-mask" x="414" y="60" width="100" height="12" rx="2"/><text class="zone-label" x="464" y="69" text-anchor="middle">BORDE HTTPS</text>
+          <rect class="zone" x="620" y="56" width="600" height="528" rx="8"/><rect class="zone-mask" x="844" y="60" width="152" height="12" rx="2"/><text class="zone-label" x="920" y="69" text-anchor="middle">RED PRIVADA DE SERVICIOS</text>
+          <path class="connector-link" d="M288 164 H360" marker-end="url(#identidad-arrow-link)"/><path class="connector-link" d="M560 156 H660" marker-end="url(#identidad-arrow-link)"/><path class="connector-link" d="M460 128 V104 Q460 96 468 96 H1052 Q1060 96 1060 104 V128" marker-end="url(#identidad-arrow-link)"/><path class="connector-link" d="M860 176 H960" marker-end="url(#identidad-arrow-link)"/><path class="connector" d="M760 200 V360" marker-end="url(#identidad-arrow)"/><path class="connector" d="M960 188 H920 Q912 188 912 196 V412 Q912 420 904 420 H860" marker-end="url(#identidad-arrow)"/><path class="connector" d="M1060 200 V360" marker-end="url(#identidad-arrow)"/><path class="connector-async" d="M1060 440 V472 Q1060 480 1052 480 H608 Q600 480 600 472 V236 Q600 228 608 228 H692 Q700 228 700 220 V200" marker-end="url(#identidad-arrow)"/>
+          <rect class="label-mask" x="300" y="140" width="48" height="12" rx="2"/><text class="arrow-label" x="324" y="149" text-anchor="middle">HTTPS</text><rect class="label-mask" x="576" y="132" width="68" height="12" rx="2"/><text class="arrow-label" x="610" y="141" text-anchor="middle">AUTH API</text><rect class="label-mask" x="724" y="76" width="72" height="12" rx="2"/><text class="arrow-label" x="760" y="85" text-anchor="middle">OIDC LOGIN</text><rect class="label-mask" x="882" y="152" width="56" height="12" rx="2"/><text class="arrow-label" x="910" y="161" text-anchor="middle">JWKS</text><rect class="label-mask" x="772" y="272" width="72" height="12" rx="2"/><text class="arrow-label" x="808" y="281" text-anchor="middle">JDBC / IAM</text><rect class="label-mask" x="924" y="292" width="68" height="12" rx="2"/><text class="arrow-label" x="958" y="301" text-anchor="middle">JDBC / KC</text><rect class="label-mask" x="992" y="268" width="60" height="12" rx="2"/><text class="arrow-label" x="1022" y="277" text-anchor="middle">AMQP PUB</text><rect class="label-mask" x="520" y="332" width="72" height="12" rx="2"/><text class="arrow-label" x="556" y="341" text-anchor="middle">AMQP EVENT</text>
+          <g aria-label="Portales y navegadores UATF"><rect class="node-mask" x="48" y="128" width="240" height="72" rx="6"/><rect class="node-external" x="48" y="128" width="240" height="72" rx="6"/><rect class="node-type" x="60" y="136" width="52" height="12" rx="2"/><text class="node-type-text" x="86" y="145" text-anchor="middle">CLIENTE</text><text class="node-name" x="168" y="169" text-anchor="middle">Portales UATF</text><text class="node-sub" x="168" y="185" text-anchor="middle">browser · https</text></g>
+          <g aria-label="Proxy inverso institucional"><rect class="node-mask" x="360" y="128" width="200" height="72" rx="6"/><rect class="node" x="360" y="128" width="200" height="72" rx="6"/><rect class="node-type" x="372" y="136" width="44" height="12" rx="2"/><text class="node-type-text" x="394" y="145" text-anchor="middle">EDGE</text><text class="node-name" x="460" y="169" text-anchor="middle">Proxy HTTPS</text><text class="node-sub" x="460" y="185" text-anchor="middle">TLS · routing</text></g>
+          <g aria-label="Auth service"><rect class="node-mask" x="660" y="128" width="200" height="72" rx="6"/><rect class="node" x="660" y="128" width="200" height="72" rx="6"/><rect class="node-type" x="672" y="136" width="44" height="12" rx="2"/><text class="node-type-text" x="694" y="145" text-anchor="middle">API</text><text class="node-name" x="760" y="169" text-anchor="middle">auth-service</text><text class="node-sub" x="760" y="185" text-anchor="middle">:8080 · /api/v1</text></g>
+          <g aria-label="Keycloak identity provider"><rect class="node-mask" x="960" y="128" width="200" height="72" rx="6"/><rect class="node-focal" x="960" y="128" width="200" height="72" rx="6"/><rect class="node-type-accent" x="972" y="136" width="48" height="12" rx="2"/><text class="node-type-text-accent" x="996" y="145" text-anchor="middle">OIDC</text><text class="node-name" x="1060" y="169" text-anchor="middle">Keycloak</text><text class="node-sub" x="1060" y="185" text-anchor="middle">:8080 · realm UATF</text></g>
+          <g aria-label="PostgreSQL para IAM y Keycloak"><rect class="node-mask" x="660" y="360" width="200" height="80" rx="6"/><rect class="node-store" x="660" y="360" width="200" height="80" rx="6"/><rect class="node-type" x="672" y="368" width="52" height="12" rx="2"/><text class="node-type-text" x="698" y="377" text-anchor="middle">STORE</text><text class="node-name" x="760" y="402" text-anchor="middle">PostgreSQL IAM</text><text class="node-sub" x="760" y="420" text-anchor="middle">:5432 · dss_identity</text></g>
+          <g aria-label="RabbitMQ para eventos de identidad"><rect class="node-mask" x="960" y="360" width="200" height="80" rx="6"/><rect class="node-queue" x="960" y="360" width="200" height="80" rx="6"/><rect class="node-type" x="972" y="368" width="52" height="12" rx="2"/><text class="node-type-text" x="998" y="377" text-anchor="middle">QUEUE</text><text class="node-name" x="1060" y="402" text-anchor="middle">RabbitMQ</text><text class="node-sub" x="1060" y="420" text-anchor="middle">:5672 · durable queue</text></g>
+          <line class="legend-rule" x1="40" y1="656" x2="1240" y2="656"/><circle class="legend-dot-red" cx="54" cy="684" r="4"/><text class="legend-text" x="66" y="687">componente focal</text><circle class="legend-dot-blue" cx="232" cy="684" r="4"/><text class="legend-text" x="244" y="687">HTTP / OIDC / JWKS</text><line x1="416" y1="684" x2="448" y2="684" stroke="#5C5C5C" stroke-width="1.4"/><text class="legend-text" x="460" y="687">conexión persistente</text><line x1="660" y1="684" x2="692" y2="684" stroke="#5C5C5C" stroke-width="1.2" stroke-dasharray="5 4"/><text class="legend-text" x="704" y="687">evento asíncrono</text><text class="legend-text" x="1240" y="687" text-anchor="end">puertos internos de contenedor</text>
+        </svg>
+      </div>
+      <div class="detail-grid"><div class="detail-block"><h3>OIDC y validación de tokens</h3><p>Keycloak publica el issuer del realm <code>uatf-dss-realm</code> por la URL HTTPS institucional. Los portales obtienen tokens OIDC y envían el access token como <code>Authorization: Bearer</code> a auth-service. Auth-service valida <code>iss</code> y <code>aud</code> y descarga claves del endpoint JWKS interno. La URL de issuer configurada debe coincidir exactamente con el claim <code>iss</code>.</p></div><div class="detail-block"><h3>IAM y mensajería</h3><p>Keycloak usa el esquema PostgreSQL <code>keycloak</code>; auth-service usa el esquema de aplicación en <code>dss_identity</code>, con roles separados. Keycloak publica eventos durables por AMQP y auth-service consume la cola <code>keycloak.user.events</code>. Mantener RabbitMQ persistente y observar consumidores y DLQ.</p></div></div>
+    </section>
+    <section class="diagram-section" aria-labelledby="data-heading">
+      <div class="section-head"><div><p class="section-kicker">Vista 02 · Datos y analítica</p><h2 id="data-heading">Extracción, DW y consultas OLAP</h2></div><p>Hop conecta las fuentes con credenciales por ambiente. El migrador prepara el DW una vez por release; OLAP consulta el esquema analítico con permisos de lectura.</p></div>
+      <div class="diagram-container"><svg viewBox="0 0 1280 720" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="arquitectura-deploy-uatf-datos-title arquitectura-deploy-uatf-datos-desc">
+        <title id="arquitectura-deploy-uatf-datos-title">ETL y OLAP del DSS UATF</title><desc id="arquitectura-deploy-uatf-datos-desc">Apache Hop se configura con un archivo productivo externo, consulta Jachasun y el catálogo IAM, carga el DW con una cuenta restringida, mientras un Job aplica migraciones y Saiku consulta el DW.</desc>
+        <defs><marker id="datos-arrow" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#5C5C5C"/></marker><marker id="datos-arrow-link" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto"><polygon points="0 0, 8 3, 0 6" fill="#1F6C9F"/></marker></defs><rect class="diagram-bg" width="1280" height="720"/>
+        <rect class="zone" x="32" y="56" width="288" height="560" rx="8"/><rect class="zone-mask" x="76" y="60" width="200" height="12" rx="2"/><text class="zone-label" x="176" y="69" text-anchor="middle">FUENTES Y OPERACIONES</text><rect class="zone" x="440" y="56" width="344" height="216" rx="8"/><rect class="zone-mask" x="550" y="60" width="124" height="12" rx="2"/><text class="zone-label" x="612" y="69" text-anchor="middle">ETL RUNTIME</text><rect class="zone" x="888" y="56" width="344" height="496" rx="8"/><rect class="zone-mask" x="962" y="60" width="196" height="12" rx="2"/><text class="zone-label" x="1060" y="69" text-anchor="middle">RED ANALÍTICA PRIVADA</text>
+        <path class="connector" d="M500 180 H288" marker-end="url(#datos-arrow)"/><path class="connector" d="M500 220 H368 Q360 220 360 228 V292 Q360 300 352 300 H288" marker-end="url(#datos-arrow)"/><path class="connector-once" d="M288 428 H392 Q400 428 400 420 V268 Q400 260 408 260 H612 Q620 260 620 252 V240" marker-end="url(#datos-arrow)"/><path class="connector" d="M740 188 H812 Q820 188 820 196 V208 Q820 216 828 216 H936" marker-end="url(#datos-arrow)"/><path class="connector-once" d="M288 560 H1192 Q1200 560 1200 552 V224 Q1200 216 1192 216 H1176" marker-end="url(#datos-arrow)"/><path class="connector" d="M1056 432 V256" marker-end="url(#datos-arrow)"/>
+        <rect class="label-mask" x="358" y="156" width="72" height="12" rx="2"/><text class="arrow-label" x="394" y="165" text-anchor="middle">JDBC / RO</text><rect class="label-mask" x="372" y="256" width="68" height="12" rx="2"/><text class="arrow-label" x="406" y="265" text-anchor="middle">JDBC / CAT</text><rect class="label-mask" x="412" y="344" width="72" height="12" rx="2"/><text class="arrow-label" x="448" y="353" text-anchor="middle">PROD JSON</text><rect class="label-mask" x="846" y="192" width="72" height="12" rx="2"/><text class="arrow-label" x="882" y="201" text-anchor="middle">JDBC / ETL</text><rect class="label-mask" x="1124" y="352" width="68" height="12" rx="2"/><text class="arrow-label" x="1158" y="361" text-anchor="middle">SQL MIGRATIONS</text><rect class="label-mask" x="980" y="328" width="64" height="12" rx="2"/><text class="arrow-label" x="1012" y="337" text-anchor="middle">JDBC / RO</text>
+        <g aria-label="Base transaccional Jachasun"><rect class="node-mask" x="48" y="144" width="240" height="72" rx="6"/><rect class="node-external" x="48" y="144" width="240" height="72" rx="6"/><rect class="node-type" x="60" y="152" width="52" height="12" rx="2"/><text class="node-type-text" x="86" y="161" text-anchor="middle">SOURCE</text><text class="node-name" x="168" y="185" text-anchor="middle">OLTP Jachasun</text><text class="node-sub" x="168" y="201" text-anchor="middle">PostgreSQL · read-only</text></g>
+        <g aria-label="Base de datos IAM para catálogo académico"><rect class="node-mask" x="48" y="260" width="240" height="80" rx="6"/><rect class="node-store" x="48" y="260" width="240" height="80" rx="6"/><rect class="node-type" x="60" y="268" width="52" height="12" rx="2"/><text class="node-type-text" x="86" y="277" text-anchor="middle">CATALOG</text><text class="node-name" x="168" y="302" text-anchor="middle">PostgreSQL IAM</text><text class="node-sub" x="168" y="320" text-anchor="middle">auth catalog · least privilege</text></g>
+        <g aria-label="Secret store que entrega prod-env.json"><rect class="node-mask" x="48" y="392" width="240" height="72" rx="6"/><rect class="node-external" x="48" y="392" width="240" height="72" rx="6"/><rect class="node-type" x="60" y="400" width="52" height="12" rx="2"/><text class="node-type-text" x="86" y="409" text-anchor="middle">SECRET</text><text class="node-name" x="168" y="433" text-anchor="middle">Secret store UATF</text><text class="node-sub" x="168" y="449" text-anchor="middle">prod-env.json · read-only</text></g>
+        <g aria-label="Job de una sola ejecución para migraciones DW"><rect class="node-mask" x="48" y="524" width="240" height="72" rx="6"/><rect class="node" x="48" y="524" width="240" height="72" rx="6"/><rect class="node-type" x="60" y="532" width="44" height="12" rx="2"/><text class="node-type-text" x="82" y="541" text-anchor="middle">JOB</text><text class="node-name" x="168" y="565" text-anchor="middle">DW migrator</text><text class="node-sub" x="168" y="581" text-anchor="middle">postgres:15-alpine · 0001–0020</text></g>
+        <g aria-label="Apache Hop Web con el proyecto ETL UATF"><rect class="node-mask" x="500" y="160" width="240" height="80" rx="6"/><rect class="node-focal" x="500" y="160" width="240" height="80" rx="6"/><rect class="node-type-accent" x="512" y="168" width="44" height="12" rx="2"/><text class="node-type-text-accent" x="534" y="177" text-anchor="middle">ETL</text><text class="node-name" x="620" y="202" text-anchor="middle">Apache Hop Web</text><text class="node-sub" x="620" y="220" text-anchor="middle">:8080 · dss-uatf-etl · prod</text></g>
+        <g aria-label="PostgreSQL Data Warehouse"><rect class="node-mask" x="936" y="176" width="240" height="80" rx="6"/><rect class="node-store" x="936" y="176" width="240" height="80" rx="6"/><rect class="node-type" x="948" y="184" width="52" height="12" rx="2"/><text class="node-type-text" x="974" y="193" text-anchor="middle">STORE</text><text class="node-name" x="1056" y="218" text-anchor="middle">PostgreSQL DW</text><text class="node-sub" x="1056" y="236" text-anchor="middle">:5432 · schemas raw / dw / etl_control</text></g>
+        <g aria-label="Saiku OLAP service"><rect class="node-mask" x="936" y="432" width="240" height="80" rx="6"/><rect class="node" x="936" y="432" width="240" height="80" rx="6"/><rect class="node-type" x="948" y="440" width="44" height="12" rx="2"/><text class="node-type-text" x="970" y="449" text-anchor="middle">OLAP</text><text class="node-name" x="1056" y="474" text-anchor="middle">Saiku OLAP</text><text class="node-sub" x="1056" y="492" text-anchor="middle">:8080 · dw_reader · persistent home</text></g>
+        <line class="legend-rule" x1="40" y1="656" x2="1240" y2="656"/><circle class="legend-dot-red" cx="54" cy="684" r="4"/><text class="legend-text" x="66" y="687">runtime ETL focal</text><line x1="232" y1="684" x2="264" y2="684" stroke="#5C5C5C" stroke-width="1.4"/><text class="legend-text" x="276" y="687">conexión iniciada por cliente</text><line x1="536" y1="684" x2="568" y2="684" stroke="#5C5C5C" stroke-width="1.2" stroke-dasharray="5 4"/><text class="legend-text" x="580" y="687">configuración externa / tarea puntual</text><text class="legend-text" x="1240" y="687" text-anchor="end">RO = solo lectura</text>
+      </svg></div>
+      <div class="detail-grid"><div class="detail-block"><h3>Configurar y arrancar Hop</h3><ul><li>Crear <code>prod-env.json</code> desde la plantilla, entregar por secret store y montar en <code>/files/project/environments/prod-env.json</code> como solo lectura.</li><li>Seleccionar <code>HOP_ENVIRONMENT_NAME=prod</code>; dejar <code>HOP_ADDITIONAL_ENVIRONMENT_NAMES</code> vacío. Definir <code>DSS_DW_*</code>, <code>OLTP_DB_*</code> y <code>AUTH_CATALOG_DB_*</code>.</li><li>Exponer Hop Web solo por VPN/red administrativa y proxy autenticado: permite editar y ejecutar pipelines.</li></ul></div><div class="detail-block"><h3>Preparar DW y OLAP</h3><ul><li>El migrador ejecuta en orden <code>infra/dw-schema/migrations/0001–0020</code>; viene de <code>postgres:15-alpine</code>, no de una imagen DSS publicada. Ejecutarlo y revisar checksums antes de iniciar cargas ETL.</li><li>El rol <code>dw_hop_runtime</code> ejecuta las operaciones ETL permitidas; OLAP usa <code>dw_reader</code> de solo lectura.</li><li>Inicializar el catálogo Saiku con el script y artefactos versionados de OLAP. Mantener persistente <code>/app/saiku-home</code>; usar <code>SAIKU_DEMO=false</code> y una contraseña admin fuerte.</li></ul></div></div>
+    </section>
+
+    <p class="footnote">Las flechas representan la conexión que abre el cliente: Hop consulta OLTP y el catálogo IAM; la migración se ejecuta una vez antes de los servicios que dependen del DW; OLAP consulta el DW con permisos de lectura. Mantener credenciales fuera de la imagen, del repositorio y de los logs. Para el procedimiento completo de instalación, variables y operación, consultar <a href="guia-despliegue-uatf-dockerhub.md">la guía de despliegue UATF</a>.</p>
+  </main>
+</body>
+</html>

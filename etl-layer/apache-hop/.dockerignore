@@ -8,3 +8,4 @@ projects/dss-uatf-etl/environments/prod-env.json
 # Local JDBC files are excluded; the image fetches its pinned driver with a
 # verified SHA-256 digest from Maven Central.
 jdbc/*
+!jdbc/postgresql-42.7.11.jar

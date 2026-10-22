@@ -22,7 +22,7 @@ export default function LoginPage() {
 
   return (
     <AuthLanding
-      onLogin={login}
+      onLogin={() => login()}
       isLoading={isLoading}
       error={error ?? callbackError}
     />
