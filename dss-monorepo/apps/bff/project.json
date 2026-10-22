@@ -6,19 +6,24 @@
   "tags": ["type:bff", "scope:infrastructure"],
   "targets": {
     "build": {
+      "command": "next build --webpack",
+      "dependsOn": ["^build"],
       "parallelism": false,
       "options": {
+        "cwd": "apps/bff",
         "env": {
           "NODE_ENV": "production"
         }
       }
     },
     "dev": {
+      "dependsOn": ["^build"],
       "options": {
         "port": 3006
       }
     },
     "serve": {
+      "dependsOn": ["^build"],
       "options": {
         "port": 3006
       }

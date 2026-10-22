@@ -10,7 +10,7 @@ El BFF es el único punto de integración de los portales con Keycloak y `auth-s
 - `GET /api/auth/logout`: elimina la sesión BFF y redirige al logout OIDC si tiene un ID token disponible.
 - `PUT /api/admin/users/:userId/academic-contexts`: reemplaza los contextos académicos del usuario. Requiere `SUPERADMIN` en el BFF y conserva la validación `ROLE_SUPERADMIN` de `auth-service` como segunda barrera.
 - `GET|POST /api/graphql`: endpoint Apollo Server protegido por la misma sesión BFF o Bearer token. Expone identidad y alcance académicos del usuario, catálogo y metadatos OLAP vigentes, y `analyticQuery` para ejecutar consultas tipadas en el servidor. Los resolvers llaman a OLAP mediante el transporte server-only del conector; los tokens nunca forman parte de la respuesta.
-- `/api/olap/rest/saiku/*`: proxy autenticado a `olap-service`, incluido su endpoint GraphQL real en `/api/olap/rest/saiku/api/graphql`. El BFF valida la sesión y reenvía el access token; Keycloak debe incluir la audiencia `olap-service` en los tokens solicitados por `dss-bff`.
+- `/api/olap/rest/saiku/*`: proxy autenticado a `olap-service`, incluido su endpoint GraphQL real en `/api/olap/rest/saiku/api/graphql`. El BFF valida la sesión y reenvía el access token; las rutas `/rest/saiku/admin/*` requieren además el rol `SUPERADMIN`. Keycloak debe incluir la audiencia `olap-service` en los tokens solicitados por `dss-bff`.
 - `/api/prediction/v1/predictions` y `/api/prediction/v1/training-jobs*`: fachada autenticada para inferencias y trabajos de entrenamiento. Solo permite las operaciones declaradas en Prediction API v1 y reenvía el token validado a `prediction-service`; el servicio debe aplicar permisos ML y ámbitos académicos. La URL del servicio solo se lee en el BFF.
 
 La cookie de sesión es `HttpOnly`, `SameSite=Lax`, `Secure` en producción y contiene un JWE que solo puede descifrar el BFF. No persiste el refresh token. Las rutas vuelven a validar el access token, issuer, audiencia y perfil activo; los endpoints de negocio deben además aplicar `requireRoles()` o `requirePermissions()`.
@@ -41,20 +41,20 @@ BFF_SESSION_SECRET=<al-menos-32-caracteres-no-versionados>
 Las consultas con ámbito de facultad o carrera requieren configurar `OLAP_ACADEMIC_SCOPE_FILTERS` como JSON en el runtime privado del BFF. El mapa local corresponde al cubo UATF versionado en [`infra/olap/schemas/uatf-rendimiento-academico.xml`](../../../infra/olap/schemas/uatf-rendimiento-academico.xml). `faculty` usa el identificador `facultyId` de Auth Service contra el nivel Facultad; `career` usa `careerId` contra el nivel Carrera. Las dimensiones de alcance son separadas de `Academic Program` para que el filtro impuesto por el BFF no choque con los niveles que el usuario consulta en filas o columnas.
 
 ```json
-  {
-    "faculty": {
-      "dimension": "Academic Faculty Scope",
-      "hierarchy": "Faculty Scope",
-      "level": "Faculty",
-      "memberTemplate": "[Academic Faculty Scope].[Faculty Scope].[Faculty].&[{id}]"
-    },
-    "career": {
-      "dimension": "Academic Career Scope",
-      "hierarchy": "Career Scope",
-      "level": "Career",
-      "memberTemplate": "[Academic Career Scope].[Career Scope].[Career].&[{id}]"
-    }
+{
+  "faculty": {
+    "dimension": "Academic Faculty Scope",
+    "hierarchy": "Faculty Scope",
+    "level": "Faculty",
+    "memberTemplate": "[Academic Faculty Scope].[Faculty Scope].[Faculty].&[{id}]"
+  },
+  "career": {
+    "dimension": "Academic Career Scope",
+    "hierarchy": "Career Scope",
+    "level": "Career",
+    "memberTemplate": "[Academic Career Scope].[Career Scope].[Career].&[{id}]"
   }
+}
 ```
 
 El esquema Mondrian usa la tabla de hechos `dw.fact_cursado` y las dimensiones `dw.dim_programa` y `dw.dim_periodo_academico`. El descriptor sin credenciales está en [`infra/olap/datasources/uatf-dw.sds`](../../../infra/olap/datasources/uatf-dw.sds). Para que Saiku resuelva el catálogo, el despliegue instala el XML y el descriptor en `<saiku-home>/repository/data/unknown/datasources/` y suministra las credenciales JDBC por `<saiku-home>/conf/datasources.properties`. El inicializador Compose mantiene estos archivos y construye la URL JDBC a partir de `POSTGRES_DW_NAME` en el volumen persistente. La definición del cubo no carga datos ni crea las tablas del DW.

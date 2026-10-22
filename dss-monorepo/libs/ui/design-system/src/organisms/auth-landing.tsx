@@ -58,7 +58,7 @@ export function AuthLanding({
           <Button
             className="w-full"
             size="lg"
-            onClick={onLogin}
+            onClick={() => onLogin()}
             disabled={isLoading}
           >
             <LogIn aria-hidden="true" />
@@ -68,7 +68,7 @@ export function AuthLanding({
             <Button
               className="w-full"
               variant="outline"
-              onClick={onRegister}
+              onClick={() => onRegister()}
               disabled={isLoading}
             >
               <UserPlus aria-hidden="true" />

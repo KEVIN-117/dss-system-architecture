@@ -85,7 +85,7 @@ CREATE TABLE balimentacion.bc_items_becas (
 SET search_path = academico, pg_catalog;
 CREATE TABLE academico.alm_programas (
     id_programa char(3) NOT NULL,
-    programa varchar NOT NULL,
+    programa varchar(50) NOT NULL,
     id_facultad smallint NOT NULL,
     id_nivel smallint NOT NULL,
     titulo varchar(45) NOT NULL,

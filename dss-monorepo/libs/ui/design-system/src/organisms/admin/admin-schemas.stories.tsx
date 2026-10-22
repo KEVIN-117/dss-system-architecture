@@ -23,7 +23,13 @@ const meta: Meta<typeof AdminSchemas> = {
   component: AdminSchemas,
   tags: ['autodocs'],
   parameters: { layout: 'padded' },
-  args: { schemas, onRefresh: fn(), onUpload: fn(), onDelete: fn() },
+  args: {
+    schemas,
+    onRefresh: fn(),
+    onView: fn(),
+    onUpload: fn(),
+    onDelete: fn(),
+  },
 };
 export default meta;
 type Story = StoryObj<typeof AdminSchemas>;

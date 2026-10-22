@@ -1,10 +1,19 @@
 export {
   AuthServiceClientError,
   fetchUserProfile,
+  getAcademicCatalog,
+  getAdminUser,
   isAcademicContextAssignmentRequest,
+  listAdminUsers,
   replaceUserAcademicContexts,
 } from './clients/auth-service-client.js';
 export type {
+  AcademicCatalog,
+  AcademicCareerOption,
+  AcademicFacultyOption,
+  AdminUserDirectoryEntry,
+  AdminUserDirectoryPage,
+  AdminUserDirectoryQuery,
   AcademicContextAssignment,
   ReplaceUserAcademicContextsRequest,
 } from './clients/auth-service-client.js';

@@ -123,6 +123,30 @@ public class UserRepositoryAdapterIntegrationTest {
     }
 
     @Test
+    @DisplayName("Should return a stable paged directory filtered by profile, role and academic context")
+    void shouldSearchAdminDirectoryWithFiltersAndPagination() {
+        User matching = userRepository.save(User.create(null, UUID.randomUUID(), "directory.match", "match@uatf.edu.bo",
+                "Ana", "Flores", true));
+        User wrongContext = userRepository.save(User.create(null, UUID.randomUUID(), "directory.other", "other@uatf.edu.bo",
+                "Ana", "Flores", true));
+        userRepository.save(User.create(null, UUID.randomUUID(), "directory.inactive", "inactive@uatf.edu.bo",
+                "Ana", "Flores", false));
+        jdbcTemplate.update("INSERT INTO roles (id, name, description) VALUES (900, 'DIRECTORY_TEST_ROLE', 'directory test') ON CONFLICT (id) DO NOTHING");
+        jdbcTemplate.update("INSERT INTO academic_faculties (faculty_id, name) VALUES (4, 'Directory Faculty 4'), (5, 'Directory Faculty 5') ON CONFLICT (faculty_id) DO NOTHING");
+        jdbcTemplate.update("INSERT INTO academic_programs (career_id, faculty_id, name) VALUES ('INF', 4, 'Directory Informatics'), ('MED', 5, 'Directory Medicine') ON CONFLICT (career_id) DO NOTHING");
+        jdbcTemplate.update("INSERT INTO user_roles (user_id, role_id) VALUES (?, 900), (?, 900)", matching.id(), wrongContext.id());
+        jdbcTemplate.update("INSERT INTO user_academic_contexts (user_id, faculty_id, career_id) VALUES (?, 4, 'INF'), (?, 5, 'MED')",
+                matching.id(), wrongContext.id());
+
+        var page = userRepository.searchDirectory("DIRECTORY", true, "directory_test_role", 4, "INF", 0, 1);
+
+        assertEquals(1, page.users().size());
+        assertEquals(matching.id(), page.users().getFirst().id());
+        assertEquals(1, page.totalElements());
+        assertEquals(1, page.totalPages());
+    }
+
+    @Test
     @DisplayName("Should update existing user when saved with same ID")
     void shouldUpdateExistingUser() {
         User initial = User.create(

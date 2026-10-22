@@ -49,6 +49,8 @@ services:
         psql -v ON_ERROR_STOP=1 -f /tests/analytical_layers_and_roles_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/execution_control_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/conformed_dimensions_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/student_scd2_id_alumno_identity_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/student_scd2_lock_volume_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/hop_execution_gates_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/hop_atomic_publisher_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/hop_atomic_publisher_rollback_test.sql

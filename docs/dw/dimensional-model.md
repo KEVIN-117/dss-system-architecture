@@ -25,7 +25,7 @@ Se conservan únicamente `dw.fact_admision`, `dw.fact_cursado` y `dw.fact_retenc
 
 | Dimensión lógica | Clave sustituta existente | Clave natural o identidad de negocio | Atributos y fuente principal | Hechos que la usan |
 | --- | --- | --- | --- | --- |
-| `DIM_ESTUDIANTE` | `estudiante_sk` | `id_ra` es la identidad canónica cuando existe; `id_alumno` es el identificador académico alterno. | Persona y atributos académicos de `public.uatf_datos` y `academico.alumnos`; colegio (`public.prs_colegios`) y localidad (`public.lugar_localidad`) son atributos del estudiante. | Admisión, cursado, retención/deserción |
+| `DIM_ESTUDIANTE` | `estudiante_sk` | `id_alumno` es la identidad histórica canónica; `id_ra` es atributo de perfil y puede compartirse. | Atributos académicos de `academico.alumnos` y perfil de `public.uatf_datos` unido por `id_ra`; colegio y localidad son atributos del estudiante. | Admisión, cursado, retención/deserción |
 | `DIM_PROGRAMA` | `programa_sk` | `id_programa` | Nombre, facultad, nivel, sede y atributos autorizados de `academico.alm_programas` y su relación de facultad. | Admisión, cursado, retención/deserción |
 | `DIM_MATERIA` | `materia_sk` | `id_materia` | Sigla, nombre, plan, programa y atributos curriculares de `academico.pln_materias`. | Cursado |
 | `DIM_PERIODO_ACADEMICO` | `periodo_academico_sk` | `(gestion, periodo)` | Gestión, código de periodo y metadatos del cierre DSA en `etl_control.academic_period_closure`. | Admisión, cursado, retención/deserción |
@@ -33,7 +33,7 @@ Se conservan únicamente `dw.fact_admision`, `dw.fact_cursado` y `dw.fact_retenc
 
 ### Identidad de estudiante
 
-`DIM_ESTUDIANTE` está centrada en persona, no en una matrícula. Cuando `id_ra` esté presente, representa la identidad canónica y permite conciliar las fuentes autorizadas. `id_alumno` se conserva como identificador académico alterno y como clave de trazabilidad para cursado y postulación. Si una fuente trae solo `id_alumno`, se podrá representar temporalmente al estudiante mediante ese identificador; la reconciliación posterior con `id_ra` no deberá crear dos personas analíticas.
+`DIM_ESTUDIANTE` mantiene una fila temporal por identidad académica `id_alumno`, identificador histórico confirmado por DSA/TI. `id_ra` enriquece la fila con el perfil de `public.uatf_datos`, pero no fusiona alumnos ni es clave única: más de un `id_alumno` puede compartirlo. Los hechos académicos resuelven la dimensión mediante `id_alumno` y la versión vigente para el cierre correspondiente.
 
 Si faltan ambos identificadores o no es posible resolver la identidad, el hecho no se atribuye a una persona artificial ni se rellena con cero: el flujo usa el miembro `UNKNOWN` y registra la incidencia de calidad. Colegio y localidad no son dimensiones independientes en esta primera constelación, porque describen al estudiante y no habilitan un proceso de negocio con grano propio.
 
@@ -203,7 +203,7 @@ Cada KPI tiene un único hecho propietario. Los tableros que comparen procesos p
 
 | Decisión | Aplicación | Seguimiento |
 | --- | --- | --- |
-| Identidad centrada en persona | `id_ra` canónico cuando existe; `id_alumno` alterno y trazable. | Dimensión SCD2 y resolución de identidad implementadas; identidad irresoluble usa `UNKNOWN` conforme a los casos cubiertos por `0017`–`0018`. |
+| Identidad académica histórica | `id_alumno` canónico; `id_ra` enriquece el perfil y no es único. | SCD2 y resolución por `id_alumno`; `UNKNOWN` se usa conforme a `0017`–`0018`. |
 | Filtro de programas único | Todos los hechos heredan el filtro definido en los contratos DW-001. | Aplicado en extracción/preparación del MVP. |
 | Unknown y No aplica | Se usarán únicamente como miembros técnicos explícitos; no ceros sustitutos. | Miembros físicos en DW-006. |
 | Periodo posterior DSA | Retención sigue cierres autorizados, no aritmética sobre `periodo`. | Implementado y probado con cierres de fixture. |

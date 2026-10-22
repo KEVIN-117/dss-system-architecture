@@ -15,5 +15,5 @@ export default function LoginPage() {
     if (isAuthenticated) window.location.replace('/');
   }, [isAuthenticated]);
 
-  return <AuthLanding onLogin={login} isLoading={isLoading} error={error ?? callbackError} />;
+  return <AuthLanding onLogin={() => login()} isLoading={isLoading} error={error ?? callbackError} />;
 }

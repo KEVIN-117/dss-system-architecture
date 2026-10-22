@@ -17,7 +17,9 @@ Intento de cursado. Una fila por `id_matricula`; conserva alumno, materia, gesti
 | `nota_2da`, `nota_ex_mesa`, parciales | `numeric` | sí | medidas de origen |
 | `estado` | `char(1)` | no | estado operativo sin dominio de aprobación documentado |
 | `observacion`, `tipo` | `varchar`, `varchar(1)` | sí | metadatos operativos |
-| `_fecha_creacion`, `_hash` | `timestamp`, `varchar` | sí | auditoría, no watermark normativo |
+| `_fecha_creacion` | `timestamp` | sí | auditoría, no watermark normativo |
+
+El DDL verificado de Jachasun no contiene una columna `_hash`; el contrato v2 no la exige ni la consulta. El hash del esquema que se registra en `etl_control` se calcula sobre la firma de columnas observada, no se extrae de una columna de origen.
 
 No contiene PII directa en la selección. Joins autorizados solo como relaciones de contrato: `id_alumno` con alumnos y `id_materia` con materias; no se ejecutan en la extracción.
 

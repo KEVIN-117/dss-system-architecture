@@ -69,14 +69,14 @@ class UserAcademicContextTest {
     }
 
     @Test
-    @DisplayName("Should throw InvalidAcademicContextException when facultyId is negative or zero")
-    void shouldThrowInvalidAcademicContextExceptionWhenFacultyIdNonPositive() {
+    @DisplayName("Should accept zero and reject negative faculty IDs")
+    void shouldAcceptZeroAndRejectNegativeFacultyIds() {
         UUID id = UUID.randomUUID();
         UUID userId = UUID.randomUUID();
 
-        assertThrows(InvalidAcademicContextException.class, () ->
-                new UserAcademicContext(id, userId, 0, null)
-        );
+        UserAcademicContext zeroFacultyContext = new UserAcademicContext(id, userId, 0, null);
+        assertEquals(0, zeroFacultyContext.facultyId());
+
         assertThrows(InvalidAcademicContextException.class, () ->
                 new UserAcademicContext(id, userId, -5, null)
         );

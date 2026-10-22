@@ -12,8 +12,8 @@ public record UserAcademicContext(
         String careerId
 ) {
     public UserAcademicContext {
-        if (facultyId != null && facultyId <= 0) {
-            throw new InvalidAcademicContextException("Faculty ID must be a positive integer.");
+        if (facultyId != null && facultyId < 0) {
+            throw new InvalidAcademicContextException("Faculty ID must be a non-negative integer.");
         }
         if (careerId != null && (careerId.length() != 3 || careerId.isBlank() || !careerId.equals(careerId.trim()))) {
             throw new InvalidAcademicContextException("Career ID must be a three-character code without surrounding whitespace.");

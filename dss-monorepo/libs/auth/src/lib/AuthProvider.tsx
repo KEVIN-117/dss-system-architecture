@@ -155,7 +155,10 @@ function getCurrentPortalReturnTo(): string {
 }
 
 function resolveReturnTo(requestedReturnTo?: string): string {
-  if (!requestedReturnTo) {
+  // React click handlers receive a MouseEvent. Treat any accidental non-string
+  // argument as an omitted return target instead of coercing it to
+  // "[object Object]" and redirecting to a broken local path.
+  if (typeof requestedReturnTo !== 'string' || !requestedReturnTo.trim()) {
     return getCurrentPortalReturnTo();
   }
 

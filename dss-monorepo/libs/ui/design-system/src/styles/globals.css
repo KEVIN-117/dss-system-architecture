@@ -292,3 +292,27 @@
   outline: 2px solid var(--ring);
   outline-offset: -2px;
 }
+
+.schema-viewer-minimap {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 0.625rem;
+  background: var(--card);
+  box-shadow: 0 4px 14px color-mix(in srgb, var(--foreground) 12%, transparent);
+}
+
+.schema-viewer-minimap .react-flow__minimap-mask {
+  fill: var(--muted);
+  fill-opacity: 0.72;
+}
+
+.schema-viewer-minimap .react-flow__minimap-node {
+  fill: var(--primary);
+  stroke: var(--card);
+  stroke-width: 2px;
+  vector-effect: non-scaling-stroke;
+}
+
+.schema-viewer-minimap .react-flow__minimap-node:hover {
+  fill: var(--role-accent, var(--primary));
+}

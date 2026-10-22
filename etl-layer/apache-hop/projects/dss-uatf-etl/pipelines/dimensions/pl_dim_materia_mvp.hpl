@@ -13,7 +13,7 @@
        row_number() OVER (ORDER BY m.id_materia)::bigint AS row_ordinal,
        m.id_materia, m.sigla, m.materia, m.id_programa::varchar(3) AS id_programa,
        m.id_plan, m.id_materia_padre, m.ciclo, m.nivel_academico,
-       m.hrs_teoricas AS horas_teoricas, m.hrs_practicas AS horas_practicas, m.creditos
+       m.hrs_teoricas AS horas_teoricas, m.hrs_practicas AS horas_practicas, m._creditos AS creditos
 FROM academico.pln_materias m
 ORDER BY m.id_materia</sql><limit>0</limit><lookup>Get run ID</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>384</xloc><yloc>128</yloc></GUI></transform>
   <transform><name>Stage DIM_MATERIA row</name><type>TableInput</type><description>Reserva o conserva surrogate key y envía payload al API privado</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection><sql>WITH p AS MATERIALIZED (

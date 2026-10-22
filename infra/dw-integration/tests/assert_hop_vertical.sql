@@ -15,9 +15,9 @@ BEGIN
           ('public.uatf_datos',2002,NULL::text),
           ('academico.alumnos',3,'9bfd57a5fab36ac19e6c20cb49495effbc85434d8e1c1570e6fbc907ef1923f8'),
           ('public.postulantes',4,'996751a46c044c8ea1c8e86213f6115ea207f0a9d4a1cd14d892bfb42219d52e'),
-          ('academico.alm_programas',2,'d0703dc2a7bc8712d9ad09f889608589dedfca53ccba762bd0d2e21e71517d23'),
-          ('academico.pln_materias',3,'04816fa6cf7a3e594d478a8b162cbf895683748fc1586712e41447fc02941d23'),
-          ('academico.notas_planilla',6,'4a591f9e237952dfb0b4fe6a9dc3308590dfb2563776c40a8f27d598d7ce41ca'),
+          ('academico.alm_programas',2,'e8884b33c49c4a58bf3314cfe0026a6539a9261354290e3a6321c79b2cdccaee'),
+          ('academico.pln_materias',3,'4da4263f5af50bf73de51540cbeb07abea8cc51ba9651cad37954ccfb1c08a5f'),
+          ('academico.notas_planilla',6,'4bc16437353f0012468a5226b259b825ce07c9907652aa0c2e79d18f23a556cf'),
           ('academico.alm_programas_facultades',2,'a93cbdaf85c233554a0c0ed50fa9dbf363cb6467292e8e14284d5c8652a07913'),
           ('public.prs_colegios',2,'6d0db6e71f8563de984eea72d0dc7ef67fde5cd2e474059d145a176c3d51a7fa'),
           ('public.lugar_localidad',2,'8d2a1b895d3755d0a5b45f128b711ad58f3f0ab496278bd3c0ca3ce9b4b1b71a')
@@ -342,18 +342,19 @@ BEGIN
     PERFORM etl_control.fail_hop_etl_execution(v_run_3,'End reversible unchanged SCD2 test');
 
     PERFORM etl_control.create_hop_etl_execution(
-        v_run_4,'CIERRE_ACADEMICO',v_closure_4,NULL,NULL,NULL,NULL,'SCD2 identity conflict test'
+        v_run_4,'CIERRE_ACADEMICO',v_closure_4,NULL,NULL,NULL,NULL,'SCD2 id_ra historization test'
     );
-    PERFORM etl_control.start_hop_etl_execution(v_run_4,'SCD2 test identity conflict');
-    BEGIN
-        PERFORM etl_control.prepare_hop_student_scd2(
-            v_run_4,jsonb_set(v_changed,'{id_ra}','"SCD2-OTHER"'::jsonb)
-        );
-        RAISE EXCEPTION 'Expected ambiguous id_ra/id_alumno association to be rejected';
-    EXCEPTION WHEN check_violation THEN
-        NULL;
-    END;
-    PERFORM etl_control.fail_hop_etl_execution(v_run_4,'End reversible identity conflict test');
+    PERFORM etl_control.start_hop_etl_execution(v_run_4,'SCD2 test id_ra attribute change');
+    v_result := etl_control.prepare_hop_student_scd2(
+        v_run_4,jsonb_set(v_changed,'{id_ra}','"SCD2-OTHER"'::jsonb)
+    );
+    IF v_result <> 2
+       OR (SELECT count(*) FROM etl_work.hop_publication_row
+           WHERE run_id=v_run_4 AND target_code='DIM_ESTUDIANTE'
+             AND operation IN ('CLOSE','INSERT')) <> 2 THEN
+        RAISE EXCEPTION 'A changed id_ra for the same id_alumno must create an SCD2 version';
+    END IF;
+    PERFORM etl_control.fail_hop_etl_execution(v_run_4,'End reversible id_ra historization test');
 
     PERFORM etl_control.create_hop_etl_execution(
         v_run_5,'CIERRE_ACADEMICO',v_closure_1,NULL,NULL,NULL,NULL,'SCD2 out-of-order test'

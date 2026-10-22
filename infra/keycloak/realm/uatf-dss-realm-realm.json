@@ -122,6 +122,9 @@
           "client": {
             "uatf-auth-service": [
               "SUPERADMIN"
+            ],
+            "olap-service": [
+              "OLAP_ADMIN"
             ]
           }
         },

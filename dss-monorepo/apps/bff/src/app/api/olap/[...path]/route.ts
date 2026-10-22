@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { authenticateRequest } from '../../_lib/auth-guard';
+import { authenticateRequest, requireRoles } from '../../_lib/auth-guard';
 import {
   BffConfigurationError,
   getOlapServiceUrl,
@@ -49,6 +49,14 @@ async function proxy(
       request,
       NextResponse.json({ error: 'Invalid OLAP path' }, { status: 400 }),
     );
+  }
+
+  // Saiku's administrative API manages OLAP infrastructure. Keep those
+  // operations restricted to SUPERADMIN even when the user has a valid DSS
+  // session; ordinary OLAP queries remain available to their authorized roles.
+  if (safeSegments[2] === 'admin') {
+    const forbidden = requireRoles(authentication.value, ['SUPERADMIN']);
+    if (forbidden) return withCors(request, forbidden);
   }
 
   let targetBase: string;

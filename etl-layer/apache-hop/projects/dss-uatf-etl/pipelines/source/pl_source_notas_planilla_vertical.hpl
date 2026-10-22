@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pipeline>
-  <info><name>pl_source_notas_planilla_vertical</name><name_sync_with_filename>Y</name_sync_with_filename><description>Valida, extrae y audita el snapshot academico.notas_planilla</description><extended_description>Lectura de solo lectura; no retiene filas ni escribe directamente en DW. Fuente asociada al contrato DW-001/v1.</extended_description><pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type><parameters><parameter><name>P_RUN_ID</name><default_value/><description>UUID del intento iniciado por el workflow</description></parameter></parameters><capture_transform_performance>N</capture_transform_performance><transform_performance_capturing_delay>1000</transform_performance_capturing_delay><transform_performance_capturing_size_limit>100</transform_performance_capturing_size_limit><created_user>DSA</created_user><created_date>2026/10/04 00:00:00.000</created_date><modified_user>DSA</modified_user><modified_date>2026/10/04 00:00:00.000</modified_date></info>
+  <info><name>pl_source_notas_planilla_vertical</name><name_sync_with_filename>Y</name_sync_with_filename><description>Valida, extrae y audita el snapshot academico.notas_planilla</description><extended_description>Lectura de solo lectura; no retiene filas ni escribe directamente en DW. Fuente asociada al contrato DW-001/v2.</extended_description><pipeline_version>1.1</pipeline_version><pipeline_type>Normal</pipeline_type><parameters><parameter><name>P_RUN_ID</name><default_value/><description>UUID del intento iniciado por el workflow</description></parameter></parameters><capture_transform_performance>N</capture_transform_performance><transform_performance_capturing_delay>1000</transform_performance_capturing_delay><transform_performance_capturing_size_limit>100</transform_performance_capturing_size_limit><created_user>DSA</created_user><created_date>2026/10/04 00:00:00.000</created_date><modified_user>DSA</modified_user><modified_date>2026/10/21 00:00:00.000</modified_date></info>
   <notepads/>
   <order>
     <hop><from>Validate contract</from><to>Hash observed schema</to><enabled>Y</enabled></hop>
@@ -31,8 +31,7 @@
         (14, 'estado', 'bpchar', 1, 'NO'),
         (15, 'observacion', 'varchar', NULL, 'YES'),
         (16, 'tipo', 'varchar', 1, 'YES'),
-        (17, '_fecha_creacion', 'timestamp', NULL, 'YES'),
-        (18, '_hash', 'varchar', NULL, 'YES')
+        (17, '_fecha_creacion', 'timestamp', NULL, 'YES')
 ), observed AS (
     SELECT e.*, c.column_name AS actual_name, c.udt_name AS actual_udt,
            c.character_maximum_length AS actual_length, c.is_nullable AS actual_nullable
@@ -61,7 +60,7 @@ FROM signature</sql><limit>0</limit><lookup/><execute_each_row>N</execute_each_r
   <transform><name>Contract accepted?</name><type>FilterRows</type><description>Bloquea la lectura si la fuente incumple el contrato</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><compare><condition><conditions/><function>=</function><leftvalue>contract_ok</leftvalue><negated>N</negated><operator>-</operator><value><isnull>N</isnull><length>-1</length><mask>####0;-####0</mask><name>constant</name><precision>0</precision><text>1</text><type>Integer</type></value></condition></compare><send_false_to>Abort invalid contract</send_false_to><send_true_to>Keep audit fields</send_true_to><attributes/><GUI><xloc>640</xloc><yloc>128</yloc></GUI></transform>
   <transform><name>Abort invalid contract</name><type>Abort</type><description>Interrumpe antes de leer el snapshot</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><abort_option>ABORT_WITH_ERROR</abort_option><always_log_rows>N</always_log_rows><message>El contrato academico.notas_planilla no coincide o contiene datos inválidos</message><row_threshold>0</row_threshold><attributes/><GUI><xloc>896</xloc><yloc>32</yloc></GUI></transform>
   <transform><name>Keep audit fields</name><type>SelectValues</type><description>Conserva solamente parámetros de consulta y hash de esquema</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><fields><field><name>schema_sha256</name><length>-2</length><precision>-2</precision></field><field><name>p_filter_gestion</name><length>-2</length><precision>-2</precision></field><field><name>p_gestion</name><length>-2</length><precision>-2</precision></field><field><name>p_periodo</name><length>-2</length><precision>-2</precision></field></fields><select_unspecified>N</select_unspecified><attributes/><GUI><xloc>896</xloc><yloc>176</yloc></GUI></transform>
-  <transform><name>Read source snapshot</name><type>TableInput</type><description>Consulta contractualmente ordenada, parametrizada y read-only</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>-- Contract 06 v1: all attempts through the requested academic cut.
+  <transform><name>Read source snapshot</name><type>TableInput</type><description>Consulta contractualmente ordenada, parametrizada y read-only</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>-- Contract 06 v2: all attempts through the requested academic cut.
 -- JDBC parameters: gestion (smallint) for the null check, then gestion/periodo (smallint).
 SELECT
     id_matricula,
@@ -81,7 +80,6 @@ SELECT
     observacion,
     tipo,
     _fecha_creacion,
-    _hash,
     ?::char(64) AS source_schema_sha256
 FROM academico.notas_planilla
 WHERE (?::smallint IS NULL OR (id_gestion, id_periodo) &lt;= (?::smallint, ?::smallint))
@@ -93,9 +91,9 @@ ORDER BY id_gestion ASC, id_periodo ASC, id_matricula ASC</sql><limit>0</limit><
     SELECT ?::uuid AS run_id, ?::char(64) AS schema_sha256, ?::bigint AS record_count
 ), registered_manifest AS (
     SELECT (etl_control.register_etl_source_manifest(
-        p.run_id, 'academico.notas_planilla'::varchar(150), 'DW-001/v1'::varchar(64),
+        p.run_id, 'academico.notas_planilla'::varchar(150), 'DW-001/v2'::varchar(64),
         'academico'::varchar(63), 'notas_planilla'::varchar(63),
-        '4a591f9e237952dfb0b4fe6a9dc3308590dfb2563776c40a8f27d598d7ce41ca'::char(64), 'id_gestion ASC, id_periodo ASC, id_matricula ASC'::text,
+        '4bc16437353f0012468a5226b259b825ce07c9907652aa0c2e79d18f23a556cf'::char(64), 'id_gestion ASC, id_periodo ASC, id_matricula ASC'::text,
         'COMPLETO'::varchar(16), p.schema_sha256,
         NULL::smallint, NULL::smallint, NULL::timestamptz, p.record_count,
         '{"engine":"apache-hop","source_rows_retained":false,"source_query_file":"pipelines/source/sql/select_notas_planilla.sql"}'::jsonb
@@ -110,7 +108,7 @@ ORDER BY id_gestion ASC, id_periodo ASC, id_matricula ASC</sql><limit>0</limit><
         p.run_id,'source_notas_planilla'::varchar(100),'EXTRACCION'::varchar(20),
         'EXITOSO'::varchar(16),6::smallint,
         'pipelines/source/pl_source_notas_planilla_vertical.hpl'::text,
-        'hop-mvp-source-v1'::varchar(255),
+        'hop-mvp-source-v1.1'::varchar(255),
         jsonb_build_object('record_count',p.record_count,'source_rows_retained',false)
     )).step_id AS step_id FROM params p CROSS JOIN registered_manifest CROSS JOIN metric
 )
