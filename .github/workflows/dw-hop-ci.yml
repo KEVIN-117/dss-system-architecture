@@ -45,11 +45,7 @@ jobs:
 
       - name: Download pinned PostgreSQL JDBC driver
         run: |
-          mkdir -p etl-layer/apache-hop/jdbc
-          curl --fail --silent --show-error --location \
-            https://repo.maven.apache.org/maven2/org/postgresql/postgresql/42.7.11/postgresql-42.7.11.jar \
-            --output etl-layer/apache-hop/jdbc/postgresql-42.7.11.jar
-          echo '1981B31D3993C58702783C1CDDF10A34E48C1F413D70FF1CB6DEF0A143484647  etl-layer/apache-hop/jdbc/postgresql-42.7.11.jar' | sha256sum --check --status
+          bash etl-layer/apache-hop/scripts/download-postgres-jdbc.sh
 
       - name: Build Apache Hop Web image
         run: docker build --tag dss-apache-hop:${{ github.sha }} etl-layer/apache-hop

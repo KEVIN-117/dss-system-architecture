@@ -7,7 +7,7 @@ Configuración de Apache Hop organizada por proyecto. Cada proyecto contiene su 
 ```text
 apache-hop/
 ├── README.md
-├── jdbc/                         # Drivers JDBC locales, no versionados
+├── jdbc/                         # Driver PostgreSQL descargado y validado antes del build
 └── projects/
     └── dss-uatf-etl/
         ├── project-config.json
@@ -27,6 +27,8 @@ apache-hop/
         │   └── quality/
         └── datasets/
 ```
+
+Antes de construir la imagen localmente, ejecuta `bash scripts/download-postgres-jdbc.sh` desde `etl-layer/apache-hop`; el script descarga PostgreSQL JDBC 42.7.11 y valida su SHA-256. CI y el flujo de publicación ejecutan este paso automáticamente.
 
 ## Proyecto y ambientes
 
