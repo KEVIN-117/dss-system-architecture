@@ -569,7 +569,36 @@
           "attributes": {}
         }
       ],
-      "dss-bff": []
+      "dss-bff": [],
+      "dw-control-service": [
+        {
+          "id": "a71ac3c5-27ac-4e47-a081-bf7f9486e8a1",
+          "name": "DW_CLOSURE_READ",
+          "description": "Read academic closure records and events.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "c0d94e51-6e3c-4b7c-9210-6d4767cdce7c",
+          "attributes": {}
+        },
+        {
+          "id": "3d3dc348-f050-4b59-8d98-0e7d0ebfcb7b",
+          "name": "DW_CLOSURE_MANAGE",
+          "description": "Create and manage academic period closures.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "c0d94e51-6e3c-4b7c-9210-6d4767cdce7c",
+          "attributes": {}
+        },
+        {
+          "id": "4b45895a-f71d-4416-9e8f-ef1985d28c3d",
+          "name": "DW_ETL_MONITOR_READ",
+          "description": "Read ETL execution monitoring data.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "c0d94e51-6e3c-4b7c-9210-6d4767cdce7c",
+          "attributes": {}
+        }
+      ]
     }
   },
   "groups": [],
@@ -927,8 +956,59 @@
             "access.token.claim": "true",
             "userinfo.token.claim": "false"
           }
+        },
+        {
+          "id": "3108a4b0-179c-4cfe-b395-e4e5bc46cbef",
+          "name": "audience-dw-control-service",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "dw-control-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
         }
       ],
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": true,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [
+        "web-origins",
+        "acr",
+        "roles",
+        "profile",
+        "basic",
+        "email"
+      ],
+      "optionalClientScopes": [
+        "address",
+        "phone",
+        "organization",
+        "offline_access",
+        "microprofile-jwt"
+      ]
+    },
+    {
+      "id": "c0d94e51-6e3c-4b7c-9210-6d4767cdce7c",
+      "clientId": "dw-control-service",
+      "name": "DW Control Service",
+      "description": "Audience and client permissions for the DW administrative API.",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [],
+      "webOrigins": [],
+      "notBefore": 0,
+      "bearerOnly": true,
+      "consentRequired": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "protocol": "openid-connect",
+      "attributes": {},
       "authenticationFlowBindingOverrides": {},
       "fullScopeAllowed": true,
       "nodeReRegistrationTimeout": -1,

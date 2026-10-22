@@ -1,0 +1,51 @@
+spring:
+  application:
+    name: dw-control-service
+  profiles:
+    active: ${DW_CONTROL_PROFILE:prod}
+  datasource:
+    url: ${DW_CONTROL_DB_URL:jdbc:postgresql://localhost:5434/dss_dw}
+    username: ${DW_CONTROL_DB_USERNAME:dw_control_runtime}
+    password: ${DW_CONTROL_DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DW_CONTROL_DB_POOL_SIZE:8}
+      connection-timeout: ${DW_CONTROL_DB_CONNECTION_TIMEOUT_MS:5000}
+
+server:
+  port: ${DW_CONTROL_PORT:8090}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: never
+      probes:
+        enabled: true
+        add-additional-paths: true
+  info:
+    env:
+      enabled: false
+
+logging:
+  structured:
+    format:
+      console: ${LOG_STRUCTURED_FORMAT:ecs}
+
+springdoc:
+  api-docs:
+    enabled: ${DW_CONTROL_OPENAPI_ENABLED:false}
+  swagger-ui:
+    enabled: ${DW_CONTROL_OPENAPI_ENABLED:false}
+    path: /swagger-ui.html
+  packages-to-scan: chronos.dw.admin.adapter.in.rest
+
+app:
+  security:
+    jwt:
+      issuer-uri: ${KEYCLOAK_ISSUER_URI}
+      jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
+      audience: ${KEYCLOAK_DW_CONTROL_AUDIENCE:dw-control-service}
+      client-id: ${KEYCLOAK_DW_CONTROL_CLIENT_ID:dw-control-service}

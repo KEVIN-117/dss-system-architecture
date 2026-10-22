@@ -1,0 +1,5 @@
+springdoc:
+  api-docs:
+    enabled: ${DW_CONTROL_OPENAPI_ENABLED:true}
+  swagger-ui:
+    enabled: ${DW_CONTROL_OPENAPI_ENABLED:true}
