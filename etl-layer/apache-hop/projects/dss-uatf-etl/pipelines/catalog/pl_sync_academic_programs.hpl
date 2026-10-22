@@ -23,7 +23,7 @@
     <sql><![CDATA[WITH expected(column_name, udt_name, char_length, is_nullable) AS (
     VALUES
         ('id_programa', 'bpchar', 3, 'NO'),
-        ('programa', 'varchar', NULL::integer, 'NO'),
+        ('programa', 'varchar', 50, 'NO'),
         ('id_facultad', 'int2', NULL::integer, 'NO'),
         ('id_nivel', 'int2', NULL::integer, 'NO'),
         ('nivel', 'varchar', 45, 'YES'),
