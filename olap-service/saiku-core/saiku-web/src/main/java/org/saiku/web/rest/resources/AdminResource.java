@@ -450,7 +450,9 @@ public class AdminResource {
                             .header("content-disposition", "attachment; filename = " + id)
                             .build();
                 } catch (RepositoryException e) {
-                    return Response.serverError().entity(e.getLocalizedMessage()).build();
+                    return Response.serverError()
+                            .entity(e.getLocalizedMessage())
+                            .build();
                 }
             }
         }
