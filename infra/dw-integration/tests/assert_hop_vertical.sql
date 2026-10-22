@@ -17,7 +17,7 @@ BEGIN
           ('public.postulantes',4,'996751a46c044c8ea1c8e86213f6115ea207f0a9d4a1cd14d892bfb42219d52e'),
           ('academico.alm_programas',2,'e8884b33c49c4a58bf3314cfe0026a6539a9261354290e3a6321c79b2cdccaee'),
           ('academico.pln_materias',3,'4da4263f5af50bf73de51540cbeb07abea8cc51ba9651cad37954ccfb1c08a5f'),
-          ('academico.notas_planilla',6,'4bc16437353f0012468a5226b259b825ce07c9907652aa0c2e79d18f23a556cf'),
+          ('academico.notas_planilla',6,'8649731b050fded85c58de8ef186553629148e9c9d91aae91a4f379bca4f9d6f'),
           ('academico.alm_programas_facultades',2,'a93cbdaf85c233554a0c0ed50fa9dbf363cb6467292e8e14284d5c8652a07913'),
           ('public.prs_colegios',2,'6d0db6e71f8563de984eea72d0dc7ef67fde5cd2e474059d145a176c3d51a7fa'),
           ('public.lugar_localidad',2,'8d2a1b895d3755d0a5b45f128b711ad58f3f0ab496278bd3c0ca3ce9b4b1b71a')

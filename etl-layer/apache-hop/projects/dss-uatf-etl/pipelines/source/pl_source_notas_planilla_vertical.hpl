@@ -93,7 +93,7 @@ ORDER BY id_gestion ASC, id_periodo ASC, id_matricula ASC</sql><limit>0</limit><
     SELECT (etl_control.register_etl_source_manifest(
         p.run_id, 'academico.notas_planilla'::varchar(150), 'DW-001/v2'::varchar(64),
         'academico'::varchar(63), 'notas_planilla'::varchar(63),
-        '4bc16437353f0012468a5226b259b825ce07c9907652aa0c2e79d18f23a556cf'::char(64), 'id_gestion ASC, id_periodo ASC, id_matricula ASC'::text,
+        '8649731b050fded85c58de8ef186553629148e9c9d91aae91a4f379bca4f9d6f'::char(64), 'id_gestion ASC, id_periodo ASC, id_matricula ASC'::text,
         'COMPLETO'::varchar(16), p.schema_sha256,
         NULL::smallint, NULL::smallint, NULL::timestamptz, p.record_count,
         '{"engine":"apache-hop","source_rows_retained":false,"source_query_file":"pipelines/source/sql/select_notas_planilla.sql"}'::jsonb
