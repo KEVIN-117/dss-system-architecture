@@ -76,19 +76,6 @@ jobs:
       - name: Run PostgreSQL DW regression suite
         run: docker compose -f infra/dw-schema/dw-test-docker.yml up --build --exit-code-from dw-schema-test
 
-      - name: Run Apache Hop academic catalog sync regression
-        run: |
-          compose=(docker compose -p dss-dw-catalog-sync -f infra/dw-integration/dw-integration-test.yml)
-          "${compose[@]}" up -d jachasun-fixture auth-catalog-fixture
-          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-initial-test
-          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-initial-assert
-          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-replay-test
-          "${compose[@]}" --profile academic-catalog-sync run --rm --no-deps hop-catalog-replay-assert
-
-      - name: Stop academic catalog fixtures before other suites
-        if: always()
-        run: docker compose -p dss-dw-catalog-sync -f infra/dw-integration/dw-integration-test.yml down --volumes --remove-orphans
-
       - name: Run Hop source-query contract regression
         run: docker compose -p dss-dw-source-contract -f infra/dw-integration/dw-integration-test.yml --profile dw-req6-sources run --rm hop-source-query-contract-test
 
@@ -105,10 +92,6 @@ jobs:
 
       - name: Run Hop atomic publication regression
         run: docker compose -p dss-dw-publish -f infra/dw-integration/dw-integration-test.yml --profile dw-publish run --rm hop-publish-assert
-
-      - name: Stop academic catalog test containers
-        if: always()
-        run: docker compose -p dss-dw-catalog-sync -f infra/dw-integration/dw-integration-test.yml down --volumes --remove-orphans
 
       - name: Stop Hop regression containers
         if: always()

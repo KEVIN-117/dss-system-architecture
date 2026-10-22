@@ -320,6 +320,7 @@ core.*
 /dss-etl-hop
 /saiku-ui
 /analysis-output
+/sites/*
 
 # Source package name matches the generic crash-dump ignore above; keep the OLAP manager source tracked.
 !olap-service/saiku-core/saiku-web/src/main/java/org/saiku/web/core/

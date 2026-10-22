@@ -27,6 +27,8 @@ while read -r local_ref local_sha remote_ref remote_sha; do
 done
 
 if [ "$run_vertical_test" = true ]; then
-  echo "Apache Hop / DW changes detected; running the local vertical regression."
-  exec "$repo_root/infra/dw-integration/run-local-vertical.sh"
+  echo "Apache Hop / DW changes detected; running local integration regressions."
+  bash "$repo_root/etl-layer/apache-hop/scripts/download-postgres-jdbc.sh"
+  bash "$repo_root/infra/dw-integration/run-local-catalog-sync.sh"
+  bash "$repo_root/infra/dw-integration/run-local-vertical.sh"
 fi
