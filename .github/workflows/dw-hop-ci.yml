@@ -60,7 +60,7 @@ jobs:
             test -f /files/project/project-config.json &&
             test -f /files/project/workflows/wf_vertical_uatf_datos_smoke.hwf &&
             test -f /files/scripts/start-hop-web.sh &&
-            test -f /files/postgresql-42.7.11.jar &&
+            test -f /usr/local/tomcat/jdbc-drivers/postgresql-42.7.11.jar &&
             test ! -f /files/project/environments/prod-env.json &&
             test ! -f /files/project/environments/dev-env.json
           '
