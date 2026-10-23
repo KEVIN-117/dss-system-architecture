@@ -50,6 +50,24 @@ jobs:
       - name: Build Apache Hop Web image
         run: docker build --tag dss-apache-hop:${{ github.sha }} etl-layer/apache-hop
 
+      - name: Build DW migrator image
+        run: >-
+          docker build
+          --build-arg MIGRATIONS_VERSION=ci-${{ github.sha }}
+          --tag dss-dw-migrator:${{ github.sha }}
+          infra/dw-schema
+
+      - name: Verify packaged DW migrations
+        env:
+          IMAGE: dss-dw-migrator:${{ github.sha }}
+        shell: bash
+        run: |
+          expected=$(find infra/dw-schema/migrations -maxdepth 1 -type f -name '[0-9][0-9][0-9][0-9]_*.sql' | wc -l)
+          actual=$(docker run --rm --entrypoint sh "$IMAGE" -ec \
+            "test -x /usr/local/bin/apply-migrations.sh; find /migrations -maxdepth 1 -type f -name '[0-9][0-9][0-9][0-9]_*.sql' | wc -l")
+          test "$actual" -eq "$expected"
+          echo "Verified $actual packaged SQL migrations."
+
       - name: Verify packaged Hop project and runtime files
         run: |
           docker run --rm --entrypoint /bin/bash dss-apache-hop:${{ github.sha }} -ec '
