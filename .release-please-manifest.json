@@ -3,5 +3,5 @@
   "olap-service": "1.1.0",
   "infra/keycloak": "1.2.0",
   "etl-layer/apache-hop": "1.1.0",
-  "infra/dw-schema": "0.0.0"
+  "infra/dw-schema": "1.0.0"
 }
