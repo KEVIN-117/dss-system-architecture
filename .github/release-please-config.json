@@ -23,6 +23,11 @@
       "release-type": "simple",
       "component": "apache-hop",
       "package-name": "dss-apache-hop"
+    },
+    "infra/dw-schema": {
+      "release-type": "simple",
+      "component": "dw-migrator",
+      "package-name": "dss-dw-migrator"
     }
   }
 }
