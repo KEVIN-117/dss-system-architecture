@@ -425,7 +425,7 @@ components:
               items: { $ref: '#/components/schemas/ExecutionSummary' }
     Problem:
       type: object
-      required: [type, title, status]
+      required: [type, title, status, code]
       properties:
         type: { type: string, format: uri-reference }
         title: { type: string }
