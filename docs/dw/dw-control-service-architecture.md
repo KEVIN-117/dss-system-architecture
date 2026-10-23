@@ -69,11 +69,11 @@ El mapeo desde roles/grupos de Keycloak a estos permisos queda explícito para #
 
 ## Roles objetivo en PostgreSQL
 
-Los roles PostgreSQL son grupos `NOLOGIN`. TI/DBA crea identidades `LOGIN` distintas por ambiente, asigna membresías y gestiona secretos fuera del repositorio. Esta matriz documenta el objetivo; su migración y aplicación corresponden a la implementación posterior de las issues de servicio.
+Los roles PostgreSQL son grupos `NOLOGIN`. TI/DBA crea identidades `LOGIN` distintas por ambiente, asigna membresías y gestiona secretos fuera del repositorio. La migración `0023_create_dw_control_reader_role.sql` implementa el grupo de solo lectura para cierres; los roles de escritura y monitoreo siguen siendo objetivos para sus alcances correspondientes.
 
-| Rol de grupo propuesto | Lectura | Escritura/comandos | Asignación |
+| Rol de grupo | Lectura | Escritura/comandos | Asignación |
 | --- | --- | --- | --- |
-| `dw_control_reader` | Cierres/eventos y tablas de ejecución requeridas para monitoreo. | Ninguna. | Solo a identidades que requieran consulta de control. |
+| `dw_control_reader` (implementado en 0023) | `etl_control.academic_period_closure` y `etl_control.academic_period_closure_event`. | Ninguna; no posee DML ni ejecución de funciones de transición. | A la identidad LOGIN del runtime de `dw-control-service`; no heredar roles adicionales. |
 | `dw_control_api` | Ninguna por sí mismo; obtiene consultas por membresía de lectura. | `EXECUTE` solo en funciones de API para crear pendientes y cerrar/reabrir; sin DML directo. | Login específico del servicio en cada ambiente. |
 | `dw_control_service` | Hereda `dw_control_reader` y `dw_control_api`. | Solo las funciones aprobadas que hereda; sin DML directo. | Composición `NOLOGIN` asignada al login del servicio. |
 | `dw_control_operator` (existente) | Permisos operativos actuales de cierres. | Compatibilidad/manual; revisar y retirar gradualmente `INSERT`/secuencia al migrar operadores a funciones. No asignar al login API. | Identidades operativas autorizadas durante la transición. |
@@ -105,7 +105,7 @@ La función de creación inserta `PENDIENTE` y produce el evento inicial en la m
 
 `dw-control-service` aplica autorización funcional antes de invocarlas: PostgreSQL registra el sujeto recibido, pero no valida por sí mismo el JWT. Los permisos directos `INSERT` y de secuencia que la migración actual otorga a `dw_control_operator` son estado existente; retirarlos requiere una migración hacia adelante y una transición de las operaciones manuales a la función de creación. No se cambia esa concesión como parte de esta issue documental.
 
-La conexión de servicio no debe heredar `dw_owner`, `dw_publisher`, `dw_hop_runtime` ni `dw_reader`. La capacidad de ejecutar funciones SQL no reemplaza los permisos de aplicación; la API debe comprobar el permiso requerido en cada ruta.
+La conexión de lectura del servicio usa `dw_control_reader`, no debe heredar `dw_owner`, `dw_publisher`, `dw_hop_runtime`, `dw_reader` ni `dw_control_operator`. Las transacciones de consulta se marcan `readOnly`; los permisos PostgreSQL mantienen la restricción aun si se omite esa indicación en la aplicación. La capacidad de ejecutar funciones SQL no reemplaza los permisos de aplicación; la API debe comprobar el permiso requerido en cada ruta.
 
 ## Estados y responsabilidades
 

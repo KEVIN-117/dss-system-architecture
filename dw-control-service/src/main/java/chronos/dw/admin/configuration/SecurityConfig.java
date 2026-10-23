@@ -27,10 +27,17 @@ public class SecurityConfig {
 
     @Bean
     SecurityFilterChain securityFilterChain(
-            HttpSecurity http, JwtDecoder jwtDecoder, DwControlJwtAuthenticationConverter authenticationConverter)
+            HttpSecurity http,
+            JwtDecoder jwtDecoder,
+            DwControlJwtAuthenticationConverter authenticationConverter,
+            ApiAuthenticationEntryPoint authenticationEntryPoint,
+            ApiAccessDeniedHandler accessDeniedHandler)
             throws Exception {
         http.csrf(AbstractHttpConfigurer::disable)
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler))
                 .authorizeHttpRequests(authorize -> authorize
                         .requestMatchers(
                                 "/actuator/health",
@@ -50,8 +57,10 @@ public class SecurityConfig {
                         .hasAuthority("DW_ETL_MONITOR_READ")
                         .anyRequest()
                         .denyAll())
-                .oauth2ResourceServer(resourceServer -> resourceServer.jwt(
-                        jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(authenticationConverter)));
+                .oauth2ResourceServer(resourceServer -> resourceServer
+                        .authenticationEntryPoint(authenticationEntryPoint)
+                        .accessDeniedHandler(accessDeniedHandler)
+                        .jwt(jwt -> jwt.decoder(jwtDecoder).jwtAuthenticationConverter(authenticationConverter)));
         return http.build();
     }
 
