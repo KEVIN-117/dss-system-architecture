@@ -59,7 +59,10 @@ the default `prod` profile disables both. Logs are ECS-formatted JSON on stdout.
 `0023_create_dw_control_reader_role.sql` creates the read-only `NOLOGIN` group. Migration
 `0024_add_academic_closure_commands.sql` creates `dw_control_api` and the `dw_control_service`
 composition, which receives read access plus `EXECUTE` on the two audited closure command
-functions. It does not grant direct table DML. TI/DBA must provision the environment's
+functions. Migration `0025_grant_dw_execution_monitoring_read.sql` extends `dw_control_reader`
+with SELECT-only access to execution summaries, steps, metrics, and error metadata. The API never
+selects raw error causes, messages, JSON details, step component references, or metric dimensions.
+The grants do not include direct table DML. TI/DBA must provision the environment's
 `dw_control_runtime` LOGIN and grant membership in `dw_control_service`; the LOGIN must inherit
 that role's privileges and must not belong to any other write-capable role. Set its password using
 the environment's secret manager or local ignored `.env`, never in migration SQL or Git.
