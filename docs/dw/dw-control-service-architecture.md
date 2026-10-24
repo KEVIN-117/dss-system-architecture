@@ -73,7 +73,7 @@ Los roles PostgreSQL son grupos `NOLOGIN`. TI/DBA crea identidades `LOGIN` disti
 
 | Rol de grupo | Lectura | Escritura/comandos | Asignación |
 | --- | --- | --- | --- |
-| `dw_control_reader` (implementado en 0023) | `etl_control.academic_period_closure` y `etl_control.academic_period_closure_event`. | Ninguna; no posee DML ni ejecución de funciones de transición. | Miembro de `dw_control_service`. |
+| `dw_control_reader` (implementado en 0023, ampliado en 0025) | Cierres, eventos, ejecuciones, pasos, métricas y errores ETL. | Ninguna; solo SELECT, sin DML ni funciones de transición. | Miembro de `dw_control_service`. |
 | `dw_control_api` (implementado en 0024) | Ninguna. | `EXECUTE` solo en funciones para crear pendientes y cerrar/reabrir; sin DML directo. | Miembro de `dw_control_service`; no asignar a usuarios humanos. |
 | `dw_control_service` (implementado en 0024) | Hereda `dw_control_reader`. | Hereda solo las funciones aprobadas de `dw_control_api`; sin DML directo. | Composición `NOLOGIN` asignada al login dedicado del servicio. |
 | `dw_control_operator` (existente) | Permisos operativos actuales de cierres. | Compatibilidad/manual; revisar y retirar gradualmente `INSERT`/secuencia al migrar operadores a funciones. No asignar al login API. | Identidades operativas autorizadas durante la transición. |
@@ -105,7 +105,7 @@ La migración `0024_add_academic_closure_commands.sql` implementa estas funcione
 
 `dw-control-service` aplica autorización funcional antes de invocarlas: PostgreSQL registra el sujeto derivado del JWT validado, pero no valida por sí mismo el JWT. Los permisos directos `INSERT` y de secuencia que la migración actual otorga a `dw_control_operator` son estado existente; retirarlos requiere una migración hacia adelante y una transición de las operaciones manuales a la función de creación. No se cambia esa concesión como parte de la issue #177.
 
-La conexión del servicio usa un LOGIN dedicado, normalmente `dw_control_runtime`, que recibe membresía únicamente en `dw_control_service`. No debe heredar `dw_owner`, `dw_publisher`, `dw_hop_runtime`, `dw_reader`, `dw_control_operator` ni otros roles de escritura. Las contraseñas de ese LOGIN se aprovisionan por ambiente como secretos, fuera de migraciones y del repositorio. Las transacciones de consulta se marcan `readOnly`; los permisos PostgreSQL mantienen la restricción aun si se omite esa indicación en la aplicación. La capacidad de ejecutar funciones SQL no reemplaza los permisos de aplicación: la API debe comprobar el permiso requerido en cada ruta.
+La conexión del servicio usa un LOGIN dedicado, normalmente `dw_control_runtime`, que recibe membresía únicamente en `dw_control_service`. La migración `0025_grant_dw_execution_monitoring_read.sql` amplía `dw_control_reader` con SELECT únicamente en las tablas necesarias para el monitoreo. No debe heredar `dw_owner`, `dw_publisher`, `dw_hop_runtime`, `dw_reader`, `dw_control_operator` ni otros roles de escritura. Las contraseñas de ese LOGIN se aprovisionan por ambiente como secretos, fuera de migraciones y del repositorio. Las transacciones de consulta se marcan `readOnly`; los permisos PostgreSQL mantienen la restricción aun si se omite esa indicación en la aplicación. La capacidad de leer datos no reemplaza los permisos de aplicación: la API comprueba `DW_ETL_MONITOR_READ` en cada endpoint de monitoreo.
 
 ## Estados y responsabilidades
 

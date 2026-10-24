@@ -1,6 +1,7 @@
 package chronos.dw.admin.adapter.in.rest.error;
 
 import chronos.dw.admin.domain.exception.AcademicClosureNotFoundException;
+import chronos.dw.admin.domain.exception.EtlExecutionNotFoundException;
 import chronos.dw.admin.domain.exception.InvalidClosureTransitionException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
@@ -60,6 +61,17 @@ public class ApiExceptionHandler {
                 HttpStatus.NOT_FOUND,
                 "No encontrado",
                 "No se encontró el cierre académico solicitado.",
+                "NOT_FOUND",
+                request);
+    }
+
+    @ExceptionHandler(EtlExecutionNotFoundException.class)
+    public ResponseEntity<ApiProblemResponse> executionNotFound(
+            EtlExecutionNotFoundException exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.NOT_FOUND,
+                "No encontrado",
+                "No se encontró la ejecución ETL solicitada.",
                 "NOT_FOUND",
                 request);
     }
