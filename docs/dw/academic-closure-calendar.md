@@ -26,7 +26,7 @@ El diagrama separa la autorización funcional de la ejecución técnica. DSA hab
 | TI/DBA | Aplicar migraciones, administrar permisos de base de datos y revisar la bitácora. |
 | Apache Hop y operador autorizado | Registrar la ejecución técnica y marcar el corte como `PROCESADO` mediante la función, solo tras publicación exitosa con `run_id` del mismo cierre. |
 
-En el MVP de la issue #133, la autorización DSA se conserva mediante operación manual identificada y auditable. La futura API/BFF deberá verificarla antes de invocar `etl_control.transition_academic_period_closure`; no es una dependencia del flujo directo Hop. La función SQL exige actor, motivo y transición válida, pero un actor declarado no demuestra por sí solo autorización funcional.
+La API `dw-control-service` implementa los comandos DSA de la issue #177. Valida el permiso `DW_CLOSURE_MANAGE`, deriva el actor del `sub` del JWT validado y solo invoca funciones SQL auditadas para crear, cerrar o reabrir. La función de bajo nivel `etl_control.transition_academic_period_closure` permanece reservada a los propietarios y flujos técnicos autorizados; no se concede directamente al rol del API.
 
 ## Elegibilidad y reapertura
 
@@ -34,16 +34,19 @@ El workflow Hop deberá solicitar una carga por cierre solo cuando el corte est�
 
 ## Operación manual
 
-Crear un corte pendiente requiere insertar `gestion`, `periodo`, `created_by_subject` y `closure_reason`. Las transiciones se realizan exclusivamente mediante:
+Las operaciones ordinarias se realizan mediante `dw-control-service` con un JWT que tenga `DW_CLOSURE_MANAGE`. La API no acepta el actor en el body. El rol SQL del servicio no tiene DML directo; la migración `0024_add_academic_closure_commands.sql` concede únicamente estas funciones:
 
 ```sql
-SELECT etl_control.transition_academic_period_closure(
-  :gestion, :periodo, :to_status, :actor_subject, :reason,
-  :effective_at, :processed_run_id
+SELECT etl_control.create_academic_period_closure(
+  :gestion, :periodo, :actor_subject, :reason
+);
+
+SELECT etl_control.request_academic_period_closure_transition(
+  :closure_id, :to_status, :actor_subject, :reason, :effective_at
 );
 ```
 
-`CERRADO` exige fecha efectiva; desde DW-004, `PROCESADO` exige un UUID de ejecución `EXITOSA` vinculada al mismo cierre. La tabla de eventos es inmutable y toda actualización directa de campos de estado es rechazada.
+Son ejemplos del contrato interno SQL, no credenciales para operaciones manuales. `CERRADO` exige fecha efectiva; la función expuesta al API solo permite `CERRADO` y `REABIERTO`, nunca `PROCESADO`. Este último exige un UUID de ejecución `EXITOSA` vinculada al mismo cierre y sigue bajo el flujo técnico de Hop. La tabla de eventos es inmutable y toda actualización directa de campos de estado es rechazada.
 
 ## Despliegue y prueba
 
@@ -59,4 +62,4 @@ El entorno no publica puertos ni persiste datos: PostgreSQL usa almacenamiento t
 
 TI/DBA puede aplicar los mismos archivos en un entorno administrado con `psql -v ON_ERROR_STOP=1`; la prueba abre una transacción y finaliza en `ROLLBACK`, por lo que no conserva registros de prueba.
 
-`dw_control_operator` conserva las rutinas de cierres. TI/DBA provisiona cuentas externas y restringe la escritura directa; el calendario funciona sin Load Manager. El runtime Hop usa el grupo dedicado y las funciones autorizadas del MVP: no recibe administración ni autoridad DSA implícita. En producción, TI/DBA debe provisionar la cuenta del ambiente y DSA autorizar cada corte. Véase [la base consolidada](mvp-direct-hop.md).
+`dw_control_operator` se conserva para compatibilidad de operación manual y no debe asignarse a `dw-control-service`. TI/DBA provisiona `dw_control_runtime` como LOGIN dedicado miembro solo de `dw_control_service`, con contraseña en el gestor de secretos; el calendario funciona sin Load Manager. El runtime Hop conserva su grupo y funciones técnicas: no recibe autoridad DSA implícita. Véase [la base consolidada](mvp-direct-hop.md).

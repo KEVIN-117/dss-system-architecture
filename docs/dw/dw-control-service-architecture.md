@@ -1,6 +1,6 @@
 # DW-CONTROL-001 — Arquitectura y contratos de `dw-control-service`
 
-**Estado:** contrato documental propuesto para las issues #175–#181. No crea ni aplica migraciones ni configura roles en un ambiente.
+**Estado:** contrato base de las issues #175–#181. La issue #177 implementa los comandos auditados de cierres y roles PostgreSQL mediante migración versionada; no se aplica a una base de datos desde este cambio.
 
 ## Objetivo y límites
 
@@ -69,20 +69,20 @@ El mapeo desde roles/grupos de Keycloak a estos permisos queda explícito para #
 
 ## Roles objetivo en PostgreSQL
 
-Los roles PostgreSQL son grupos `NOLOGIN`. TI/DBA crea identidades `LOGIN` distintas por ambiente, asigna membresías y gestiona secretos fuera del repositorio. La migración `0023_create_dw_control_reader_role.sql` implementa el grupo de solo lectura para cierres; los roles de escritura y monitoreo siguen siendo objetivos para sus alcances correspondientes.
+Los roles PostgreSQL son grupos `NOLOGIN`. TI/DBA crea identidades `LOGIN` distintas por ambiente, asigna membresías y gestiona secretos fuera del repositorio. Las migraciones `0023` y `0024` implementan lectura de cierres y comandos auditados; los roles de monitoreo siguen siendo objetivos para su alcance correspondiente.
 
 | Rol de grupo | Lectura | Escritura/comandos | Asignación |
 | --- | --- | --- | --- |
-| `dw_control_reader` (implementado en 0023) | `etl_control.academic_period_closure` y `etl_control.academic_period_closure_event`. | Ninguna; no posee DML ni ejecución de funciones de transición. | A la identidad LOGIN del runtime de `dw-control-service`; no heredar roles adicionales. |
-| `dw_control_api` | Ninguna por sí mismo; obtiene consultas por membresía de lectura. | `EXECUTE` solo en funciones de API para crear pendientes y cerrar/reabrir; sin DML directo. | Login específico del servicio en cada ambiente. |
-| `dw_control_service` | Hereda `dw_control_reader` y `dw_control_api`. | Solo las funciones aprobadas que hereda; sin DML directo. | Composición `NOLOGIN` asignada al login del servicio. |
+| `dw_control_reader` (implementado en 0023) | `etl_control.academic_period_closure` y `etl_control.academic_period_closure_event`. | Ninguna; no posee DML ni ejecución de funciones de transición. | Miembro de `dw_control_service`. |
+| `dw_control_api` (implementado en 0024) | Ninguna. | `EXECUTE` solo en funciones para crear pendientes y cerrar/reabrir; sin DML directo. | Miembro de `dw_control_service`; no asignar a usuarios humanos. |
+| `dw_control_service` (implementado en 0024) | Hereda `dw_control_reader`. | Hereda solo las funciones aprobadas de `dw_control_api`; sin DML directo. | Composición `NOLOGIN` asignada al login dedicado del servicio. |
 | `dw_control_operator` (existente) | Permisos operativos actuales de cierres. | Compatibilidad/manual; revisar y retirar gradualmente `INSERT`/secuencia al migrar operadores a funciones. No asignar al login API. | Identidades operativas autorizadas durante la transición. |
 | `dw_hop_runtime` (existente) | Evidencia técnica que necesita Hop. | Funciones técnicas Hop ya autorizadas, independiente del servicio. | Login de Apache Hop; nunca compartir con la API. |
 | `dw_owner` (existente) | Propietario técnico. | DDL y funciones `SECURITY DEFINER`. | Migrador/administración, nunca runtime. |
 
-### Contrato SQL objetivo
+### Contrato SQL implementado
 
-La migración futura deberá ofrecer estas funciones, propiedad de `dw_owner`, con `SECURITY DEFINER`, `search_path` fijo (`pg_catalog, etl_control`) y ejecución revocada a `PUBLIC`:
+La migración 0024 ofrece estas funciones, propiedad de `dw_owner`, con `SECURITY DEFINER`, `search_path` fijo (`pg_catalog, etl_control`) y ejecución revocada a `PUBLIC`:
 
 ```text
 etl_control.create_academic_period_closure(
@@ -101,11 +101,11 @@ etl_control.request_academic_period_closure_transition(
 ) RETURNS etl_control.academic_period_closure
 ```
 
-La función de creación inserta `PENDIENTE` y produce el evento inicial en la misma transacción. La de transición resuelve el `closure_id` a gestión/periodo, limita los estados invocables por la API a `CERRADO`/`REABIERTO` y delega las reglas de bloqueo y transición en `transition_academic_period_closure`; no expone `PROCESADO` ni acepta un `run_id`. La concesión de `dw_control_api` se limita a estas dos funciones. Hop conserva sus funciones técnicas y la transición a `PROCESADO` bajo su contrato independiente.
+La migración `0024_add_academic_closure_commands.sql` implementa estas funciones. La de creación inserta `PENDIENTE` y el trigger escribe el evento inicial dentro de la misma transacción. La función de transición resuelve el `closure_id` a gestión/periodo, limita los estados invocables por la API a `CERRADO`/`REABIERTO` y delega las reglas de bloqueo y transición en `transition_academic_period_closure`; no expone `PROCESADO` ni acepta un `run_id`. La concesión de `dw_control_api` se limita a estas dos funciones. Hop conserva sus funciones técnicas y la transición a `PROCESADO` bajo su contrato independiente.
 
-`dw-control-service` aplica autorización funcional antes de invocarlas: PostgreSQL registra el sujeto recibido, pero no valida por sí mismo el JWT. Los permisos directos `INSERT` y de secuencia que la migración actual otorga a `dw_control_operator` son estado existente; retirarlos requiere una migración hacia adelante y una transición de las operaciones manuales a la función de creación. No se cambia esa concesión como parte de esta issue documental.
+`dw-control-service` aplica autorización funcional antes de invocarlas: PostgreSQL registra el sujeto derivado del JWT validado, pero no valida por sí mismo el JWT. Los permisos directos `INSERT` y de secuencia que la migración actual otorga a `dw_control_operator` son estado existente; retirarlos requiere una migración hacia adelante y una transición de las operaciones manuales a la función de creación. No se cambia esa concesión como parte de la issue #177.
 
-La conexión de lectura del servicio usa `dw_control_reader`, no debe heredar `dw_owner`, `dw_publisher`, `dw_hop_runtime`, `dw_reader` ni `dw_control_operator`. Las transacciones de consulta se marcan `readOnly`; los permisos PostgreSQL mantienen la restricción aun si se omite esa indicación en la aplicación. La capacidad de ejecutar funciones SQL no reemplaza los permisos de aplicación; la API debe comprobar el permiso requerido en cada ruta.
+La conexión del servicio usa un LOGIN dedicado, normalmente `dw_control_runtime`, que recibe membresía únicamente en `dw_control_service`. No debe heredar `dw_owner`, `dw_publisher`, `dw_hop_runtime`, `dw_reader`, `dw_control_operator` ni otros roles de escritura. Las contraseñas de ese LOGIN se aprovisionan por ambiente como secretos, fuera de migraciones y del repositorio. Las transacciones de consulta se marcan `readOnly`; los permisos PostgreSQL mantienen la restricción aun si se omite esa indicación en la aplicación. La capacidad de ejecutar funciones SQL no reemplaza los permisos de aplicación: la API debe comprobar el permiso requerido en cada ruta.
 
 ## Estados y responsabilidades
 

@@ -32,8 +32,8 @@ public class DwControlJwtAuthenticationConverter implements Converter<Jwt, Abstr
 
     @Override
     public AbstractAuthenticationToken convert(Jwt jwt) {
-        if (!StringUtils.hasText(jwt.getSubject())) {
-            throw new BadJwtException("Access token is missing the subject claim");
+        if (!StringUtils.hasText(jwt.getSubject()) || jwt.getSubject().length() > 255) {
+            throw new BadJwtException("Access token has an invalid subject claim");
         }
 
         Set<GrantedAuthority> authorities = new LinkedHashSet<>();
