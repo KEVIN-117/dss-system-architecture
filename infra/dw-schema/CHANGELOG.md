@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.0.0...dw-migrator-v1.1.0) (2026-10-24)
+
+
+### Features
+
+* **dw-control:** implement audited closure commands ([#177](https://github.com/KEVIN-117/dss-system-architecture/issues/177)) ([#194](https://github.com/KEVIN-117/dss-system-architecture/issues/194)) ([2e33f99](https://github.com/KEVIN-117/dss-system-architecture/commit/2e33f99a3378e046e9e53bc59174429a64a55761))
+
 ## 1.0.0 (2026-10-23)
 
 
