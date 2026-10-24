@@ -307,8 +307,8 @@ components:
       additionalProperties: false
       required: [gestion, periodo, reason]
       properties:
-        gestion: { type: integer, minimum: 2000 }
-        periodo: { type: integer, minimum: 1 }
+        gestion: { type: integer, minimum: 2000, maximum: 32767 }
+        periodo: { type: integer, minimum: 1, maximum: 32767 }
         reason: { type: string, minLength: 1, maxLength: 2000 }
     ClosureCommand:
       type: object

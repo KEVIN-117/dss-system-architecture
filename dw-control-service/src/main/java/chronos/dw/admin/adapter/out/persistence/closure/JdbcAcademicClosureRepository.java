@@ -2,10 +2,15 @@ package chronos.dw.admin.adapter.out.persistence.closure;
 
 import chronos.dw.admin.application.model.ClosurePage;
 import chronos.dw.admin.application.port.out.LoadAcademicClosuresPort;
+import chronos.dw.admin.application.port.out.ManageAcademicClosuresPort;
 import chronos.dw.admin.application.port.out.QueryAcademicClosurePort;
 import chronos.dw.admin.domain.model.AcademicClosureSearchCriteria;
 import chronos.dw.admin.domain.model.AcademicPeriodClosure;
 import chronos.dw.admin.domain.model.AcademicPeriodClosureEvent;
+import chronos.dw.admin.domain.model.ClosureStatus;
+import java.time.Instant;
+import java.time.OffsetDateTime;
+import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -15,7 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /** Read-only PostgreSQL adapter for the academic closure calendar. */
 @Repository
-public class JdbcAcademicClosureRepository implements LoadAcademicClosuresPort, QueryAcademicClosurePort {
+public class JdbcAcademicClosureRepository
+        implements LoadAcademicClosuresPort, QueryAcademicClosurePort, ManageAcademicClosuresPort {
 
     private static final String SELECT_COLUMNS =
             """
@@ -62,6 +68,42 @@ public class JdbcAcademicClosureRepository implements LoadAcademicClosuresPort, 
     public Optional<AcademicPeriodClosure> findById(long closureId) {
         return jdbcTemplate.query(SELECT_COLUMNS + " WHERE closure_id = ?", rowMapper, closureId).stream()
                 .findFirst();
+    }
+
+    @Override
+    public AcademicPeriodClosure create(int gestion, int periodo, String actorSubject, String reason) {
+        return jdbcTemplate
+                .query(
+                        "SELECT * FROM etl_control.create_academic_period_closure("
+                                + "?::smallint, ?::smallint, ?::varchar, ?::text)",
+                        rowMapper,
+                        gestion,
+                        periodo,
+                        actorSubject,
+                        reason)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Closure creation returned no record"));
+    }
+
+    @Override
+    public AcademicPeriodClosure transition(
+            long closureId, ClosureStatus target, String actorSubject, String reason, Instant effectiveAt) {
+        OffsetDateTime effectiveAtValue =
+                effectiveAt == null ? null : OffsetDateTime.ofInstant(effectiveAt, ZoneOffset.UTC);
+        return jdbcTemplate
+                .query(
+                        "SELECT * FROM etl_control.request_academic_period_closure_transition("
+                                + "?::bigint, ?::varchar, ?::varchar, ?::text, ?::timestamptz)",
+                        rowMapper,
+                        closureId,
+                        target.name(),
+                        actorSubject,
+                        reason,
+                        effectiveAtValue)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("Closure transition returned no record"));
     }
 
     @Override

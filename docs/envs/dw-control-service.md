@@ -11,7 +11,7 @@ service audience are validated from Keycloak's JWK Set.
 | `KEYCLOAK_DW_CONTROL_AUDIENCE` | `dw-control-service` | Required member of the token `aud` claim. |
 | `KEYCLOAK_DW_CONTROL_CLIENT_ID` | `dw-control-service` | Client claim from which this API reads permissions. |
 | `DW_CONTROL_DB_URL` | `jdbc:postgresql://postgres-dw:5432/dss_dw` | PostgreSQL connection URL for the DW control schema. |
-| `DW_CONTROL_DB_USERNAME` | `dw_control_runtime` | Dedicated LOGIN account; grant membership in `dw_control_reader` only. Do not use `dw_owner`, `dw_control_operator`, or a migration account. |
+| `DW_CONTROL_DB_USERNAME` | `dw_control_runtime` | Dedicated LOGIN account; grant membership in `dw_control_service` only. Do not use `dw_owner`, `dw_control_operator`, or a migration account. |
 | `DW_CONTROL_DB_PASSWORD` | Managed secret | Password for the dedicated runtime login. |
 | `DW_CONTROL_PORT` | `8090` | HTTP port used by the service and image health check. |
 | `DW_CONTROL_PROFILE` | `dev` or `prod` | Selects environment-specific settings; defaults to `prod`. |
@@ -56,10 +56,24 @@ available at `/livez` and `/readyz`.
 The base configuration reads PostgreSQL and Keycloak settings from environment variables. The
 `dev` profile enables Swagger UI at `/swagger-ui.html` and the OpenAPI document at `/v3/api-docs`;
 the default `prod` profile disables both. Logs are ECS-formatted JSON on stdout. Migration
-`0023_create_dw_control_reader_role.sql` creates the `NOLOGIN` group role with `CONNECT`, schema
-`USAGE`, and `SELECT` only on the closure and audit tables. TI/DBA must provision the environment's
-`dw_control_runtime` LOGIN and grant it membership in `dw_control_reader` for this read-only scope.
-The LOGIN must inherit that group role's privileges and must not be a member of any write-capable
-role.
-Closure query transactions are also marked read-only by the application; future write operations
-must add only their separately reviewed function permissions.
+`0023_create_dw_control_reader_role.sql` creates the read-only `NOLOGIN` group. Migration
+`0024_add_academic_closure_commands.sql` creates `dw_control_api` and the `dw_control_service`
+composition, which receives read access plus `EXECUTE` on the two audited closure command
+functions. It does not grant direct table DML. TI/DBA must provision the environment's
+`dw_control_runtime` LOGIN and grant membership in `dw_control_service`; the LOGIN must inherit
+that role's privileges and must not belong to any other write-capable role. Set its password using
+the environment's secret manager or local ignored `.env`, never in migration SQL or Git.
+Closure query transactions are also marked read-only by the application; mutations run through the
+security-definer functions only.
+
+For a new local environment, TI/DBA creates the service login after the role migrations have been
+applied, then grants it membership in the service composition. In an interactive `psql` session:
+
+```sql
+CREATE ROLE dw_control_runtime LOGIN INHERIT NOSUPERUSER NOCREATEDB NOCREATEROLE NOREPLICATION NOBYPASSRLS;
+GRANT dw_control_service TO dw_control_runtime;
+\password dw_control_runtime
+```
+
+The `\password` command prompts for the secret instead of embedding it in a SQL file or shell
+history. Do not use the cluster administrator or `dw_control_operator` credentials in the service.

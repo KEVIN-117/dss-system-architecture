@@ -1,7 +1,10 @@
 package chronos.dw.admin.adapter.in.rest.error;
 
+import chronos.dw.admin.domain.exception.AcademicClosureNotFoundException;
+import chronos.dw.admin.domain.exception.InvalidClosureTransitionException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
+import java.sql.SQLException;
 import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.dao.TransientDataAccessException;
@@ -47,6 +50,28 @@ public class ApiExceptionHandler {
                 "Acceso denegado",
                 "No tienes permiso para realizar esta operación.",
                 "FORBIDDEN",
+                request);
+    }
+
+    @ExceptionHandler(AcademicClosureNotFoundException.class)
+    public ResponseEntity<ApiProblemResponse> closureNotFound(
+            AcademicClosureNotFoundException exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.NOT_FOUND,
+                "No encontrado",
+                "No se encontró el cierre académico solicitado.",
+                "NOT_FOUND",
+                request);
+    }
+
+    @ExceptionHandler(InvalidClosureTransitionException.class)
+    public ResponseEntity<ApiProblemResponse> invalidClosureTransition(
+            InvalidClosureTransitionException exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.CONFLICT,
+                "Conflicto",
+                "La transición no es válida para el estado actual del cierre.",
+                "CONFLICT",
                 request);
     }
 
@@ -105,6 +130,39 @@ public class ApiExceptionHandler {
     @ExceptionHandler(DataAccessException.class)
     public ResponseEntity<ApiProblemResponse> databaseFailure(
             DataAccessException exception, HttpServletRequest request) {
+        String sqlState = sqlState(exception);
+        if ("P0002".equals(sqlState) || "23503".equals(sqlState)) {
+            return response(
+                    HttpStatus.NOT_FOUND,
+                    "No encontrado",
+                    "No se encontró el cierre académico solicitado.",
+                    "NOT_FOUND",
+                    request);
+        }
+        if ("23505".equals(sqlState)) {
+            return response(
+                    HttpStatus.CONFLICT,
+                    "Conflicto",
+                    "Ya existe un cierre para esa gestión y periodo.",
+                    "CONFLICT",
+                    request);
+        }
+        if ("23514".equals(sqlState)) {
+            return response(
+                    HttpStatus.CONFLICT,
+                    "Conflicto",
+                    "La operación no es compatible con el estado actual del cierre.",
+                    "CONFLICT",
+                    request);
+        }
+        if ("22023".equals(sqlState) || "22001".equals(sqlState)) {
+            return response(
+                    HttpStatus.BAD_REQUEST,
+                    "Solicitud inválida",
+                    "Revisa los parámetros y el contenido de la solicitud.",
+                    "BAD_REQUEST",
+                    request);
+        }
         return internalError(request);
     }
 
@@ -120,6 +178,17 @@ public class ApiExceptionHandler {
                 "Ocurrió un error al procesar la solicitud.",
                 "INTERNAL_ERROR",
                 request);
+    }
+
+    private static String sqlState(Throwable exception) {
+        Throwable current = exception;
+        while (current != null) {
+            if (current instanceof SQLException sqlException) {
+                return sqlException.getSQLState();
+            }
+            current = current.getCause();
+        }
+        return null;
     }
 
     private static ResponseEntity<ApiProblemResponse> response(
