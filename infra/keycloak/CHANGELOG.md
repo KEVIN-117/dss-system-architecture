@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/keycloak-v1.2.0...keycloak-v1.3.0) (2026-10-25)
+
+
+### Features
+
+* **bff:** integrate DW control service ([#197](https://github.com/KEVIN-117/dss-system-architecture/issues/197)) ([d0aa0cc](https://github.com/KEVIN-117/dss-system-architecture/commit/d0aa0cc41cacb14d3c1417cf7579b10a674200a2))
+
 ## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/keycloak-v1.1.0...keycloak-v1.2.0) (2026-10-22)
 
 
