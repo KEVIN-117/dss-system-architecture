@@ -73,3 +73,17 @@ Consulta las variables y valores por ambiente en [`docs/envs/dw-control-service.
 ```
 
 La documentación de arquitectura y permisos está en [`docs/dw/dw-control-service-architecture.md`](../docs/dw/dw-control-service-architecture.md), y el contrato OpenAPI en [`docs/dw/contracts/dw-control-service-v1.yaml`](../docs/dw/contracts/dw-control-service-v1.yaml).
+
+## CI y publicación de imagen
+
+El workflow [DW Control Service CI](../.github/workflows/dw-control-service-ci.yml)
+ejecuta lint, tests, genera el JAR y verifica que la imagen Docker se construya.
+El workflow [Container CI and Releases](../.github/workflows/container-release.yml)
+incorpora el servicio al proceso de Release Please y publica
+`<DOCKERHUB_USERNAME>/dss-dw-control-service` cuando se crea su release.
+
+La publicación genera las etiquetas de versión exacta, mayor, mayor-menor,
+`latest` y `sha-<commit>`. Para volver a publicar la versión vigente, ejecuta
+`Container CI and Releases` mediante `workflow_dispatch` y selecciona
+`publish_dw_control_service`. Requiere los secretos `DOCKERHUB_USERNAME`,
+`DOCKERHUB_TOKEN` y `RELEASE_PLEASE_TOKEN` configurados en GitHub Actions.

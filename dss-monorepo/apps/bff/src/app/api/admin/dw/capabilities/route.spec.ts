@@ -13,12 +13,12 @@ beforeEach(() => {
 });
 
 describe('GET /api/admin/dw/capabilities', () => {
-  it('returns only boolean closure capabilities for the authenticated user', async () => {
+  it('returns only boolean DW capabilities for the authenticated user', async () => {
     authenticateRequest.mockResolvedValue({
       authenticated: true,
       value: {
         clientRoles: {
-          'dw-control-service': ['DW_CLOSURE_READ'],
+          'dw-control-service': ['DW_CLOSURE_READ', 'DW_ETL_MONITOR_READ'],
           other: ['PRIVATE_ROLE'],
         },
       },
@@ -32,6 +32,7 @@ describe('GET /api/admin/dw/capabilities', () => {
     expect(await response.json()).toEqual({
       canReadClosures: true,
       canManageClosures: false,
+      canReadEtlExecutions: true,
     });
     expect(response.headers.get('cache-control')).toBe('no-store');
   });

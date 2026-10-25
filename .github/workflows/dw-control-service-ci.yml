@@ -6,6 +6,9 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/dw-control-service-ci.yml"
+      - ".github/workflows/container-release.yml"
+      - ".github/release-please-config.json"
+      - ".release-please-manifest.json"
       - "dw-control-service/**"
       - "infra/keycloak/realm/**"
       - "docs/envs/dw-control-service.md"

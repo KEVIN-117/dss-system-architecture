@@ -18,6 +18,7 @@ export async function GET(request: Request): Promise<Response> {
       {
         canReadClosures: roles.includes('DW_CLOSURE_READ'),
         canManageClosures: roles.includes('DW_CLOSURE_MANAGE'),
+        canReadEtlExecutions: roles.includes('DW_ETL_MONITOR_READ'),
       },
       { headers: { 'Cache-Control': 'no-store' } },
     ),
