@@ -18,6 +18,8 @@ on:
       - "infra/dw-integration/**"
       - "infra/dw-test-data/**"
       - "docs/dw/**"
+      - "docs/envs/dw-control-service.md"
+      - "dw-control-service/**"
   workflow_dispatch:
     inputs:
       publish_keycloak:
@@ -37,6 +39,11 @@ on:
         default: false
       publish_dw_migrator:
         description: Republish the current DW migrator release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_dw_control_service:
+        description: Republish the current DW Control Service release from the manifest
         required: false
         type: boolean
         default: false
@@ -67,6 +74,10 @@ jobs:
     name: Verify Apache Hop and DW migrations
     uses: ./.github/workflows/dw-hop-ci.yml
 
+  verify-dw-control-service:
+    name: Verify DW Control Service
+    uses: ./.github/workflows/dw-control-service-ci.yml
+
   release-please:
     name: Create component release PRs or GitHub releases
     needs:
@@ -74,6 +85,7 @@ jobs:
       - verify-keycloak
       - verify-olap-service
       - verify-apache-hop
+      - verify-dw-control-service
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -100,6 +112,10 @@ jobs:
       dw_migrator_version: ${{ steps.release.outputs['infra/dw-schema--version'] || steps.manifest.outputs.dw_migrator_version }}
       dw_migrator_major: ${{ steps.release.outputs['infra/dw-schema--major'] || steps.manifest.outputs.dw_migrator_major }}
       dw_migrator_minor: ${{ steps.release.outputs['infra/dw-schema--minor'] || steps.manifest.outputs.dw_migrator_minor }}
+      dw_control_service_release_created: ${{ steps.release.outputs['dw-control-service--release_created'] }}
+      dw_control_service_version: ${{ steps.release.outputs['dw-control-service--version'] || steps.manifest.outputs.dw_control_service_version }}
+      dw_control_service_major: ${{ steps.release.outputs['dw-control-service--major'] || steps.manifest.outputs.dw_control_service_major }}
+      dw_control_service_minor: ${{ steps.release.outputs['dw-control-service--minor'] || steps.manifest.outputs.dw_control_service_minor }}
     steps:
       - uses: actions/checkout@v4
       - name: Read current component versions
@@ -117,6 +133,7 @@ jobs:
           olap olap-service
           hop etl-layer/apache-hop
           dw_migrator infra/dw-schema
+          dw_control_service dw-control-service
           VERSIONS
       - name: Require release automation token
         env:
@@ -324,5 +341,47 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=dw-migrator
           cache-to: type=gha,mode=max,scope=dw-migrator
+          sbom: true
+          provenance: mode=max
+
+  publish-dw-control-service:
+    name: Publish DW Control Service
+    if: >-
+      needs.release-please.outputs.dw_control_service_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_dw_control_service && needs.release-please.outputs.dw_control_service_version != '0.0.0')
+    needs: [verify-dw-control-service, release-please]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - name: Require Docker Hub credentials
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: test -n "$DOCKERHUB_USERNAME" && test -n "$DOCKERHUB_TOKEN"
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/dss-dw-control-service
+          tags: |
+            type=raw,value=${{ needs.release-please.outputs.dw_control_service_version }}
+            type=raw,value=${{ needs.release-please.outputs.dw_control_service_major }}
+            type=raw,value=${{ needs.release-please.outputs.dw_control_service_major }}.${{ needs.release-please.outputs.dw_control_service_minor }}
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+      - uses: docker/build-push-action@v6
+        with:
+          context: dw-control-service
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=dw-control-service
+          cache-to: type=gha,mode=max,scope=dw-control-service
           sbom: true
           provenance: mode=max

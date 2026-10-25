@@ -28,6 +28,11 @@
       "release-type": "simple",
       "component": "dw-migrator",
       "package-name": "dss-dw-migrator"
+    },
+    "dw-control-service": {
+      "release-type": "simple",
+      "component": "dw-control-service",
+      "package-name": "dss-dw-control-service"
     }
   }
 }

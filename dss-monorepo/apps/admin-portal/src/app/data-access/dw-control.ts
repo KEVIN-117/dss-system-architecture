@@ -46,11 +46,74 @@ export interface ClosureFilters {
 export interface DwClosureCapabilities {
   canReadClosures: boolean;
   canManageClosures: boolean;
+  canReadEtlExecutions: boolean;
+}
+
+export type ExecutionStatus =
+  | 'SOLICITADA'
+  | 'EN_EJECUCION'
+  | 'PUBLICANDO'
+  | 'EXITOSA'
+  | 'FALLIDA'
+  | 'CANCELADA';
+export type ExecutionKind = 'HISTORICA' | 'CIERRE_ACADEMICO' | 'REPROCESO';
+export interface EtlExecutionSummary {
+  runId: string;
+  executionKind: ExecutionKind;
+  status: ExecutionStatus;
+  closureId: number | null;
+  requestedGestion: number | null;
+  requestedPeriodo: number | null;
+  requestedBy: string;
+  requestedAt: string;
+  startedAt: string | null;
+  endedAt: string | null;
+}
+export interface EtlExecutionStep {
+  stepCode: string;
+  phase:
+    | 'EXTRACCION'
+    | 'STAGING'
+    | 'TRANSFORMACION'
+    | 'VALIDACION'
+    | 'PUBLICACION';
+  status: 'PENDIENTE' | 'EN_EJECUCION' | 'EXITOSO' | 'FALLIDO' | 'OMITIDO';
+  stepOrder: number;
+  startedAt: string | null;
+  endedAt: string | null;
+}
+export interface EtlExecutionMetric {
+  name: string;
+  value: number;
+  unit: string;
+  measuredAt: string;
+}
+export interface SanitizedExecutionError {
+  severity: 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL';
+  code: string;
+  message: string;
+  stepCode: string | null;
+  occurredAt: string;
+}
+export interface EtlExecutionDetail extends EtlExecutionSummary {
+  steps: EtlExecutionStep[];
+  metrics: EtlExecutionMetric[];
+  errors: SanitizedExecutionError[];
+}
+export interface ExecutionFilters {
+  status?: ExecutionStatus;
+  executionKind?: ExecutionKind;
+  gestion?: number;
+  periodo?: number;
+  closureId?: number;
+  page: number;
+  size: number;
 }
 
 const BFF_BASE_URL =
   process.env.NEXT_PUBLIC_BFF_URL?.trim().replace(/\/$/, '') ?? '';
 const CLOSURES_URL = `${BFF_BASE_URL}/api/admin/dw/academic-closures`;
+const EXECUTIONS_URL = `${BFF_BASE_URL}/api/admin/dw/etl/executions`;
 
 async function requestError(
   response: Response,
@@ -109,6 +172,32 @@ export function getDwClosureCapabilities(
   signal?: AbortSignal,
 ): Promise<DwClosureCapabilities> {
   return getJson(`${BFF_BASE_URL}/api/admin/dw/capabilities`, signal);
+}
+
+export function listEtlExecutions(
+  filters: ExecutionFilters,
+  signal?: AbortSignal,
+): Promise<Page<EtlExecutionSummary>> {
+  const params = new URLSearchParams({
+    page: String(filters.page),
+    size: String(filters.size),
+  });
+  if (filters.status) params.set('status', filters.status);
+  if (filters.executionKind) params.set('executionKind', filters.executionKind);
+  if (filters.gestion !== undefined)
+    params.set('gestion', String(filters.gestion));
+  if (filters.periodo !== undefined)
+    params.set('periodo', String(filters.periodo));
+  if (filters.closureId !== undefined)
+    params.set('closureId', String(filters.closureId));
+  return getJson(`${EXECUTIONS_URL}?${params}`, signal);
+}
+
+export function getEtlExecution(
+  runId: string,
+  signal?: AbortSignal,
+): Promise<EtlExecutionDetail> {
+  return getJson(`${EXECUTIONS_URL}/${encodeURIComponent(runId)}`, signal);
 }
 
 export function listAcademicClosures(

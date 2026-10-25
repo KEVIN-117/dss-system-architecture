@@ -1,7 +1,13 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { CalendarClock, Database, LayoutDashboard, Users } from 'lucide-react';
+import {
+  Activity,
+  CalendarClock,
+  Database,
+  LayoutDashboard,
+  Users,
+} from 'lucide-react';
 import { ProtectedRoute, useAuth } from '@dss-monorepo/auth';
 import { AccessDenied, DashboardTemplate } from '@dss-monorepo/design-system';
 import { RoleGuard } from '@dss-monorepo/rbac';
@@ -42,6 +48,11 @@ export function AdminPortalLayout({
           title: 'Cierres académicos',
           href: '/academic-closures',
           icon: <CalendarClock className="size-4" />,
+        },
+        {
+          title: 'Ejecuciones ETL',
+          href: '/etl-executions',
+          icon: <Activity className="size-4" />,
         },
       ]}
       user={

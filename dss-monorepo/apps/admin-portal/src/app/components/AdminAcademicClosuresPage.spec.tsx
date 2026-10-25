@@ -86,6 +86,7 @@ beforeEach(() => {
   getDwClosureCapabilities.mockResolvedValue({
     canReadClosures: true,
     canManageClosures: true,
+    canReadEtlExecutions: false,
   });
   listAcademicClosures.mockResolvedValue(closurePage());
   getAcademicClosure.mockResolvedValue(pending);
@@ -254,6 +255,7 @@ describe('AdminAcademicClosuresPage', () => {
     getDwClosureCapabilities.mockResolvedValue({
       canReadClosures: true,
       canManageClosures: false,
+      canReadEtlExecutions: false,
     });
     const processed = { ...pending, status: 'PROCESADO' as const };
     listAcademicClosures.mockResolvedValue(closurePage([processed]));
@@ -273,6 +275,7 @@ describe('AdminAcademicClosuresPage', () => {
     getDwClosureCapabilities.mockResolvedValue({
       canReadClosures: false,
       canManageClosures: false,
+      canReadEtlExecutions: false,
     });
     render(<AdminAcademicClosuresPage />);
 
