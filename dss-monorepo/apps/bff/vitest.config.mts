@@ -21,6 +21,10 @@ export default defineConfig(() => ({
         import.meta.dirname,
         '../../libs/connectors/olap-connector/src/lib/server.ts',
       ),
+      '@dss-monorepo/dw-control-connector/server': join(
+        import.meta.dirname,
+        '../../libs/connectors/dw-control-connector/src/server.ts',
+      ),
       '@dss-monorepo/rbac-server': join(
         import.meta.dirname,
         '../../libs/shared/rbac-server/src/index.ts',

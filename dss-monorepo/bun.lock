@@ -101,6 +101,7 @@
         "@as-integrations/next": "^4.1.0",
         "@dss-monorepo/auth-connector": "workspace:*",
         "@dss-monorepo/auth-models": "workspace:*",
+        "@dss-monorepo/dw-control-connector": "workspace:*",
         "@dss-monorepo/ml-connector": "workspace:*",
         "@dss-monorepo/olap-connector": "workspace:*",
         "@dss-monorepo/rbac-server": "workspace:*",
@@ -243,6 +244,13 @@
       "dependencies": {
         "@dss-monorepo/auth-models": "workspace:*",
         "jose": "^6.2.12",
+      },
+    },
+    "libs/connectors/dw-control-connector": {
+      "name": "@dss-monorepo/dw-control-connector",
+      "version": "0.0.1",
+      "devDependencies": {
+        "vitest": "~4.1.0",
       },
     },
     "libs/connectors/olap-connector": {
@@ -682,6 +690,8 @@
     "@dss-monorepo/decano-dashboard-e2e": ["@dss-monorepo/decano-dashboard-e2e@workspace:apps/decano-dashboard-e2e"],
 
     "@dss-monorepo/design-system": ["@dss-monorepo/design-system@workspace:libs/ui/design-system"],
+
+    "@dss-monorepo/dw-control-connector": ["@dss-monorepo/dw-control-connector@workspace:libs/connectors/dw-control-connector"],
 
     "@dss-monorepo/director-dashboard": ["@dss-monorepo/director-dashboard@workspace:apps/director-dashboard"],
 

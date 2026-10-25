@@ -62,13 +62,16 @@
   ],
   "references": [
     {
-      "path": "../../libs/connectors/olap-connector"
-    },
-    {
       "path": "../../libs/shared/rbac-server"
     },
     {
+      "path": "../../libs/connectors/olap-connector"
+    },
+    {
       "path": "../../libs/connectors/ml-connector"
+    },
+    {
+      "path": "../../libs/connectors/dw-control-connector"
     },
     {
       "path": "../../libs/shared/auth-models"

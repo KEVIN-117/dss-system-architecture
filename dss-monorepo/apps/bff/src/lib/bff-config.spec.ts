@@ -4,6 +4,7 @@ import {
   BffConfigurationError,
   getAllowedOrigins,
   getBffAuthConfig,
+  getDwControlServiceConfig,
   getPredictionServiceUrl,
 } from './bff-config';
 
@@ -24,6 +25,31 @@ const environment = {
 };
 
 describe('BFF server configuration', () => {
+  it('validates the private DW Control Service URL and timeout', () => {
+    expect(
+      getDwControlServiceConfig({
+        DW_CONTROL_SERVICE_URL: 'http://dw-control-service:8090/',
+      }),
+    ).toEqual({ baseUrl: 'http://dw-control-service:8090', timeoutMs: 15_000 });
+    expect(
+      getDwControlServiceConfig({
+        DW_CONTROL_SERVICE_URL: 'https://dw.example.edu/api',
+        DW_CONTROL_SERVICE_TIMEOUT_MS: '30000',
+      }),
+    ).toEqual({ baseUrl: 'https://dw.example.edu/api', timeoutMs: 30_000 });
+    expect(() =>
+      getDwControlServiceConfig({
+        DW_CONTROL_SERVICE_URL: 'http://user:password@dw-control-service:8090',
+      }),
+    ).toThrow(BffConfigurationError);
+    expect(() =>
+      getDwControlServiceConfig({
+        DW_CONTROL_SERVICE_URL: 'http://dw-control-service:8090',
+        DW_CONTROL_SERVICE_TIMEOUT_MS: '100',
+      }),
+    ).toThrow(BffConfigurationError);
+  });
+
   it('validates the private Prediction Service URL', () => {
     expect(
       getPredictionServiceUrl({
