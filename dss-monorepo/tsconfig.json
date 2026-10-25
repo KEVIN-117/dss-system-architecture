@@ -83,6 +83,9 @@
     },
     {
       "path": "./libs/connectors/ml-connector"
+    },
+    {
+      "path": "./libs/connectors/dw-control-connector"
     }
   ]
 }

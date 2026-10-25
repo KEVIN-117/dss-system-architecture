@@ -9,6 +9,8 @@ El BFF es el único punto de integración de los portales con Keycloak y `auth-s
 - `GET /api/auth/me`: devuelve perfil, roles y permisos efectivos desde una sesión BFF válida.
 - `GET /api/auth/logout`: elimina la sesión BFF y redirige al logout OIDC si tiene un ID token disponible.
 - `PUT /api/admin/users/:userId/academic-contexts`: reemplaza los contextos académicos del usuario. Requiere `SUPERADMIN` en el BFF y conserva la validación `ROLE_SUPERADMIN` de `auth-service` como segunda barrera.
+- `/api/admin/dw/academic-closures*`: fachada autenticada de cierres académicos, historial y transiciones. Requiere el rol correspondiente (`DW_CLOSURE_READ` o `DW_CLOSURE_MANAGE`) del cliente `dw-control-service`; el BFF reenvía el JWT verificado y el servicio conserva el `sub` para auditoría.
+- `/api/admin/dw/etl/executions*`: consulta paginada y detalle de ejecuciones ETL. Requiere `DW_ETL_MONITOR_READ` del cliente `dw-control-service`. El BFF valida y normaliza respuestas y no propaga cuerpos de error del servicio.
 - `GET|POST /api/graphql`: endpoint Apollo Server protegido por la misma sesión BFF o Bearer token. Expone identidad y alcance académicos del usuario, catálogo y metadatos OLAP vigentes, y `analyticQuery` para ejecutar consultas tipadas en el servidor. Los resolvers llaman a OLAP mediante el transporte server-only del conector; los tokens nunca forman parte de la respuesta.
 - `/api/olap/rest/saiku/*`: proxy autenticado a `olap-service`, incluido su endpoint GraphQL real en `/api/olap/rest/saiku/api/graphql`. El BFF valida la sesión y reenvía el access token; las rutas `/rest/saiku/admin/*` requieren además el rol `SUPERADMIN`. Keycloak debe incluir la audiencia `olap-service` en los tokens solicitados por `dss-bff`.
 - `/api/prediction/v1/predictions` y `/api/prediction/v1/training-jobs*`: fachada autenticada para inferencias y trabajos de entrenamiento. Solo permite las operaciones declaradas en Prediction API v1 y reenvía el token validado a `prediction-service`; el servicio debe aplicar permisos ML y ámbitos académicos. La URL del servicio solo se lee en el BFF.
@@ -33,6 +35,8 @@ KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI=http://localhost:3000/login
 AUTH_SERVICE_URL=http://localhost:8000
 PREDICTION_SERVICE_URL=http://prediction-service:8000
 OLAP_SERVICE_URL=http://olap-service:8080
+DW_CONTROL_SERVICE_URL=http://dw-control-service:8090
+DW_CONTROL_SERVICE_TIMEOUT_MS=15000
 BFF_ALLOWED_ORIGINS=http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
 BFF_DEFAULT_POST_LOGIN_REDIRECT_URI=http://localhost:3000/auth/callback
 BFF_SESSION_SECRET=<al-menos-32-caracteres-no-versionados>
@@ -62,6 +66,8 @@ El esquema Mondrian usa la tabla de hechos `dw.fact_cursado` y las dimensiones `
 El BFF deriva el alcance desde los roles y `academicContexts` validados, agrega el filtro de seguridad al servidor y rechaza argumentos que pretendan seleccionar la jerarquía protegida. Rector usa alcance institucional. No se declaran nombres de indicadores ni medidas ficticios: el catálogo y el schema se obtienen del OLAP activo y la consulta solo admite las medidas/campos que el propio servicio valida. Predicciones y ML siguen fuera de esta integración.
 
 La URL `http://prediction-service:8000` aplica cuando BFF y Prediction Service comparten la red `dss-net`; configura una dirección alcanzable desde el runtime del BFF en desarrollo local. El conector ML y estas rutas siguen el borrador [prediction-api-v1.yaml](../../../docs/prediction/contracts/prediction-api-v1.yaml). El servicio actual aún no implementa ese contrato: hasta que lo haga y se aprueben sus decisiones de audiencia/roles y dominio, las rutas no representan una integración ML lista para producción.
+
+`DW_CONTROL_SERVICE_URL` es privada y debe apuntar a una dirección alcanzable desde el proceso BFF (`http://localhost:8090` al ejecutar localmente, o `http://dw-control-service:8090` en una red de contenedores compartida). El timeout opcional acepta 1000–60000 ms. El BFF necesita que Keycloak incluya la audiencia `dw-control-service` y roles del cliente `dw-control-service` en el access token. Asigna esos roles explícitamente a las cuentas/grupos autorizados; el BFF falla cerrado cuando falta el rol requerido y dw-control-service lo vuelve a validar.
 
 ### Ejecución local
 

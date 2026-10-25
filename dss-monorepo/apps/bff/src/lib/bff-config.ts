@@ -20,6 +20,11 @@ export interface BffSessionConfig {
   secure: boolean;
 }
 
+export interface DwControlServiceRuntimeConfig {
+  baseUrl: string;
+  timeoutMs: number;
+}
+
 export const DEFAULT_SESSION_COOKIE_NAME = 'dss_session';
 const DEFAULT_SESSION_TTL_SECONDS = 300;
 
@@ -47,6 +52,27 @@ export function getPredictionServiceUrl(
     );
   }
   return url.toString().replace(/\/$/, '');
+}
+
+/** Private server-side endpoint for the authenticated DW control API. */
+export function getDwControlServiceConfig(
+  environment: Environment = process.env,
+): DwControlServiceRuntimeConfig {
+  const baseUrl = requiredHttpUrl(environment, 'DW_CONTROL_SERVICE_URL');
+  const url = new URL(baseUrl);
+  if (url.username || url.password || url.search || url.hash) {
+    throw new BffConfigurationError(
+      'DW_CONTROL_SERVICE_URL must not contain credentials, query parameters, or a fragment',
+    );
+  }
+  const configuredTimeout = environment.DW_CONTROL_SERVICE_TIMEOUT_MS?.trim();
+  const timeoutMs = configuredTimeout ? Number(configuredTimeout) : 15_000;
+  if (!Number.isInteger(timeoutMs) || timeoutMs < 1000 || timeoutMs > 60_000) {
+    throw new BffConfigurationError(
+      'DW_CONTROL_SERVICE_TIMEOUT_MS must be an integer between 1000 and 60000 milliseconds',
+    );
+  }
+  return { baseUrl: url.toString().replace(/\/$/, ''), timeoutMs };
 }
 
 /**

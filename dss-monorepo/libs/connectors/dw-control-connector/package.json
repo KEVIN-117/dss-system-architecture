@@ -1,0 +1,27 @@
+{
+  "name": "@dss-monorepo/dw-control-connector",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "main": "./dist/server.js",
+  "module": "./dist/server.js",
+  "types": "./dist/server.d.ts",
+  "exports": {
+    "./package.json": "./package.json",
+    "./server": {
+      "@dss-monorepo/source": "./src/server.ts",
+      "types": "./dist/server.d.ts",
+      "import": "./dist/server.js",
+      "default": "./dist/server.js"
+    }
+  },
+  "nx": {
+    "tags": [
+      "type:connector",
+      "scope:infrastructure"
+    ]
+  },
+  "devDependencies": {
+    "vitest": "~4.1.0"
+  }
+}

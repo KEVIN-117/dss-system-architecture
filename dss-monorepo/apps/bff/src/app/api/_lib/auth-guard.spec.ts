@@ -8,6 +8,7 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   authenticateRequest,
   extractBearerToken,
+  requireClientRoles,
   requirePermissions,
   requireRoles,
 } from './auth-guard';
@@ -80,6 +81,7 @@ describe('BFF authentication guard', () => {
       value: {
         token: 'access-token',
         roles: ['DIRECTOR'],
+        clientRoles: {},
         user: { ...profile, roles: ['DIRECTOR'] },
       },
     });
@@ -199,6 +201,7 @@ describe('BFF authentication guard', () => {
     const authentication = {
       token: 'access-token',
       roles: ['SUPERADMIN'] as const,
+      clientRoles: {},
       user: { ...profile, roles: ['SUPERADMIN'] as const },
     };
 
@@ -207,6 +210,30 @@ describe('BFF authentication guard', () => {
     ).toBeNull();
     expect(
       requirePermissions(authentication, ['analytics:global'])?.status,
+    ).toBe(403);
+  });
+
+  it('requires the requested permission from the verified service client roles', () => {
+    const authentication = {
+      token: 'access-token',
+      roles: ['SUPERADMIN'] as const,
+      clientRoles: { 'dw-control-service': ['DW_CLOSURE_READ'] },
+      user: { ...profile, roles: ['SUPERADMIN'] as const },
+    };
+
+    expect(
+      requireClientRoles(authentication, 'dw-control-service', [
+        'DW_CLOSURE_READ',
+      ]),
+    ).toBeNull();
+    expect(
+      requireClientRoles(authentication, 'dw-control-service', [
+        'DW_CLOSURE_MANAGE',
+      ])?.status,
+    ).toBe(403);
+    expect(
+      requireClientRoles(authentication, 'other-client', ['DW_CLOSURE_READ'])
+        ?.status,
     ).toBe(403);
   });
 });
