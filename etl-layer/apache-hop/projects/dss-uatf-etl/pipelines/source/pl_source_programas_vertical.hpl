@@ -416,7 +416,3 @@ SELECT step_id FROM step</sql>
   <attributes/>
   <transform_error_handling/>
 </pipeline>
-<<<<<<< HEAD
-=======
-
->>>>>>> fa8a720 (feat(prediction): add PRED-002 dataset validation)

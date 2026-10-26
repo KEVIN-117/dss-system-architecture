@@ -493,8 +493,3 @@ def _matches_logical_type(value: Any, logical_type: Any) -> bool:
         except ValueError:
             return False
     return False
-
-<<<<<<< HEAD
-=======
-
->>>>>>> fa8a720 (feat(prediction): add PRED-002 dataset validation)

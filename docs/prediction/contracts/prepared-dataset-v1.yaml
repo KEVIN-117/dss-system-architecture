@@ -201,8 +201,3 @@ validation_gates:
     - no_target_or_future_field_in_feature_roles
     - both_target_classes_observed
   failure_state: BLOCKED_OR_INSUFFICIENT_EVIDENCE
-
-<<<<<<< HEAD
-=======
-
->>>>>>> fa8a720 (feat(prediction): add PRED-002 dataset validation)

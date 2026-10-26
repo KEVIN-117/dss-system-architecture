@@ -60,8 +60,3 @@ El esquema versionado está en [`contracts/prepared-dataset-v1.yaml`](contracts/
 | Adaptador y validación estructural | Implementados; pendientes de ejecutar con extracción autorizada |
 | Pruebas de elegibilidad y fuga temporal | Cubiertas con fixtures sintéticos; no sustituyen validación institucional |
 | Viabilidad | No determinada hasta contar con reglas y datos autorizados |
-
-<<<<<<< HEAD
-=======
-
->>>>>>> fa8a720 (feat(prediction): add PRED-002 dataset validation)
