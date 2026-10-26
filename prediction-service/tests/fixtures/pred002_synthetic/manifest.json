@@ -1,0 +1,136 @@
+{
+  "fixture_only": true,
+  "warning": "Datos totalmente sintéticos. No representan población, resultados ni decisiones oficiales de la UATF/DSA.",
+  "contract_version": "1.0",
+  "dataset_id": "aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee",
+  "snapshot_ref": "fixture:pred002-synthetic-v1",
+  "source": {
+    "system": "dw",
+    "contract_ref": "synthetic-fixture:dw-retention-v1",
+    "run_id": "11111111-2222-4333-8444-555555555555"
+  },
+  "grain": "student_program_academic_cut",
+  "academic_cut": {
+    "closure_id": "synthetic-closure-2024-1",
+    "gestion": 2024,
+    "periodo": 1,
+    "status": "PROCESADO",
+    "effective_at": "2024-07-15T23:59:59Z"
+  },
+  "schema_version": "prepared-dataset-v1",
+  "created_at": "2026-10-16T12:00:00Z",
+  "row_count": 8,
+  "exclusions": {},
+  "content_digest": "f23b1276376a10bd11e2af1c12b2cd659363b7da0fa611ef630c3d3ad2d21163",
+  "population_definition_ref": null,
+  "target_definition_ref": null,
+  "eligibility_approved": false,
+  "target_approved": false,
+  "target_definition": null,
+  "target_field": null,
+  "feature_fields": [],
+  "fields": [
+    {
+      "name": "student_ref",
+      "logical_type": "string",
+      "role": "identifier",
+      "nullable": false
+    },
+    {
+      "name": "program_ref",
+      "logical_type": "string",
+      "role": "identifier",
+      "nullable": false
+    },
+    {
+      "name": "cut_id",
+      "logical_type": "string",
+      "role": "identifier",
+      "nullable": false
+    },
+    {
+      "name": "academic_year",
+      "logical_type": "integer",
+      "role": "audit",
+      "nullable": false
+    },
+    {
+      "name": "academic_period",
+      "logical_type": "integer",
+      "role": "audit",
+      "nullable": false
+    },
+    {
+      "name": "source_run_id",
+      "logical_type": "uuid",
+      "role": "audit",
+      "nullable": false
+    },
+    {
+      "name": "population_status",
+      "logical_type": "category",
+      "role": "audit",
+      "nullable": false
+    },
+    {
+      "name": "resultado_retencion",
+      "logical_type": "category",
+      "role": "audit",
+      "nullable": false
+    },
+    {
+      "name": "es_desercion",
+      "logical_type": "boolean",
+      "role": "audit",
+      "nullable": true
+    },
+    {
+      "name": "conteo_snapshot",
+      "logical_type": "integer",
+      "role": "audit",
+      "nullable": false
+    },
+    {
+      "name": "conteo_evaluable",
+      "logical_type": "integer",
+      "role": "audit",
+      "nullable": false
+    },
+    {
+      "name": "conteo_desercion",
+      "logical_type": "integer",
+      "role": "audit",
+      "nullable": false
+    },
+    {
+      "name": "materias_cursadas",
+      "logical_type": "integer",
+      "role": "audit",
+      "nullable": true
+    },
+    {
+      "name": "materias_aprobadas",
+      "logical_type": "integer",
+      "role": "audit",
+      "nullable": true
+    },
+    {
+      "name": "materias_reprobadas",
+      "logical_type": "integer",
+      "role": "audit",
+      "nullable": true
+    },
+    {
+      "name": "materias_arrastradas",
+      "logical_type": "integer",
+      "role": "audit",
+      "nullable": true
+    },
+    {
+      "name": "ppa_acumulado",
+      "logical_type": "number",
+      "role": "audit",
+      "nullable": true
+    }
+  ]
+}

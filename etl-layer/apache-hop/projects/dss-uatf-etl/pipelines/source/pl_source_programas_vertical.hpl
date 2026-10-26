@@ -97,5 +97,3 @@ ORDER BY id_programa ASC</sql><limit>0</limit><lookup>Keep audit fields</lookup>
 SELECT step_id FROM step</sql><limit>0</limit><lookup>Audit parameters</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>2176</xloc><yloc>176</yloc></GUI></transform>
   <transform_error_handling/><attributes/>
 </pipeline>
-
-

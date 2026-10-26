@@ -1,6 +1,6 @@
 # Motor Predictivo — arquitectura y CRISP-DM
 
-Documentación de la issue [PRED-001 — Definir la arquitectura y los contratos del servicio predictivo](https://github.com/KEVIN-117/dss-system-architecture/issues/144). Los ADR y contratos están propuestos para revisión; los acuerdos institucionales pendientes se etiquetan en vez de asumirlos.
+Documentación de las issues PRED-001 y PRED-002 del motor predictivo. Los contratos y análisis se versionan; los acuerdos institucionales pendientes se etiquetan en vez de asumirlos.
 
 ## Entregables
 
@@ -10,7 +10,11 @@ Documentación de la issue [PRED-001 — Definir la arquitectura y los contratos
 - [OpenAPI v1 del API predictivo](contracts/prediction-api-v1.yaml)
 - [Notas semánticas, seguridad y compatibilidad del contrato](contracts/contract-notes.md)
 - [Diagramas C4, flujos e inventario de evidencia](architecture.md)
+- [Plan de trabajo PRED-002](PRED-002-plan.md)
+- [Comprensión de datos académicos](data-understanding.md)
+- [Contrato del dataset preparado v1](contracts/prepared-dataset-v1.yaml)
+- [Fixture sintético PRED-002](../../prediction-service/tests/fixtures/pred002_synthetic/README.md)
 
 ## Estado
 
-Los documentos establecen una propuesta implementable y delimitan decisiones que requieren DSA, IAM o TI. No equivalen a aprobación de reglas predictivas, grants productivos, despliegue ni cierre de PRED-001. No se ejecutaron pruebas de software en este trabajo documental.
+PRED-001 está fusionada. PRED-002 tiene evidencia estática del esquema DW, contrato, validador estructural y un fixture DW-shaped sintético que permanece bloqueado mientras falten aprobaciones. No se ha recibido ni perfilado una extracción institucional autorizada; evento, horizonte y elegibilidad continúan pendientes de DSA. No se ha declarado viable ni entrenado un modelo.
