@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/apache-hop-v1.1.0...apache-hop-v1.2.0) (2026-10-26)
+
+
+### Features
+
+* **prediction:** add PRED-002 dataset validation foundation ([#153](https://github.com/KEVIN-117/dss-system-architecture/issues/153)) ([cf6091d](https://github.com/KEVIN-117/dss-system-architecture/commit/cf6091d112a89ad46d6a822ade29b63bb3e2d862))
+
 ## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/apache-hop-v1.0.0...apache-hop-v1.1.0) (2026-10-22)
 
 
