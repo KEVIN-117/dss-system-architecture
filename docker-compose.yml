@@ -250,7 +250,9 @@ services:
       - dss-net
 
   prediction-service:
-    build: ./prediction-service
+    build:
+      context: ./prediction-service
+      dockerfile: Dockerfile
     restart: on-failure
     environment:
       PREDICTION_ENV: ${PREDICTION_ENV:-production}
@@ -258,6 +260,42 @@ services:
       PREDICTION_PORT: ${PREDICTION_PORT:-8000}
       PREDICTION_LOG_LEVEL: ${PREDICTION_LOG_LEVEL:-info}
       PREDICTION_RELOAD: ${PREDICTION_RELOAD:-false}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+      WORKER_ARTIFACTS_DIR: /app/artifacts
+      WORKER_JOB_STORE_PATH: /app/artifacts/job_store.json
+    volumes:
+      - prediction_artifacts:/app/artifacts
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - dss-net
+
+  prediction-worker:
+    build:
+      context: ./prediction-service
+      dockerfile: Dockerfile.worker
+    restart: on-failure
+    environment:
+      PREDICTION_ENV: ${PREDICTION_ENV:-production}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
+      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
+      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+      WORKER_MAX_CONCURRENT_JOBS: ${WORKER_MAX_CONCURRENT_JOBS:-1}
+      WORKER_JOB_TIMEOUT_SECONDS: ${WORKER_JOB_TIMEOUT_SECONDS:-1800}
+      WORKER_ARTIFACTS_DIR: /app/artifacts
+      WORKER_JOB_STORE_PATH: /app/artifacts/job_store.json
+    volumes:
+      - prediction_artifacts:/app/artifacts
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
     networks:
       - dss-net
 
@@ -301,3 +339,4 @@ networks:
 volumes:
   postgres_data:
   olap_home_empty:
+  prediction_artifacts:
