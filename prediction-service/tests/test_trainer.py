@@ -5,10 +5,17 @@ from __future__ import annotations
 import json
 import copy
 import unittest
+from dataclasses import replace
 from pathlib import Path
 
 from preparation.pipeline import prepare_dataset
-from training.trainer import get_dependency_versions, train_model
+from training.trainer import (
+    _select_validation_threshold,
+    _validated_decision_policy,
+    get_dependency_versions,
+    train_model,
+)
+from training.configuration import resolve_training_configuration
 
 
 class TrainerTests(unittest.TestCase):
@@ -92,6 +99,46 @@ class TrainerTests(unittest.TestCase):
         self.assertIn("imbalanced_learn", versions)
         self.assertIn("pandas", versions)
         self.assertIn("numpy", versions)
+
+    def test_threshold_selection_uses_approved_validation_costs(self) -> None:
+        policy = {
+            "approved": True,
+            "policy_ref": "dsa:synthetic-cost-policy-v1",
+            "false_negative_cost": 5,
+            "false_positive_cost": 1,
+        }
+        threshold, summary = _select_validation_threshold([0, 0, 1, 1], [0.1, 0.6, 0.4, 0.8], policy)
+        self.assertEqual(threshold, 0.4)
+        self.assertEqual(summary["validation_cost"], 1.0)
+        self.assertEqual(_validated_decision_policy({"decision_policy": policy})["policy_ref"], policy["policy_ref"])
+
+    def test_unapproved_threshold_policy_is_rejected(self) -> None:
+        with self.assertRaisesRegex(ValueError, "approved=true"):
+            _validated_decision_policy({"decision_policy": {"policy_ref": "dsa:pending"}})
+
+    def test_configuration_reference_loads_from_catalog_and_is_digested(self) -> None:
+        import os
+        from unittest.mock import patch
+
+        root = Path(__file__).parent / ".test-tmp" / "config-catalog"
+        root.mkdir(parents=True, exist_ok=True)
+        content = '{"decision_policy":{"approved":true,"policy_ref":"dsa:cost-v1","false_negative_cost":2,"false_positive_cost":1}}'
+        (root / "approved-v1.json").write_text(content, encoding="utf-8")
+        with patch.dict(os.environ, {"PREDICTION_CONFIG_ROOT": str(root)}):
+            config = resolve_training_configuration({"configuration_ref": "approved-v1"})
+        self.assertEqual(config["decision_policy"]["policy_ref"], "dsa:cost-v1")
+        self.assertEqual(len(config["configuration_digest"]), 64)
+
+    def test_configuration_reference_rejects_traversal(self) -> None:
+        with self.assertRaisesRegex(ValueError, "opaque identifier"):
+            resolve_training_configuration({"configuration_ref": "../outside"})
+
+    def test_institutional_evaluation_requires_policy_before_test(self) -> None:
+        metadata = dict(self.partition.partition_metadata)
+        metadata["evidence_kind"] = "institutional_unverified"
+        institutional_partition = replace(self.partition, partition_metadata=metadata)
+        with self.assertRaisesRegex(ValueError, "before the final test is opened"):
+            train_model(institutional_partition, "random_forest", config={"search_space": {"n_estimators": [5]}})
 
     def test_tuning_uses_grouped_cv_and_never_selects_on_outer_test(self) -> None:
         result = train_model(

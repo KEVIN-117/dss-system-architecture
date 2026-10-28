@@ -302,9 +302,11 @@ services:
       WORKER_MEMORY_LIMIT_MB: ${WORKER_MEMORY_LIMIT_MB:-2048}
       WORKER_ARTIFACTS_DIR: /app/artifacts
       PREDICTION_DATASET_ROOT: ${PREDICTION_DATASET_ROOT:-/app/snapshots}
+      PREDICTION_CONFIG_ROOT: /app/configurations
     volumes:
       - prediction_artifacts:/app/artifacts
       - ${PREDICTION_SNAPSHOT_DIR:-./infra/prediction-snapshots}:/app/snapshots:ro
+      - ${PREDICTION_CONFIG_DIR:-./infra/prediction-configurations}:/app/configurations:ro
     cpus: ${WORKER_CPU_LIMIT:-2}
     mem_limit: ${WORKER_MEMORY_LIMIT_MB:-2048}m
     depends_on:

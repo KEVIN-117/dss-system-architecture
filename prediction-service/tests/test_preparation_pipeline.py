@@ -51,11 +51,33 @@ class PreparationPipelineTests(unittest.TestCase):
             test_ratio=0.25,
         )
 
-        train_students = set(partition.partition_metadata["train_students"])
-        test_students = set(partition.partition_metadata["test_students"])
+        train_students = set(partition.train_groups)
+        test_students = set(partition.test_groups)
 
         overlap = train_students.intersection(test_students)
         self.assertEqual(len(overlap), 0, f"Students leaked between train and test: {overlap}")
+        meta = partition.partition_metadata
+        self.assertLess(tuple(meta["train_period_max"]), tuple(meta["test_period_min"]))
+        self.assertFalse(meta["student_group_overlap"])
+        self.assertEqual(len(partition.X_test), meta["test_rows"])
+        self.assertNotIn("train_students", meta)
+        self.assertNotIn("test_students", meta)
+
+    def test_prior_history_for_test_students_is_excluded(self) -> None:
+        rows = [dict(row) for row in self.rows]
+        repeated = dict(rows[-1])
+        repeated["academic_year"] = 2023
+        repeated["academic_period"] = 1
+        repeated["cut_id"] = "synthetic-history-cut"
+        rows.append(repeated)
+        partition = prepare_dataset(self.manifest, rows, seed=42, test_ratio=0.25)
+        self.assertGreaterEqual(partition.partition_metadata["excluded_prior_history_rows"], 1)
+        self.assertFalse(set(partition.train_groups) & set(partition.test_groups))
+
+    def test_single_period_fails_closed(self) -> None:
+        rows = [dict(row, academic_year=2024, academic_period=1) for row in self.rows]
+        with self.assertRaisesRegex(ValueError, "At least two distinct academic periods"):
+            prepare_dataset(self.manifest, rows)
 
     def test_unapproved_target_raises_error(self) -> None:
         bad_manifest = dict(self.manifest)
