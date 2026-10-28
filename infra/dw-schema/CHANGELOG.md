@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.1.0...dw-migrator-v1.2.0) (2026-10-28)
+
+
+### Features
+
+* **prediction:** implement isolated RF and XGBoost training workers ([#146](https://github.com/KEVIN-117/dss-system-architecture/issues/146)) ([#203](https://github.com/KEVIN-117/dss-system-architecture/issues/203)) ([9f8974a](https://github.com/KEVIN-117/dss-system-architecture/commit/9f8974a5df6d4ffb6720d60a85ac94e58ad8d38f))
+
 ## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.0.0...dw-migrator-v1.1.0) (2026-10-24)
 
 
