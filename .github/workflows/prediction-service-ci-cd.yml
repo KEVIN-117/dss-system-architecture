@@ -1,0 +1,117 @@
+name: Prediction Service CI/CD
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - ".github/workflows/prediction-service-ci-cd.yml"
+      - "prediction-service/**"
+      - "infra/dw-schema/migrations/0026_prediction_training_jobs.sql"
+      - "infra/dw-schema/migrations/0027_prediction_outbox_retry_backoff.sql"
+      - "docker-compose.yml"
+      - ".env.example"
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/prediction-service-ci-cd.yml"
+      - "prediction-service/**"
+      - "infra/dw-schema/migrations/0026_prediction_training_jobs.sql"
+      - "infra/dw-schema/migrations/0027_prediction_outbox_retry_backoff.sql"
+      - "docker-compose.yml"
+      - ".env.example"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: prediction-service-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    name: Verify prediction service
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      OMP_NUM_THREADS: "1"
+      OPENBLAS_NUM_THREADS: "1"
+      MKL_NUM_THREADS: "1"
+      NUMEXPR_NUM_THREADS: "1"
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Install uv and Python
+        uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: 0.11.32
+          python-version: "3.14"
+          enable-cache: true
+          cache-dependency-glob: |
+            prediction-service/pyproject.toml
+            prediction-service/uv.lock
+
+      - name: Install locked test dependencies
+        working-directory: prediction-service
+        run: uv sync --locked --extra test --no-dev --no-install-project
+
+      - name: Run unit suite
+        working-directory: prediction-service
+        run: uv run --no-sync python -m unittest discover -s tests -p "test_*.py" -v
+
+      - name: Validate Compose configuration
+        env:
+          KEYCLOAK_BFF_CLIENT_SECRET: ci-validation-only
+        run: docker compose --env-file .env.example config --quiet
+
+  publish-images:
+    name: Publish API and worker images
+    needs: verify
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Build and publish prediction API
+        uses: docker/build-push-action@v7
+        with:
+          context: ./prediction-service
+          file: ./prediction-service/Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/kevin-117/prediction-service-api:${{ github.sha }}
+            ghcr.io/kevin-117/prediction-service-api:latest
+          cache-from: type=gha,scope=prediction-api
+          cache-to: type=gha,mode=max,scope=prediction-api
+
+      - name: Build and publish prediction worker
+        uses: docker/build-push-action@v7
+        with:
+          context: ./prediction-service
+          file: ./prediction-service/Dockerfile.worker
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ghcr.io/kevin-117/prediction-service-worker:${{ github.sha }}
+            ghcr.io/kevin-117/prediction-service-worker:latest
+          cache-from: type=gha,scope=prediction-worker
+          cache-to: type=gha,mode=max,scope=prediction-worker

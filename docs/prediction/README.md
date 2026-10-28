@@ -14,6 +14,7 @@ Documentación de las issues PRED-001 y PRED-002 del motor predictivo. Los contr
 - [Comprensión de datos académicos](data-understanding.md)
 - [Contrato del dataset preparado v1](contracts/prepared-dataset-v1.yaml)
 - [Fixture sintético PRED-002](../../prediction-service/tests/fixtures/pred002_synthetic/README.md)
+- [Plan propuesto PRED-003](PRED-003-plan.md)
 
 ## Estado
 

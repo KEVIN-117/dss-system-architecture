@@ -23,6 +23,19 @@ def _read_bool(name: str, default: bool) -> bool:
     raise ValueError(f"{name} must be a boolean (true/false).")
 
 
+def _read_int(name: str, default: int, minimum: int = 1) -> int:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    try:
+        parsed = int(value.strip())
+    except ValueError as error:
+        raise ValueError(f"{name} must be an integer >= {minimum}.") from error
+    if parsed < minimum:
+        raise ValueError(f"{name} must be an integer >= {minimum}.")
+    return parsed
+
+
 @dataclass(frozen=True)
 class Settings:
     environment: str
@@ -57,6 +70,43 @@ class Settings:
             raise ValueError("PREDICTION_RELOAD must be false in production.")
 
         return cls(environment, host, port, log_level, reload)
+
+
+@dataclass(frozen=True)
+class WorkerSettings:
+    """Configuration for the Celery training worker."""
+
+    broker_url: str
+    max_concurrent_jobs: int
+    job_timeout_seconds: int
+    cpu_limit: int
+    memory_limit_mb: int
+    artifacts_dir: str
+    random_seed: int
+
+    @classmethod
+    def from_environment(cls) -> "WorkerSettings":
+        rabbit_host = os.getenv("RABBITMQ_HOST", "rabbitmq")
+        rabbit_port = os.getenv("RABBITMQ_PORT", "5672")
+        rabbit_user = os.getenv("RABBITMQ_USERNAME", "guest")
+        rabbit_pass = os.getenv("RABBITMQ_PASSWORD", "guest")
+        rabbit_vhost = os.getenv("RABBITMQ_VHOST", "/")
+
+        vhost = rabbit_vhost if rabbit_vhost == "/" else f"/{rabbit_vhost}"
+        broker_url = os.getenv(
+            "CELERY_BROKER_URL",
+            f"amqp://{rabbit_user}:{rabbit_pass}@{rabbit_host}:{rabbit_port}{vhost}",
+        )
+
+        return cls(
+            broker_url=broker_url,
+            max_concurrent_jobs=_read_int("WORKER_MAX_CONCURRENT_JOBS", 1),
+            job_timeout_seconds=_read_int("WORKER_JOB_TIMEOUT_SECONDS", 1800),
+            cpu_limit=_read_int("WORKER_CPU_LIMIT", 2),
+            memory_limit_mb=_read_int("WORKER_MEMORY_LIMIT_MB", 2048),
+            artifacts_dir=os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"),
+            random_seed=_read_int("WORKER_RANDOM_SEED", 42, minimum=0),
+        )
 
 
 settings = Settings.from_environment()

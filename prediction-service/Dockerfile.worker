@@ -1,0 +1,36 @@
+FROM python:3.14-slim
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+RUN groupadd --system --gid 10001 app \
+    && useradd --system --uid 10001 --gid app --no-create-home app \
+    && mkdir -p /app/artifacts \
+    && chown -R app:app /app/artifacts
+
+COPY pyproject.toml uv.lock ./
+ARG UV_VERSION=0.11.32
+RUN pip install --no-cache-dir "uv==${UV_VERSION}" \
+    && uv sync --locked --extra worker --no-dev --no-install-project
+
+COPY --chown=app:app config.py dataset_contract.py main.py ./
+COPY --chown=app:app preparation/ ./preparation/
+COPY --chown=app:app training/ ./training/
+COPY --chown=app:app tests/ ./tests/
+
+ENV PATH="/app/.venv/bin:${PATH}" \
+    PYTHONPATH=/app \
+    PREDICTION_ENV=production \
+    WORKER_MAX_CONCURRENT_JOBS=1 \
+    WORKER_JOB_TIMEOUT_SECONDS=1800 \
+    WORKER_CPU_LIMIT=2 \
+    WORKER_MEMORY_LIMIT_MB=2048 \
+    WORKER_ARTIFACTS_DIR=/app/artifacts
+
+USER app
+
+VOLUME ["/app/artifacts"]
+
+CMD ["celery", "-A", "training.tasks.celery_app", "worker", "--loglevel=info", "-c", "1", "--without-mingle", "--without-gossip", "--without-heartbeat"]
