@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import logging
+import hashlib
+import json
 from dataclasses import dataclass
 from typing import Any, Mapping
 
@@ -138,18 +140,44 @@ def prepare_dataset(
     )
     train_students = set(train_groups.unique())
     test_students = set(test_groups.unique())
+    train_rows_per_student = train_groups.value_counts()
+    test_rows_per_student = test_groups.value_counts()
+    split_metadata = dict(train_df.attrs.get("split_metadata", {}))
+    if train_students & test_students:
+        raise RuntimeError("Student identity leaked across the outer evaluation split.")
+    partition_basis = {
+        "dataset_digest": manifest.get("content_digest"),
+        "target_definition_ref": manifest.get("target_definition_ref"),
+        "target_field": target_field,
+        "feature_fields": feature_names,
+        "split": split_metadata,
+    }
+    partition_id = hashlib.sha256(
+        json.dumps(partition_basis, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
     metadata = {
         "train_size": len(x_train),
         "test_size": len(x_test),
-        "split_method": "temporal_student_grouped",
-        "seed": seed,
-        "test_ratio": test_ratio,
-        "train_students": sorted(train_students),
-        "test_students": sorted(test_students),
+        **split_metadata,
+        "partition_id": partition_id,
+        "dataset_digest": manifest.get("content_digest"),
+        "target_definition_ref": manifest.get("target_definition_ref"),
         "student_groups_train": len(train_students),
         "student_groups_test": len(test_students),
+        "rows_per_student_train": {
+            "min": int(train_rows_per_student.min()),
+            "median": float(train_rows_per_student.median()),
+            "max": int(train_rows_per_student.max()),
+        },
+        "rows_per_student_test": {
+            "min": int(test_rows_per_student.min()),
+            "median": float(test_rows_per_student.median()),
+            "max": int(test_rows_per_student.max()),
+        },
         "target_definition": manifest.get("target_definition"),
         "cv_method": "stratified_group_k_fold",
+        "evaluation_unit": "student_program_academic_cut",
+        "evidence_kind": "synthetic_fixture" if manifest.get("fixture_only") is True and str(manifest.get("snapshot_ref", "")).startswith(("fixture:", "synthetic:")) else "institutional_unverified",
     }
     return PreparedPartition(
         X_train=x_train,

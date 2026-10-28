@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import itertools
 import logging
+import math
 import sys
 import time
 from dataclasses import dataclass
@@ -16,21 +17,14 @@ import pandas as pd
 from imblearn.over_sampling import SMOTE, SMOTENC
 from joblib import parallel_backend
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import (
-    accuracy_score,
-    average_precision_score,
-    confusion_matrix,
-    f1_score,
-    precision_score,
-    recall_score,
-    roc_auc_score,
-)
+from sklearn.metrics import f1_score, recall_score
 from sklearn.model_selection import StratifiedGroupKFold
 from threadpoolctl import threadpool_limits
 from xgboost import XGBClassifier
 
 from preparation.balancer import BalanceReport, _class_distribution, apply_smote_if_warranted
 from preparation.pipeline import PreparedPartition, build_preprocessing_pipeline
+from evaluation.metrics import classification_metrics
 
 logger = logging.getLogger(__name__)
 
@@ -154,22 +148,71 @@ def _fold_count(y: pd.Series, groups: pd.Series, requested: int) -> int:
     return min(requested, int(class_counts.min()), *(int(value) for value in groups_per_class))
 
 
-def _metrics(y_true: pd.Series, y_pred: np.ndarray, probabilities: np.ndarray | None) -> dict[str, Any]:
-    roc_auc = pr_auc = None
-    if probabilities is not None and y_true.nunique() > 1:
-        roc_auc = float(roc_auc_score(y_true, probabilities))
-        pr_auc = float(average_precision_score(y_true, probabilities))
-    return {
-        "accuracy": float(accuracy_score(y_true, y_pred)),
-        "recall": float(recall_score(y_true, y_pred, zero_division=0)),
-        "precision": float(precision_score(y_true, y_pred, zero_division=0)),
-        "f1_score": float(f1_score(y_true, y_pred, zero_division=0)),
-        "roc_auc": roc_auc,
-        "pr_auc": pr_auc,
-        "confusion_matrix": confusion_matrix(y_true, y_pred, labels=[0, 1]).tolist(),
-        "support": {str(label): int(count) for label, count in y_true.value_counts().items()},
-        "test_row_count": len(y_true),
-    }
+def _validated_decision_policy(config: dict[str, Any]) -> dict[str, Any] | None:
+    policy = config.get("decision_policy")
+    if policy is None:
+        return None
+    if not isinstance(policy, dict) or policy.get("approved") is not True or not isinstance(policy.get("policy_ref"), str) or not policy["policy_ref"].strip():
+        raise ValueError("decision_policy requires approved=true and a non-empty DSA policy_ref.")
+    costs = {}
+    for name in ("false_negative_cost", "false_positive_cost"):
+        value = policy.get(name)
+        if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+            raise ValueError(f"decision_policy.{name} must be a finite non-negative number.")
+        costs[name] = float(value)
+    if not any(costs.values()):
+        raise ValueError("At least one decision error cost must be greater than zero.")
+    return {**policy, **costs}
+
+
+def _select_validation_threshold(y_true: list[int], probabilities: list[float], policy: dict[str, Any]) -> tuple[float, dict[str, float]]:
+    truth = np.asarray(y_true, dtype=int)
+    scores = np.asarray(probabilities, dtype=float)
+    candidates = sorted({0.0, 1.0, *(float(value) for value in scores)})
+    ranked = []
+    for threshold in candidates:
+        prediction = (scores >= threshold).astype(int)
+        false_negative = int(((truth == 1) & (prediction == 0)).sum())
+        false_positive = int(((truth == 0) & (prediction == 1)).sum())
+        cost = policy["false_negative_cost"] * false_negative + policy["false_positive_cost"] * false_positive
+        recall = float(recall_score(truth, prediction, zero_division=0))
+        f1 = float(f1_score(truth, prediction, zero_division=0))
+        ranked.append((cost, -recall, -f1, threshold, false_negative, false_positive))
+    cost, _, _, threshold, fn, fp = min(ranked)
+    return threshold, {"validation_cost": float(cost), "false_negatives": fn, "false_positives": fp}
+
+
+def _select_validation_threshold_by_metrics(y_true: list[int], probabilities: list[float]) -> float:
+    """Descriptive-only threshold rule for synthetic evidence: recall, then F1."""
+    truth = np.asarray(y_true, dtype=int)
+    scores = np.asarray(probabilities, dtype=float)
+    candidates = sorted({0.0, 1.0, *(float(value) for value in scores)})
+    return max(
+        candidates,
+        key=lambda threshold: (
+            float(recall_score(truth, scores >= threshold, zero_division=0)),
+            float(f1_score(truth, scores >= threshold, zero_division=0)),
+            threshold,
+        ),
+    )
+
+
+def _metrics(
+    y_true: pd.Series,
+    y_pred: np.ndarray,
+    probabilities: np.ndarray | None,
+    target_meta: dict[str, Any],
+) -> dict[str, Any]:
+    metrics = classification_metrics(
+        y_true, y_pred, probabilities, negative_label=0, positive_label=1,
+        class_names={0: target_meta["negative_class"], 1: target_meta["positive_class"]},
+    )
+    metrics["class_definition"] = target_meta
+    metrics["positive_class"] = target_meta["positive_class"]
+    metrics["negative_class"] = target_meta["negative_class"]
+    metrics["positive_class_code"] = 1
+    metrics["negative_class_code"] = 0
+    return metrics
 
 
 def _probability(model: Any, x: pd.DataFrame) -> np.ndarray | None:
@@ -202,6 +245,9 @@ def train_model(
         raise ValueError("cpu_limit must be >= 1 and cv_splits must be >= 2.")
 
     y_train, y_test, target_meta = _encode_targets(partition)
+    decision_policy = _validated_decision_policy(config)
+    if partition.partition_metadata.get("evidence_kind") != "synthetic_fixture" and decision_policy is None:
+        raise ValueError("Institutional evaluation requires an approved DSA decision_policy before the final test is opened.")
     groups = partition.train_groups.reset_index(drop=True)
     x_train = partition.X_train.reset_index(drop=True)
     y_train = y_train.reset_index(drop=True)
@@ -223,6 +269,8 @@ def train_model(
         for candidate in candidates:
             recall_scores: list[float] = []
             f1_scores: list[float] = []
+            validation_truth: list[int] = []
+            validation_probabilities: list[float] = []
             fold_balance_reports: list[dict[str, Any]] = []
             for fold_number, (fit_idx, valid_idx) in enumerate(
                 splitter.split(x_train, y_train, groups), start=1,
@@ -241,6 +289,8 @@ def train_model(
                 prediction = model.predict(x_valid)
                 recall_scores.append(float(recall_score(y_valid, prediction, zero_division=0)))
                 f1_scores.append(float(f1_score(y_valid, prediction, zero_division=0)))
+                validation_truth.extend(int(value) for value in y_valid.tolist())
+                validation_probabilities.extend(float(value) for value in model.predict_proba(x_valid)[:, 1])
                 fit_groups = set(groups.iloc[fit_idx])
                 validation_groups = set(groups.iloc[valid_idx])
                 if fit_groups & validation_groups:
@@ -254,16 +304,38 @@ def train_model(
                     "validation_rows": len(y_valid),
                     "balance": balance.__dict__,
                 })
+            validation_threshold = 0.5
+            validation_cost = None
+            if decision_policy is not None:
+                validation_threshold, cost_summary = _select_validation_threshold(
+                    validation_truth, validation_probabilities, decision_policy,
+                )
+                validation_cost = cost_summary["validation_cost"]
+            else:
+                validation_threshold = _select_validation_threshold_by_metrics(
+                    validation_truth, validation_probabilities,
+                )
+            validation_predictions = (np.asarray(validation_probabilities) >= validation_threshold).astype(int)
+            validation_recall = float(recall_score(validation_truth, validation_predictions, zero_division=0))
+            validation_f1 = float(f1_score(validation_truth, validation_predictions, zero_division=0))
             cv_results.append({
                 "parameters": candidate,
-                "mean_recall": float(np.mean(recall_scores)),
-                "std_recall": float(np.std(recall_scores)),
-                "mean_f1": float(np.mean(f1_scores)),
+                "mean_recall": validation_recall,
+                "mean_f1": validation_f1,
+                "fold_mean_recall_at_0_5": float(np.mean(recall_scores)),
+                "fold_mean_f1_at_0_5": float(np.mean(f1_scores)),
+                "validation_prediction_unit": "out_of_fold_rows",
+                "validation_threshold": validation_threshold,
+                "validation_cost": validation_cost,
                 "folds": fold_balance_reports,
             })
 
-        best = max(cv_results, key=lambda item: (item["mean_recall"], item["mean_f1"]))
+        if decision_policy is None:
+            best = max(cv_results, key=lambda item: (item["mean_recall"], item["mean_f1"]))
+        else:
+            best = min(cv_results, key=lambda item: (item["validation_cost"], -item["mean_recall"], -item["mean_f1"]))
         best_params = best["parameters"]
+        decision_threshold = best["validation_threshold"]
 
         # Refit only on the complete outer training partition.
         final_preprocessor = _transformer(partition)
@@ -277,8 +349,11 @@ def train_model(
         )
         model = _estimator(algorithm, best_params, seed, cpu_limit)
         model.fit(x_train_final, y_train_final)
-        y_pred = model.predict(x_test_final)
-        metrics = _metrics(y_test, y_pred, _probability(model, x_test_final))
+        test_probabilities = _probability(model, x_test_final)
+        y_pred = (test_probabilities >= decision_threshold).astype(int) if test_probabilities is not None else model.predict(x_test_final)
+        metrics = _metrics(y_test, y_pred, test_probabilities, target_meta)
+        metrics["decision_threshold"] = decision_threshold
+        metrics["threshold_origin"] = "approved_validation_cost_policy" if decision_policy else "validation_recall_then_f1_descriptive"
 
     balance_report = {
         **final_balance.__dict__,
@@ -310,6 +385,17 @@ def train_model(
         "algorithm": algorithm,
         "seed": seed,
         "hyperparameters": best_params,
+        "evaluation_protocol": {
+            "partition_id": partition.partition_metadata.get("partition_id"),
+            "dataset_digest": partition.partition_metadata.get("dataset_digest"),
+            "target_definition_ref": partition.partition_metadata.get("target_definition_ref"),
+            "split": partition.partition_metadata,
+            "selection_metric": "validation_cost_then_oof_recall_then_f1" if decision_policy else "validation_oof_recall_then_f1",
+            "decision_threshold": decision_threshold,
+            "threshold_origin": "approved_validation_cost_policy" if decision_policy else "validation_recall_then_f1_descriptive; DSA cost policy pending",
+            "decision_policy": decision_policy,
+            "institutional_decision": "EVIDENCIA_INSUFICIENTE",
+        },
         "cpu_limit": cpu_limit,
         "memory_limit_mb": memory_limit_mb,
         "tuning": {
@@ -320,6 +406,7 @@ def train_model(
             "results": cv_results,
             "best_mean_recall": best["mean_recall"],
             "best_mean_f1": best["mean_f1"],
+            "best_validation_cost": best["validation_cost"],
             "outer_test_used_for_selection": False,
         },
         "user_config": config,

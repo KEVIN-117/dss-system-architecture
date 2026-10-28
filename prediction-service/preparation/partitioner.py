@@ -1,18 +1,12 @@
-"""Temporal student-grouped split strategy.
-
-Splits prepared academic datasets so that the most recent academic periods
-form the test set and older periods form the training set.  Students are
-grouped so the same student never appears in both partitions, preserving
-temporal validity and preventing identity leakage.
-"""
+"""Strict global-temporal holdout with student-level disjointness."""
 
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any
 
 import pandas as pd
-
 
 log = logging.getLogger(__name__)
 
@@ -25,92 +19,66 @@ def temporal_student_grouped_split(
     test_ratio: float = 0.2,
     seed: int = 42,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Split a dataset temporally with student-level grouping.
+    """Reserve the latest global periods for test and keep students disjoint.
 
-    Parameters
-    ----------
-    df:
-        Prepared dataset with student identifiers and temporal columns.
-    target_col:
-        Name of the target (label) column — used only for logging.
-    student_col:
-        Column identifying individual students.
-    time_cols:
-        Tuple of ``(year_col, period_col)`` that together define temporal
-        ordering.
-    test_ratio:
-        Fraction of *students* (by temporal ordering) assigned to test.
-        Must be in ``(0, 1)``.
-    seed:
-        Random seed for reproducibility.  Currently only recorded in
-        metadata; the split itself is deterministic given the data.
-
-    Returns
-    -------
-    tuple[pd.DataFrame, pd.DataFrame]
-        ``(train_df, test_df)`` with original indices preserved.
-
-    Raises
-    ------
-    ValueError
-        If the dataframe is missing required columns or ``test_ratio``
-        is out of range.
+    Test contains rows in the final chronological period block. Train contains
+    only earlier rows belonging to students absent from test. Earlier history
+    for test students is excluded, so both temporal and group boundaries hold.
+    The seed is recorded for protocol reproducibility; this split is deterministic.
     """
     if not 0.0 < test_ratio < 1.0:
         raise ValueError(f"test_ratio must be in (0, 1), got {test_ratio}.")
-
     year_col, period_col = time_cols
-    missing = {student_col, year_col, period_col} - set(df.columns)
+    missing = {student_col, year_col, period_col, target_col} - set(df.columns)
     if missing:
         raise ValueError(f"DataFrame is missing required columns: {sorted(missing)}")
-
     if df.empty:
         raise ValueError("Cannot split an empty DataFrame.")
+    if df[[student_col, year_col, period_col]].isna().any().any():
+        raise ValueError("Student and academic time columns cannot contain null values.")
 
-    # ------------------------------------------------------------------
-    # 1. Create a temporal ordering key from (academic_year, academic_period).
-    # ------------------------------------------------------------------
-    temporal_key = df[[year_col, period_col]].apply(tuple, axis=1)
+    periods = sorted(set(zip(df[year_col].tolist(), df[period_col].tolist())))
+    if len(periods) < 2:
+        raise ValueError("At least two distinct academic periods are required for a temporal holdout.")
+    n_test_periods = min(len(periods) - 1, max(1, math.ceil(len(periods) * test_ratio)))
+    test_periods = periods[-n_test_periods:]
+    first_test_period = test_periods[0]
+    time_keys = pd.Series(list(zip(df[year_col].tolist(), df[period_col].tolist())), index=df.index)
+    test_mask = time_keys.isin(test_periods)
+    test_df = df.loc[test_mask].copy()
+    test_students = set(test_df[student_col].unique())
+    prior_mask = time_keys.map(lambda key: key < first_test_period)
+    train_candidates = df.loc[prior_mask]
+    train_df = train_candidates.loc[~train_candidates[student_col].isin(test_students)].copy()
 
-    # ------------------------------------------------------------------
-    # 2. Assign each student to the partition of their LATEST record.
-    # ------------------------------------------------------------------
-    student_latest: pd.Series[Any] = temporal_key.groupby(df[student_col]).max()
+    if train_df.empty or test_df.empty:
+        raise ValueError("Temporal holdout produced an empty partition; more academic periods or eligible students are required.")
+    train_periods = sorted(set(zip(train_df[year_col].tolist(), train_df[period_col].tolist())))
+    test_periods_observed = sorted(set(zip(test_df[year_col].tolist(), test_df[period_col].tolist())))
+    if max(train_periods) >= min(test_periods_observed):
+        raise RuntimeError("Temporal boundary invariant failed: training period is not strictly earlier than test.")
+    train_students = set(train_df[student_col].unique())
+    overlap = train_students & test_students
+    if overlap:
+        raise RuntimeError("Student identity leaked across the temporal holdout.")
 
-    # ------------------------------------------------------------------
-    # 3. Sort students by their latest temporal key.
-    # ------------------------------------------------------------------
-    student_latest_sorted = student_latest.sort_values()
-    ordered_students = student_latest_sorted.index.tolist()
-
-    # ------------------------------------------------------------------
-    # 4. Most recent ``test_ratio`` fraction of students → test.
-    # ------------------------------------------------------------------
-    n_students = len(ordered_students)
-    n_test = max(1, int(round(n_students * test_ratio)))
-    cutoff = n_students - n_test
-
-    train_students = set(ordered_students[:cutoff])
-    test_students = set(ordered_students[cutoff:])
-
-    # ------------------------------------------------------------------
-    # 5. Assign rows to partitions.
-    # ------------------------------------------------------------------
-    train_mask = df[student_col].isin(train_students)
-    test_mask = df[student_col].isin(test_students)
-
-    train_df = df.loc[train_mask]
-    test_df = df.loc[test_mask]
-
-    log.info(
-        "Temporal student-grouped split: %d train rows (%d students), "
-        "%d test rows (%d students), seed=%d, target=%s",
-        len(train_df),
-        len(train_students),
-        len(test_df),
-        len(test_students),
-        seed,
-        target_col,
-    )
-
+    split_metadata: dict[str, Any] = {
+        "split_method": "global_temporal_student_disjoint_v1",
+        "seed": seed,
+        "test_ratio": test_ratio,
+        "train_period_min": list(min(train_periods)),
+        "train_period_max": list(max(train_periods)),
+        "test_period_min": list(min(test_periods_observed)),
+        "test_period_max": list(max(test_periods_observed)),
+        "train_period_count": len(train_periods),
+        "test_period_count": len(test_periods_observed),
+        "train_rows": len(train_df),
+        "test_rows": len(test_df),
+        "train_student_count": len(train_students),
+        "test_student_count": len(test_students),
+        "excluded_prior_history_rows": len(train_candidates) - len(train_df),
+        "student_group_overlap": False,
+    }
+    train_df.attrs["split_metadata"] = split_metadata
+    log.info("Strict temporal holdout: %s", split_metadata)
     return train_df, test_df

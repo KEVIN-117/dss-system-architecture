@@ -109,11 +109,13 @@ def train_model_task(
     """Execute training in an isolated Celery worker process."""
     from preparation.pipeline import prepare_dataset
     from training.artifact_writer import write_training_artifacts
+    from training.configuration import resolve_training_configuration
     from training.trainer import train_model
 
     store = JobStore()
     artifacts_path = Path(artifacts_dir)
-    seed = (config or {}).get("seed", worker_settings.random_seed)
+    config = resolve_training_configuration(config)
+    seed = config.get("seed", worker_settings.random_seed)
 
     # Redeliveries are expected; only a queued job can be claimed.
     if not store.claim(job_id, worker_settings.job_timeout_seconds + 300):
@@ -170,7 +172,21 @@ def train_model_task(
             balance_report=train_result.balance_report,
             feature_names=train_result.feature_names,
             dependency_lock=train_result.dependency_lock,
-            dataset_ref={"dataset_ref": dataset_ref, "manifest_ref": partition.manifest_ref},
+            dataset_ref={
+                "dataset_ref": dataset_ref,
+                "manifest_ref": partition.manifest_ref,
+                "dataset_id": manifest.get("dataset_id"),
+                "dataset_digest": manifest.get("content_digest"),
+                "snapshot_ref": manifest.get("snapshot_ref"),
+                "target_definition_ref": manifest.get("target_definition_ref"),
+                "population_definition_ref": manifest.get("population_definition_ref"),
+                "fixture_only": manifest.get("fixture_only") is True,
+                "source": manifest.get("source"),
+                "academic_cut": manifest.get("academic_cut"),
+                "partition_id": partition.partition_metadata.get("partition_id"),
+                "split_method": partition.partition_metadata.get("split_method"),
+                "target_definition": manifest.get("target_definition"),
+            },
         )
 
         # 6. Update store to SUCCEEDED

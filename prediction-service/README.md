@@ -44,6 +44,7 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `PREDICTION_DATABASE_URL` | PostgreSQL Compose local | Base compartida para estado de trabajos y outbox transaccional. |
 | `PREDICTION_IDEMPOTENCY_SCOPE` | `development` | Ámbito que delimita las claves de idempotencia. |
 | `PREDICTION_DATASET_ROOT` | `/app/snapshots` | Raíz de solo lectura para snapshots preparados. |
+| `PREDICTION_CONFIG_ROOT` | `/app/configurations` (worker) | Catálogo de configuraciones versionadas; Compose lo monta en solo lectura. |
 | `PREDICTION_OUTBOX_POLL_SECONDS` | `5` | Intervalo de recuperación de mensajes pendientes en outbox. |
 
 ### Variables del Worker y Broker
@@ -65,6 +66,8 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 
 Las migraciones `0026` y `0027` crean el registro, el outbox y el grupo SQL `dw_prediction_runtime`, con acceso únicamente a esas tablas. Para entornos fuera de desarrollo, provisionar logins independientes para API/worker y asignarles ese grupo; no usar `dw_ml_writer` para el API. El API inserta job y outbox en una transacción; si falla el broker, el sondeo periódico vuelve a publicar el outbox con backoff exponencial. La entrega es al menos una vez: Celery usa `job_id` como identificador estable y el worker reclama el registro con una lease atómica. PostgreSQL es la fuente de estado y resultados, por eso Celery no usa backend RPC ni colas temporales de control/mingle. Si el worker cae, el reintento espera a que expire la lease y escribe en un directorio de artefactos por intento.
 
+El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.json` dentro del catálogo de solo lectura y registra la referencia y el digest de su contenido. El directorio local está en `infra/prediction-configurations/`; sus JSON no se versionan. Una política institucional requiere aprobación y costes DSA válidos; los valores no se envían directamente en una petición.
+
 ## Endpoints de la API
 
 - `GET /`: Health check básico del servicio.
@@ -74,10 +77,11 @@ Las migraciones `0026` y `0027` crean el registro, el outbox y el grupo SQL `dw_
 
 ## Pipeline de Preparación y Modelado
 
-- **Partición temporal y agrupamiento:** `temporal_student_grouped_split` asegura que periodos recientes queden en test y que ningún estudiante aparezca en ambos conjuntos (prevención de fuga por identidad).
+- **Partición temporal y agrupamiento:** `temporal_student_grouped_split` reserva un bloque global de periodos futuros para test, excluye el historial de estudiantes del test del train y comprueba que no haya solapamiento.
 - **Imputación y preprocesamiento:** Imputación por mediana ajustada **exclusivamente con datos de entrenamiento**.
 - **Balanceo SMOTE:** `apply_smote_if_warranted` evalúa el ratio de desbalance y aplica `SMOTE` o `SMOTENC` **únicamente sobre el fold de entrenamiento**. Test y validación permanecen con su distribución observada real.
-- **Selección de hiperparámetros:** `StratifiedGroupKFold` agrupa por estudiante dentro del train temporal. Cada fold ajusta su propio preprocesador y sampler; se selecciona por recall medio. El holdout temporal solo se evalúa después de fijar la configuración ganadora.
+- **Selección de hiperparámetros y umbral:** `StratifiedGroupKFold` agrupa por estudiante dentro del train temporal. Cada fold ajusta su propio preprocesador y sampler. El candidato se selecciona por recall medio y F1; para evidencia sintética el umbral descriptivo se deriva de validación por recall y F1. Para datasets institucionales no se abre el test sin una `decision_policy` aprobada con referencia y costes de FN/FP; con ella, modelo y umbral se seleccionan exclusivamente usando validación.
+- **Métricas y comparación:** El reporte incluye precision, recall, F1 y soporte por clase, matriz de confusión etiquetada, promedios, exactitud complementaria y causas de métricas indefinidas. `evaluation.comparison` compara los artefactos RF/XGBoost si prueban la misma partición, dataset, objetivo y política; selecciona solo con validación y declara empate sin forzar un ganador. La decisión institucional permanece `EVIDENCIA_INSUFICIENTE` sin evidencia autorizada y criterios DSA.
 - **Trazabilidad de artefactos:** Cada intento genera en `/artifacts/{job_id}-attempt-{n}/`:
   - `model.joblib`: Modelo entrenado.
   - `pipeline.joblib`: Pipeline de preprocesamiento serializado.
@@ -87,6 +91,8 @@ Las migraciones `0026` y `0027` crean el registro, el outbox y el grupo SQL `dw_
   - `balance_report.json`: Decisión y registro de la técnica de balanceo.
   - `dependency_lock.json`: Versiones exactas de Python y librerías ML.
   - `feature_names.json`: Lista ordenada de variables predictoras.
+
+Para generar un reporte comparativo a partir de dos jobs completados, ejecutar `uv run python -m evaluation.comparison --output artifacts/pred004-comparison.json artifacts/<job-rf> artifacts/<job-xgb>`. El resultado registra la elección hecha con validación y muestra las métricas test sin usarlas para seleccionar.
 
 ## Ejecución de Pruebas
 

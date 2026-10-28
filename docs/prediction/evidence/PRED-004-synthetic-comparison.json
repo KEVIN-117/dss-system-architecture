@@ -1,0 +1,582 @@
+{
+  "candidate_selection_status": "NO_UNIQUE_WINNER",
+  "created_at": "2026-10-28T14:15:09.863362+00:00",
+  "crisp_dm_next_step": {
+    "deployment_allowed": false,
+    "phase": "Business Understanding and Data Understanding",
+    "reason": "Obtain DSA-approved event, population, horizon, evaluation unit, error-cost policy and utility criteria; then use an authorized DW snapshot for the independent institutional assessment."
+  },
+  "dataset": {
+    "academic_cut": {
+      "closure_id": "synthetic-closure-2025-1",
+      "effective_at": "2025-07-15T23:59:59Z",
+      "status": "PROCESADO"
+    },
+    "dataset_digest": "4690ca3d8c816d1e09cc05ff7d75a7ddb7857a9cf3a909052990493714cc91b2",
+    "dataset_id": "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
+    "dataset_ref": "fixture:pred003_synthetic-v1",
+    "fixture_only": true,
+    "manifest_ref": "bbbbbbbb-cccc-4ddd-8eee-ffffffffffff",
+    "partition_id": "471a8677e4ac8f384b3ebabeae621c0456207ee9d83873b4c7a7452e57c48b4a",
+    "population_definition_ref": "decision:synthetic-population-v1",
+    "snapshot_ref": "fixture:pred003-synthetic-v1",
+    "source": {
+      "contract_ref": "synthetic-fixture:dw-retention-v1",
+      "run_id": "22222222-3333-4444-8555-666666666666",
+      "system": "dw"
+    },
+    "target_definition_ref": "decision:synthetic-target-v1"
+  },
+  "decision_reason": "La evidencia corresponde a un fixture sintético y solo valida el software; no permite inferir utilidad institucional.",
+  "decision_status": "EVIDENCIA_INSUFICIENTE",
+  "evaluation_identity": {
+    "classes": {
+      "event_code": "NEXT_CLOSURE_DROPOUT",
+      "negative_class": "NO_RISK",
+      "positive_class": "RISK"
+    },
+    "dataset_digest": "4690ca3d8c816d1e09cc05ff7d75a7ddb7857a9cf3a909052990493714cc91b2",
+    "decision_policy": null,
+    "partition_id": "471a8677e4ac8f384b3ebabeae621c0456207ee9d83873b4c7a7452e57c48b4a",
+    "target_definition_ref": "decision:synthetic-target-v1"
+  },
+  "evidence_kind": "synthetic_fixture",
+  "models": [
+    {
+      "algorithm": "random_forest",
+      "artifact_digest": "5aff402476122dea0dfaf70bdccdb403c69868d8937dda15651145071715cf4c",
+      "model_id": "2f7e8399-886a-4052-b41b-2bb0c397b94a",
+      "test_metrics_final_only": {
+        "accuracy": 1.0,
+        "auc_undefined_reasons": {},
+        "averaging": "per_class plus macro over defined classes",
+        "class_definition": {
+          "event_code": "NEXT_CLOSURE_DROPOUT",
+          "negative_class": "NO_RISK",
+          "positive_class": "RISK"
+        },
+        "confusion_matrix": {
+          "columns": "predicted",
+          "label_names": [
+            "NO_RISK",
+            "RISK"
+          ],
+          "labels": [
+            0,
+            1
+          ],
+          "rows": "actual",
+          "values": [
+            [
+              8,
+              0
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        },
+        "decision_threshold": 0.9,
+        "f1_score": 1.0,
+        "macro_average": {
+          "f1_score": 1.0,
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "negative_class": "NO_RISK",
+        "negative_class_code": 0,
+        "per_class": {
+          "0": {
+            "class_name": "NO_RISK",
+            "f1_score": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "support": 8,
+            "undefined_reasons": {}
+          },
+          "1": {
+            "class_name": "RISK",
+            "f1_score": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "support": 2,
+            "undefined_reasons": {}
+          }
+        },
+        "positive_class": "RISK",
+        "positive_class_code": 1,
+        "pr_auc": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "roc_auc": 1.0,
+        "support": {
+          "0": 8,
+          "1": 2
+        },
+        "test_row_count": 10,
+        "threshold_origin": "validation_recall_then_f1_descriptive"
+      },
+      "training_config": {
+        "algorithm": "random_forest",
+        "cpu_limit": 1,
+        "evaluation_protocol": {
+          "dataset_digest": "4690ca3d8c816d1e09cc05ff7d75a7ddb7857a9cf3a909052990493714cc91b2",
+          "decision_policy": null,
+          "decision_threshold": 0.9,
+          "institutional_decision": "EVIDENCIA_INSUFICIENTE",
+          "partition_id": "471a8677e4ac8f384b3ebabeae621c0456207ee9d83873b4c7a7452e57c48b4a",
+          "selection_metric": "validation_oof_recall_then_f1",
+          "split": {
+            "cv_method": "stratified_group_k_fold",
+            "dataset_digest": "4690ca3d8c816d1e09cc05ff7d75a7ddb7857a9cf3a909052990493714cc91b2",
+            "evaluation_unit": "student_program_academic_cut",
+            "evidence_kind": "synthetic_fixture",
+            "excluded_prior_history_rows": 0,
+            "partition_id": "471a8677e4ac8f384b3ebabeae621c0456207ee9d83873b4c7a7452e57c48b4a",
+            "rows_per_student_test": {
+              "max": 1,
+              "median": 1.0,
+              "min": 1
+            },
+            "rows_per_student_train": {
+              "max": 1,
+              "median": 1.0,
+              "min": 1
+            },
+            "seed": 42,
+            "split_method": "global_temporal_student_disjoint_v1",
+            "student_group_overlap": false,
+            "student_groups_test": 10,
+            "student_groups_train": 30,
+            "target_definition": {
+              "event_code": "NEXT_CLOSURE_DROPOUT",
+              "horizon_ref": "next-processed-closure",
+              "label_source": "synthetic-fixture",
+              "negative_class": "NO_RISK",
+              "positive_class": "RISK"
+            },
+            "target_definition_ref": "decision:synthetic-target-v1",
+            "test_period_count": 1,
+            "test_period_max": [
+              2024,
+              2
+            ],
+            "test_period_min": [
+              2024,
+              2
+            ],
+            "test_ratio": 0.25,
+            "test_rows": 10,
+            "test_size": 10,
+            "test_student_count": 10,
+            "train_period_count": 3,
+            "train_period_max": [
+              2024,
+              1
+            ],
+            "train_period_min": [
+              2023,
+              1
+            ],
+            "train_rows": 30,
+            "train_size": 30,
+            "train_student_count": 30
+          },
+          "target_definition_ref": "decision:synthetic-target-v1",
+          "threshold_origin": "validation_recall_then_f1_descriptive; DSA cost policy pending"
+        },
+        "hyperparameters": {
+          "max_depth": 3,
+          "min_samples_split": 2,
+          "n_estimators": 10
+        },
+        "memory_limit_mb": 2048,
+        "seed": 42,
+        "tuning": {
+          "best_mean_f1": 1.0,
+          "best_mean_recall": 1.0,
+          "best_validation_cost": null,
+          "candidate_count": 1,
+          "method": "StratifiedGroupKFold",
+          "n_splits": 3,
+          "outer_test_used_for_selection": false,
+          "results": [
+            {
+              "fold_mean_f1_at_0_5": 1.0,
+              "fold_mean_recall_at_0_5": 1.0,
+              "folds": [
+                {
+                  "balance": {
+                    "applied_to": "train_only",
+                    "balanced_distribution": null,
+                    "k_neighbors_used": null,
+                    "original_distribution": {
+                      "0": 13,
+                      "1": 7
+                    },
+                    "reason_if_skipped": "Class ratio 0.538 >= threshold 0.4; balancing is not necessary.",
+                    "technique": null
+                  },
+                  "fold": 1,
+                  "student_group_overlap": false,
+                  "train_students": 20,
+                  "validation_distribution": {
+                    "0": 7,
+                    "1": 3
+                  },
+                  "validation_rows": 10,
+                  "validation_students": 10
+                },
+                {
+                  "balance": {
+                    "applied_to": "train_only",
+                    "balanced_distribution": null,
+                    "k_neighbors_used": null,
+                    "original_distribution": {
+                      "0": 13,
+                      "1": 7
+                    },
+                    "reason_if_skipped": "Class ratio 0.538 >= threshold 0.4; balancing is not necessary.",
+                    "technique": null
+                  },
+                  "fold": 2,
+                  "student_group_overlap": false,
+                  "train_students": 20,
+                  "validation_distribution": {
+                    "0": 7,
+                    "1": 3
+                  },
+                  "validation_rows": 10,
+                  "validation_students": 10
+                },
+                {
+                  "balance": {
+                    "applied_to": "train_only",
+                    "balanced_distribution": null,
+                    "k_neighbors_used": null,
+                    "original_distribution": {
+                      "0": 14,
+                      "1": 6
+                    },
+                    "reason_if_skipped": "Class ratio 0.429 >= threshold 0.4; balancing is not necessary.",
+                    "technique": null
+                  },
+                  "fold": 3,
+                  "student_group_overlap": false,
+                  "train_students": 20,
+                  "validation_distribution": {
+                    "0": 6,
+                    "1": 4
+                  },
+                  "validation_rows": 10,
+                  "validation_students": 10
+                }
+              ],
+              "mean_f1": 1.0,
+              "mean_recall": 1.0,
+              "parameters": {
+                "max_depth": 3,
+                "min_samples_split": 2,
+                "n_estimators": 10
+              },
+              "validation_cost": null,
+              "validation_prediction_unit": "out_of_fold_rows",
+              "validation_threshold": 0.9
+            }
+          ],
+          "scoring": "recall"
+        },
+        "user_config": {
+          "search_space": {
+            "max_depth": [
+              3
+            ],
+            "n_estimators": [
+              10
+            ]
+          }
+        }
+      },
+      "validation": {
+        "mean_f1": 1.0,
+        "mean_recall": 1.0,
+        "selection_metric": "validation_oof_recall_then_f1",
+        "validation_cost": null
+      },
+      "version": "random_forest-20261028141507-42"
+    },
+    {
+      "algorithm": "xgboost",
+      "artifact_digest": "e6ad633237d636fbb7bf630864674c32cab39c3c437d05e51a35f2435fff7014",
+      "model_id": "67cd77fa-15d8-4e29-be2a-def7df5dd04a",
+      "test_metrics_final_only": {
+        "accuracy": 1.0,
+        "auc_undefined_reasons": {},
+        "averaging": "per_class plus macro over defined classes",
+        "class_definition": {
+          "event_code": "NEXT_CLOSURE_DROPOUT",
+          "negative_class": "NO_RISK",
+          "positive_class": "RISK"
+        },
+        "confusion_matrix": {
+          "columns": "predicted",
+          "label_names": [
+            "NO_RISK",
+            "RISK"
+          ],
+          "labels": [
+            0,
+            1
+          ],
+          "rows": "actual",
+          "values": [
+            [
+              8,
+              0
+            ],
+            [
+              0,
+              2
+            ]
+          ]
+        },
+        "decision_threshold": 0.6201101541519165,
+        "f1_score": 1.0,
+        "macro_average": {
+          "f1_score": 1.0,
+          "precision": 1.0,
+          "recall": 1.0
+        },
+        "negative_class": "NO_RISK",
+        "negative_class_code": 0,
+        "per_class": {
+          "0": {
+            "class_name": "NO_RISK",
+            "f1_score": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "support": 8,
+            "undefined_reasons": {}
+          },
+          "1": {
+            "class_name": "RISK",
+            "f1_score": 1.0,
+            "precision": 1.0,
+            "recall": 1.0,
+            "support": 2,
+            "undefined_reasons": {}
+          }
+        },
+        "positive_class": "RISK",
+        "positive_class_code": 1,
+        "pr_auc": 1.0,
+        "precision": 1.0,
+        "recall": 1.0,
+        "roc_auc": 1.0,
+        "support": {
+          "0": 8,
+          "1": 2
+        },
+        "test_row_count": 10,
+        "threshold_origin": "validation_recall_then_f1_descriptive"
+      },
+      "training_config": {
+        "algorithm": "xgboost",
+        "cpu_limit": 1,
+        "evaluation_protocol": {
+          "dataset_digest": "4690ca3d8c816d1e09cc05ff7d75a7ddb7857a9cf3a909052990493714cc91b2",
+          "decision_policy": null,
+          "decision_threshold": 0.6201101541519165,
+          "institutional_decision": "EVIDENCIA_INSUFICIENTE",
+          "partition_id": "471a8677e4ac8f384b3ebabeae621c0456207ee9d83873b4c7a7452e57c48b4a",
+          "selection_metric": "validation_oof_recall_then_f1",
+          "split": {
+            "cv_method": "stratified_group_k_fold",
+            "dataset_digest": "4690ca3d8c816d1e09cc05ff7d75a7ddb7857a9cf3a909052990493714cc91b2",
+            "evaluation_unit": "student_program_academic_cut",
+            "evidence_kind": "synthetic_fixture",
+            "excluded_prior_history_rows": 0,
+            "partition_id": "471a8677e4ac8f384b3ebabeae621c0456207ee9d83873b4c7a7452e57c48b4a",
+            "rows_per_student_test": {
+              "max": 1,
+              "median": 1.0,
+              "min": 1
+            },
+            "rows_per_student_train": {
+              "max": 1,
+              "median": 1.0,
+              "min": 1
+            },
+            "seed": 42,
+            "split_method": "global_temporal_student_disjoint_v1",
+            "student_group_overlap": false,
+            "student_groups_test": 10,
+            "student_groups_train": 30,
+            "target_definition": {
+              "event_code": "NEXT_CLOSURE_DROPOUT",
+              "horizon_ref": "next-processed-closure",
+              "label_source": "synthetic-fixture",
+              "negative_class": "NO_RISK",
+              "positive_class": "RISK"
+            },
+            "target_definition_ref": "decision:synthetic-target-v1",
+            "test_period_count": 1,
+            "test_period_max": [
+              2024,
+              2
+            ],
+            "test_period_min": [
+              2024,
+              2
+            ],
+            "test_ratio": 0.25,
+            "test_rows": 10,
+            "test_size": 10,
+            "test_student_count": 10,
+            "train_period_count": 3,
+            "train_period_max": [
+              2024,
+              1
+            ],
+            "train_period_min": [
+              2023,
+              1
+            ],
+            "train_rows": 30,
+            "train_size": 30,
+            "train_student_count": 30
+          },
+          "target_definition_ref": "decision:synthetic-target-v1",
+          "threshold_origin": "validation_recall_then_f1_descriptive; DSA cost policy pending"
+        },
+        "hyperparameters": {
+          "learning_rate": 0.1,
+          "max_depth": 3,
+          "n_estimators": 10
+        },
+        "memory_limit_mb": 2048,
+        "seed": 42,
+        "tuning": {
+          "best_mean_f1": 1.0,
+          "best_mean_recall": 1.0,
+          "best_validation_cost": null,
+          "candidate_count": 1,
+          "method": "StratifiedGroupKFold",
+          "n_splits": 3,
+          "outer_test_used_for_selection": false,
+          "results": [
+            {
+              "fold_mean_f1_at_0_5": 1.0,
+              "fold_mean_recall_at_0_5": 1.0,
+              "folds": [
+                {
+                  "balance": {
+                    "applied_to": "train_only",
+                    "balanced_distribution": null,
+                    "k_neighbors_used": null,
+                    "original_distribution": {
+                      "0": 13,
+                      "1": 7
+                    },
+                    "reason_if_skipped": "Class ratio 0.538 >= threshold 0.4; balancing is not necessary.",
+                    "technique": null
+                  },
+                  "fold": 1,
+                  "student_group_overlap": false,
+                  "train_students": 20,
+                  "validation_distribution": {
+                    "0": 7,
+                    "1": 3
+                  },
+                  "validation_rows": 10,
+                  "validation_students": 10
+                },
+                {
+                  "balance": {
+                    "applied_to": "train_only",
+                    "balanced_distribution": null,
+                    "k_neighbors_used": null,
+                    "original_distribution": {
+                      "0": 13,
+                      "1": 7
+                    },
+                    "reason_if_skipped": "Class ratio 0.538 >= threshold 0.4; balancing is not necessary.",
+                    "technique": null
+                  },
+                  "fold": 2,
+                  "student_group_overlap": false,
+                  "train_students": 20,
+                  "validation_distribution": {
+                    "0": 7,
+                    "1": 3
+                  },
+                  "validation_rows": 10,
+                  "validation_students": 10
+                },
+                {
+                  "balance": {
+                    "applied_to": "train_only",
+                    "balanced_distribution": null,
+                    "k_neighbors_used": null,
+                    "original_distribution": {
+                      "0": 14,
+                      "1": 6
+                    },
+                    "reason_if_skipped": "Class ratio 0.429 >= threshold 0.4; balancing is not necessary.",
+                    "technique": null
+                  },
+                  "fold": 3,
+                  "student_group_overlap": false,
+                  "train_students": 20,
+                  "validation_distribution": {
+                    "0": 6,
+                    "1": 4
+                  },
+                  "validation_rows": 10,
+                  "validation_students": 10
+                }
+              ],
+              "mean_f1": 1.0,
+              "mean_recall": 1.0,
+              "parameters": {
+                "learning_rate": 0.1,
+                "max_depth": 3,
+                "n_estimators": 10
+              },
+              "validation_cost": null,
+              "validation_prediction_unit": "out_of_fold_rows",
+              "validation_threshold": 0.6201101541519165
+            }
+          ],
+          "scoring": "recall"
+        },
+        "user_config": {
+          "search_space": {
+            "max_depth": [
+              3
+            ],
+            "n_estimators": [
+              10
+            ]
+          }
+        }
+      },
+      "validation": {
+        "mean_f1": 1.0,
+        "mean_recall": 1.0,
+        "selection_metric": "validation_oof_recall_then_f1",
+        "validation_cost": null
+      },
+      "version": "xgboost-20261028141509-42"
+    }
+  ],
+  "report_scope": "software_validation_only",
+  "report_version": "pred004-comparison-v1",
+  "selected_candidate_by_validation": null,
+  "selection_rule": "Validation out-of-fold recall, then F1 at the validation-selected descriptive threshold. If both tie, no unique candidate is selected. Outer test does not participate.",
+  "top_candidates_by_validation": [
+    "2f7e8399-886a-4052-b41b-2bb0c397b94a",
+    "67cd77fa-15d8-4e29-be2a-def7df5dd04a"
+  ]
+}

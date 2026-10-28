@@ -70,6 +70,8 @@ docker-compose.override.yml
 
 # ------------------------------------------
 # Datos fuente / históricos locales (no versionar)
+# Catálogo local de políticas/configuraciones de predicción; solo versionar su README.
+/infra/prediction-configurations/*.json
 # ------------------------------------------
 # Exportaciones OLTP y datasets originales pueden contener datos personales.
 # Los fixtures sintéticos aprobados bajo infra/dw-test-data sí se versionan.
