@@ -95,6 +95,14 @@ cd prediction-service
 uv run python -m unittest discover tests
 ```
 
+## CI/CD en GitHub Actions
+
+`.github/workflows/prediction-service-ci-cd.yml` se activa para PR hacia `main`, cambios en `main` que afecten predicción y ejecución manual. Los filtros evitan ejecutar el flujo por cambios ajenos al servicio. El job de verificación usa una sola VM Linux, Python 3.14, dependencias fijadas por `uv.lock`, caché de `uv`, una suite unitaria y validación de Compose. Limita los hilos nativos a uno para evitar sobrecarga del runner. El smoke test con PostgreSQL/RabbitMQ queda opt-in y no se ejecuta en cada PR.
+
+Después de pasar CI, los cambios que llegan a `main` publican las imágenes API y worker en GHCR, solo para `linux/amd64`, con tags del SHA y `latest`. La publicación usa el `GITHUB_TOKEN` con permiso `packages: write` y caché BuildKit separada para cada imagen; no requiere secretos adicionales del repositorio. En una instalación autorizada se puede seleccionar una versión inmutable con `PREDICTION_IMAGE_TAG=<commit-sha>`, descargar con `docker compose pull prediction-service prediction-worker` e iniciar esos servicios con `docker compose up -d --no-build prediction-service prediction-worker`.
+
+Este CD entrega imágenes del servicio. No despliega automáticamente a un entorno institucional, entrena con datos institucionales ni promueve un modelo candidato a activo; esos pasos requieren un proceso operativo aprobado aparte.
+
 ### Integración local con Compose
 
 Con `.env` de desarrollo configurado, iniciar solo las dependencias y servicios de predicción:

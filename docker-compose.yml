@@ -250,6 +250,7 @@ services:
       - dss-net
 
   prediction-service:
+    image: ghcr.io/kevin-117/prediction-service-api:${PREDICTION_IMAGE_TAG:-local}
     build:
       context: ./prediction-service
       dockerfile: Dockerfile
@@ -282,6 +283,7 @@ services:
       - dss-net
 
   prediction-worker:
+    image: ghcr.io/kevin-117/prediction-service-worker:${PREDICTION_IMAGE_TAG:-local}
     build:
       context: ./prediction-service
       dockerfile: Dockerfile.worker
