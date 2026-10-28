@@ -6,6 +6,7 @@
   "tags": ["type:app", "scope:shared"],
   "targets": {
     "build": {
+      "dependsOn": ["^build"],
       "parallelism": false,
       "options": {
         "env": {
