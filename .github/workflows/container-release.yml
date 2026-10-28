@@ -20,6 +20,7 @@ on:
       - "docs/dw/**"
       - "docs/envs/dw-control-service.md"
       - "dw-control-service/**"
+      - "dss-monorepo/**"
   workflow_dispatch:
     inputs:
       publish_keycloak:
@@ -44,6 +45,46 @@ on:
         default: false
       publish_dw_control_service:
         description: Republish the current DW Control Service release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_dss_bff:
+        description: Republish the current BFF release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_dss_admin_portal:
+        description: Republish the current admin portal release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_dss_director_dashboard:
+        description: Republish the current director dashboard release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_dss_decano_dashboard:
+        description: Republish the current decano dashboard release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_dss_rector_dashboard:
+        description: Republish the current rector dashboard release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_dss_landing:
+        description: Republish the current landing release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_dss_docs_portal:
+        description: Republish the current docs portal release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_dss_olap_workspace:
+        description: Republish the current OLAP workspace release from the manifest
         required: false
         type: boolean
         default: false
@@ -78,14 +119,24 @@ jobs:
     name: Verify DW Control Service
     uses: ./.github/workflows/dw-control-service-ci.yml
 
+  verify-dss-monorepo:
+    name: Verify affected DSS frontend projects
+    uses: ./.github/workflows/ci.yml
+    permissions:
+      actions: read
+      contents: read
+    secrets: inherit
+
   release-please:
     name: Create component release PRs or GitHub releases
+    if: github.ref == 'refs/heads/main'
     needs:
       - verify-auth-service
       - verify-keycloak
       - verify-olap-service
       - verify-apache-hop
       - verify-dw-control-service
+      - verify-dss-monorepo
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -116,6 +167,38 @@ jobs:
       dw_control_service_version: ${{ steps.release.outputs['dw-control-service--version'] || steps.manifest.outputs.dw_control_service_version }}
       dw_control_service_major: ${{ steps.release.outputs['dw-control-service--major'] || steps.manifest.outputs.dw_control_service_major }}
       dw_control_service_minor: ${{ steps.release.outputs['dw-control-service--minor'] || steps.manifest.outputs.dw_control_service_minor }}
+      dss_bff_release_created: ${{ steps.release.outputs['dss-monorepo/apps/bff--release_created'] }}
+      dss_bff_version: ${{ steps.release.outputs['dss-monorepo/apps/bff--version'] || steps.manifest.outputs.dss_bff_version }}
+      dss_bff_major: ${{ steps.release.outputs['dss-monorepo/apps/bff--major'] || steps.manifest.outputs.dss_bff_major }}
+      dss_bff_minor: ${{ steps.release.outputs['dss-monorepo/apps/bff--minor'] || steps.manifest.outputs.dss_bff_minor }}
+      dss_admin_portal_release_created: ${{ steps.release.outputs['dss-monorepo/apps/admin-portal--release_created'] }}
+      dss_admin_portal_version: ${{ steps.release.outputs['dss-monorepo/apps/admin-portal--version'] || steps.manifest.outputs.dss_admin_portal_version }}
+      dss_admin_portal_major: ${{ steps.release.outputs['dss-monorepo/apps/admin-portal--major'] || steps.manifest.outputs.dss_admin_portal_major }}
+      dss_admin_portal_minor: ${{ steps.release.outputs['dss-monorepo/apps/admin-portal--minor'] || steps.manifest.outputs.dss_admin_portal_minor }}
+      dss_director_dashboard_release_created: ${{ steps.release.outputs['dss-monorepo/apps/director-dashboard--release_created'] }}
+      dss_director_dashboard_version: ${{ steps.release.outputs['dss-monorepo/apps/director-dashboard--version'] || steps.manifest.outputs.dss_director_dashboard_version }}
+      dss_director_dashboard_major: ${{ steps.release.outputs['dss-monorepo/apps/director-dashboard--major'] || steps.manifest.outputs.dss_director_dashboard_major }}
+      dss_director_dashboard_minor: ${{ steps.release.outputs['dss-monorepo/apps/director-dashboard--minor'] || steps.manifest.outputs.dss_director_dashboard_minor }}
+      dss_decano_dashboard_release_created: ${{ steps.release.outputs['dss-monorepo/apps/decano-dashboard--release_created'] }}
+      dss_decano_dashboard_version: ${{ steps.release.outputs['dss-monorepo/apps/decano-dashboard--version'] || steps.manifest.outputs.dss_decano_dashboard_version }}
+      dss_decano_dashboard_major: ${{ steps.release.outputs['dss-monorepo/apps/decano-dashboard--major'] || steps.manifest.outputs.dss_decano_dashboard_major }}
+      dss_decano_dashboard_minor: ${{ steps.release.outputs['dss-monorepo/apps/decano-dashboard--minor'] || steps.manifest.outputs.dss_decano_dashboard_minor }}
+      dss_rector_dashboard_release_created: ${{ steps.release.outputs['dss-monorepo/apps/rector-dashboard--release_created'] }}
+      dss_rector_dashboard_version: ${{ steps.release.outputs['dss-monorepo/apps/rector-dashboard--version'] || steps.manifest.outputs.dss_rector_dashboard_version }}
+      dss_rector_dashboard_major: ${{ steps.release.outputs['dss-monorepo/apps/rector-dashboard--major'] || steps.manifest.outputs.dss_rector_dashboard_major }}
+      dss_rector_dashboard_minor: ${{ steps.release.outputs['dss-monorepo/apps/rector-dashboard--minor'] || steps.manifest.outputs.dss_rector_dashboard_minor }}
+      dss_landing_release_created: ${{ steps.release.outputs['dss-monorepo/apps/landing--release_created'] }}
+      dss_landing_version: ${{ steps.release.outputs['dss-monorepo/apps/landing--version'] || steps.manifest.outputs.dss_landing_version }}
+      dss_landing_major: ${{ steps.release.outputs['dss-monorepo/apps/landing--major'] || steps.manifest.outputs.dss_landing_major }}
+      dss_landing_minor: ${{ steps.release.outputs['dss-monorepo/apps/landing--minor'] || steps.manifest.outputs.dss_landing_minor }}
+      dss_docs_portal_release_created: ${{ steps.release.outputs['dss-monorepo/apps/docs-portal--release_created'] }}
+      dss_docs_portal_version: ${{ steps.release.outputs['dss-monorepo/apps/docs-portal--version'] || steps.manifest.outputs.dss_docs_portal_version }}
+      dss_docs_portal_major: ${{ steps.release.outputs['dss-monorepo/apps/docs-portal--major'] || steps.manifest.outputs.dss_docs_portal_major }}
+      dss_docs_portal_minor: ${{ steps.release.outputs['dss-monorepo/apps/docs-portal--minor'] || steps.manifest.outputs.dss_docs_portal_minor }}
+      dss_olap_workspace_release_created: ${{ steps.release.outputs['dss-monorepo/apps/olap-workspace--release_created'] }}
+      dss_olap_workspace_version: ${{ steps.release.outputs['dss-monorepo/apps/olap-workspace--version'] || steps.manifest.outputs.dss_olap_workspace_version }}
+      dss_olap_workspace_major: ${{ steps.release.outputs['dss-monorepo/apps/olap-workspace--major'] || steps.manifest.outputs.dss_olap_workspace_major }}
+      dss_olap_workspace_minor: ${{ steps.release.outputs['dss-monorepo/apps/olap-workspace--minor'] || steps.manifest.outputs.dss_olap_workspace_minor }}
     steps:
       - uses: actions/checkout@v4
       - name: Read current component versions
@@ -134,6 +217,14 @@ jobs:
           hop etl-layer/apache-hop
           dw_migrator infra/dw-schema
           dw_control_service dw-control-service
+          dss_bff dss-monorepo/apps/bff
+          dss_admin_portal dss-monorepo/apps/admin-portal
+          dss_director_dashboard dss-monorepo/apps/director-dashboard
+          dss_decano_dashboard dss-monorepo/apps/decano-dashboard
+          dss_rector_dashboard dss-monorepo/apps/rector-dashboard
+          dss_landing dss-monorepo/apps/landing
+          dss_docs_portal dss-monorepo/apps/docs-portal
+          dss_olap_workspace dss-monorepo/apps/olap-workspace
           VERSIONS
       - name: Require release automation token
         env:
@@ -385,3 +476,123 @@ jobs:
           cache-to: type=gha,mode=max,scope=dw-control-service
           sbom: true
           provenance: mode=max
+
+  publish-dss-bff:
+    name: Publish bff
+    if: >-
+      needs.release-please.outputs.dss_bff_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_dss_bff && needs.release-please.outputs.dss_bff_version != '0.0.0')
+    needs: [verify-dss-monorepo, release-please]
+    uses: ./.github/workflows/publish-nextjs-app.yml
+    with:
+      app_name: bff
+      image_name: dss-bff
+      version: ${{ needs.release-please.outputs.dss_bff_version }}
+      major: ${{ needs.release-please.outputs.dss_bff_major }}
+      minor: ${{ needs.release-please.outputs.dss_bff_minor }}
+    secrets: inherit
+
+  publish-dss-admin-portal:
+    name: Publish admin-portal
+    if: >-
+      needs.release-please.outputs.dss_admin_portal_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_dss_admin_portal && needs.release-please.outputs.dss_admin_portal_version != '0.0.0')
+    needs: [verify-dss-monorepo, release-please]
+    uses: ./.github/workflows/publish-nextjs-app.yml
+    with:
+      app_name: admin-portal
+      image_name: dss-admin-portal
+      version: ${{ needs.release-please.outputs.dss_admin_portal_version }}
+      major: ${{ needs.release-please.outputs.dss_admin_portal_major }}
+      minor: ${{ needs.release-please.outputs.dss_admin_portal_minor }}
+    secrets: inherit
+
+  publish-dss-director-dashboard:
+    name: Publish director-dashboard
+    if: >-
+      needs.release-please.outputs.dss_director_dashboard_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_dss_director_dashboard && needs.release-please.outputs.dss_director_dashboard_version != '0.0.0')
+    needs: [verify-dss-monorepo, release-please]
+    uses: ./.github/workflows/publish-nextjs-app.yml
+    with:
+      app_name: director-dashboard
+      image_name: dss-director-dashboard
+      version: ${{ needs.release-please.outputs.dss_director_dashboard_version }}
+      major: ${{ needs.release-please.outputs.dss_director_dashboard_major }}
+      minor: ${{ needs.release-please.outputs.dss_director_dashboard_minor }}
+    secrets: inherit
+
+  publish-dss-decano-dashboard:
+    name: Publish decano-dashboard
+    if: >-
+      needs.release-please.outputs.dss_decano_dashboard_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_dss_decano_dashboard && needs.release-please.outputs.dss_decano_dashboard_version != '0.0.0')
+    needs: [verify-dss-monorepo, release-please]
+    uses: ./.github/workflows/publish-nextjs-app.yml
+    with:
+      app_name: decano-dashboard
+      image_name: dss-decano-dashboard
+      version: ${{ needs.release-please.outputs.dss_decano_dashboard_version }}
+      major: ${{ needs.release-please.outputs.dss_decano_dashboard_major }}
+      minor: ${{ needs.release-please.outputs.dss_decano_dashboard_minor }}
+    secrets: inherit
+
+  publish-dss-rector-dashboard:
+    name: Publish rector-dashboard
+    if: >-
+      needs.release-please.outputs.dss_rector_dashboard_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_dss_rector_dashboard && needs.release-please.outputs.dss_rector_dashboard_version != '0.0.0')
+    needs: [verify-dss-monorepo, release-please]
+    uses: ./.github/workflows/publish-nextjs-app.yml
+    with:
+      app_name: rector-dashboard
+      image_name: dss-rector-dashboard
+      version: ${{ needs.release-please.outputs.dss_rector_dashboard_version }}
+      major: ${{ needs.release-please.outputs.dss_rector_dashboard_major }}
+      minor: ${{ needs.release-please.outputs.dss_rector_dashboard_minor }}
+    secrets: inherit
+
+  publish-dss-landing:
+    name: Publish landing
+    if: >-
+      needs.release-please.outputs.dss_landing_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_dss_landing && needs.release-please.outputs.dss_landing_version != '0.0.0')
+    needs: [verify-dss-monorepo, release-please]
+    uses: ./.github/workflows/publish-nextjs-app.yml
+    with:
+      app_name: landing
+      image_name: dss-landing
+      version: ${{ needs.release-please.outputs.dss_landing_version }}
+      major: ${{ needs.release-please.outputs.dss_landing_major }}
+      minor: ${{ needs.release-please.outputs.dss_landing_minor }}
+    secrets: inherit
+
+  publish-dss-docs-portal:
+    name: Publish docs-portal
+    if: >-
+      needs.release-please.outputs.dss_docs_portal_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_dss_docs_portal && needs.release-please.outputs.dss_docs_portal_version != '0.0.0')
+    needs: [verify-dss-monorepo, release-please]
+    uses: ./.github/workflows/publish-nextjs-app.yml
+    with:
+      app_name: docs-portal
+      image_name: dss-docs-portal
+      version: ${{ needs.release-please.outputs.dss_docs_portal_version }}
+      major: ${{ needs.release-please.outputs.dss_docs_portal_major }}
+      minor: ${{ needs.release-please.outputs.dss_docs_portal_minor }}
+    secrets: inherit
+
+  publish-dss-olap-workspace:
+    name: Publish olap-workspace
+    if: >-
+      needs.release-please.outputs.dss_olap_workspace_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_dss_olap_workspace && needs.release-please.outputs.dss_olap_workspace_version != '0.0.0')
+    needs: [verify-dss-monorepo, release-please]
+    uses: ./.github/workflows/publish-nextjs-app.yml
+    with:
+      app_name: olap-workspace
+      image_name: dss-olap-workspace
+      version: ${{ needs.release-please.outputs.dss_olap_workspace_version }}
+      major: ${{ needs.release-please.outputs.dss_olap_workspace_major }}
+      minor: ${{ needs.release-please.outputs.dss_olap_workspace_minor }}
+    secrets: inherit

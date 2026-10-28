@@ -472,6 +472,32 @@ El archivo [`nx.json`](./nx.json) contiene:
 
 ## 9. Comandos frecuentes
 
+### Desarrollo local
+
+Instala las dependencias y crea `.env` desde el ejemplo de cada aplicación que quieras ejecutar. Los comandos `dev:*` usan Nx y conservan el hot reload de Next.js:
+
+```sh
+bun install --frozen-lockfile
+cp apps/admin-portal/.env.example apps/admin-portal/.env
+cp apps/bff/.env.example apps/bff/.env
+bun run dev:bff
+bun run dev:admin
+```
+
+Ejecuta cada `dev:*` en una terminal separada. Los portales usan `NEXT_PUBLIC_BFF_URL` para apuntar al BFF local (por defecto, `http://localhost:3006`). Los valores de `.env` son de desarrollo y no se copian a la imagen Docker.
+
+### Build local de imágenes de producción
+
+Los comandos `docker:build:*` usan el mismo Dockerfile multi-stage del flujo de publicación. Configura las URLs públicas en el `.env` de cada app antes de construir los portales; Landing también requiere las URLs de los portales.
+
+```sh
+bun run docker:build:bff
+bun run docker:build:admin
+bun run docker:build:landing
+```
+
+Las imágenes se construyen como `dss-<app>` y escuchan en el puerto `3000` dentro del contenedor. El BFF recibe sus secretos y URLs privadas al ejecutar el contenedor; no los pases como argumentos de build. CI valida y empaqueta las aplicaciones actuales; no representa por sí solo una aprobación funcional de producto.
+
 ### Desarrollo
 
 ```sh

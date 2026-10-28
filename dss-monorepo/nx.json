@@ -15,7 +15,11 @@
       "!{projectRoot}/.storybook/**/*",
       "!{projectRoot}/tsconfig.storybook.json"
     ],
-    "sharedGlobals": ["{workspaceRoot}/.github/workflows/ci.yml"]
+    "sharedGlobals": [
+      "{workspaceRoot}/package.json",
+      "{workspaceRoot}/bun.lock",
+      "{workspaceRoot}/nx.json"
+    ]
   },
   "plugins": [
     {
@@ -103,5 +107,6 @@
         "unitTestRunner": "vitest"
       }
     }
-  }
+  },
+  "nxCloudId": "6ae2117b6b554cefad9a08dd"
 }

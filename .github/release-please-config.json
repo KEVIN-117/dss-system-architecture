@@ -33,6 +33,46 @@
       "release-type": "simple",
       "component": "dw-control-service",
       "package-name": "dss-dw-control-service"
+    },
+    "dss-monorepo/apps/bff": {
+      "release-type": "simple",
+      "component": "bff",
+      "package-name": "dss-bff"
+    },
+    "dss-monorepo/apps/admin-portal": {
+      "release-type": "simple",
+      "component": "admin-portal",
+      "package-name": "dss-admin-portal"
+    },
+    "dss-monorepo/apps/director-dashboard": {
+      "release-type": "simple",
+      "component": "director-dashboard",
+      "package-name": "dss-director-dashboard"
+    },
+    "dss-monorepo/apps/decano-dashboard": {
+      "release-type": "simple",
+      "component": "decano-dashboard",
+      "package-name": "dss-decano-dashboard"
+    },
+    "dss-monorepo/apps/rector-dashboard": {
+      "release-type": "simple",
+      "component": "rector-dashboard",
+      "package-name": "dss-rector-dashboard"
+    },
+    "dss-monorepo/apps/landing": {
+      "release-type": "simple",
+      "component": "landing",
+      "package-name": "dss-landing"
+    },
+    "dss-monorepo/apps/docs-portal": {
+      "release-type": "simple",
+      "component": "docs-portal",
+      "package-name": "dss-docs-portal"
+    },
+    "dss-monorepo/apps/olap-workspace": {
+      "release-type": "simple",
+      "component": "olap-workspace",
+      "package-name": "dss-olap-workspace"
     }
   }
 }
