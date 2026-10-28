@@ -119,6 +119,12 @@ export default [
     },
   },
   {
+    files: ['next.config.js', '**/next.config.js'],
+    rules: {
+      '@nx/enforce-module-boundaries': 'off',
+    },
+  },
+  {
     files: [
       '**/*.ts',
       '**/*.tsx',
