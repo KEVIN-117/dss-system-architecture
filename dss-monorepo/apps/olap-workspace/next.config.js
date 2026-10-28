@@ -1,5 +1,8 @@
+const sharedNextConfig = require('../../next.config.shared');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  ...sharedNextConfig,
   // Compile workspace libraries from their source entrypoints. This keeps Next.js
   // from bundling the design system's all-components distribution barrel during
   // App Router server rendering.

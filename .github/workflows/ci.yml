@@ -1,0 +1,82 @@
+name: DSS Monorepo CI
+
+on:
+  pull_request:
+    paths:
+      - "dss-monorepo/**"
+      - ".github/workflows/**"
+      - ".github/release-please-config.json"
+      - ".release-please-manifest.json"
+  workflow_call:
+
+permissions:
+  actions: read
+  contents: read
+
+concurrency:
+  group: dss-monorepo-ci-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  affected:
+    name: Affected lint, tests, build, and E2E
+    runs-on: ubuntu-latest
+    environment:
+      name: ${{ github.ref == 'refs/heads/main' && 'nx-cloud-protected' || 'nx-cloud-unprotected' }}
+    defaults:
+      run:
+        working-directory: dss-monorepo
+    env:
+      LANDING_PORT: 3000
+      ADMIN_PORTAL_PORT: 3001
+      DECANO_DASHBOARD_PORT: 3002
+      DIRECTOR_DASHBOARD_PORT: 3003
+      RECTOR_DASHBOARD_PORT: 3004
+      BFF_PORT: 3006
+      NEXT_PUBLIC_BFF_URL: http://localhost:3006
+      NEXT_PUBLIC_ADMIN_PORTAL_URL: http://localhost:3001
+      NEXT_PUBLIC_RECTOR_DASHBOARD_URL: http://localhost:3004
+      NEXT_PUBLIC_DECANO_DASHBOARD_URL: http://localhost:3002
+      NEXT_PUBLIC_DIRECTOR_DASHBOARD_URL: http://localhost:3003
+      KEYCLOAK_URL: http://localhost:8080
+      KEYCLOAK_REALM: uatf-dss-realm
+      KEYCLOAK_AUDIENCE: uatf-auth-service
+      KEYCLOAK_ROLE_CLIENT_ID: uatf-auth-service
+      KEYCLOAK_BFF_CLIENT_ID: dss-bff
+      KEYCLOAK_BFF_CLIENT_SECRET: ci-client-secret-not-used-in-production
+      KEYCLOAK_BFF_REDIRECT_URI: http://localhost:3006/api/auth/callback
+      KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI: http://localhost:3000/login
+      AUTH_SERVICE_URL: http://localhost:8000
+      BFF_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
+      BFF_DEFAULT_POST_LOGIN_REDIRECT_URI: http://localhost:3000/auth/callback
+      BFF_SESSION_SECRET: ci-session-secret-not-used-in-production-123456
+      BFF_SESSION_TTL_SECONDS: 300
+      BFF_SESSION_COOKIE: dss_session
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          filter: tree:0
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      - uses: nrwl/nx-set-shas@v5
+
+      - run: bun install --frozen-lockfile
+      - run: bun playwright install --with-deps
+      - name: Require Nx Cloud read-only token for same-repository PRs
+        if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+        run: test -n "$NX_CLOUD_ACCESS_TOKEN" || { echo "Configure the NX_CLOUD_ACCESS_TOKEN repository secret with an Nx Cloud read-only token for pull requests" >&2; exit 1; }
+      - name: Require Nx Cloud read-write token for protected ref CI
+        if: github.ref == 'refs/heads/main'
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
+        run: test -n "$NX_CLOUD_ACCESS_TOKEN" || { echo "Configure NX_CLOUD_ACCESS_TOKEN as a read-write secret in the nx-cloud-protected environment" >&2; exit 1; }
+      - name: Run affected Nx tasks
+        run: bun nx affected -t lint test build e2e --parallel=2
+        env:
+          NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}

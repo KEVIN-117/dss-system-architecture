@@ -20,7 +20,6 @@ export default [
         'error',
         {
           enforceBuildableLibDependency: true,
-          allow: [],
           depConstraints: [
             // --- Dimensión TYPE ---
             {
@@ -117,6 +116,12 @@ export default [
           ],
         },
       ],
+    },
+  },
+  {
+    files: ['next.config.js', '**/next.config.js'],
+    rules: {
+      '@nx/enforce-module-boundaries': 'off',
     },
   },
   {

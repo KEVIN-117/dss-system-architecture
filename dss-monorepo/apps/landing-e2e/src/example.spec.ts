@@ -22,7 +22,7 @@ test('presents the SSO login entry point without collecting credentials', async 
   await page.goto('/login');
 
   await expect(
-    page.getByText('Dirección de Servicios Académicos', { exact: true }),
+    page.getByText('Dirección de Servicios Académicos', { exact: true }).first(),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: /iniciar sesión/i }),
@@ -49,7 +49,9 @@ test('shows access denied when the session has no DSS role', async ({
 
   await page.goto('/auth/callback');
 
-  await expect(page.getByRole('alert')).toContainText('Acceso no autorizado');
+  await expect(
+    page.getByRole('alert').filter({ hasText: 'Acceso no autorizado' }).first(),
+  ).toBeVisible();
   await expect(
     page.getByRole('link', { name: /cerrar sesión/i }),
   ).toHaveAttribute('href', /\/api\/auth\/logout$/);

@@ -26,6 +26,14 @@ export default [
     },
   },
   {
+    // Apps load this shared config from their own directories. Next config
+    // imports are framework configuration, not source-level project edges.
+    files: ['next.config.js', '**/next.config.js'],
+    rules: {
+      '@nx/enforce-module-boundaries': 'off',
+    },
+  },
+  {
     files: [
       '**/*.ts',
       '**/*.tsx',

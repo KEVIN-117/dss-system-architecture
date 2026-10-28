@@ -12,10 +12,11 @@ import {
   Select,
 } from '@dss-monorepo/design-system';
 import {
+  executeQuery,
   listOlapConnections,
   getCubeMetadata,
+  newQuery,
 } from '@dss-monorepo/olap-data-access';
-import { executeQuery, newQuery } from '@dss-monorepo/olap-connector';
 import {
   parseCellset,
   toNumber,

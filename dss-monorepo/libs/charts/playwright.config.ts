@@ -5,8 +5,11 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 15_000 },
   outputDir: './test-output/playwright',
-  fullyParallel: true,
-  workers: 2,
+  // Keep CI browser work below the hosted runner's memory/CPU limit. Nx can
+  // execute several affected E2E projects at once, so each project uses one
+  // browser worker in CI.
+  fullyParallel: process.env.CI !== 'true',
+  workers: process.env.CI === 'true' ? 1 : 2,
   reporter: [['list'], ['html', { outputFolder: './test-output/playwright-report', open: 'never' }]],
   // Storybook's Vite preview protects development builds served by a host
   // other than localhost. Keep the browser URL aligned with the dev server.
