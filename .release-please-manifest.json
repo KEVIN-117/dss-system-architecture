@@ -7,7 +7,7 @@
   "dw-control-service": "1.1.0",
   "dss-monorepo/apps/bff": "1.0.0",
   "dss-monorepo/apps/admin-portal": "0.0.0",
-  "dss-monorepo/apps/director-dashboard": "0.0.0",
+  "dss-monorepo/apps/director-dashboard": "1.0.0",
   "dss-monorepo/apps/decano-dashboard": "1.0.0",
   "dss-monorepo/apps/rector-dashboard": "1.0.0",
   "dss-monorepo/apps/landing": "1.0.0",
