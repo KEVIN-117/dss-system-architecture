@@ -1,6 +1,6 @@
 # PRED-003 — Plan de entrenamiento aislado de modelos
 
-**Estado:** Implementación completada y verificada mediante suite automatizada de 41 pruebas unitarias e integración en `feature/PRED-003`.
+**Estado:** Implementación PRED-003 con persistencia PostgreSQL, outbox, idempotencia, recuperación por lease, límites de recursos y validación cruzada sin fuga. La suite completa se ejecuta en la imagen Linux del worker; el smoke test Compose valida la integración API → PostgreSQL/outbox → RabbitMQ → worker con fixtures sintéticos.
 **Rama:** `feature/PRED-003`.
 **Issue:** [PRED-003](https://github.com/KEVIN-117/dss-system-architecture/issues/146).
 **Fases CRISP-DM:** preparación de los datos y modelado.
@@ -58,7 +58,24 @@ Estas propuestas reducen decisiones pendientes de PRED-001; deben confirmarse co
 | Seguridad | Exigir permiso de operador ML definido por IAM; separar creación/consulta de trabajos de permisos académicos de inferencia. Sin permiso aprobado, ruta deshabilitada o denegada por defecto. | No mapear `SUPERADMIN` a operador ML sin aprobación DSA/IAM. |
 | Datos | Aceptar solo `dataset_ref` opaco registrado y manifiesto que pase `validate_prepared_dataset` como `READY_FOR_PREPARATION`; no aceptar rutas arbitrarias o features libres. | El fixture PRED-002 bloqueado continúa siendo prueba del rechazo. Un fixture nuevo de entrenamiento debe ser sintético, autocontenido y marcado `synthetic_test_only`. |
 
-La elección de PostgreSQL para la cola aprovecha el workspace ML y el volumen bajo esperado de entrenamientos manuales; no es una decisión irrevocable. La creación de tablas, usuario y grants debe aplicar mínimo privilegio: la API no necesita leer hechos DW ni cargar artefactos, y el worker debe limitar lectura a las relaciones aprobadas y escritura a objetos ML autorizados.
+La implementación usa PostgreSQL como registro durable del trabajo y outbox transaccional; RabbitMQ solo transporta mensajes. No se considera RabbitMQ la fuente de estado. La migración `0026_prediction_training_jobs.sql` crea ambas tablas en `ml_workspace`; el Compose local comparte la URL de PostgreSQL entre API y worker. Para operación real falta desplegar identidades separadas de mínimo privilegio: el API solo debe administrar jobs/outbox, y el worker debe limitar lectura a snapshots aprobados y escritura a objetos ML autorizados.
+
+### Aclaración de entrega y recuperación
+
+- La API inserta `training_job` y `training_job_outbox` dentro de la misma transacción.
+- El API sondea periódicamente el outbox, además de despachar al recibir una solicitud. Un fallo de publicación deja el registro pendiente para reintento.
+- La publicación es al menos una vez. Reintentos usan `job_id` como `task_id`; el worker reclama el job atómicamente y reintenta entregas mientras exista una lease activa.
+- El worker solo acepta snapshots desde `PREDICTION_DATASET_ROOT` o referencias de fixtures explícitas. Un `dataset_ref` desconocido no se sustituye por datos sintéticos.
+- Cada intento escribe a un directorio de artefactos distinto, para no mezclar archivos de una ejecución incompleta con una recuperación.
+- PostgreSQL/SQLite ejercita las pruebas de repositorio localmente; SQLite es solo adaptador de pruebas, nunca fuente compartida en Compose.
+
+### Correcciones de cumplimiento de recursos y evaluación
+
+- El worker tiene límites configurables por `WORKER_CPU_LIMIT` (2 por defecto), `WORKER_MEMORY_LIMIT_MB` (2048 MB), concurrencia (1) y timeout (1800 s). Compose aplica cuotas duras de CPU/RAM; RF/XGBoost y pools nativos reciben el límite de CPU.
+- El holdout temporal externo se reserva para la evaluación final. La búsqueda pequeña y reproducible de hiperparámetros usa `StratifiedGroupKFold` agrupado por estudiante y selecciona por recall medio (métrica de negocio prioritaria).
+- Cada fold crea y ajusta su propio imputador/codificador, aplica SMOTE/SMOTENC solo al subtrain y evalúa la validación con su distribución intacta. Tras elegir parámetros, se reajustan preprocesador y sampler en el train externo completo; solo entonces se evalúa el holdout.
+- `prediction-service/tests/integration/stack_smoke.py` es una prueba opt-in con Compose que valida la migración/DB reales, publicación del outbox, RabbitMQ, API, worker, idempotencia, lease vencida y digest de artefacto usando exclusivamente el fixture sintético. Para afirmar que el punto 3 está verificado, debe ejecutarse tras levantar el stack local.
+- Verificación de desarrollo (2026-10-27): 50 pruebas unitarias en imagen Linux (`unittest`, todas OK), smoke test Compose end-to-end OK y límites efectivos del worker comprobados con Docker Inspect: 2 CPU (`NanoCpus=2000000000`) y 2048 MiB (`Memory=2147483648`). El smoke confirmó también recuperación de outbox, idempotencia, reintento de lease vencida y digest SHA-256. Una lease vencida no consume capacidad de concurrencia.
 
 ## 5. Flujo propuesto
 
