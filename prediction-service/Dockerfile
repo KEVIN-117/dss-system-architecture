@@ -24,8 +24,7 @@ ENV PATH="/app/.venv/bin:${PATH}" \
     PREDICTION_ENV=production \
     PREDICTION_LOG_LEVEL=info \
     PREDICTION_RELOAD=false \
-    WORKER_ARTIFACTS_DIR=/app/artifacts \
-    WORKER_JOB_STORE_PATH=/app/artifacts/job_store.json
+    WORKER_ARTIFACTS_DIR=/app/artifacts
 
 USER app
 EXPOSE 8000

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import copy
 import unittest
 from pathlib import Path
 
@@ -91,6 +92,60 @@ class TrainerTests(unittest.TestCase):
         self.assertIn("imbalanced_learn", versions)
         self.assertIn("pandas", versions)
         self.assertIn("numpy", versions)
+
+    def test_tuning_uses_grouped_cv_and_never_selects_on_outer_test(self) -> None:
+        result = train_model(
+            self.partition,
+            "random_forest",
+            config={"search_space": {"n_estimators": [10], "max_depth": [3]}},
+            seed=17,
+            cpu_limit=1,
+            cv_splits=3,
+        )
+        tuning = result.training_config["tuning"]
+        self.assertEqual(tuning["method"], "StratifiedGroupKFold")
+        self.assertFalse(tuning["outer_test_used_for_selection"])
+        self.assertEqual(tuning["candidate_count"], 1)
+        for folds in tuning["results"][0]["folds"]:
+            self.assertFalse(folds["student_group_overlap"])
+            self.assertEqual(folds["balance"]["applied_to"], "train_only")
+            self.assertEqual(sum(folds["validation_distribution"].values()), folds["validation_rows"])
+        self.assertEqual(result.training_config["hyperparameters"]["n_estimators"], 10)
+
+    def test_smote_runs_inside_cv_fold_and_validation_distribution_stays_real(self) -> None:
+        rows = []
+        template = self.rows[0]
+        for index in range(200):
+            row = copy.deepcopy(template)
+            is_risk = index % 4 == 0
+            row.update({
+                "student_ref": f"synthetic-cv-student-{index:03d}",
+                "academic_year": 2020 + index // 40,
+                "academic_period": index % 2 + 1,
+                "resultado_retencion": "DESERTOR" if is_risk else "RETENIDO",
+                "es_desercion": is_risk,
+                "target_class": "RISK" if is_risk else "NO_RISK",
+                "materias_cursadas": 8 + index % 5,
+                "materias_aprobadas": 4 + index % 4,
+                "materias_reprobadas": 1 + index % 3,
+            })
+            rows.append(row)
+        partition = prepare_dataset(self.manifest, rows, seed=21, test_ratio=0.2, apply_balancing=True)
+        result = train_model(
+            partition,
+            "random_forest",
+            config={"search_space": {"n_estimators": [10], "max_depth": [3]}},
+            seed=21,
+            cpu_limit=1,
+            cv_splits=3,
+        )
+        folds = result.training_config["tuning"]["results"][0]["folds"]
+        self.assertTrue(all(fold["balance"]["technique"] == "SMOTE" for fold in folds))
+        for fold in folds:
+            self.assertFalse(fold["student_group_overlap"])
+            self.assertEqual(sum(fold["validation_distribution"].values()), fold["validation_rows"])
+        self.assertEqual(result.balance_report["scope"], "outer_train_refit")
+        self.assertEqual(result.metrics["test_row_count"], len(partition.y_test))
 
 
 if __name__ == "__main__":

@@ -37,12 +37,10 @@ class PreparationPipelineTests(unittest.TestCase):
         self.assertNotIn("target_class", partition.X_train.columns)
         self.assertNotIn("target_class", partition.X_test.columns)
 
-        # No nulls remain after imputation
-        self.assertEqual(partition.X_train.isna().sum().sum(), 0)
-        self.assertEqual(partition.X_test.isna().sum().sum(), 0)
-
-        # Balance report is documented
-        self.assertEqual(partition.balance_report.applied_to, "train_only")
+        # Preparation keeps raw values: every CV fold must fit its own imputer.
+        self.assertFalse(hasattr(partition.preprocessing_pipeline, "transformers_"))
+        self.assertEqual(partition.balance_report.applied_to, "fold_train_only")
+        self.assertEqual(partition.balance_report.reason_if_skipped, "Balancing is deferred to each training fold.")
 
     def test_student_grouping_prevents_identity_leakage(self) -> None:
         """Verify no student appears in both train and test partitions."""

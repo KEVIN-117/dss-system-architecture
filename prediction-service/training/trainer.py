@@ -1,7 +1,8 @@
-"""Model training for Random Forest and XGBoost with evaluation and manifest generation."""
+"""Fold-isolated tuning and final fitting for Random Forest and XGBoost."""
 
 from __future__ import annotations
 
+import itertools
 import logging
 import sys
 import time
@@ -12,6 +13,8 @@ from uuid import uuid4
 
 import numpy as np
 import pandas as pd
+from imblearn.over_sampling import SMOTE, SMOTENC
+from joblib import parallel_backend
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
     accuracy_score,
@@ -22,17 +25,18 @@ from sklearn.metrics import (
     recall_score,
     roc_auc_score,
 )
+from sklearn.model_selection import StratifiedGroupKFold
+from threadpoolctl import threadpool_limits
 from xgboost import XGBClassifier
 
-from preparation.pipeline import PreparedPartition
+from preparation.balancer import BalanceReport, _class_distribution, apply_smote_if_warranted
+from preparation.pipeline import PreparedPartition, build_preprocessing_pipeline
 
 logger = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
 class TrainingResult:
-    """Immutable outcome of a model training and evaluation run."""
-
     model: Any
     preprocessing_pipeline: Any
     manifest: dict[str, Any]
@@ -45,7 +49,6 @@ class TrainingResult:
 
 
 def get_dependency_versions() -> dict[str, str]:
-    """Capture exact runtime library versions for reproducibility."""
     import imblearn
     import sklearn
     import xgboost
@@ -60,185 +63,275 @@ def get_dependency_versions() -> dict[str, str]:
     }
 
 
+def _encode_targets(partition: PreparedPartition) -> tuple[pd.Series, pd.Series, dict[str, Any]]:
+    target_meta = partition.partition_metadata.get("target_definition") or {}
+    positive = target_meta.get("positive_class", "RISK")
+    negative = target_meta.get("negative_class", "NO_RISK")
+    event_code = target_meta.get("event_code", "NEXT_CLOSURE_DROPOUT")
+    if set(partition.y_train.unique()).issubset({0, 1}):
+        y_train = partition.y_train.astype(int)
+        y_test = partition.y_test.astype(int)
+    else:
+        mapping = {negative: 0, positive: 1}
+        y_train = partition.y_train.map(mapping)
+        y_test = partition.y_test.map(mapping)
+        if y_train.isna().any() or y_test.isna().any():
+            raise ValueError("Dataset contains target classes not declared in target_definition.")
+        y_train = y_train.astype(int)
+        y_test = y_test.astype(int)
+    if y_train.nunique() != 2:
+        raise ValueError("Training partition must contain both target classes.")
+    return y_train, y_test, {
+        "positive_class": positive,
+        "negative_class": negative,
+        "event_code": event_code,
+    }
+
+
+def _candidate_grid(algorithm: str, config: dict[str, Any]) -> list[dict[str, Any]]:
+    if algorithm == "random_forest":
+        default = {
+            "n_estimators": [100, 200],
+            "max_depth": [None, 10],
+            "min_samples_split": [2],
+        }
+    else:
+        default = {
+            "n_estimators": [100, 200],
+            "max_depth": [3, 6],
+            "learning_rate": [0.1],
+        }
+    user_grid = config.get("search_space")
+    if user_grid is not None:
+        if not isinstance(user_grid, dict) or not user_grid:
+            raise ValueError("search_space must be a non-empty object of parameter lists.")
+        default.update(user_grid)
+    for name, value in config.get("hyperparameters", {}).items():
+        default[name] = [value]
+    if any(not isinstance(values, list) or not values for values in default.values()):
+        raise ValueError("Each search_space parameter must have a non-empty list of candidate values.")
+    keys = list(default)
+    return [dict(zip(keys, values)) for values in itertools.product(*(default[key] for key in keys))]
+
+
+def _estimator(algorithm: str, params: dict[str, Any], seed: int, cpu_limit: int):
+    common = {**params, "random_state": seed, "n_jobs": cpu_limit}
+    if algorithm == "random_forest":
+        common.setdefault("class_weight", "balanced")
+        return RandomForestClassifier(**common)
+    return XGBClassifier(eval_metric="logloss", **common)
+
+
+def _transformer(partition: PreparedPartition):
+    return build_preprocessing_pipeline(partition.feature_names, partition.categorical_features)
+
+
+def _balance(
+    x: pd.DataFrame,
+    y: pd.Series,
+    partition: PreparedPartition,
+    seed: int,
+) -> tuple[pd.DataFrame, pd.Series, BalanceReport]:
+    if not partition.apply_balancing:
+        return x, y, BalanceReport(
+            original_distribution=_class_distribution(y), balanced_distribution=None,
+            technique=None, reason_if_skipped="Balancing disabled by caller.",
+            k_neighbors_used=None, applied_to="fold_train_only",
+        )
+    numeric_count = len(partition.feature_names) - len(partition.categorical_features)
+    categorical_indices = list(range(numeric_count, len(partition.feature_names)))
+    return apply_smote_if_warranted(
+        x, y,
+        categorical_indices=categorical_indices or None,
+        imbalance_threshold=partition.imbalance_threshold,
+        seed=seed,
+    )
+
+
+def _fold_count(y: pd.Series, groups: pd.Series, requested: int) -> int:
+    class_counts = y.value_counts()
+    groups_per_class = [groups.loc[y == label].nunique() for label in class_counts.index]
+    return min(requested, int(class_counts.min()), *(int(value) for value in groups_per_class))
+
+
+def _metrics(y_true: pd.Series, y_pred: np.ndarray, probabilities: np.ndarray | None) -> dict[str, Any]:
+    roc_auc = pr_auc = None
+    if probabilities is not None and y_true.nunique() > 1:
+        roc_auc = float(roc_auc_score(y_true, probabilities))
+        pr_auc = float(average_precision_score(y_true, probabilities))
+    return {
+        "accuracy": float(accuracy_score(y_true, y_pred)),
+        "recall": float(recall_score(y_true, y_pred, zero_division=0)),
+        "precision": float(precision_score(y_true, y_pred, zero_division=0)),
+        "f1_score": float(f1_score(y_true, y_pred, zero_division=0)),
+        "roc_auc": roc_auc,
+        "pr_auc": pr_auc,
+        "confusion_matrix": confusion_matrix(y_true, y_pred, labels=[0, 1]).tolist(),
+        "support": {str(label): int(count) for label, count in y_true.value_counts().items()},
+        "test_row_count": len(y_true),
+    }
+
+
+def _probability(model: Any, x: pd.DataFrame) -> np.ndarray | None:
+    if not hasattr(model, "predict_proba"):
+        return None
+    return model.predict_proba(x)[:, 1]
+
+
 def train_model(
     partition: PreparedPartition,
     algorithm: str,
     config: dict[str, Any] | None = None,
     seed: int = 42,
+    cpu_limit: int = 1,
+    memory_limit_mb: int | None = None,
+    cv_splits: int = 5,
 ) -> TrainingResult:
-    """Train either Random Forest or XGBoost on the prepared training partition.
+    """Tune on grouped folds from outer train; inspect outer test once at end.
 
-    Evaluation is performed strictly on the holdout test set, which has never
-    participated in fitting transformations, tuning, or balancing.
-
-    Parameters
-    ----------
-    partition:
-        Prepared partition containing X_train, y_train, X_test, y_test, etc.
-    algorithm:
-        Algorithm identifier: ``'random_forest'`` or ``'xgboost'``.
-    config:
-        Optional hyperparameter dictionary to override defaults.
-    seed:
-        Seed for pseudo-random number generators.
-
-    Returns
-    -------
-    TrainingResult
-        Complete training outcome with fitted model, metrics, and manifest.
+    Every fold creates and fits its own imputer/encoder and applies SMOTE only
+    to that fold's training rows. The outer temporal holdout is never used to
+    choose hyperparameters, samplers, or preprocessing choices.
     """
-    start_time = time.perf_counter()
-    user_config = config or {}
+    start = time.perf_counter()
+    config = config or {}
+    algorithm = algorithm.lower().strip()
+    if algorithm not in {"random_forest", "xgboost"}:
+        raise ValueError("algorithm must be 'random_forest' or 'xgboost'.")
+    if cpu_limit < 1 or cv_splits < 2:
+        raise ValueError("cpu_limit must be >= 1 and cv_splits must be >= 2.")
 
-    algorithm_norm = algorithm.lower().strip()
-    if algorithm_norm not in {"random_forest", "xgboost"}:
-        raise ValueError(f"Unsupported algorithm '{algorithm}'. Must be 'random_forest' or 'xgboost'.")
+    y_train, y_test, target_meta = _encode_targets(partition)
+    groups = partition.train_groups.reset_index(drop=True)
+    x_train = partition.X_train.reset_index(drop=True)
+    y_train = y_train.reset_index(drop=True)
+    x_test = partition.X_test.reset_index(drop=True)
+    y_test = y_test.reset_index(drop=True)
+    if len(groups) != len(y_train):
+        raise ValueError("Student groups must align with training rows.")
 
-    # 1. Target identification
-    target_meta = partition.partition_metadata.get("target_definition") or {}
-    positive_class = target_meta.get("positive_class", "RISK")
-    negative_class = target_meta.get("negative_class", "NO_RISK")
-    event_code = target_meta.get("event_code", "NEXT_CLOSURE_DROPOUT")
+    folds = _fold_count(y_train, groups, cv_splits)
+    if folds < 2:
+        raise ValueError("Not enough class-bearing student groups for cross-validation (need at least 2).")
+    splitter = StratifiedGroupKFold(n_splits=folds, shuffle=True, random_state=seed)
+    candidates = _candidate_grid(algorithm, config)
+    cv_results: list[dict[str, Any]] = []
 
-    # Encode labels to 0/1 integers for estimators (especially XGBoost)
-    label_map = {negative_class: 0, positive_class: 1}
-    y_train_raw = partition.y_train
-    y_test_raw = partition.y_test
+    # Celery's prefork worker marks its child process daemonic. Use joblib
+    # threads (not nested loky processes) so the estimator honors the CPU cap.
+    with threadpool_limits(limits=cpu_limit), parallel_backend("threading", n_jobs=cpu_limit):
+        for candidate in candidates:
+            recall_scores: list[float] = []
+            f1_scores: list[float] = []
+            fold_balance_reports: list[dict[str, Any]] = []
+            for fold_number, (fit_idx, valid_idx) in enumerate(
+                splitter.split(x_train, y_train, groups), start=1,
+            ):
+                preprocessor = _transformer(partition)
+                x_fit_raw, x_valid_raw = x_train.iloc[fit_idx], x_train.iloc[valid_idx]
+                y_fit, y_valid = y_train.iloc[fit_idx], y_train.iloc[valid_idx]
+                x_fit_values = preprocessor.fit_transform(x_fit_raw)
+                x_valid_values = preprocessor.transform(x_valid_raw)
+                transformed_names = list(preprocessor.get_feature_names_out())
+                x_fit = pd.DataFrame(x_fit_values, columns=transformed_names)
+                x_valid = pd.DataFrame(x_valid_values, columns=transformed_names)
+                x_fit, y_fit, balance = _balance(x_fit, y_fit, partition, seed + fold_number)
+                model = _estimator(algorithm, candidate, seed, cpu_limit)
+                model.fit(x_fit, y_fit)
+                prediction = model.predict(x_valid)
+                recall_scores.append(float(recall_score(y_valid, prediction, zero_division=0)))
+                f1_scores.append(float(f1_score(y_valid, prediction, zero_division=0)))
+                fit_groups = set(groups.iloc[fit_idx])
+                validation_groups = set(groups.iloc[valid_idx])
+                if fit_groups & validation_groups:
+                    raise RuntimeError("Student identity leaked across a cross-validation fold.")
+                fold_balance_reports.append({
+                    "fold": fold_number,
+                    "train_students": int(groups.iloc[fit_idx].nunique()),
+                    "validation_students": int(groups.iloc[valid_idx].nunique()),
+                    "student_group_overlap": False,
+                    "validation_distribution": _class_distribution(y_valid),
+                    "validation_rows": len(y_valid),
+                    "balance": balance.__dict__,
+                })
+            cv_results.append({
+                "parameters": candidate,
+                "mean_recall": float(np.mean(recall_scores)),
+                "std_recall": float(np.std(recall_scores)),
+                "mean_f1": float(np.mean(f1_scores)),
+                "folds": fold_balance_reports,
+            })
 
-    if set(y_train_raw.unique()).issubset({0, 1}):
-        y_train_enc = y_train_raw.astype(int)
-        y_test_enc = y_test_raw.astype(int)
-    else:
-        y_train_enc = y_train_raw.map(label_map).fillna(0).astype(int)
-        y_test_enc = y_test_raw.map(label_map).fillna(0).astype(int)
+        best = max(cv_results, key=lambda item: (item["mean_recall"], item["mean_f1"]))
+        best_params = best["parameters"]
 
-    # 2. Build estimator with defaults and config overrides
-    effective_config: dict[str, Any] = {}
-    if algorithm_norm == "random_forest":
-        default_params: dict[str, Any] = {
-            "n_estimators": 100,
-            "max_depth": None,
-            "min_samples_split": 2,
-            "random_state": seed,
-            "n_jobs": -1,
-            "class_weight": "balanced",
-        }
-        default_params.update(user_config.get("hyperparameters", {}))
-        effective_config = default_params
-        model: Any = RandomForestClassifier(**default_params)
-    else:  # xgboost
-        default_params = {
-            "n_estimators": 100,
-            "max_depth": 6,
-            "learning_rate": 0.1,
-            "random_state": seed,
-            "eval_metric": "logloss",
-            "n_jobs": -1,
-        }
-        default_params.update(user_config.get("hyperparameters", {}))
-        effective_config = default_params
-        model = XGBClassifier(**default_params)
+        # Refit only on the complete outer training partition.
+        final_preprocessor = _transformer(partition)
+        train_values = final_preprocessor.fit_transform(x_train)
+        test_values = final_preprocessor.transform(x_test)
+        transformed_names = list(final_preprocessor.get_feature_names_out())
+        x_train_final = pd.DataFrame(train_values, columns=transformed_names)
+        x_test_final = pd.DataFrame(test_values, columns=transformed_names)
+        x_train_final, y_train_final, final_balance = _balance(
+            x_train_final, y_train, partition, seed,
+        )
+        model = _estimator(algorithm, best_params, seed, cpu_limit)
+        model.fit(x_train_final, y_train_final)
+        y_pred = model.predict(x_test_final)
+        metrics = _metrics(y_test, y_pred, _probability(model, x_test_final))
 
-    # 3. Fit on training fold only
-    model.fit(partition.X_train, y_train_enc)
-
-    # 4. Predict on holdout test partition
-    y_pred_enc = model.predict(partition.X_test)
-
-    # Predict probabilities for AUC/PR-AUC
-    y_prob = None
-    if hasattr(model, "predict_proba"):
-        probs = model.predict_proba(partition.X_test)
-        if probs.shape[1] > 1:
-            y_prob = probs[:, 1]
-        else:
-            y_prob = probs[:, 0]
-
-    # 5. Compute evaluation metrics
-    acc = float(accuracy_score(y_test_enc, y_pred_enc))
-    rec = float(recall_score(y_test_enc, y_pred_enc, zero_division=0))
-    prec = float(precision_score(y_test_enc, y_pred_enc, zero_division=0))
-    f1 = float(f1_score(y_test_enc, y_pred_enc, zero_division=0))
-
-    roc_auc = None
-    pr_auc = None
-    if y_prob is not None and len(np.unique(y_test_enc)) > 1:
-        try:
-            roc_auc = float(roc_auc_score(y_test_enc, y_prob))
-            pr_auc = float(average_precision_score(y_test_enc, y_prob))
-        except ValueError as err:
-            logger.warning("Could not calculate ROC-AUC or PR-AUC: %s", err)
-
-    cm = confusion_matrix(y_test_enc, y_pred_enc).tolist()
-    support = {
-        str(cls): int(count) for cls, count in y_test_raw.value_counts().items()
+    balance_report = {
+        **final_balance.__dict__,
+        "scope": "outer_train_refit",
+        "cv_fold_reports": [entry["folds"] for entry in cv_results],
     }
-
-    metrics = {
-        "accuracy": acc,
-        "recall": rec,
-        "precision": prec,
-        "f1_score": f1,
-        "roc_auc": roc_auc,
-        "pr_auc": pr_auc,
-        "confusion_matrix": cm,
-        "support": support,
-        "test_row_count": len(y_test_enc),
-    }
-
-    duration = time.perf_counter() - start_time
-
-    # 6. Generate ModelManifest compliant with contracts
+    duration = time.perf_counter() - start
+    dep_versions = get_dependency_versions()
     model_id = str(uuid4())
-    version_timestamp = datetime.now(timezone.utc).strftime("%Y%m%d%H%M%S")
-    version = f"{algorithm_norm}-{version_timestamp}-{seed}"
-
+    version = f"{algorithm}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{seed}"
     manifest = {
         "contract_version": "1.0",
         "model_id": model_id,
         "version": version,
-        "algorithm": algorithm_norm,
+        "algorithm": algorithm,
         "dataset_id": partition.manifest_ref,
         "input_schema_version": "prepared-dataset-v1",
-        "classes": {
-            "positive_class": positive_class,
-            "negative_class": negative_class,
-            "event_code": event_code,
-        },
+        "classes": target_meta,
         "created_at": datetime.now(timezone.utc).isoformat(),
         "evaluation_ref": f"eval-{model_id[:8]}",
         "lifecycle_state": "CANDIDATE",
-        "artifact_digest": "",  # Populated after serialization by artifact_writer
+        "artifact_digest": "",
         "artifact_uri": "",
         "preprocessing_ref": "",
         "dependency_lock_ref": "",
         "training_config_ref": "",
     }
-
-    dep_versions = get_dependency_versions()
-
-    balance_report_dict = {
-        "original_distribution": partition.balance_report.original_distribution,
-        "balanced_distribution": partition.balance_report.balanced_distribution,
-        "technique": partition.balance_report.technique,
-        "reason_if_skipped": partition.balance_report.reason_if_skipped,
-        "k_neighbors_used": partition.balance_report.k_neighbors_used,
-        "applied_to": partition.balance_report.applied_to,
+    training_config = {
+        "algorithm": algorithm,
+        "seed": seed,
+        "hyperparameters": best_params,
+        "cpu_limit": cpu_limit,
+        "memory_limit_mb": memory_limit_mb,
+        "tuning": {
+            "method": "StratifiedGroupKFold",
+            "scoring": "recall",
+            "n_splits": folds,
+            "candidate_count": len(cv_results),
+            "results": cv_results,
+            "best_mean_recall": best["mean_recall"],
+            "best_mean_f1": best["mean_f1"],
+            "outer_test_used_for_selection": False,
+        },
+        "user_config": config,
     }
-
     return TrainingResult(
         model=model,
-        preprocessing_pipeline=partition.preprocessing_pipeline,
+        preprocessing_pipeline=final_preprocessor,
         manifest=manifest,
         metrics=metrics,
-        training_config={
-            "algorithm": algorithm_norm,
-            "seed": seed,
-            "hyperparameters": effective_config,
-            "user_config": user_config,
-        },
-        balance_report=balance_report_dict,
-        feature_names=partition.feature_names,
+        training_config=training_config,
+        balance_report=balance_report,
+        feature_names=transformed_names,
         dependency_lock=dep_versions,
         duration_seconds=duration,
     )
