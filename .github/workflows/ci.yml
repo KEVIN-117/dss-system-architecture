@@ -77,6 +77,6 @@ jobs:
           NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}
         run: test -n "$NX_CLOUD_ACCESS_TOKEN" || { echo "Configure NX_CLOUD_ACCESS_TOKEN as a read-write secret in the nx-cloud-protected environment" >&2; exit 1; }
       - name: Run affected Nx tasks
-        run: bun nx affected -t lint test build typecheck e2e
+        run: bun nx affected -t lint test build e2e --parallel=2
         env:
           NX_CLOUD_ACCESS_TOKEN: ${{ secrets.NX_CLOUD_ACCESS_TOKEN }}

@@ -20,7 +20,9 @@ export default [
         'error',
         {
           enforceBuildableLibDependency: true,
-          allow: [],
+          // Next.js config files share one root config; this relative import is
+          // build configuration, not a source-level project dependency.
+          allow: ['^\\.\\./\\.\\./next\\.config\\.shared$'],
           depConstraints: [
             // --- Dimensión TYPE ---
             {
