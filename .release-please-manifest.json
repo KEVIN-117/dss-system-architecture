@@ -5,12 +5,12 @@
   "etl-layer/apache-hop": "1.2.0",
   "infra/dw-schema": "1.2.0",
   "dw-control-service": "1.1.0",
+  "dss-monorepo/apps/admin-portal": "1.0.0",
   "dss-monorepo/apps/bff": "1.0.0",
-  "dss-monorepo/apps/admin-portal": "0.0.0",
-  "dss-monorepo/apps/director-dashboard": "0.0.0",
-  "dss-monorepo/apps/decano-dashboard": "1.0.0",
-  "dss-monorepo/apps/rector-dashboard": "0.0.0",
-  "dss-monorepo/apps/landing": "0.0.0",
   "dss-monorepo/apps/docs-portal": "1.0.0",
-  "dss-monorepo/apps/olap-workspace": "0.0.0"
+  "dss-monorepo/apps/decano-dashboard": "1.0.1",
+  "dss-monorepo/apps/director-dashboard": "1.0.0",
+  "dss-monorepo/apps/rector-dashboard": "1.0.0",
+  "dss-monorepo/apps/landing": "1.0.0",
+  "dss-monorepo/apps/olap-workspace": "1.0.0"
 }
