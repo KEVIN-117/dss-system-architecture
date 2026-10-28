@@ -19,9 +19,13 @@ test.beforeEach(async ({ page }) => {
 });
 
 test('updates data, the click callback, resize and hidden containers', async ({ page }) => {
+  test.setTimeout(90_000);
   await page.goto(playground);
+  // Storybook compiles the first requested story on demand in CI. Wait for the
+  // React story controls before checking the asynchronously initialized chart.
+  await expect(page.getByRole('button', { name: 'Inspeccionar opciones' })).toBeVisible({ timeout: 45_000 });
   const canvas = page.getByTestId('local-theme').locator('canvas');
-  await expect(canvas).toHaveCount(1);
+  await expect(canvas).toHaveCount(1, { timeout: 45_000 });
   const original = await page.locator('[role="img"]').getAttribute('_echarts_instance_');
   if (!original) throw new Error('Missing initial ECharts instance');
   await page.getByLabel('Datos', { exact: true }).selectOption('reduced');

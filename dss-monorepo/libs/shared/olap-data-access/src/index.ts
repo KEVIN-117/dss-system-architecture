@@ -1,7 +1,9 @@
 import {
+  executeQuery,
   getApp,
   listApps,
   loadDashboard,
+  newQuery,
   olapFetch,
   toRepoRelative,
 } from '@dss-monorepo/olap-connector';
@@ -17,6 +19,10 @@ import type {
   SaikuDimension,
   SaikuMeasure,
 } from '@dss-monorepo/olap-models';
+
+// Keep application code on the data-access layer instead of depending on the
+// low-level OLAP connector directly.
+export { executeQuery, newQuery };
 
 export type {
   AppPage,
