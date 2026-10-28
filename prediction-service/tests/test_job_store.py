@@ -49,8 +49,10 @@ class JobStoreTests(unittest.TestCase):
     def test_create_duplicate_job_raises_error(self) -> None:
         record = self._sample_record()
         self.store.create(record)
-        with self.assertRaises(ValueError):
-            self.store.create(record)
+        duplicate_id = self._sample_record(key="a-different-key")
+        import sqlite3
+        with self.assertRaises(sqlite3.IntegrityError):
+            self.store.create(duplicate_id)
 
     def test_update_status_transitions(self) -> None:
         record = self._sample_record()
@@ -109,6 +111,31 @@ class JobStoreTests(unittest.TestCase):
         missing = self.store.find_by_idempotency_key("non-existent-key")
         self.assertIsNone(missing)
 
+    def test_same_key_with_different_request_conflicts(self) -> None:
+        from training.job_store import IdempotencyConflict
+        record = self._sample_record(key="same-key")
+        self.store.create(record)
+        changed = self._sample_record(job_id="job-002", key="same-key")
+        changed.algorithm = "xgboost"
+        changed.request_digest = self.store.request_digest(changed.dataset_ref, changed.algorithm, changed.config)
+        with self.assertRaises(IdempotencyConflict):
+            self.store.create(changed)
+
+    def test_only_one_duplicate_delivery_can_claim_job(self) -> None:
+        record = self._sample_record()
+        self.store.create(record)
+        self.assertTrue(self.store.claim(record.job_id))
+        self.assertFalse(self.store.claim(record.job_id))
+
+    def test_expired_running_job_can_be_reclaimed(self) -> None:
+        record = self._sample_record()
+        self.store.create(record)
+        self.assertTrue(self.store.claim(record.job_id))
+        with self.store._connect() as connection:
+            connection.execute("UPDATE jobs SET lease_until='2000-01-01 00:00:00' WHERE job_id=?", (record.job_id,))
+        self.assertTrue(self.store.claim(record.job_id))
+        self.assertEqual(self.store.get(record.job_id).attempt, 2)
+
     def test_list_active_jobs(self) -> None:
         rec1 = self._sample_record("job-1", "k1")
         rec2 = self._sample_record("job-2", "k2")
@@ -118,12 +145,21 @@ class JobStoreTests(unittest.TestCase):
         self.store.create(rec2)
         self.store.create(rec3)
 
-        self.store.update_status("job-2", JobStatus.RUNNING)
+        self.assertTrue(self.store.claim("job-2"))
         self.store.update_status("job-3", JobStatus.SUCCEEDED)
 
         active = self.store.list_active()
         active_ids = {j.job_id for j in active}
         self.assertEqual(active_ids, {"job-1", "job-2"})
+
+    def test_expired_running_lease_does_not_consume_capacity(self) -> None:
+        record = self._sample_record()
+        self.store.create(record)
+        self.assertTrue(self.store.claim(record.job_id))
+        with self.store._connect() as connection:
+            connection.execute("UPDATE jobs SET lease_until='2000-01-01 00:00:00' WHERE job_id=?", (record.job_id,))
+
+        self.assertEqual(self.store.list_active(), [])
 
 
 if __name__ == "__main__":

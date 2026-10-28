@@ -255,21 +255,27 @@ services:
       dockerfile: Dockerfile
     restart: on-failure
     environment:
-      PREDICTION_ENV: ${PREDICTION_ENV:-production}
+      PREDICTION_ENV: ${PREDICTION_ENV:-development}
       PREDICTION_HOST: 0.0.0.0
       PREDICTION_PORT: ${PREDICTION_PORT:-8000}
       PREDICTION_LOG_LEVEL: ${PREDICTION_LOG_LEVEL:-info}
       PREDICTION_RELOAD: ${PREDICTION_RELOAD:-false}
+      PREDICTION_DATABASE_URL: ${PREDICTION_API_DATABASE_URL:-${PREDICTION_DATABASE_URL:-postgresql://${POSTGRES_DW_USER}:${POSTGRES_DW_PASSWORD}@postgres-dw:5432/${POSTGRES_DW_NAME}}}
+      PREDICTION_IDEMPOTENCY_SCOPE: ${PREDICTION_IDEMPOTENCY_SCOPE:-development}
+      PREDICTION_DEV_SUBJECT: ${PREDICTION_DEV_SUBJECT:-development-operator}
+      PREDICTION_OUTBOX_POLL_SECONDS: ${PREDICTION_OUTBOX_POLL_SECONDS:-5}
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
-      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+      RABBITMQ_USERNAME: ${PREDICTION_RABBITMQ_USER:-${RABBITMQ_DEFAULT_USER}}
+      RABBITMQ_PASSWORD: ${PREDICTION_RABBITMQ_PASSWORD:-${RABBITMQ_DEFAULT_PASS}}
+      RABBITMQ_VHOST: ${PREDICTION_RABBITMQ_VHOST:-${RABBITMQ_VHOST:-/}}
       WORKER_ARTIFACTS_DIR: /app/artifacts
-      WORKER_JOB_STORE_PATH: /app/artifacts/job_store.json
-    volumes:
-      - prediction_artifacts:/app/artifacts
+      PREDICTION_DATASET_ROOT: ${PREDICTION_DATASET_ROOT:-/app/snapshots}
     depends_on:
+      postgres-dw:
+        condition: service_healthy
+      dw-migrator:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
     networks:
@@ -281,19 +287,29 @@ services:
       dockerfile: Dockerfile.worker
     restart: on-failure
     environment:
-      PREDICTION_ENV: ${PREDICTION_ENV:-production}
+      PREDICTION_ENV: ${PREDICTION_ENV:-development}
+      PREDICTION_DATABASE_URL: ${PREDICTION_WORKER_DATABASE_URL:-${PREDICTION_DATABASE_URL:-postgresql://${POSTGRES_DW_USER}:${POSTGRES_DW_PASSWORD}@postgres-dw:5432/${POSTGRES_DW_NAME}}}
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
-      RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
-      RABBITMQ_PASSWORD: ${RABBITMQ_DEFAULT_PASS}
-      RABBITMQ_VHOST: ${RABBITMQ_VHOST:-/}
+      RABBITMQ_USERNAME: ${PREDICTION_RABBITMQ_USER:-${RABBITMQ_DEFAULT_USER}}
+      RABBITMQ_PASSWORD: ${PREDICTION_RABBITMQ_PASSWORD:-${RABBITMQ_DEFAULT_PASS}}
+      RABBITMQ_VHOST: ${PREDICTION_RABBITMQ_VHOST:-${RABBITMQ_VHOST:-/}}
       WORKER_MAX_CONCURRENT_JOBS: ${WORKER_MAX_CONCURRENT_JOBS:-1}
       WORKER_JOB_TIMEOUT_SECONDS: ${WORKER_JOB_TIMEOUT_SECONDS:-1800}
+      WORKER_CPU_LIMIT: ${WORKER_CPU_LIMIT:-2}
+      WORKER_MEMORY_LIMIT_MB: ${WORKER_MEMORY_LIMIT_MB:-2048}
       WORKER_ARTIFACTS_DIR: /app/artifacts
-      WORKER_JOB_STORE_PATH: /app/artifacts/job_store.json
+      PREDICTION_DATASET_ROOT: ${PREDICTION_DATASET_ROOT:-/app/snapshots}
     volumes:
       - prediction_artifacts:/app/artifacts
+      - ${PREDICTION_SNAPSHOT_DIR:-./infra/prediction-snapshots}:/app/snapshots:ro
+    cpus: ${WORKER_CPU_LIMIT:-2}
+    mem_limit: ${WORKER_MEMORY_LIMIT_MB:-2048}m
     depends_on:
+      postgres-dw:
+        condition: service_healthy
+      dw-migrator:
+        condition: service_completed_successfully
       rabbitmq:
         condition: service_healthy
     networks:

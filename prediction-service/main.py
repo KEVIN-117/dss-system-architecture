@@ -4,16 +4,18 @@ from __future__ import annotations
 
 import logging
 import os
+import asyncio
+from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
-from uuid import uuid4
+from uuid import UUID, uuid4
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from config import settings
+from training.job_store import IdempotencyConflict, JobStore
 
 logger = logging.getLogger(__name__)
 
@@ -21,10 +23,32 @@ logger = logging.getLogger(__name__)
 # FastAPI application
 # ---------------------------------------------------------------------------
 
+async def _outbox_recovery_loop() -> None:
+    """Periodically republish committed jobs left pending by broker outages."""
+    while True:
+        await asyncio.sleep(float(os.getenv("PREDICTION_OUTBOX_POLL_SECONDS", "5")))
+        try:
+            await asyncio.to_thread(_dispatch_pending, JobStore())
+        except Exception:
+            logger.exception("Outbox recovery cycle failed; it will retry")
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    task = asyncio.create_task(_outbox_recovery_loop())
+    try:
+        yield
+    finally:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
 app = FastAPI(
     title="Prediction Service API",
     description="API para servicios de predicción y análisis prescriptivo",
     version="1.0.0",
+    lifespan=lifespan,
 )
 
 
@@ -140,17 +164,20 @@ def submit_training_job(
     Requiere permiso de operador ML. Nunca entrena dentro de la petición.
     El Idempotency-Key evita jobs duplicados al reintentar.
     """
-    from training.job_store import JobStore, JobStatus, TrainingJobRecord
+    from training.job_store import JobStatus, TrainingJobRecord
 
     request_id = x_request_id or str(uuid4())
-    artifacts_dir = os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts")
-    store_path = os.getenv("WORKER_JOB_STORE_PATH", os.path.join(artifacts_dir, "job_store.json"))
-
-    store = JobStore(Path(store_path))
+    store = JobStore()
 
     # Idempotency check
-    existing = store.find_by_idempotency_key(idempotency_key)
+    scope = os.getenv("PREDICTION_IDEMPOTENCY_SCOPE", "development")
+    existing = store.find_by_idempotency_key(idempotency_key, scope)
     if existing is not None:
+        digest = store.request_digest(body.dataset_ref, body.algorithm, {"configuration_ref": body.configuration_ref})
+        if existing.request_digest != digest:
+            return _make_problem(409, "Idempotency conflict", "CONFLICT", request_id,
+                                 detail="Idempotency-Key was already used for a different request.")
+        _dispatch_pending(store)
         return TrainingJobResponse(
             job_id=existing.job_id,
             dataset_ref=existing.dataset_ref,
@@ -165,7 +192,7 @@ def submit_training_job(
     # Check capacity
     active_jobs = store.list_active()
     max_concurrent = int(os.getenv("WORKER_MAX_CONCURRENT_JOBS", "1"))
-    if len(active_jobs) >= max_concurrent:
+    if len([j for j in active_jobs if j.status == JobStatus.RUNNING]) >= max_concurrent:
         return _make_problem(
             429, "Job capacity exhausted", "JOB_CAPACITY", request_id,
             detail=f"Maximum {max_concurrent} concurrent jobs allowed.",
@@ -182,7 +209,7 @@ def submit_training_job(
         created_at=now,
         started_at=None,
         finished_at=None,
-        submitted_by="anonymous",  # TODO: extract from JWT when auth is implemented
+        submitted_by=os.getenv("PREDICTION_DEV_SUBJECT", "development-operator"),
         model_candidate=None,
         error=None,
         idempotency_key=idempotency_key,
@@ -190,46 +217,21 @@ def submit_training_job(
         dataset_version=body.dataset_ref,
         dependency_versions={},
     )
-    store.create(record)
-
-    # Dispatch to Celery worker
+    record.request_digest = store.request_digest(body.dataset_ref, body.algorithm, record.config)
     try:
-        from training.tasks import train_model_task
-
-        train_model_task.delay(
-            job_id=job_id,
-            dataset_ref=body.dataset_ref,
-            algorithm=body.algorithm,
-            config={"configuration_ref": body.configuration_ref},
-            artifacts_dir=artifacts_dir,
-            job_store_path=store_path,
-        )
-        logger.info("Training job %s dispatched for algorithm=%s", job_id, body.algorithm)
-    except Exception:
-        logger.exception("Failed to dispatch training job %s to Celery", job_id)
-        store.update_status(
-            job_id,
-            JobStatus.FAILED,
-            error={
-                "type": "about:blank",
-                "title": "Worker dispatch failed",
-                "status": 503,
-                "code": "INTERNAL_ERROR",
-                "request_id": request_id,
-            },
-        )
-        return _make_problem(
-            503, "Worker unavailable", "INTERNAL_ERROR", request_id,
-            detail="Could not dispatch training job to worker.",
-        )
+        record = store.create(record, scope)
+    except IdempotencyConflict:
+        return _make_problem(409, "Idempotency conflict", "CONFLICT", request_id,
+                             detail="Idempotency-Key was already used for a different request.")
+    _dispatch_pending(store)
 
     return TrainingJobResponse(
-        job_id=job_id,
+        job_id=record.job_id,
         dataset_ref=body.dataset_ref,
         algorithm=body.algorithm,
-        status=JobStatus.QUEUED.value,
-        created_at=now,
-        submitted_by="anonymous",
+        status=record.status.value,
+        created_at=record.created_at,
+        submitted_by=record.submitted_by,
     )
 
 
@@ -243,13 +245,21 @@ def get_training_job(
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
 ) -> Any:
     """Consulta el estado de un trabajo dentro del ámbito autorizado."""
-    from training.job_store import JobStore
-
     request_id = x_request_id or str(uuid4())
-    artifacts_dir = os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts")
-    store_path = os.getenv("WORKER_JOB_STORE_PATH", os.path.join(artifacts_dir, "job_store.json"))
-
-    store = JobStore(Path(store_path))
+    try:
+        UUID(job_id)
+    except ValueError:
+        raise HTTPException(
+            status_code=404,
+            detail={
+                "type": "about:blank",
+                "title": "Training job not found",
+                "status": 404,
+                "code": "RESOURCE_NOT_FOUND",
+                "request_id": request_id,
+            },
+        ) from None
+    store = JobStore()
     record = store.get(job_id)
 
     if record is None:
@@ -283,6 +293,27 @@ def get_training_job(
         model_candidate=model_candidate,
         error=record.error,
     )
+
+
+def _dispatch_pending(store: JobStore) -> None:
+    """Publish committed outbox entries; failed publishes remain retryable."""
+    from training.tasks import train_model_task
+    for job_id in store.pending_outbox():
+        job = store.get(job_id)
+        if job is None:
+            continue
+        try:
+            train_model_task.apply_async(
+                kwargs={"job_id": job.job_id, "dataset_ref": job.dataset_ref,
+                        "algorithm": job.algorithm, "config": job.config,
+                        "artifacts_dir": os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts")},
+                task_id=job.job_id,
+                queue="prediction.train_model",
+            )
+            store.mark_published(job_id)
+        except Exception as exc:
+            logger.warning("Outbox dispatch pending for job %s: %s", job_id, exc)
+            store.mark_published(job_id, error=exc)
 
 
 # ---------------------------------------------------------------------------
