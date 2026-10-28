@@ -12,5 +12,5 @@
   "dss-monorepo/apps/rector-dashboard": "0.0.0",
   "dss-monorepo/apps/landing": "0.0.0",
   "dss-monorepo/apps/docs-portal": "0.0.0",
-  "dss-monorepo/apps/olap-workspace": "0.0.0"
+  "dss-monorepo/apps/olap-workspace": "1.0.0"
 }
