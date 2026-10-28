@@ -8,6 +8,7 @@
   "targets": {
     "build": {
       "command": "next build --webpack",
+      "dependsOn": ["^build"],
       "parallelism": false,
       "options": {
         "cwd": "apps/landing",
