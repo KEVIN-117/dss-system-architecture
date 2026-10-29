@@ -1,0 +1,1806 @@
+{
+  "metadata": {
+    "country": "Bolivia",
+    "total_schools_nationwide": 5235,
+    "total_schools_potosi": 488,
+    "source": "Ministerio de Educación de Bolivia / UATF colegios.csv"
+  },
+  "national_department_distribution": {
+    "La Paz": 1460,
+    "Santa Cruz": 1144,
+    "Cochabamba": 815,
+    "Potosi": 488,
+    "Beni": 392,
+    "Chuquisaca": 309,
+    "Oruro": 240,
+    "Tarija": 225,
+    "Pando": 162
+  },
+  "empirical_distributions": {
+    "dependency": {
+      "Fiscal": 0.8076,
+      "Privada": 0.0986,
+      "Convenio": 0.0938
+    },
+    "shift": {
+      "Mañana": 0.5759,
+      "Mañana-Tarde": 0.2369,
+      "Tarde": 0.1601,
+      "Noche": 0.0271
+    },
+    "area": {
+      "Urbana": 0.624,
+      "Rural": 0.376
+    }
+  },
+  "iconic_potosi_schools": [
+    {
+      "cod_ue": 81980001,
+      "name": "COLEGIO NACIONAL PICHINCHA",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1826,
+      "notes": "Colegio fiscal tradicional de varones más antiguo de Potosí",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980002,
+      "name": "COLEGIO NACIONAL JUAN MANUEL CALERO",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1941,
+      "notes": "Colegio fiscal tradicional, histórico rival deportivo del Pichincha",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980003,
+      "name": "COLEGIO SANTA ROSA",
+      "type": "Fiscal",
+      "shift": "Tarde",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1912,
+      "notes": "Liceo tradicional de señoritas de Potosí",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980004,
+      "name": "COLEGIO PARTICULAR DON BOSCO",
+      "type": "Convenio",
+      "shift": "Mañana",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1935,
+      "notes": "Colegio Salesiano de gran prestigio académico",
+      "dependency": "Convenio"
+    },
+    {
+      "cod_ue": 81980005,
+      "name": "COLEGIO PARTICULAR FRANCISCANO",
+      "type": "Privada",
+      "shift": "Mañana",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1960,
+      "notes": "Colegio privado católico",
+      "dependency": "Privada"
+    },
+    {
+      "cod_ue": 81980006,
+      "name": "COLEGIO PARTICULAR MARIA AUXILIADORA",
+      "type": "Privada",
+      "shift": "Mañana",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1928,
+      "notes": "Colegio femenino de congregación religiosa",
+      "dependency": "Privada"
+    },
+    {
+      "cod_ue": 81980007,
+      "name": "COLEGIO CRISTO MAESTRO",
+      "type": "Convenio",
+      "shift": "Mañana-Tarde",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1975,
+      "notes": "Red Fe y Alegría",
+      "dependency": "Convenio"
+    },
+    {
+      "cod_ue": 81980008,
+      "name": "COLEGIO NACIONAL SIMÓN BOLÍVAR",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1955,
+      "notes": "Colegio fiscal emblemático",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980009,
+      "name": "COLEGIO MODESTO OMISTE",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1908,
+      "notes": "Uno de los primeros colegios de primaria/secundaria",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980010,
+      "name": "COLEGIO SUCRE",
+      "type": "Fiscal",
+      "shift": "Tarde",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1925,
+      "notes": "Tradicional colegio fiscal",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980011,
+      "name": "COLEGIO CARLOS MEDINACELLI",
+      "type": "Fiscal",
+      "shift": "Tarde",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1968,
+      "notes": "Nombrado en honor al escritor de La Chaskañawi",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980012,
+      "name": "COLEGIO ANICETO ARCE",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1938,
+      "notes": "Colegio fiscal de zona popular",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980013,
+      "name": "COLEGIO JOSÉ MARÍA LINARES",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1948,
+      "notes": "Colegio emblemático",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980014,
+      "name": "COLEGIO PARTICULAR BANCARIO",
+      "type": "Privada",
+      "shift": "Mañana",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1982,
+      "notes": "Colegio privado comercial",
+      "dependency": "Privada"
+    },
+    {
+      "cod_ue": 81980015,
+      "name": "COLEGIO CLETO LOAYZA",
+      "type": "Fiscal",
+      "shift": "Tarde",
+      "area": "Urbana",
+      "level": "Secundaria",
+      "founded": 1970,
+      "notes": "Colegio fiscal de Potosí",
+      "dependency": "Fiscal"
+    }
+  ],
+  "provincial_sub_sede_schools": [
+    {
+      "cod_ue": 81980101,
+      "name": "COLEGIO NACIONAL SUCRE DE TUPIZA",
+      "sede": "Tupiza",
+      "province": "Sud Chichas",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980102,
+      "name": "COLEGIO NACIONAL CHOROLQUE",
+      "sede": "Tupiza",
+      "province": "Sud Chichas",
+      "type": "Fiscal",
+      "shift": "Mañana-Tarde",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980103,
+      "name": "COLEGIO 9 DE ABRIL",
+      "sede": "Villazón",
+      "province": "Modesto Omiste",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980104,
+      "name": "COLEGIO CORNELIO SAAVEDRA DE VILLAZON",
+      "sede": "Villazón",
+      "province": "Modesto Omiste",
+      "type": "Fiscal",
+      "shift": "Tarde",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980105,
+      "name": "COLEGIO ANTONIO QUIJARRO",
+      "sede": "Uyuni",
+      "province": "Antonio Quijarro",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980106,
+      "name": "COLEGIO HEROES DEL CHACO",
+      "sede": "Uyuni",
+      "province": "Antonio Quijarro",
+      "type": "Fiscal",
+      "shift": "Tarde",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980107,
+      "name": "COLEGIO NACIONAL JUNIN DE UNCIA",
+      "sede": "Uncía",
+      "province": "Rafael Bustillo",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980108,
+      "name": "COLEGIO SIGLO XX",
+      "sede": "Llallagua",
+      "province": "Rafael Bustillo",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980109,
+      "name": "COLEGIO AMERICA DE CATAVI",
+      "sede": "Catavi",
+      "province": "Rafael Bustillo",
+      "type": "Fiscal",
+      "shift": "Tarde",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980110,
+      "name": "COLEGIO DANIEL CAMPOS DE LLICA",
+      "sede": "Llica",
+      "province": "Daniel Campos",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "dependency": "Fiscal"
+    },
+    {
+      "cod_ue": 81980111,
+      "name": "COLEGIO ALONSO DE IBAÑEZ",
+      "sede": "Sacaca",
+      "province": "Alonso de Ibáñez",
+      "type": "Fiscal",
+      "shift": "Mañana",
+      "dependency": "Fiscal"
+    }
+  ],
+  "potosi_schools_catalog_sample": [
+    {
+      "cod_ue": 81410134,
+      "name": "PEDRO ARRAYA DE CHACOPAMPA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "NO EXISTE EN CNPV 2001",
+      "municipality": "NO EXISTE EN CNPV 2001",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 61480025,
+      "name": "JESUS VALLE",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 61480032,
+      "name": "CHALVIRI",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 61480036,
+      "name": "1RO. DE MAYO DE SAN ILDEFONSO",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 61480037,
+      "name": "KARACHIPAMPA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71480001,
+      "name": "CHULLCHUCANI",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 71480006,
+      "name": "SANTIAGO DE OCKORURO",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 71480107,
+      "name": "SANTA MARIA DE CHAQUILLA ALTA",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 71480109,
+      "name": "SAMASA BAJA",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 71480112,
+      "name": "MANQUIRI",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 71480125,
+      "name": "SAN RAFAEL DE HUARI HUARI B",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81480005,
+      "name": "MODESTO OMISTE B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480010,
+      "name": "1RO. DE ABRIL B",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480014,
+      "name": "LUIS FELIPE MANZANO B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480020,
+      "name": "JOSE ALONSO DE IBAÑEZ B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480032,
+      "name": "GREGORIO BARRIGA",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480038,
+      "name": "HUMBERTO QUEZADA",
+      "dependency": "Convenio",
+      "shift": "N",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81480040,
+      "name": "LITORAL C",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480042,
+      "name": "SAN JOSE B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480048,
+      "name": "ANDRES DE SANTA CRUZ C",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480054,
+      "name": "LADISLAO CABRERA",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480055,
+      "name": "AIDA MENDOZA DE ALURRALDE",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480075,
+      "name": "VICENTE BERNEDO B",
+      "dependency": "Convenio",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81480077,
+      "name": "MANUEL ASCENCIO PADILLA",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480079,
+      "name": "CLETO LOAYZA B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480085,
+      "name": "GERMAN BUSCH B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480090,
+      "name": "21 DE ENERO C",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480095,
+      "name": "SAN CLEMENTE B",
+      "dependency": "Convenio",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81480105,
+      "name": "SANTA ROSA B",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480106,
+      "name": "JUAN MANUEL CALERO A",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480107,
+      "name": "OTTO FELIPE BRAUN",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480111,
+      "name": "ANTOFAGASTA A",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480113,
+      "name": "JOSE DAVID BERRIOS",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480114,
+      "name": "MANUEL BASCONEZ",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480115,
+      "name": "SUCRE",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480116,
+      "name": "MARIA GUTIERREZ",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480117,
+      "name": "BOLIVIA",
+      "dependency": "Fiscal",
+      "shift": "N",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480118,
+      "name": "POTOSI",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480119,
+      "name": "PICHINCHA A",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480120,
+      "name": "JOSE IGNACIO SANJINEZ",
+      "dependency": "Fiscal",
+      "shift": "N",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480121,
+      "name": "CARLOS MEDINACELLI",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480122,
+      "name": "ANICETO ARCE",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480123,
+      "name": "SIMON BOLIVAR",
+      "dependency": "Fiscal",
+      "shift": "N",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480124,
+      "name": "PACIFICO SEQUEIROS",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480126,
+      "name": "LUIS ESPINAL",
+      "dependency": "Convenio",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81480143,
+      "name": "MEJILLONES B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480145,
+      "name": "31 DE OCTUBRE C",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480147,
+      "name": "DIVINO MAESTRO C",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480155,
+      "name": "ANTONIO JOSE DE SUCRE B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480157,
+      "name": "CRISTO MAESTRO",
+      "dependency": "Privada",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480158,
+      "name": "FRANCISCANO",
+      "dependency": "Privada",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480159,
+      "name": "BANCARIA",
+      "dependency": "Privada",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480160,
+      "name": "NUEVO TIEMPO",
+      "dependency": "Privada",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480161,
+      "name": "DON BOSCO A",
+      "dependency": "Privada",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480163,
+      "name": "MARIA AUXILIADORA",
+      "dependency": "Privada",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480164,
+      "name": "TOMAS FRIAS",
+      "dependency": "Privada",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480166,
+      "name": "GENESIS",
+      "dependency": "Privada",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480168,
+      "name": "SANTA MARIA",
+      "dependency": "Privada",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480170,
+      "name": "COPACABANA C",
+      "dependency": "Convenio",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81480177,
+      "name": "KENNY PRIETO MELGAREJO",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480178,
+      "name": "SAGRADOS CORAZONES DE JESUS Y DE MARIA A",
+      "dependency": "Privada",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480179,
+      "name": "TOPATER C",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480180,
+      "name": "JUAN PABLO II",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480182,
+      "name": "VIDA Y VERDAD",
+      "dependency": "Privada",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Privada"
+    },
+    {
+      "cod_ue": 81480184,
+      "name": "JESUS DE NAZARETH",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480187,
+      "name": "MIRAFLORES",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81480191,
+      "name": "JUAN EVO MORALES",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480192,
+      "name": "JORGE AVILES DE JAYAQUILA",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81480193,
+      "name": "GUALBERTO VILLARROEL B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480195,
+      "name": "OSCAR ALFARO B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480199,
+      "name": "ELIZARDO PEREZ",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480204,
+      "name": "SIMEON RONCAL B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480208,
+      "name": "JOSE MARIA LINARES C",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480209,
+      "name": "6 DE JUNIO B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480210,
+      "name": "COBIJA B",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480211,
+      "name": "ELIZARDO PEREZ DE VILLA VICTORIA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480213,
+      "name": "DON BOSCO C",
+      "dependency": "Convenio",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81480214,
+      "name": "HUGO CHAVEZ FRIAS",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480234,
+      "name": "HUMBERTO IPORRE SALINAS B",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81480249,
+      "name": "CECILIO GUZMAN DE ROJAS A",
+      "dependency": "Fiscal",
+      "shift": "T",
+      "province": "TOMAS FRIAS",
+      "municipality": "CAPITAL (POTOSÍ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71480013,
+      "name": "MCAL. ANTONIO JOSE DE SUCRE DE TALULA",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "PRIMERA SECCIÓN (TINGUIPAYA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 71480033,
+      "name": "JAHUACAYA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "PRIMERA SECCIÓN (TINGUIPAYA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71480043,
+      "name": "ANTHURA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "PRIMERA SECCIÓN (TINGUIPAYA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71480049,
+      "name": "CHALLAMAYU",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "PRIMERA SECCIÓN (TINGUIPAYA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71480058,
+      "name": "FRANZ TAMAYO DE ACTARA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "PRIMERA SECCIÓN (TINGUIPAYA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71480075,
+      "name": "CIENEGOMA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "PRIMERA SECCIÓN (TINGUIPAYA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71480084,
+      "name": "FOROCTIRI JUNIN",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "PRIMERA SECCIÓN (TINGUIPAYA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71480114,
+      "name": "MCAL. SUCRE B",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "PRIMERA SECCIÓN (TINGUIPAYA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71480131,
+      "name": "TOMAS FRIAS",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "PRIMERA SECCIÓN (TINGUIPAYA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71480137,
+      "name": "SIMON RODRIGUEZ",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "PRIMERA SECCIÓN (TINGUIPAYA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 61480001,
+      "name": "EDUARDO ABAROA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "SEGUNDA SECCIÓN (YOCALLA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 61480009,
+      "name": "ELIZARDO PEREZ DE TURQUI",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "SEGUNDA SECCIÓN (YOCALLA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 61480015,
+      "name": "CAYARA",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "SEGUNDA SECCIÓN (YOCALLA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 61480019,
+      "name": "SAN ANTONIO",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "SEGUNDA SECCIÓN (YOCALLA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 61480022,
+      "name": "SANTA LUCIA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "SEGUNDA SECCIÓN (YOCALLA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 61480049,
+      "name": "ING. CARLOS PRUDENCIO RAMIREZ",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "SEGUNDA SECCIÓN (YOCALLA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 61480052,
+      "name": "TOMÁS FRIAS DE CHIRACORO",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "SEGUNDA SECCIÓN (YOCALLA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 61480053,
+      "name": "FRAY SERGIO CASTELLI",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "SEGUNDA SECCIÓN (YOCALLA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 61480054,
+      "name": "MARTIN CRUZ DE YURAC CKASA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "SEGUNDA SECCIÓN (YOCALLA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 51480001,
+      "name": "JUAN JOSE PEREZ",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "TOMAS FRIAS",
+      "municipality": "TERCERA SECCIÓN (URMIRI)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81390002,
+      "name": "VILLA PORVENIR DE SAN ANTONIO DE LIPEZ",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "SUR LÍPEZ",
+      "municipality": "PRIMERA SECCIÓN (SAN PABLO DE LIPEZ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81390007,
+      "name": "NUEVA ESPERANZA DE POLULOS",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "SUR LÍPEZ",
+      "municipality": "PRIMERA SECCIÓN (SAN PABLO DE LIPEZ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81390027,
+      "name": "SAN PABLO DE LIPEZ",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "SUR LÍPEZ",
+      "municipality": "PRIMERA SECCIÓN (SAN PABLO DE LIPEZ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81390028,
+      "name": "LITORAL",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "SUR LÍPEZ",
+      "municipality": "PRIMERA SECCIÓN (SAN PABLO DE LIPEZ)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81390020,
+      "name": "MOJINETE",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "SUR LÍPEZ",
+      "municipality": "SEGUNDA SECCIÓN (MOJINETE)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 61390001,
+      "name": "PROF. FLORENCIO MAMANI TOCONAS",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "SUR LÍPEZ",
+      "municipality": "TERCERA SECCIÓN (SAN ANTONIO DE ESMORUCO)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71380001,
+      "name": "RAUL PEREZ DE ALKATUYO",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380001,
+      "name": "FRAY JOSE  ANTONIO ZAMPA DE YASCAPI",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81380013,
+      "name": "FRAY FRANCO VALLI BROGI DE SUQUICHA",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81380016,
+      "name": "VILACAYA",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81380023,
+      "name": "GERARDO MALDINI DE CHACABUCO",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81380049,
+      "name": "23 DE MARZO DE CHINOLY",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380056,
+      "name": "TURQUIÑA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380063,
+      "name": "BELEN",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380065,
+      "name": "MARCELINO AGUIRRE",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380072,
+      "name": "MEDIA LUNA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380078,
+      "name": "CHECCHI",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380082,
+      "name": "SEOCOCHI",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380089,
+      "name": "FRANZ TAMAYO",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380105,
+      "name": "10 DE NOVIEMBRE DE TAMBILLOS",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380108,
+      "name": "EUSEBIO BALTAZAR FLORES",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380109,
+      "name": "MANUEL ASCENCIO PADILLA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380116,
+      "name": "QHALAPAYA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380119,
+      "name": "KELUYO",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380120,
+      "name": "UYUNI",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380128,
+      "name": "MOLLES",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380137,
+      "name": "TOMAS FRIAS",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380140,
+      "name": "JOSE MARIA LINARES B",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380142,
+      "name": "JOSE MARIA LINARES C",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380143,
+      "name": "20 DE ENERO DE CKOCHAS B",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380144,
+      "name": "LITORAL",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380145,
+      "name": "OTAVI",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380151,
+      "name": "ALBERTO MAISANT",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 81380152,
+      "name": "JOSE MARIA LINARES E",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380153,
+      "name": "EDUARDO ABAROA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81380164,
+      "name": "PADRE ADRIAN WILLEMS PAZ",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "PRIMERA SECCIÓN (PUNA)",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 71380005,
+      "name": "FRANZ TAMAYO DE OCKORURO",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "SEGUNDA SECCIÓN (CAIZA \"D\")",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71380012,
+      "name": "BOLIVAR DE JATUN PAMPA VISIJSA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "SEGUNDA SECCIÓN (CAIZA \"D\")",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71380038,
+      "name": "PABLO VI",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "SEGUNDA SECCIÓN (CAIZA \"D\")",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 71380039,
+      "name": "MCAL. ANDRES DE SANTA CRUZ DE LA LAVA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "SEGUNDA SECCIÓN (CAIZA \"D\")",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71380041,
+      "name": "SAN BARTOLOME",
+      "dependency": "Convenio",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "SEGUNDA SECCIÓN (CAIZA \"D\")",
+      "area": "Rural",
+      "type": "Convenio"
+    },
+    {
+      "cod_ue": 71380045,
+      "name": "SEVERO BARRIENTOS DURAN",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "SEGUNDA SECCIÓN (CAIZA \"D\")",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 71380047,
+      "name": "JUAN EVO MORALES AYMA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "JOSÉ MARIA LINARES",
+      "municipality": "SEGUNDA SECCIÓN (CAIZA \"D\")",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81370009,
+      "name": "BOLIVIA",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "ANTONIO QUIJARRO",
+      "municipality": "PRIMERA SECCIÓN (UYUNI)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81370010,
+      "name": "JAIME DE ZUDAÑEZ",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "ANTONIO QUIJARRO",
+      "municipality": "PRIMERA SECCIÓN (UYUNI)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81370011,
+      "name": "POTOSI",
+      "dependency": "Fiscal",
+      "shift": "M",
+      "province": "ANTONIO QUIJARRO",
+      "municipality": "PRIMERA SECCIÓN (UYUNI)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81370012,
+      "name": "NOEL MARIACA CARVAJAL",
+      "dependency": "Fiscal",
+      "shift": "N",
+      "province": "ANTONIO QUIJARRO",
+      "municipality": "PRIMERA SECCIÓN (UYUNI)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81370015,
+      "name": "RICARDO RODRIGUEZ DE QUEHUA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "ANTONIO QUIJARRO",
+      "municipality": "PRIMERA SECCIÓN (UYUNI)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81370018,
+      "name": "TELMO ROMAN",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "ANTONIO QUIJARRO",
+      "municipality": "PRIMERA SECCIÓN (UYUNI)",
+      "area": "Rural",
+      "type": "Fiscal"
+    },
+    {
+      "cod_ue": 81370029,
+      "name": "JUANA AZURDUY DE PADILLA DE VILLA ESPERANZA",
+      "dependency": "Fiscal",
+      "shift": "M-T",
+      "province": "ANTONIO QUIJARRO",
+      "municipality": "PRIMERA SECCIÓN (UYUNI)",
+      "area": "Rural",
+      "type": "Fiscal"
+    }
+  ]
+}

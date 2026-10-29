@@ -1,0 +1,1379 @@
+{
+  "metadata": {
+    "source": "19,073 historical records from UATF grad_2019_2025.xlsx",
+    "description": "Empirical demographic distributions, names, surnames, and document formats for Bolivia and Potosí"
+  },
+  "surnames": {
+    "empirical_top_100": [
+      {
+        "surname": "MAMANI",
+        "count": 1862,
+        "frequency_percentage": 4.922,
+        "cumulative_percentage": 4.922,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "FLORES",
+        "count": 1117,
+        "frequency_percentage": 2.953,
+        "cumulative_percentage": 7.875,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "QUISPE",
+        "count": 975,
+        "frequency_percentage": 2.578,
+        "cumulative_percentage": 10.453,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "CONDORI",
+        "count": 840,
+        "frequency_percentage": 2.221,
+        "cumulative_percentage": 12.674,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "CHOQUE",
+        "count": 830,
+        "frequency_percentage": 2.194,
+        "cumulative_percentage": 14.868,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "CRUZ",
+        "count": 675,
+        "frequency_percentage": 1.784,
+        "cumulative_percentage": 16.652,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "GUTIERREZ",
+        "count": 501,
+        "frequency_percentage": 1.324,
+        "cumulative_percentage": 17.976,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "RAMOS",
+        "count": 441,
+        "frequency_percentage": 1.166,
+        "cumulative_percentage": 19.142,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "VARGAS",
+        "count": 415,
+        "frequency_percentage": 1.097,
+        "cumulative_percentage": 20.239,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "MARTINEZ",
+        "count": 410,
+        "frequency_percentage": 1.084,
+        "cumulative_percentage": 21.323,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "FERNANDEZ",
+        "count": 382,
+        "frequency_percentage": 1.01,
+        "cumulative_percentage": 22.333,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "LOPEZ",
+        "count": 371,
+        "frequency_percentage": 0.981,
+        "cumulative_percentage": 23.314,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "RODRIGUEZ",
+        "count": 348,
+        "frequency_percentage": 0.92,
+        "cumulative_percentage": 24.234,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "COLQUE",
+        "count": 315,
+        "frequency_percentage": 0.833,
+        "cumulative_percentage": 25.067,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "VILLCA",
+        "count": 299,
+        "frequency_percentage": 0.79,
+        "cumulative_percentage": 25.857,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "RAMIREZ",
+        "count": 251,
+        "frequency_percentage": 0.664,
+        "cumulative_percentage": 26.521,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CASTRO",
+        "count": 248,
+        "frequency_percentage": 0.656,
+        "cumulative_percentage": 27.177,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CORO",
+        "count": 239,
+        "frequency_percentage": 0.632,
+        "cumulative_percentage": 27.809,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "LLANOS",
+        "count": 229,
+        "frequency_percentage": 0.605,
+        "cumulative_percentage": 28.414,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "GOMEZ",
+        "count": 227,
+        "frequency_percentage": 0.6,
+        "cumulative_percentage": 29.014,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "MENDOZA",
+        "count": 209,
+        "frequency_percentage": 0.553,
+        "cumulative_percentage": 29.567,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "COPA",
+        "count": 195,
+        "frequency_percentage": 0.516,
+        "cumulative_percentage": 30.083,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "DELGADO",
+        "count": 194,
+        "frequency_percentage": 0.513,
+        "cumulative_percentage": 30.596,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "GARCIA",
+        "count": 188,
+        "frequency_percentage": 0.497,
+        "cumulative_percentage": 31.093,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "SANCHEZ",
+        "count": 188,
+        "frequency_percentage": 0.497,
+        "cumulative_percentage": 31.59,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "HUANCA",
+        "count": 183,
+        "frequency_percentage": 0.484,
+        "cumulative_percentage": 32.074,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "FUERTES",
+        "count": 183,
+        "frequency_percentage": 0.484,
+        "cumulative_percentage": 32.558,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ROJAS",
+        "count": 176,
+        "frequency_percentage": 0.465,
+        "cumulative_percentage": 33.023,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "GONZALES",
+        "count": 173,
+        "frequency_percentage": 0.457,
+        "cumulative_percentage": 33.48,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "TORREZ",
+        "count": 172,
+        "frequency_percentage": 0.455,
+        "cumulative_percentage": 33.935,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "PINTO",
+        "count": 172,
+        "frequency_percentage": 0.455,
+        "cumulative_percentage": 34.39,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "MIRANDA",
+        "count": 171,
+        "frequency_percentage": 0.452,
+        "cumulative_percentage": 34.842,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ESTRADA",
+        "count": 159,
+        "frequency_percentage": 0.42,
+        "cumulative_percentage": 35.262,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "PEREZ",
+        "count": 156,
+        "frequency_percentage": 0.412,
+        "cumulative_percentage": 35.674,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "AGUILAR",
+        "count": 147,
+        "frequency_percentage": 0.389,
+        "cumulative_percentage": 36.063,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ROMERO",
+        "count": 145,
+        "frequency_percentage": 0.383,
+        "cumulative_percentage": 36.446,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "VEDIA",
+        "count": 145,
+        "frequency_percentage": 0.383,
+        "cumulative_percentage": 36.829,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "MARCA",
+        "count": 144,
+        "frequency_percentage": 0.381,
+        "cumulative_percentage": 37.21,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "PACO",
+        "count": 143,
+        "frequency_percentage": 0.378,
+        "cumulative_percentage": 37.588,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "ESPINOZA",
+        "count": 142,
+        "frequency_percentage": 0.375,
+        "cumulative_percentage": 37.963,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "LEON",
+        "count": 141,
+        "frequency_percentage": 0.373,
+        "cumulative_percentage": 38.336,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "MORALES",
+        "count": 132,
+        "frequency_percentage": 0.349,
+        "cumulative_percentage": 38.685,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CHAMBI",
+        "count": 130,
+        "frequency_percentage": 0.344,
+        "cumulative_percentage": 39.029,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "ALVAREZ",
+        "count": 124,
+        "frequency_percentage": 0.328,
+        "cumulative_percentage": 39.357,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "VASQUEZ",
+        "count": 124,
+        "frequency_percentage": 0.328,
+        "cumulative_percentage": 39.685,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "LIMACHI",
+        "count": 124,
+        "frequency_percentage": 0.328,
+        "cumulative_percentage": 40.013,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "YUCRA",
+        "count": 124,
+        "frequency_percentage": 0.328,
+        "cumulative_percentage": 40.341,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "SOTO",
+        "count": 121,
+        "frequency_percentage": 0.32,
+        "cumulative_percentage": 40.661,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ORTEGA",
+        "count": 120,
+        "frequency_percentage": 0.317,
+        "cumulative_percentage": 40.978,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ARANDO",
+        "count": 119,
+        "frequency_percentage": 0.315,
+        "cumulative_percentage": 41.293,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CARDENAS",
+        "count": 119,
+        "frequency_percentage": 0.315,
+        "cumulative_percentage": 41.608,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "HUALLPA",
+        "count": 118,
+        "frequency_percentage": 0.312,
+        "cumulative_percentage": 41.92,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "VELIZ",
+        "count": 118,
+        "frequency_percentage": 0.312,
+        "cumulative_percentage": 42.232,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "RUIZ",
+        "count": 116,
+        "frequency_percentage": 0.307,
+        "cumulative_percentage": 42.539,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "HUARACHI",
+        "count": 115,
+        "frequency_percentage": 0.304,
+        "cumulative_percentage": 42.843,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CALIZAYA",
+        "count": 113,
+        "frequency_percentage": 0.299,
+        "cumulative_percentage": 43.142,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "VELASQUEZ",
+        "count": 113,
+        "frequency_percentage": 0.299,
+        "cumulative_percentage": 43.441,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CABRERA",
+        "count": 111,
+        "frequency_percentage": 0.293,
+        "cumulative_percentage": 43.734,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "BRAVO",
+        "count": 110,
+        "frequency_percentage": 0.291,
+        "cumulative_percentage": 44.025,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "APAZA",
+        "count": 109,
+        "frequency_percentage": 0.288,
+        "cumulative_percentage": 44.313,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "PUMA",
+        "count": 106,
+        "frequency_percentage": 0.28,
+        "cumulative_percentage": 44.593,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "MENDEZ",
+        "count": 103,
+        "frequency_percentage": 0.272,
+        "cumulative_percentage": 44.865,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "NINA",
+        "count": 103,
+        "frequency_percentage": 0.272,
+        "cumulative_percentage": 45.137,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "GUZMAN",
+        "count": 103,
+        "frequency_percentage": 0.272,
+        "cumulative_percentage": 45.409,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ZAMBRANA",
+        "count": 102,
+        "frequency_percentage": 0.27,
+        "cumulative_percentage": 45.679,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ISLA",
+        "count": 99,
+        "frequency_percentage": 0.262,
+        "cumulative_percentage": 45.941,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "OYOLA",
+        "count": 98,
+        "frequency_percentage": 0.259,
+        "cumulative_percentage": 46.2,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CAYO",
+        "count": 97,
+        "frequency_percentage": 0.256,
+        "cumulative_percentage": 46.456,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ESCOBAR",
+        "count": 97,
+        "frequency_percentage": 0.256,
+        "cumulative_percentage": 46.712,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "RIVERA",
+        "count": 94,
+        "frequency_percentage": 0.248,
+        "cumulative_percentage": 46.96,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "DIAZ",
+        "count": 93,
+        "frequency_percentage": 0.246,
+        "cumulative_percentage": 47.206,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "MACHACA",
+        "count": 92,
+        "frequency_percentage": 0.243,
+        "cumulative_percentage": 47.449,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "JANCKO",
+        "count": 92,
+        "frequency_percentage": 0.243,
+        "cumulative_percentage": 47.692,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "HUANACO",
+        "count": 92,
+        "frequency_percentage": 0.243,
+        "cumulative_percentage": 47.935,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CANAVIRI",
+        "count": 89,
+        "frequency_percentage": 0.235,
+        "cumulative_percentage": 48.17,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "TAPIA",
+        "count": 88,
+        "frequency_percentage": 0.233,
+        "cumulative_percentage": 48.403,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ORCKO",
+        "count": 88,
+        "frequency_percentage": 0.233,
+        "cumulative_percentage": 48.636,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "IBARRA",
+        "count": 88,
+        "frequency_percentage": 0.233,
+        "cumulative_percentage": 48.869,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "UÑO",
+        "count": 88,
+        "frequency_percentage": 0.233,
+        "cumulative_percentage": 49.102,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "RIOS",
+        "count": 87,
+        "frequency_percentage": 0.23,
+        "cumulative_percentage": 49.332,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CALDERON",
+        "count": 82,
+        "frequency_percentage": 0.217,
+        "cumulative_percentage": 49.549,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "GARNICA",
+        "count": 81,
+        "frequency_percentage": 0.214,
+        "cumulative_percentage": 49.763,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "DURAN",
+        "count": 80,
+        "frequency_percentage": 0.211,
+        "cumulative_percentage": 49.974,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "SAAVEDRA",
+        "count": 79,
+        "frequency_percentage": 0.209,
+        "cumulative_percentage": 50.183,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "MENACHO",
+        "count": 78,
+        "frequency_percentage": 0.206,
+        "cumulative_percentage": 50.389,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "LAIME",
+        "count": 76,
+        "frequency_percentage": 0.201,
+        "cumulative_percentage": 50.59,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "SANTOS",
+        "count": 76,
+        "frequency_percentage": 0.201,
+        "cumulative_percentage": 50.791,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "PEREIRA",
+        "count": 76,
+        "frequency_percentage": 0.201,
+        "cumulative_percentage": 50.992,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CHAVARRIA",
+        "count": 76,
+        "frequency_percentage": 0.201,
+        "cumulative_percentage": 51.193,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "BAUTISTA",
+        "count": 75,
+        "frequency_percentage": 0.198,
+        "cumulative_percentage": 51.391,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "SOLIZ",
+        "count": 74,
+        "frequency_percentage": 0.196,
+        "cumulative_percentage": 51.587,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ALEJO",
+        "count": 74,
+        "frequency_percentage": 0.196,
+        "cumulative_percentage": 51.783,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "TACURI",
+        "count": 74,
+        "frequency_percentage": 0.196,
+        "cumulative_percentage": 51.979,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "TICONA",
+        "count": 74,
+        "frequency_percentage": 0.196,
+        "cumulative_percentage": 52.175,
+        "origin": "Quechua/Aymara"
+      },
+      {
+        "surname": "ZARATE",
+        "count": 73,
+        "frequency_percentage": 0.193,
+        "cumulative_percentage": 52.368,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "AGUIRRE",
+        "count": 73,
+        "frequency_percentage": 0.193,
+        "cumulative_percentage": 52.561,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "QUINTANILLA",
+        "count": 73,
+        "frequency_percentage": 0.193,
+        "cumulative_percentage": 52.754,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "MURILLO",
+        "count": 71,
+        "frequency_percentage": 0.188,
+        "cumulative_percentage": 52.942,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "CONDO",
+        "count": 69,
+        "frequency_percentage": 0.182,
+        "cumulative_percentage": 53.124,
+        "origin": "Castellano/Boliviano"
+      },
+      {
+        "surname": "ARAMAYO",
+        "count": 68,
+        "frequency_percentage": 0.18,
+        "cumulative_percentage": 53.304,
+        "origin": "Castellano/Boliviano"
+      }
+    ],
+    "origin_breakdown": {
+      "indigenous_andina_percentage": 38.5,
+      "castellano_criollo_percentage": 61.5
+    }
+  },
+  "first_names": {
+    "male": {
+      "top_names": [
+        {
+          "name": "JUAN CARLOS",
+          "count": 139,
+          "is_composite": true,
+          "weight": 0.0175
+        },
+        {
+          "name": "MIGUEL ANGEL",
+          "count": 125,
+          "is_composite": true,
+          "weight": 0.0157
+        },
+        {
+          "name": "JOSE LUIS",
+          "count": 103,
+          "is_composite": true,
+          "weight": 0.013
+        },
+        {
+          "name": "EDWIN",
+          "count": 75,
+          "is_composite": false,
+          "weight": 0.0094
+        },
+        {
+          "name": "MARCO ANTONIO",
+          "count": 73,
+          "is_composite": true,
+          "weight": 0.0092
+        },
+        {
+          "name": "DAVID",
+          "count": 60,
+          "is_composite": false,
+          "weight": 0.0076
+        },
+        {
+          "name": "JHONNY",
+          "count": 45,
+          "is_composite": false,
+          "weight": 0.0057
+        },
+        {
+          "name": "ALVARO",
+          "count": 43,
+          "is_composite": false,
+          "weight": 0.0054
+        },
+        {
+          "name": "JAVIER",
+          "count": 42,
+          "is_composite": false,
+          "weight": 0.0053
+        },
+        {
+          "name": "ROLANDO",
+          "count": 42,
+          "is_composite": false,
+          "weight": 0.0053
+        },
+        {
+          "name": "OSCAR",
+          "count": 41,
+          "is_composite": false,
+          "weight": 0.0052
+        },
+        {
+          "name": "FREDDY",
+          "count": 40,
+          "is_composite": false,
+          "weight": 0.005
+        },
+        {
+          "name": "ARIEL",
+          "count": 40,
+          "is_composite": false,
+          "weight": 0.005
+        },
+        {
+          "name": "LUIS ALBERTO",
+          "count": 39,
+          "is_composite": true,
+          "weight": 0.0049
+        },
+        {
+          "name": "JORGE LUIS",
+          "count": 38,
+          "is_composite": true,
+          "weight": 0.0048
+        },
+        {
+          "name": "DANIEL",
+          "count": 37,
+          "is_composite": false,
+          "weight": 0.0047
+        },
+        {
+          "name": "VICTOR HUGO",
+          "count": 37,
+          "is_composite": true,
+          "weight": 0.0047
+        },
+        {
+          "name": "JUAN JOSE",
+          "count": 35,
+          "is_composite": true,
+          "weight": 0.0044
+        },
+        {
+          "name": "VLADIMIR",
+          "count": 35,
+          "is_composite": false,
+          "weight": 0.0044
+        },
+        {
+          "name": "JAIME",
+          "count": 34,
+          "is_composite": false,
+          "weight": 0.0043
+        },
+        {
+          "name": "CRISTIAN",
+          "count": 33,
+          "is_composite": false,
+          "weight": 0.0042
+        },
+        {
+          "name": "GONZALO",
+          "count": 32,
+          "is_composite": false,
+          "weight": 0.004
+        },
+        {
+          "name": "RAMIRO",
+          "count": 32,
+          "is_composite": false,
+          "weight": 0.004
+        },
+        {
+          "name": "JUAN",
+          "count": 32,
+          "is_composite": false,
+          "weight": 0.004
+        },
+        {
+          "name": "EDGAR",
+          "count": 31,
+          "is_composite": false,
+          "weight": 0.0039
+        },
+        {
+          "name": "LUIS FERNANDO",
+          "count": 31,
+          "is_composite": true,
+          "weight": 0.0039
+        },
+        {
+          "name": "ORLANDO",
+          "count": 31,
+          "is_composite": false,
+          "weight": 0.0039
+        },
+        {
+          "name": "MARIO",
+          "count": 30,
+          "is_composite": false,
+          "weight": 0.0038
+        },
+        {
+          "name": "RAUL",
+          "count": 30,
+          "is_composite": false,
+          "weight": 0.0038
+        },
+        {
+          "name": "REYNALDO",
+          "count": 29,
+          "is_composite": false,
+          "weight": 0.0037
+        },
+        {
+          "name": "JUAN PABLO",
+          "count": 29,
+          "is_composite": true,
+          "weight": 0.0037
+        },
+        {
+          "name": "GROVER",
+          "count": 29,
+          "is_composite": false,
+          "weight": 0.0037
+        },
+        {
+          "name": "RUBEN",
+          "count": 29,
+          "is_composite": false,
+          "weight": 0.0037
+        },
+        {
+          "name": "RODRIGO",
+          "count": 29,
+          "is_composite": false,
+          "weight": 0.0037
+        },
+        {
+          "name": "FERNANDO",
+          "count": 28,
+          "is_composite": false,
+          "weight": 0.0035
+        },
+        {
+          "name": "LUIS MIGUEL",
+          "count": 28,
+          "is_composite": true,
+          "weight": 0.0035
+        },
+        {
+          "name": "JOSE MANUEL",
+          "count": 27,
+          "is_composite": true,
+          "weight": 0.0034
+        },
+        {
+          "name": "ALFREDO",
+          "count": 25,
+          "is_composite": false,
+          "weight": 0.0031
+        },
+        {
+          "name": "GUSTAVO",
+          "count": 25,
+          "is_composite": false,
+          "weight": 0.0031
+        },
+        {
+          "name": "LUIS ALFREDO",
+          "count": 24,
+          "is_composite": true,
+          "weight": 0.003
+        },
+        {
+          "name": "OMAR",
+          "count": 23,
+          "is_composite": false,
+          "weight": 0.0029
+        },
+        {
+          "name": "JORGE",
+          "count": 22,
+          "is_composite": false,
+          "weight": 0.0028
+        },
+        {
+          "name": "MARCELO",
+          "count": 22,
+          "is_composite": false,
+          "weight": 0.0028
+        },
+        {
+          "name": "ROBERTO CARLOS",
+          "count": 22,
+          "is_composite": true,
+          "weight": 0.0028
+        },
+        {
+          "name": "RONALD",
+          "count": 22,
+          "is_composite": false,
+          "weight": 0.0028
+        },
+        {
+          "name": "WILSON",
+          "count": 21,
+          "is_composite": false,
+          "weight": 0.0026
+        },
+        {
+          "name": "IVAN",
+          "count": 21,
+          "is_composite": false,
+          "weight": 0.0026
+        },
+        {
+          "name": "CARLOS",
+          "count": 20,
+          "is_composite": false,
+          "weight": 0.0025
+        },
+        {
+          "name": "SAMUEL",
+          "count": 19,
+          "is_composite": false,
+          "weight": 0.0024
+        },
+        {
+          "name": "ARMANDO",
+          "count": 19,
+          "is_composite": false,
+          "weight": 0.0024
+        }
+      ],
+      "composite_rate": 0.35,
+      "single_rate": 0.65
+    },
+    "female": {
+      "top_names": [
+        {
+          "name": "MARIBEL",
+          "count": 90,
+          "is_composite": false,
+          "weight": 0.0081
+        },
+        {
+          "name": "ELIZABETH",
+          "count": 74,
+          "is_composite": false,
+          "weight": 0.0066
+        },
+        {
+          "name": "ROXANA",
+          "count": 66,
+          "is_composite": false,
+          "weight": 0.0059
+        },
+        {
+          "name": "MARIA ELENA",
+          "count": 62,
+          "is_composite": true,
+          "weight": 0.0056
+        },
+        {
+          "name": "ANA MARIA",
+          "count": 60,
+          "is_composite": true,
+          "weight": 0.0054
+        },
+        {
+          "name": "SONIA",
+          "count": 53,
+          "is_composite": false,
+          "weight": 0.0048
+        },
+        {
+          "name": "PATRICIA",
+          "count": 52,
+          "is_composite": false,
+          "weight": 0.0047
+        },
+        {
+          "name": "SANDRA",
+          "count": 52,
+          "is_composite": false,
+          "weight": 0.0047
+        },
+        {
+          "name": "VERONICA",
+          "count": 51,
+          "is_composite": false,
+          "weight": 0.0046
+        },
+        {
+          "name": "GABRIELA",
+          "count": 49,
+          "is_composite": false,
+          "weight": 0.0044
+        },
+        {
+          "name": "LOURDES",
+          "count": 48,
+          "is_composite": false,
+          "weight": 0.0043
+        },
+        {
+          "name": "MARIA ISABEL",
+          "count": 48,
+          "is_composite": true,
+          "weight": 0.0043
+        },
+        {
+          "name": "DANIELA",
+          "count": 44,
+          "is_composite": false,
+          "weight": 0.004
+        },
+        {
+          "name": "FABIOLA",
+          "count": 43,
+          "is_composite": false,
+          "weight": 0.0039
+        },
+        {
+          "name": "CARMEN ROSA",
+          "count": 43,
+          "is_composite": true,
+          "weight": 0.0039
+        },
+        {
+          "name": "MARIA EUGENIA",
+          "count": 40,
+          "is_composite": true,
+          "weight": 0.0036
+        },
+        {
+          "name": "LIDIA",
+          "count": 39,
+          "is_composite": false,
+          "weight": 0.0035
+        },
+        {
+          "name": "MARISOL",
+          "count": 39,
+          "is_composite": false,
+          "weight": 0.0035
+        },
+        {
+          "name": "XIMENA",
+          "count": 36,
+          "is_composite": false,
+          "weight": 0.0032
+        },
+        {
+          "name": "CLAUDIA",
+          "count": 35,
+          "is_composite": false,
+          "weight": 0.0031
+        },
+        {
+          "name": "MONICA",
+          "count": 34,
+          "is_composite": false,
+          "weight": 0.0031
+        },
+        {
+          "name": "TANIA",
+          "count": 34,
+          "is_composite": false,
+          "weight": 0.0031
+        },
+        {
+          "name": "PAOLA ANDREA",
+          "count": 34,
+          "is_composite": true,
+          "weight": 0.0031
+        },
+        {
+          "name": "ALEJANDRA",
+          "count": 31,
+          "is_composite": false,
+          "weight": 0.0028
+        },
+        {
+          "name": "MARTHA",
+          "count": 31,
+          "is_composite": false,
+          "weight": 0.0028
+        },
+        {
+          "name": "MARLENE",
+          "count": 31,
+          "is_composite": false,
+          "weight": 0.0028
+        },
+        {
+          "name": "PAMELA",
+          "count": 31,
+          "is_composite": false,
+          "weight": 0.0028
+        },
+        {
+          "name": "ROSMERY",
+          "count": 30,
+          "is_composite": false,
+          "weight": 0.0027
+        },
+        {
+          "name": "SILVIA",
+          "count": 30,
+          "is_composite": false,
+          "weight": 0.0027
+        },
+        {
+          "name": "CELIA",
+          "count": 30,
+          "is_composite": false,
+          "weight": 0.0027
+        },
+        {
+          "name": "SOLEDAD",
+          "count": 30,
+          "is_composite": false,
+          "weight": 0.0027
+        },
+        {
+          "name": "LIZBETH",
+          "count": 29,
+          "is_composite": false,
+          "weight": 0.0026
+        },
+        {
+          "name": "NORMA",
+          "count": 29,
+          "is_composite": false,
+          "weight": 0.0026
+        },
+        {
+          "name": "NOEMI",
+          "count": 29,
+          "is_composite": false,
+          "weight": 0.0026
+        },
+        {
+          "name": "ZULMA",
+          "count": 28,
+          "is_composite": false,
+          "weight": 0.0025
+        },
+        {
+          "name": "JIMENA",
+          "count": 27,
+          "is_composite": false,
+          "weight": 0.0024
+        },
+        {
+          "name": "KARINA",
+          "count": 27,
+          "is_composite": false,
+          "weight": 0.0024
+        },
+        {
+          "name": "MARCELA",
+          "count": 26,
+          "is_composite": false,
+          "weight": 0.0023
+        },
+        {
+          "name": "DELIA",
+          "count": 25,
+          "is_composite": false,
+          "weight": 0.0022
+        },
+        {
+          "name": "LIZETH",
+          "count": 25,
+          "is_composite": false,
+          "weight": 0.0022
+        },
+        {
+          "name": "GLADYS",
+          "count": 25,
+          "is_composite": false,
+          "weight": 0.0022
+        },
+        {
+          "name": "BEATRIZ",
+          "count": 24,
+          "is_composite": false,
+          "weight": 0.0022
+        },
+        {
+          "name": "CRISTINA",
+          "count": 24,
+          "is_composite": false,
+          "weight": 0.0022
+        },
+        {
+          "name": "MIRIAN",
+          "count": 22,
+          "is_composite": false,
+          "weight": 0.002
+        },
+        {
+          "name": "ROSALIA",
+          "count": 22,
+          "is_composite": false,
+          "weight": 0.002
+        },
+        {
+          "name": "HILDA",
+          "count": 22,
+          "is_composite": false,
+          "weight": 0.002
+        },
+        {
+          "name": "MIRIAM",
+          "count": 22,
+          "is_composite": false,
+          "weight": 0.002
+        },
+        {
+          "name": "MARISABEL",
+          "count": 22,
+          "is_composite": false,
+          "weight": 0.002
+        },
+        {
+          "name": "JHOVANA",
+          "count": 22,
+          "is_composite": false,
+          "weight": 0.002
+        },
+        {
+          "name": "SILVIA EUGENIA",
+          "count": 21,
+          "is_composite": true,
+          "weight": 0.0019
+        }
+      ],
+      "composite_rate": 0.32,
+      "single_rate": 0.68
+    }
+  },
+  "document_identification": {
+    "ci_dip": {
+      "min_number": 3500000,
+      "max_number": 13500000,
+      "extension_distribution": {
+        "PT": 0.7,
+        "CH": 0.1,
+        "OR": 0.08,
+        "LP": 0.05,
+        "CB": 0.04,
+        "TJ": 0.015,
+        "SC": 0.01,
+        "BE": 0.003,
+        "PA": 0.002
+      },
+      "complement_probability": 0.03
+    },
+    "id_ra": {
+      "prefix": "RA-",
+      "format": "RA-######",
+      "regex": "^RA-[0-9]{5,6}$"
+    }
+  },
+  "demographic_parameters": {
+    "gender_ratio": {
+      "M": 0.495,
+      "F": 0.505
+    },
+    "marital_status": {
+      "1": {
+        "code": "S",
+        "description": "SOLTERO/A",
+        "weight": 0.887
+      },
+      "2": {
+        "code": "C",
+        "description": "CASADO/A",
+        "weight": 0.1
+      },
+      "3": {
+        "code": "D",
+        "description": "DIVORCIADO/A",
+        "weight": 0.01
+      },
+      "4": {
+        "code": "V",
+        "description": "VIUDO/A",
+        "weight": 0.003
+      }
+    }
+  }
+}

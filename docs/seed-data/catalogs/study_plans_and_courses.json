@@ -1,0 +1,4422 @@
+{
+  "metadata": {
+    "institution": "UATF",
+    "description": "Study plans, course structures, credits, and prerequisite chains for UATF synthetic generator",
+    "active_plans": [
+      "Plan 2018",
+      "Plan 2020",
+      "Plan 2022"
+    ],
+    "benchmark_programs_modeled": [
+      "SIS",
+      "MED",
+      "DER",
+      "CIV",
+      "ADM",
+      "COP",
+      "ENF",
+      "MIN"
+    ]
+  },
+  "subject_types_catalog": [
+    {
+      "code": "P",
+      "name": "Principal",
+      "description": "Materia curricular obligatoria del plan"
+    },
+    {
+      "code": "N",
+      "name": "Prerrequisito Indispensable",
+      "description": "Debe estar aprobada para habilitar inscripción a la subsecuente"
+    },
+    {
+      "code": "C",
+      "name": "Control",
+      "description": "Prerrequisito de control de segundo nivel"
+    },
+    {
+      "code": "M",
+      "name": "Matricial",
+      "description": "Materia de tronco común institucional"
+    },
+    {
+      "code": "V",
+      "name": "Convalidado",
+      "description": "Asignatura acreditada de otra universidad o plan"
+    },
+    {
+      "code": "H",
+      "name": "Homologado",
+      "description": "Asignatura equivalente entre planes de la misma carrera"
+    }
+  ],
+  "procedural_generation_rules": {
+    "sigla_formula": "{id_programa}-{nivel}{indice_materia:02d}",
+    "courses_per_term": {
+      "LIC_SEMESTRAL": 4,
+      "LIC_ANUAL": 5,
+      "TUS_SEMESTRAL": 4,
+      "TUM_SEMESTRAL": 4,
+      "TUM_ANUAL": 5
+    },
+    "credit_range": {
+      "min": 3,
+      "max": 8,
+      "default": 4
+    },
+    "prerequisite_chain_rule": "Subject at level L (L >= 2) requires subject at level L-1 with matching index or index 1",
+    "passing_grade_threshold": 51
+  },
+  "programs_curricula": {
+    "SIS": {
+      "program_id": "SIS",
+      "program_name": "INGENIERIA DE SISTEMAS",
+      "regime": "S",
+      "total_levels": 10,
+      "total_courses": 40,
+      "total_credits": 190,
+      "courses": [
+        {
+          "sigla": "SIS-101",
+          "name": "Álgebra Lineal",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "SIS-102",
+          "name": "Cálculo I",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "SIS-103",
+          "name": "Introducción a la Programación",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "SIS-104",
+          "name": "Física I",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "SIS-201",
+          "name": "Cálculo II",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-102",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-202",
+          "name": "Estructuras de Datos",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-103",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-203",
+          "name": "Física II",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-104",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-204",
+          "name": "Programación Orientada a Objetos",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-103",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-301",
+          "name": "Cálculo III",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-302",
+          "name": "Base de Datos I",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-202",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-303",
+          "name": "Programación Web",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-204",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-304",
+          "name": "Arquitectura de Computadoras",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-203",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-401",
+          "name": "Base de Datos II",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-302",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-402",
+          "name": "Ingeniería de Software I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-303",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-403",
+          "name": "Redes de Computadoras I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-304",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-404",
+          "name": "Sistemas Operativos",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-304",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-501",
+          "name": "Ingeniería de Software II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-402",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-502",
+          "name": "Redes de Computadoras II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-403",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-503",
+          "name": "Inteligencia Artificial",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-401",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-504",
+          "name": "Teoría de Sistemas",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-402",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-601",
+          "name": "Gestión de Software",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-501",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-602",
+          "name": "Auditoría de Sistemas",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-501",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-603",
+          "name": "Seguridad Informática",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-502",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-604",
+          "name": "Sistemas Distribuidos",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-502",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-701",
+          "name": "Modelos y Simulación",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-503",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-702",
+          "name": "Inteligencia de Negocios",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-601",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-703",
+          "name": "Taller de Grado I",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-601",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-704",
+          "name": "Gestión Estratégica",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-602",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-801",
+          "name": "Taller de Grado II",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "SIS-703",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-802",
+          "name": "Práctica Profesional",
+          "level": 8,
+          "hours_theory": 2,
+          "hours_practice": 8,
+          "hours_total": 10,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "SIS-703",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-803",
+          "name": "Ética en Sistemas",
+          "level": 8,
+          "hours_theory": 2,
+          "hours_practice": 2,
+          "hours_total": 4,
+          "credits": 3,
+          "prerequisites": [
+            {
+              "sigla": "SIS-704",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-804",
+          "name": "Calidad de Software",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-702",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-901",
+          "name": "Big Data y Analítica",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "SIS-702",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-902",
+          "name": "Seguridad de la Información",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-603",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-903",
+          "name": "Electiva I",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-604",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-904",
+          "name": "Electiva II",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-601",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-1001",
+          "name": "Tesis de Grado",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "SIS-801",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-1002",
+          "name": "Proyecto de Fin de Carrera",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "SIS-801",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-1003",
+          "name": "Electiva III",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-901",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "SIS-1004",
+          "name": "Electiva IV",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "SIS-902",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        }
+      ]
+    },
+    "MED": {
+      "program_id": "MED",
+      "program_name": "MEDICINA",
+      "regime": "A",
+      "total_levels": 6,
+      "total_courses": 30,
+      "total_credits": 225,
+      "courses": [
+        {
+          "sigla": "MED-101",
+          "name": "Anatomía Humana I",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 6,
+          "hours_total": 10,
+          "credits": 8,
+          "prerequisites": []
+        },
+        {
+          "sigla": "MED-102",
+          "name": "Histología",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": []
+        },
+        {
+          "sigla": "MED-103",
+          "name": "Embriología",
+          "level": 1,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "MED-104",
+          "name": "Bioquímica Médica",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": []
+        },
+        {
+          "sigla": "MED-105",
+          "name": "Salud Pública I",
+          "level": 1,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "MED-201",
+          "name": "Anatomía Humana II",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 6,
+          "hours_total": 10,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "MED-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-202",
+          "name": "Fisiología",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 7,
+          "prerequisites": [
+            {
+              "sigla": "MED-102",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-203",
+          "name": "Microbiología y Parasitología",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "MED-104",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-204",
+          "name": "Patología General",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "MED-102",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-205",
+          "name": "Salud Pública II",
+          "level": 2,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MED-105",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-301",
+          "name": "Farmacología",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "MED-202",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-302",
+          "name": "Semiología Médica",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 9,
+          "prerequisites": [
+            {
+              "sigla": "MED-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-303",
+          "name": "Fisiopatología",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "MED-204",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-304",
+          "name": "Epidemiología",
+          "level": 3,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MED-205",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-305",
+          "name": "Nutrición Médica",
+          "level": 3,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MED-203",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-401",
+          "name": "Medicina Interna I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 9,
+          "prerequisites": [
+            {
+              "sigla": "MED-302",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-402",
+          "name": "Cirugía General I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 9,
+          "prerequisites": [
+            {
+              "sigla": "MED-302",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-403",
+          "name": "Pediatría I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 6,
+          "hours_total": 10,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "MED-303",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-404",
+          "name": "Ginecología",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 6,
+          "hours_total": 10,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "MED-303",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-405",
+          "name": "Salud Pública III",
+          "level": 4,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MED-304",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-501",
+          "name": "Medicina Interna II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 9,
+          "prerequisites": [
+            {
+              "sigla": "MED-401",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-502",
+          "name": "Cirugía General II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 9,
+          "prerequisites": [
+            {
+              "sigla": "MED-402",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-503",
+          "name": "Pediatría II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 6,
+          "hours_total": 10,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "MED-403",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-504",
+          "name": "Obstetricia",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 6,
+          "hours_total": 10,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "MED-404",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-505",
+          "name": "Medicina Legal y Ética",
+          "level": 5,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MED-405",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-601",
+          "name": "Internado Rotatorio de Cirugía",
+          "level": 6,
+          "hours_theory": 0,
+          "hours_practice": 40,
+          "hours_total": 40,
+          "credits": 12,
+          "prerequisites": [
+            {
+              "sigla": "MED-502",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-602",
+          "name": "Internado Rotatorio de Pediatría",
+          "level": 6,
+          "hours_theory": 0,
+          "hours_practice": 40,
+          "hours_total": 40,
+          "credits": 12,
+          "prerequisites": [
+            {
+              "sigla": "MED-503",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-603",
+          "name": "Internado Rotatorio de Medicina Interna",
+          "level": 6,
+          "hours_theory": 0,
+          "hours_practice": 40,
+          "hours_total": 40,
+          "credits": 12,
+          "prerequisites": [
+            {
+              "sigla": "MED-501",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-604",
+          "name": "Internado Rotatorio de Gineco-Obstetricia",
+          "level": 6,
+          "hours_theory": 0,
+          "hours_practice": 40,
+          "hours_total": 40,
+          "credits": 12,
+          "prerequisites": [
+            {
+              "sigla": "MED-504",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MED-605",
+          "name": "Internado Rotatorio de Salud Pública",
+          "level": 6,
+          "hours_theory": 0,
+          "hours_practice": 40,
+          "hours_total": 40,
+          "credits": 12,
+          "prerequisites": [
+            {
+              "sigla": "MED-505",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        }
+      ]
+    },
+    "DER": {
+      "program_id": "DER",
+      "program_name": "DERECHO",
+      "regime": "A",
+      "total_levels": 5,
+      "total_courses": 25,
+      "total_credits": 122,
+      "courses": [
+        {
+          "sigla": "DER-101",
+          "name": "Introducción al Derecho",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "DER-102",
+          "name": "Derecho Civil I (Personas)",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "DER-103",
+          "name": "Derecho Constitucional",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "DER-104",
+          "name": "Historia del Derecho",
+          "level": 1,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "DER-105",
+          "name": "Sociología Jurídica",
+          "level": 1,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "DER-201",
+          "name": "Derecho Civil II (Bienes)",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-102",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-202",
+          "name": "Derecho Penal I",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-203",
+          "name": "Derecho Romano",
+          "level": 2,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "DER-104",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-204",
+          "name": "Oratoria Forense",
+          "level": 2,
+          "hours_theory": 2,
+          "hours_practice": 4,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "DER-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-205",
+          "name": "Criminología",
+          "level": 2,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "DER-105",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-301",
+          "name": "Derecho Civil III (Obligaciones)",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-302",
+          "name": "Derecho Penal II",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-202",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-303",
+          "name": "Derecho Internacional Público",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-103",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-304",
+          "name": "Derecho Administrativo",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-103",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-305",
+          "name": "Derecho de Familia",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-401",
+          "name": "Derecho Civil IV (Contratos)",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-301",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-402",
+          "name": "Derecho Procesal Civil I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "DER-301",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-403",
+          "name": "Derecho Procesal Penal",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "DER-302",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-404",
+          "name": "Derecho Laboral",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-304",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-405",
+          "name": "Filosofía del Derecho",
+          "level": 4,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "DER-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-501",
+          "name": "Derecho de Sucesiones",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-401",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-502",
+          "name": "Derecho Procesal Civil II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "DER-402",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-503",
+          "name": "Derecho Internacional Privado",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "DER-303",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-504",
+          "name": "Práctica Forense",
+          "level": 5,
+          "hours_theory": 2,
+          "hours_practice": 8,
+          "hours_total": 10,
+          "credits": 7,
+          "prerequisites": [
+            {
+              "sigla": "DER-402",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "DER-505",
+          "name": "Ética Profesional",
+          "level": 5,
+          "hours_theory": 2,
+          "hours_practice": 2,
+          "hours_total": 4,
+          "credits": 3,
+          "prerequisites": [
+            {
+              "sigla": "DER-405",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        }
+      ]
+    },
+    "CIV": {
+      "program_id": "CIV",
+      "program_name": "INGENIERIA CIVIL",
+      "regime": "S",
+      "total_levels": 10,
+      "total_courses": 40,
+      "total_credits": 194,
+      "courses": [
+        {
+          "sigla": "CIV-101",
+          "name": "Cálculo I",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "CIV-102",
+          "name": "Álgebra Lineal",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "CIV-103",
+          "name": "Geometría Descriptiva",
+          "level": 1,
+          "hours_theory": 2,
+          "hours_practice": 4,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "CIV-104",
+          "name": "Química Tecnológica",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "CIV-201",
+          "name": "Cálculo II",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-202",
+          "name": "Física I",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-203",
+          "name": "Topografía I",
+          "level": 2,
+          "hours_theory": 2,
+          "hours_practice": 6,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-103",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-204",
+          "name": "Dibujo Técnico en CAD",
+          "level": 2,
+          "hours_theory": 2,
+          "hours_practice": 4,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-103",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-301",
+          "name": "Cálculo III",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-302",
+          "name": "Física II",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-202",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-303",
+          "name": "Topografía II",
+          "level": 3,
+          "hours_theory": 2,
+          "hours_practice": 6,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-203",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-304",
+          "name": "Resistencia de Materiales I",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-202",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-401",
+          "name": "Resistencia de Materiales II",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-304",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-402",
+          "name": "Hidráulica I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-302",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-403",
+          "name": "Mecánica de Suelos I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-304",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-404",
+          "name": "Materiales de Construcción",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-304",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-501",
+          "name": "Hidráulica II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-402",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-502",
+          "name": "Mecánica de Suelos II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-403",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-503",
+          "name": "Análisis Estructural I",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-401",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-504",
+          "name": "Tecnología del Hormigón",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-404",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-601",
+          "name": "Análisis Estructural II",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-503",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-602",
+          "name": "Hidrología Aplicada",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-501",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-603",
+          "name": "Diseño de Hormigón Armado I",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "CIV-503",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-604",
+          "name": "Carreteras I",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-303",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-701",
+          "name": "Diseño de Hormigón Armado II",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "CIV-603",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-702",
+          "name": "Ingeniería Sanitaria I",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-602",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-703",
+          "name": "Puentes",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-603",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-704",
+          "name": "Fundaciones y Cimientos",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-502",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-801",
+          "name": "Estructuras Metálicas",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-601",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-802",
+          "name": "Ingeniería Sanitaria II",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-702",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-803",
+          "name": "Taller de Grado I",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-701",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-804",
+          "name": "Presupuestos y Costos",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-604",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-901",
+          "name": "Obras Hidráulicas",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "CIV-702",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-902",
+          "name": "Vías de Comunicación",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-604",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-903",
+          "name": "Taller de Grado II",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "CIV-803",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-904",
+          "name": "Electiva I",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-803",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-1001",
+          "name": "Trabajo de Grado",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "CIV-903",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-1002",
+          "name": "Proyecto de Ingeniería",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "CIV-903",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-1003",
+          "name": "Electiva II",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-904",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "CIV-1004",
+          "name": "Electiva III",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "CIV-904",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        }
+      ]
+    },
+    "ADM": {
+      "program_id": "ADM",
+      "program_name": "ADMINISTRACION DE EMPRESAS",
+      "regime": "S",
+      "total_levels": 10,
+      "total_courses": 40,
+      "total_credits": 182,
+      "courses": [
+        {
+          "sigla": "ADM-101",
+          "name": "Introducción a la Administración",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "ADM-102",
+          "name": "Fundamentos de Economía",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "ADM-103",
+          "name": "Contabilidad General",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "ADM-104",
+          "name": "Matemáticas Financieras",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "ADM-201",
+          "name": "Proceso Administrativo",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ADM-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-202",
+          "name": "Microeconomía",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-102",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-203",
+          "name": "Contabilidad de Costos",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ADM-103",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-204",
+          "name": "Estadística Descriptiva",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-104",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-301",
+          "name": "Recursos Humanos I",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-302",
+          "name": "Macroeconomía",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-202",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-303",
+          "name": "Presupuestos",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-203",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-304",
+          "name": "Estadística Inferencial",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-204",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-401",
+          "name": "Recursos Humanos II",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-301",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-402",
+          "name": "Marketing I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-403",
+          "name": "Administración Financiera I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ADM-303",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-404",
+          "name": "Investigación de Operaciones",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-304",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-501",
+          "name": "Comportamiento Organizacional",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-401",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-502",
+          "name": "Marketing II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-402",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-503",
+          "name": "Administración Financiera II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ADM-403",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-504",
+          "name": "Planificación Estratégica",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ADM-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-601",
+          "name": "Gestión de Operaciones",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-404",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-602",
+          "name": "Investigación de Mercados",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ADM-502",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-603",
+          "name": "Finanzas Corporativas",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ADM-503",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-604",
+          "name": "Organización y Métodos",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-504",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-701",
+          "name": "Dirección y Liderazgo",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-501",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-702",
+          "name": "Formulación de Proyectos",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ADM-603",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-703",
+          "name": "Toma de Decisiones",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-601",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-704",
+          "name": "Taller de Grado I",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ADM-504",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-801",
+          "name": "Evaluación de Proyectos",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ADM-702",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-802",
+          "name": "Gestión de la Calidad",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-601",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-803",
+          "name": "Taller de Grado II",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "ADM-704",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-804",
+          "name": "Emprendimiento",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-702",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-901",
+          "name": "Consultoría Organizacional",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-801",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-902",
+          "name": "Gestión del Cambio",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-701",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-903",
+          "name": "Electiva I",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-704",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-904",
+          "name": "Electiva II",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-704",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-1001",
+          "name": "Trabajo de Grado",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "ADM-803",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-1002",
+          "name": "Proyecto Fin de Carrera",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "ADM-803",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-1003",
+          "name": "Electiva III",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-903",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ADM-1004",
+          "name": "Electiva IV",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ADM-904",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        }
+      ]
+    },
+    "COP": {
+      "program_id": "COP",
+      "program_name": "AUDITORIA - CONTADURIA PUBLICA",
+      "regime": "S",
+      "total_levels": 10,
+      "total_courses": 40,
+      "total_credits": 190,
+      "courses": [
+        {
+          "sigla": "COP-101",
+          "name": "Contabilidad Básica",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "COP-102",
+          "name": "Introducción a la Economía",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "COP-103",
+          "name": "Matemáticas para Auditores",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "COP-104",
+          "name": "Metodología de Trabajo",
+          "level": 1,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 3,
+          "prerequisites": []
+        },
+        {
+          "sigla": "COP-201",
+          "name": "Contabilidad Intermedia",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-202",
+          "name": "Microeconomía",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-102",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-203",
+          "name": "Contabilidad Costos I",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-204",
+          "name": "Derecho Tributario I",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-104",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-301",
+          "name": "Contabilidad Costos II",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-203",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-302",
+          "name": "Contabilidad Cooperativas",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-303",
+          "name": "Administración General",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-102",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-304",
+          "name": "Derecho Tributario II",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-204",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-401",
+          "name": "Contabilidad Sociedades",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-402",
+          "name": "Contabilidad Gubernamental I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-403",
+          "name": "Introducción a la Auditoría",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-404",
+          "name": "Sistemas Contables",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-501",
+          "name": "Contabilidad Agropecuaria",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-401",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-502",
+          "name": "Contabilidad Gubernamental II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-402",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-503",
+          "name": "Auditoría Financiera I",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "COP-403",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-504",
+          "name": "Auditoría Interna",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-403",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-601",
+          "name": "Contabilidad Bancaria",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-401",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-602",
+          "name": "Auditoría Financiera II",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "COP-503",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-603",
+          "name": "Auditoría Gubernamental I",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-502",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-604",
+          "name": "Finanzas de Empresas",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-202",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-701",
+          "name": "Auditoría Gubernamental II",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-603",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-702",
+          "name": "Auditoría Tributaria",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-304",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-703",
+          "name": "Auditoría de Sistemas",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-404",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-704",
+          "name": "Taller de Grado I",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-602",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-801",
+          "name": "Auditoría Operativa",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-602",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-802",
+          "name": "Auditoría Forense",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "COP-602",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-803",
+          "name": "Taller de Grado II",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "COP-704",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-804",
+          "name": "Práctica Profesional",
+          "level": 8,
+          "hours_theory": 2,
+          "hours_practice": 8,
+          "hours_total": 10,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "COP-704",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-901",
+          "name": "Control de Gestión",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-801",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-902",
+          "name": "Auditoría de Gestión",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-801",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-903",
+          "name": "Electiva I",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-704",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-904",
+          "name": "Electiva II",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-704",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-1001",
+          "name": "Trabajo de Grado",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "COP-803",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-1002",
+          "name": "Proyecto Final Auditoría",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "COP-803",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-1003",
+          "name": "Electiva III",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-903",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "COP-1004",
+          "name": "Electiva IV",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "COP-904",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        }
+      ]
+    },
+    "ENF": {
+      "program_id": "ENF",
+      "program_name": "ENFERMERIA",
+      "regime": "A",
+      "total_levels": 5,
+      "total_courses": 25,
+      "total_credits": 147,
+      "courses": [
+        {
+          "sigla": "ENF-101",
+          "name": "Fundamentos de Enfermería",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 6,
+          "hours_total": 10,
+          "credits": 7,
+          "prerequisites": []
+        },
+        {
+          "sigla": "ENF-102",
+          "name": "Anatomía y Fisiología",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": []
+        },
+        {
+          "sigla": "ENF-103",
+          "name": "Psicología Evolutiva",
+          "level": 1,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "ENF-104",
+          "name": "Nutrición y Dietética",
+          "level": 1,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "ENF-105",
+          "name": "Primeros Auxilios",
+          "level": 1,
+          "hours_theory": 2,
+          "hours_practice": 4,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "ENF-201",
+          "name": "Enfermería Médico-Quirúrgica I",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "ENF-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-202",
+          "name": "Farmacología Clínica",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ENF-102",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-203",
+          "name": "Microbiología Aplicada",
+          "level": 2,
+          "hours_theory": 3,
+          "hours_practice": 4,
+          "hours_total": 7,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ENF-102",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-204",
+          "name": "Epidemiología de Campo",
+          "level": 2,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ENF-105",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-205",
+          "name": "Salud Comunitaria I",
+          "level": 2,
+          "hours_theory": 3,
+          "hours_practice": 4,
+          "hours_total": 7,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ENF-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-301",
+          "name": "Enfermería Médico-Quirúrgica II",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "ENF-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-302",
+          "name": "Enfermería Materno-Infantil",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "ENF-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-303",
+          "name": "Gestión de Servicios de Enfermería",
+          "level": 3,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ENF-205",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-304",
+          "name": "Salud Comunitaria II",
+          "level": 3,
+          "hours_theory": 3,
+          "hours_practice": 4,
+          "hours_total": 7,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ENF-205",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-305",
+          "name": "Ética y Deontología",
+          "level": 3,
+          "hours_theory": 2,
+          "hours_practice": 2,
+          "hours_total": 4,
+          "credits": 3,
+          "prerequisites": [
+            {
+              "sigla": "ENF-103",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-401",
+          "name": "Enfermería Pediátrica",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "ENF-302",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-402",
+          "name": "Salud Mental y Psiquiatría",
+          "level": 4,
+          "hours_theory": 3,
+          "hours_practice": 4,
+          "hours_total": 7,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ENF-301",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-403",
+          "name": "Investigación en Enfermería",
+          "level": 4,
+          "hours_theory": 3,
+          "hours_practice": 4,
+          "hours_total": 7,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ENF-303",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-404",
+          "name": "Enfermería Geriátrica",
+          "level": 4,
+          "hours_theory": 3,
+          "hours_practice": 4,
+          "hours_total": 7,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "ENF-301",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-405",
+          "name": "Prácticas Clínicas Integradas I",
+          "level": 4,
+          "hours_theory": 0,
+          "hours_practice": 16,
+          "hours_total": 16,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "ENF-301",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-501",
+          "name": "Enfermería de Urgencias y Emergencias",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "ENF-405",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-502",
+          "name": "Cuidados Paliativos",
+          "level": 5,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ENF-404",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-503",
+          "name": "Gestión Hospitalaria",
+          "level": 5,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "ENF-403",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-504",
+          "name": "Prácticas Clínicas Integradas II",
+          "level": 5,
+          "hours_theory": 0,
+          "hours_practice": 16,
+          "hours_total": 16,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "ENF-405",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "ENF-505",
+          "name": "Internado Rotatorio",
+          "level": 5,
+          "hours_theory": 0,
+          "hours_practice": 36,
+          "hours_total": 36,
+          "credits": 12,
+          "prerequisites": [
+            {
+              "sigla": "ENF-405",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        }
+      ]
+    },
+    "MIN": {
+      "program_id": "MIN",
+      "program_name": "INGENIERIA DE MINAS",
+      "regime": "S",
+      "total_levels": 10,
+      "total_courses": 40,
+      "total_credits": 191,
+      "courses": [
+        {
+          "sigla": "MIN-101",
+          "name": "Cálculo I",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": []
+        },
+        {
+          "sigla": "MIN-102",
+          "name": "Física I",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "MIN-103",
+          "name": "Química General",
+          "level": 1,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "MIN-104",
+          "name": "Introducción a la Minería",
+          "level": 1,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": []
+        },
+        {
+          "sigla": "MIN-201",
+          "name": "Cálculo II",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-101",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-202",
+          "name": "Física II",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-102",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-203",
+          "name": "Cristalografía y Mineralogía",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-103",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-204",
+          "name": "Geología General",
+          "level": 2,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-104",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-301",
+          "name": "Mineralogía Óptica",
+          "level": 3,
+          "hours_theory": 3,
+          "hours_practice": 4,
+          "hours_total": 7,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-203",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-302",
+          "name": "Geología Estructural",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-204",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-303",
+          "name": "Mecánica de Fluidos",
+          "level": 3,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-202",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-304",
+          "name": "Topografía Subterránea",
+          "level": 3,
+          "hours_theory": 2,
+          "hours_practice": 6,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-201",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-401",
+          "name": "Yacimientos Minerales",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-302",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-402",
+          "name": "Mecánica de Rocas I",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-302",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-403",
+          "name": "Perforación y Voladura",
+          "level": 4,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-304",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-404",
+          "name": "Transporte Minero",
+          "level": 4,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-303",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-501",
+          "name": "Mecánica de Rocas II",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-402",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-502",
+          "name": "Métodos Explotación Subterránea",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "MIN-403",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-503",
+          "name": "Ventilación de Minas",
+          "level": 5,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-404",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-504",
+          "name": "Seguridad Minera",
+          "level": 5,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-402",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-601",
+          "name": "Métodos Explotación Superficial",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "MIN-502",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-602",
+          "name": "Fortificación de Minas",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-501",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-603",
+          "name": "Metalurgia Extractiva",
+          "level": 6,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-401",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-604",
+          "name": "Economía Minera",
+          "level": 6,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-502",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-701",
+          "name": "Diseño de Minas",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "MIN-601",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-702",
+          "name": "Maquinaria Minera",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-503",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-703",
+          "name": "Taller de Grado I",
+          "level": 7,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-601",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-704",
+          "name": "Legislación Minera",
+          "level": 7,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 3,
+          "prerequisites": [
+            {
+              "sigla": "MIN-604",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-801",
+          "name": "Automatización Minera",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-702",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-802",
+          "name": "Cierre de Minas",
+          "level": 8,
+          "hours_theory": 3,
+          "hours_practice": 2,
+          "hours_total": 5,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-701",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-803",
+          "name": "Taller de Grado II",
+          "level": 8,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "MIN-703",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-804",
+          "name": "Práctica Industrial",
+          "level": 8,
+          "hours_theory": 0,
+          "hours_practice": 12,
+          "hours_total": 12,
+          "credits": 6,
+          "prerequisites": [
+            {
+              "sigla": "MIN-703",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-901",
+          "name": "Geoestadística",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-701",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-902",
+          "name": "Simulación Operaciones Mineras",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 4,
+          "hours_total": 8,
+          "credits": 5,
+          "prerequisites": [
+            {
+              "sigla": "MIN-801",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-903",
+          "name": "Electiva I",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-703",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-904",
+          "name": "Electiva II",
+          "level": 9,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-703",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-1001",
+          "name": "Trabajo de Grado",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "MIN-803",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-1002",
+          "name": "Proyecto Final Minería",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 8,
+          "hours_total": 12,
+          "credits": 8,
+          "prerequisites": [
+            {
+              "sigla": "MIN-803",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-1003",
+          "name": "Electiva III",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-903",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        },
+        {
+          "sigla": "MIN-1004",
+          "name": "Electiva IV",
+          "level": 10,
+          "hours_theory": 4,
+          "hours_practice": 2,
+          "hours_total": 6,
+          "credits": 4,
+          "prerequisites": [
+            {
+              "sigla": "MIN-904",
+              "type": "N",
+              "type_description": "Prerrequisito Indispensable Directo"
+            }
+          ]
+        }
+      ]
+    }
+  }
+}
