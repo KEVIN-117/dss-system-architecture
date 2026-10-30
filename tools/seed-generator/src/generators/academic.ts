@@ -21,6 +21,14 @@ export class AcademicGenerator {
 
   private siglaToCourseMap = new Map<string, PreparedCourse>();
 
+  private normalizeSigla(sig: string): string {
+    if (!sig) return '';
+    if (sig.length <= 7) return sig;
+    const noHyphen = sig.replace(/-/g, '');
+    if (noHyphen.length <= 7) return noHyphen;
+    return noHyphen.substring(0, 7);
+  }
+
   constructor(
     private facultiesCatalog: any,
     private curriculaCatalog: any,
@@ -61,9 +69,10 @@ export class AcademicGenerator {
       if (progCurriculum && Array.isArray(progCurriculum.courses)) {
         for (const c of progCurriculum.courses) {
           const courseId = nextMateriaId++;
+          const formattedSigla = this.normalizeSigla(c.sigla);
           const prepared: PreparedCourse = {
             id_materia: courseId,
-            sigla: c.sigla,
+            sigla: formattedSigla,
             materia: (c.name || c.materia || c.sigla).toUpperCase(),
             ciclo: c.level || c.ciclo || 1,
             _creditos: c.credits || 4,
@@ -76,10 +85,11 @@ export class AcademicGenerator {
             id_plan: 2018,
             materia_graduacion: (c.level >= 9 || c.sigla.includes('TES') || c.sigla.includes('TGR')) ? 'SI' : 'NO',
             prerrequisitos: Array.isArray(c.prerequisites)
-              ? c.prerequisites.map((p: any) => (typeof p === 'string' ? p : p.sigla || ''))
+              ? c.prerequisites.map((p: any) => this.normalizeSigla(typeof p === 'string' ? p : p.sigla || ''))
               : [],
           };
 
+          this.siglaToCourseMap.set(`${prog.id_programa}:${formattedSigla}`, prepared);
           this.siglaToCourseMap.set(`${prog.id_programa}:${c.sigla}`, prepared);
           this.allCourses.push(prepared);
         }
@@ -89,7 +99,8 @@ export class AcademicGenerator {
         for (let lvl = 1; lvl <= totalLevels; lvl++) {
           for (let m = 1; m <= 4; m++) {
             const courseId = nextMateriaId++;
-            const sigla = `${prog.id_programa}-${lvl}0${m}`;
+            const rawSigla = `${prog.id_programa}-${lvl}0${m}`;
+            const sigla = this.normalizeSigla(rawSigla);
             const prepared: PreparedCourse = {
               id_materia: courseId,
               sigla,

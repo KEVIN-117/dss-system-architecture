@@ -291,7 +291,6 @@ CREATE TABLE IF NOT EXISTS academico.pln_materias (
     atributos varchar[],
     _obs varchar DEFAULT ''::character varying NOT NULL,
     _creditos smallint DEFAULT 4 NOT NULL,
-    creditos smallint GENERATED ALWAYS AS (_creditos) STORED,
     id_materia_padre integer REFERENCES academico.pln_materias(id_materia),
     descripcion varchar,
     fecha_creacion timestamp without time zone DEFAULT now() NOT NULL,
