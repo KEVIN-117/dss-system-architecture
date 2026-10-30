@@ -55,17 +55,10 @@ CREATE SEQUENCE IF NOT EXISTS actas_graduacion.graduados_id_seq START WITH 1 INC
 -- 3.1. Países
 CREATE TABLE IF NOT EXISTS public.prs_pais_v2 (
     id_pais integer DEFAULT nextval('public.prs_pais_2_id_pais_seq'::regclass) NOT NULL PRIMARY KEY,
-    cod_pais char(2),
-    pais varchar(255),
-    sigla varchar(10),
-    nacionalidad varchar(50),
-    cod_numerico integer,
+    pais char(255),
     calificacion smallint,
     num_materias smallint,
-    estado varchar(1) DEFAULT 'A',
-    _registrado timestamp without time zone DEFAULT now() NOT NULL,
-    _modificado timestamp without time zone DEFAULT now() NOT NULL,
-    _estado char(1) DEFAULT 'A'::bpchar NOT NULL
+    estado varchar(1) DEFAULT 'A'
 );
 
 -- 3.2. Estados Civiles
@@ -83,10 +76,7 @@ CREATE TABLE IF NOT EXISTS public._bp_estados_civiles (
 -- 3.3. Tipo de Calificación de Colegio (Fiscal / Particular / Convenio)
 CREATE TABLE IF NOT EXISTS public.prs_calificacion (
     id_calificacion varchar(1) NOT NULL PRIMARY KEY,
-    calificacion varchar(20) NOT NULL,
-    _registrado timestamp without time zone DEFAULT now() NOT NULL,
-    _modificado timestamp without time zone DEFAULT now() NOT NULL,
-    _estado char(1) DEFAULT 'A'::bpchar NOT NULL
+    calificacion varchar(20) NOT NULL
 );
 
 -- 3.4. Modalidades de Examen / Admisión
@@ -118,39 +108,32 @@ CREATE TABLE IF NOT EXISTS academico.alm_programas_facultades (
     decano integer,
     web varchar(50),
     fax varchar(15),
-    email varchar(45),
-    sigla varchar(20)
+    email varchar(45)
 );
 
 -- 3.6. Tipos de Carrera (Semestral / Anual / Programa)
 CREATE TABLE IF NOT EXISTS academico.carreras_tipos (
-    tipo_c varchar(1) NOT NULL PRIMARY KEY,
-    tipo varchar(20),
+    tipo varchar(1) NOT NULL PRIMARY KEY,
     descripcion varchar,
     semanas smallint
 );
 
 -- 3.7. Sedes Universitarias (Central Potosí y Sub-sedes provinciales)
 CREATE TABLE IF NOT EXISTS academico.sedes (
-    id_sede varchar(5) NOT NULL PRIMARY KEY,
-    sede varchar(50),
-    tipo varchar(1) DEFAULT 'C',
-    nom_sede varchar(50)
+    id_sede varchar NOT NULL PRIMARY KEY,
+    sede varchar
 );
 
 -- 3.8. Estados Académicos de Alumnos (P=Regular, A=Egresado, T=Titulado, etc.)
 CREATE TABLE IF NOT EXISTS academico.alumnos_estados (
     estado varchar(1) NOT NULL PRIMARY KEY,
-    descripcion varchar(50),
-    visible boolean DEFAULT true,
-    estado_original varchar(10)
+    descripcion varchar
 );
 
 -- 3.9. Períodos Académicos del Sistema (0=Verano, 1=Semestre I, 2=Semestre II, 3=Anual)
 CREATE TABLE IF NOT EXISTS academico.periodos (
-    id_periodo integer NOT NULL PRIMARY KEY,
-    periodo varchar(50),
-    des_periodo varchar(50),
+    id_periodo integer,
+    des_periodo varchar,
     orden smallint,
     tipo char[]
 );
@@ -175,20 +158,17 @@ CREATE TABLE IF NOT EXISTS academico.alm_programas_edificios (
 -- 4.1. Departamentos Geográficos de Bolivia
 CREATE TABLE IF NOT EXISTS public.lugar_departamento (
     cod_dep integer DEFAULT nextval('public.lugar_departamento_v2_cod_dep_seq'::regclass) NOT NULL PRIMARY KEY,
-    departamento varchar(50) NOT NULL,
-    sigla varchar(5),
+    departamento char(15) NOT NULL,
     cod_pais integer REFERENCES public.prs_pais_v2(id_pais),
     _registro timestamp without time zone DEFAULT now() NOT NULL,
-    expedido varchar(5)
+    expedido varchar
 );
 
 -- 4.2. Períodos Operacionales (con auto-referencia id_periodo_relacion)
 CREATE TABLE IF NOT EXISTS academico.alm_periodos (
     id_periodo smallint NOT NULL PRIMARY KEY,
-    periodo varchar(50),
     descripcion varchar,
     id_periodo_relacion smallint NOT NULL,
-    _unique integer DEFAULT 1,
     CONSTRAINT fk_alm_periodos_relacion FOREIGN KEY (id_periodo_relacion) REFERENCES academico.alm_periodos(id_periodo)
 );
 
@@ -197,13 +177,12 @@ CREATE TABLE IF NOT EXISTS academico.alm_programas (
     id_programa char(3) NOT NULL PRIMARY KEY,
     programa varchar(100) NOT NULL,
     id_facultad smallint NOT NULL REFERENCES academico.alm_programas_facultades(id_facultad),
-    facultad integer REFERENCES academico.alm_programas_facultades(id_facultad),
     id_nivel smallint DEFAULT 1 NOT NULL,
     titulo varchar(60) DEFAULT '' NOT NULL,
     activo varchar DEFAULT 'A',
     nivel varchar(45) DEFAULT 'LIC',
     fec_creacion date,
-    tipo varchar REFERENCES academico.carreras_tipos(tipo_c),
+    tipo varchar REFERENCES academico.carreras_tipos(tipo),
     anulacion_parc varchar(2),
     fecha_aprob_curriculo date,
     fecha_creacion date,
@@ -602,7 +581,14 @@ CREATE TABLE IF NOT EXISTS academico.notas_planilla (
     CONSTRAINT notas_planilla_unique UNIQUE (id_gestion, id_periodo, id_alumno, id_materia, grupo, _unique)
 );
 
--- 10.3. Actas de Graduación y Titulación
+-- 10.3. Modalidades de Graduación
+CREATE TABLE IF NOT EXISTS actas_graduacion.modalidad_graduacion (
+    id integer NOT NULL PRIMARY KEY,
+    titulo_graduacion char(255),
+    id_gestion smallint
+);
+
+-- 10.4. Actas de Graduación y Titulación
 CREATE TABLE IF NOT EXISTS actas_graduacion.graduados (
     id integer DEFAULT nextval('actas_graduacion.graduados_id_seq'::regclass) NOT NULL PRIMARY KEY,
     id_alumno integer REFERENCES academico.alumnos(id_alumno),

@@ -388,6 +388,7 @@ export class LongitudinalCohortSimulator {
         const idGrad = this.nextGraduadoId++;
         const notaDefensa = randomInt(70, 98);
         const modalities = ['TESIS DE GRADO', 'PROYECTO DE GRADO', 'EXCELENCIA ACADEMICA', 'TRABAJO DIRIGIDO'];
+        const modalId = randomInt(1, 4);
 
         const graduado: EntityGraduado = {
           id: idGrad,
@@ -396,8 +397,11 @@ export class LongitudinalCohortSimulator {
           id_gestion: gestion,
           id_periodo: 2,
           fecha_graduacion: `${gestion}-11-25`,
-          modalidad_graduacion: sampleUniform(modalities),
+          modalidad_graduacion: modalities[modalId - 1] || 'TESIS DE GRADO',
+          id_modalidad: modalId,
           nota_defensa: notaDefensa,
+          titulo: 'LICENCIATURA',
+          nro_dip: st.datos.nro_dip,
           nro_acta: `ACTA-${gestion}-${idGrad.toString().padStart(4, '0')}`,
           _registrado: `${gestion}-11-25 15:00:00`,
         };

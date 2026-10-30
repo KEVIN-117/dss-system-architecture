@@ -95,6 +95,8 @@ describe('Suite de Pruebas Unitarias y de Integración — DATA-001', () => {
     assert.ok(!sql.includes('nro_impresiones'), 'No debe existir nro_impresiones');
     assert.ok(!sql.includes('id_colegio_sie varchar'), 'No debe existir id_colegio_sie en uatf_datos');
     assert.ok(!sql.includes('_hash varchar'), 'No debe existir _hash en notas_planilla');
+    assert.ok(!sql.includes('prs_examen (id_examen, examen, _registrado, _modificado'), 'No debe existir _modificado en prs_examen');
+    assert.ok(!sql.includes('prs_calificacion (id_calificacion, calificacion, _registrado'), 'No debe existir _registrado en prs_calificacion');
 
     // Comprobar que _tipo_academico = 'CAR' está presente para Apache Hop
     assert.ok(sql.includes("'CAR'"), "Debe incluir '_tipo_academico = CAR' requerido por Apache Hop");

@@ -313,7 +313,10 @@ export interface EntityGraduado {
   id_periodo: number;
   fecha_graduacion: string;
   modalidad_graduacion: string;
+  id_modalidad: number;
   nota_defensa: number;
   nro_acta: string;
+  nro_dip: string;
+  titulo: string;
   _registrado: string;
 }
