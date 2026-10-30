@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.1](https://github.com/KEVIN-117/dss-system-architecture/compare/apache-hop-v1.2.0...apache-hop-v1.2.1) (2026-10-30)
+
+
+### Bug Fixes
+
+* **hop:** make project environment configs writable ([#221](https://github.com/KEVIN-117/dss-system-architecture/issues/221)) ([428e208](https://github.com/KEVIN-117/dss-system-architecture/commit/428e208e8ca67ce6bd1a4f59f6fb9bb2c0b7d6b6))
+
 ## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/apache-hop-v1.1.0...apache-hop-v1.2.0) (2026-10-26)
 
 
