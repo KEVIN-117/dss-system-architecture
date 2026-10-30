@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-control-service-v1.1.0...dw-control-service-v1.2.0) (2026-10-30)
+
+
+### Features
+
+* **data:** add reproducible synthetic OLTP seed generator ([#206](https://github.com/KEVIN-117/dss-system-architecture/issues/206)) ([#219](https://github.com/KEVIN-117/dss-system-architecture/issues/219)) ([b510261](https://github.com/KEVIN-117/dss-system-architecture/commit/b510261fd6b4e45f3e2d987c1480d2656ab74001))
+
 ## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-control-service-v1.0.0...dw-control-service-v1.1.0) (2026-10-25)
 
 
