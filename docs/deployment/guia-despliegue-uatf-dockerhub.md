@@ -239,6 +239,15 @@ En un directorio protegido de despliegue, crear `prod-env.json` a partir de `etl
 /files/project/environments/prod-env.json
 ```
 
+La imagen copia el proyecto con propiedad del usuario `hop` (UID/GID 501 en la imagen desplegada), que ejecuta Hop Web. Así puede escribir archivos auxiliares de configuración en `environments/`; el archivo `prod-env.json` puede montarse de solo lectura. No montes todo el directorio `environments/` como solo lectura, porque Hop necesita crear allí archivos temporales como `OLTP_DB-config.json.new`.
+
+En Dokploy, crea un File Mount con **File Path** `prod-env.json` y el contenido de producción. En el Compose, referencia el archivo persistente de Dokploy con este bind mount (el destino incluye el nombre del archivo):
+
+```yaml
+volumes:
+  - ../files/prod-env.json:/files/project/environments/prod-env.json:ro
+```
+
 Variables del proceso:
 
 ```dotenv
