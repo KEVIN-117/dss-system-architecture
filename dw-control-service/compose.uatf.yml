@@ -1,0 +1,41 @@
+name: dw-control-service
+
+services:
+  dw-control-service:
+    # Keep this pinned to a published release. Update only after verifying the
+    # matching tag exists in Docker Hub.
+    image: kevin117rodriguez/dss-dw-control-service:1.1.0
+    restart: unless-stopped
+    env_file:
+      - ./dw-control-service.uatf.env
+    environment:
+      DW_CONTROL_PROFILE: prod
+      DW_CONTROL_PORT: "8090"
+      DW_CONTROL_OPENAPI_ENABLED: "false"
+      LOG_STRUCTURED_FORMAT: ecs
+    expose:
+      - "8090"
+    networks:
+      - dokploy-network
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - CMD
+        - busybox
+        - wget
+        - -q
+        - -O
+        - /dev/null
+        - http://127.0.0.1:8090/actuator/health/readiness
+      interval: 30s
+      timeout: 5s
+      start_period: 45s
+      retries: 3
+
+networks:
+  dokploy-network:
+    external: true
+    name: dokploy-network

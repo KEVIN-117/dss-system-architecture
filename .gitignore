@@ -327,3 +327,6 @@ core.*
 # Source package name matches the generic crash-dump ignore above; keep the OLAP manager source tracked.
 !olap-service/saiku-core/saiku-web/src/main/java/org/saiku/web/core/
 !olap-service/saiku-core/saiku-web/src/main/java/org/saiku/web/core/**
+
+.agents/
+**/.agents/

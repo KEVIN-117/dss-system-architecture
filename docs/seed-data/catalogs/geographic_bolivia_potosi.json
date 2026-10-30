@@ -1,0 +1,1001 @@
+{
+  "metadata": {
+    "country": "Estado Plurinacional de Bolivia",
+    "total_departments": 9,
+    "potosi_provinces_count": 16,
+    "total_localities_in_db": 4471,
+    "potosi_localities_in_db": 2006
+  },
+  "departments": [
+    {
+      "cod_dep": 1,
+      "name": "Chuquisaca",
+      "iso_code": "BO-H",
+      "ci_extension": "CH",
+      "capital": "Sucre",
+      "student_weight": 0.1
+    },
+    {
+      "cod_dep": 2,
+      "name": "La Paz",
+      "iso_code": "BO-L",
+      "ci_extension": "LP",
+      "capital": "Nuestra Señora de La Paz",
+      "student_weight": 0.05
+    },
+    {
+      "cod_dep": 3,
+      "name": "Cochabamba",
+      "iso_code": "BO-C",
+      "ci_extension": "CB",
+      "capital": "Cochabamba",
+      "student_weight": 0.04
+    },
+    {
+      "cod_dep": 4,
+      "name": "Oruro",
+      "iso_code": "BO-O",
+      "ci_extension": "OR",
+      "capital": "Oruro",
+      "student_weight": 0.08
+    },
+    {
+      "cod_dep": 5,
+      "name": "Potosí",
+      "iso_code": "BO-P",
+      "ci_extension": "PT",
+      "capital": "Villa Imperial de Potosí",
+      "student_weight": 0.7
+    },
+    {
+      "cod_dep": 6,
+      "name": "Tarija",
+      "iso_code": "BO-T",
+      "ci_extension": "TJ",
+      "capital": "Tarija",
+      "student_weight": 0.015
+    },
+    {
+      "cod_dep": 7,
+      "name": "Santa Cruz",
+      "iso_code": "BO-S",
+      "ci_extension": "SC",
+      "capital": "Santa Cruz de la Sierra",
+      "student_weight": 0.01
+    },
+    {
+      "cod_dep": 8,
+      "name": "Beni",
+      "iso_code": "BO-B",
+      "ci_extension": "BE",
+      "capital": "Trinidad",
+      "student_weight": 0.003
+    },
+    {
+      "cod_dep": 9,
+      "name": "Pando",
+      "iso_code": "BO-N",
+      "ci_extension": "PA",
+      "capital": "Cobija",
+      "student_weight": 0.002
+    }
+  ],
+  "potosi_provinces": [
+    {
+      "cod_prov": 2,
+      "name": "TOMÁS FRÍAS",
+      "capital": "Potosí",
+      "municipalities_count": 4,
+      "municipalities": [
+        "Potosí",
+        "Yocalla",
+        "Belén de Urmiri",
+        "Tinguipaya"
+      ],
+      "localities_in_database": 319,
+      "representative_localities": [
+        {
+          "cod_loc": 1518,
+          "localidad": "QUERHUANI"
+        },
+        {
+          "cod_loc": 4034,
+          "localidad": "KOLLPUOTA"
+        },
+        {
+          "cod_loc": 5071,
+          "localidad": "GALLEGO"
+        },
+        {
+          "cod_loc": 5031,
+          "localidad": "KAQUENA BAJA"
+        },
+        {
+          "cod_loc": 5055,
+          "localidad": "KELLU CANCHA"
+        },
+        {
+          "cod_loc": 5066,
+          "localidad": "CASILA"
+        },
+        {
+          "cod_loc": 5067,
+          "localidad": "AGUA DE CASTILLA"
+        },
+        {
+          "cod_loc": 5072,
+          "localidad": "CALLAPAMPA"
+        },
+        {
+          "cod_loc": 5085,
+          "localidad": "UJCHAQUE"
+        },
+        {
+          "cod_loc": 4111,
+          "localidad": "CONCEPCION - CHALVIRI BAJO"
+        }
+      ]
+    },
+    {
+      "cod_prov": 72,
+      "name": "RAFAEL BUSTILLO",
+      "capital": "Uncía",
+      "municipalities_count": 4,
+      "municipalities": [
+        "Uncía",
+        "Llallagua",
+        "Chayanta",
+        "Chuquihuta"
+      ],
+      "localities_in_database": 133,
+      "representative_localities": [
+        {
+          "cod_loc": 4124,
+          "localidad": "CKOPANA (AYLLU PANACACHI)"
+        },
+        {
+          "cod_loc": 5012,
+          "localidad": "CHIQUERUYO"
+        },
+        {
+          "cod_loc": 5023,
+          "localidad": "CHOCO GRANDE"
+        },
+        {
+          "cod_loc": 5024,
+          "localidad": "YAURIRI"
+        },
+        {
+          "cod_loc": 5025,
+          "localidad": "MERCAYMAYA"
+        },
+        {
+          "cod_loc": 5110,
+          "localidad": "CHIU"
+        },
+        {
+          "cod_loc": 5111,
+          "localidad": "PUCRO"
+        },
+        {
+          "cod_loc": 5028,
+          "localidad": "JANCO LAIME"
+        },
+        {
+          "cod_loc": 1519,
+          "localidad": "RIO VERDE (QUILA QUILA)"
+        },
+        {
+          "cod_loc": 1517,
+          "localidad": "UNCIA"
+        }
+      ]
+    },
+    {
+      "cod_prov": 73,
+      "name": "CORNELIO SAAVEDRA",
+      "capital": "Betanzos",
+      "municipalities_count": 3,
+      "municipalities": [
+        "Betanzos",
+        "Chaquí",
+        "Tacobamba"
+      ],
+      "localities_in_database": 276,
+      "representative_localities": [
+        {
+          "cod_loc": 5558,
+          "localidad": "SAN LORENZO"
+        },
+        {
+          "cod_loc": 11226,
+          "localidad": "CALIMALI"
+        },
+        {
+          "cod_loc": 1632,
+          "localidad": "TRAPICHE"
+        },
+        {
+          "cod_loc": 5029,
+          "localidad": "LEQUEZANA"
+        },
+        {
+          "cod_loc": 10025,
+          "localidad": "ALCHIRI"
+        },
+        {
+          "cod_loc": 2740,
+          "localidad": "NEGRO TAMBO"
+        },
+        {
+          "cod_loc": 5034,
+          "localidad": "CHALQUINA ALTA"
+        },
+        {
+          "cod_loc": 5035,
+          "localidad": "CHIRA"
+        },
+        {
+          "cod_loc": 5048,
+          "localidad": "SACACA"
+        },
+        {
+          "cod_loc": 5052,
+          "localidad": "HUANO HUANO"
+        }
+      ]
+    },
+    {
+      "cod_prov": 74,
+      "name": "CHAYANTA",
+      "capital": "Colquechaca",
+      "municipalities_count": 5,
+      "municipalities": [
+        "Colquechaca",
+        "Ravelo",
+        "Pocoata",
+        "Ocurí",
+        "San Pedro de Macha"
+      ],
+      "localities_in_database": 181,
+      "representative_localities": [
+        {
+          "cod_loc": 11227,
+          "localidad": "AÑAGUANI"
+        },
+        {
+          "cod_loc": 11236,
+          "localidad": "TOLOMA"
+        },
+        {
+          "cod_loc": 5043,
+          "localidad": "MILLUNI"
+        },
+        {
+          "cod_loc": 5062,
+          "localidad": "GUAYOME"
+        },
+        {
+          "cod_loc": 5077,
+          "localidad": "LLUSTAQUE"
+        },
+        {
+          "cod_loc": 5081,
+          "localidad": "ESQUENA"
+        },
+        {
+          "cod_loc": 5083,
+          "localidad": "TUSCUPAYA"
+        },
+        {
+          "cod_loc": 1568,
+          "localidad": "MACHA"
+        },
+        {
+          "cod_loc": 1573,
+          "localidad": "AYOMA"
+        },
+        {
+          "cod_loc": 1600,
+          "localidad": "MARCOMA"
+        }
+      ]
+    },
+    {
+      "cod_prov": 75,
+      "name": "CHARCAS",
+      "capital": "San Pedro de Buena Vista",
+      "municipalities_count": 2,
+      "municipalities": [
+        "San Pedro de Buena Vista",
+        "Toro Toro"
+      ],
+      "localities_in_database": 42,
+      "representative_localities": [
+        {
+          "cod_loc": 1615,
+          "localidad": "PUCARA"
+        },
+        {
+          "cod_loc": 1601,
+          "localidad": "SAN PEDRO DE BUENA VISTA"
+        },
+        {
+          "cod_loc": 1602,
+          "localidad": "QUINAMARA"
+        },
+        {
+          "cod_loc": 1603,
+          "localidad": "SAN MARCOS"
+        },
+        {
+          "cod_loc": 1604,
+          "localidad": "MOSCARI"
+        },
+        {
+          "cod_loc": 1605,
+          "localidad": "MICANI"
+        },
+        {
+          "cod_loc": 1606,
+          "localidad": "TORACARI"
+        },
+        {
+          "cod_loc": 1607,
+          "localidad": "COACARI"
+        },
+        {
+          "cod_loc": 1608,
+          "localidad": "CHIRO K'ASA"
+        },
+        {
+          "cod_loc": 1609,
+          "localidad": "ESQUENCACHI"
+        }
+      ]
+    },
+    {
+      "cod_prov": 76,
+      "name": "NOR CHICHAS",
+      "capital": "Cotagaita",
+      "municipalities_count": 2,
+      "municipalities": [
+        "Santiago de Cotagaita",
+        "Vitichi"
+      ],
+      "localities_in_database": 193,
+      "representative_localities": [
+        {
+          "cod_loc": 1631,
+          "localidad": "QUECHISLA"
+        },
+        {
+          "cod_loc": 11228,
+          "localidad": "TUSQUIÑA (ORG. COMUNITARIA)"
+        },
+        {
+          "cod_loc": 11231,
+          "localidad": "TORCOCHI GRANDE"
+        },
+        {
+          "cod_loc": 4203,
+          "localidad": "LIMETA - RANCHO CAZON"
+        },
+        {
+          "cod_loc": 5064,
+          "localidad": "PACHECO"
+        },
+        {
+          "cod_loc": 5032,
+          "localidad": "EL RANCHO"
+        },
+        {
+          "cod_loc": 5044,
+          "localidad": "CHILECLA"
+        },
+        {
+          "cod_loc": 5049,
+          "localidad": "JATUN JARA"
+        },
+        {
+          "cod_loc": 2664,
+          "localidad": "COTAGAITA (COTAGAITILLA)"
+        },
+        {
+          "cod_loc": 4706,
+          "localidad": "CHINCHOLA"
+        }
+      ]
+    },
+    {
+      "cod_prov": 95,
+      "name": "SUD CHICHAS",
+      "capital": "Tupiza",
+      "municipalities_count": 2,
+      "municipalities": [
+        "Tupiza",
+        "Atocha"
+      ],
+      "localities_in_database": 122,
+      "representative_localities": [
+        {
+          "cod_loc": 3128,
+          "localidad": "ROSA DE ORO"
+        },
+        {
+          "cod_loc": 5557,
+          "localidad": "COTANI"
+        },
+        {
+          "cod_loc": 5082,
+          "localidad": "MINA SERVIA"
+        },
+        {
+          "cod_loc": 1677,
+          "localidad": "SUIPACHA"
+        },
+        {
+          "cod_loc": 2668,
+          "localidad": "HUARIRACA"
+        },
+        {
+          "cod_loc": 4704,
+          "localidad": "YURCUMA"
+        },
+        {
+          "cod_loc": 5013,
+          "localidad": "VETILLAS"
+        },
+        {
+          "cod_loc": 5014,
+          "localidad": "ISQUE"
+        },
+        {
+          "cod_loc": 5016,
+          "localidad": "PEÃA BLANCA"
+        },
+        {
+          "cod_loc": 5019,
+          "localidad": "PACCHI"
+        }
+      ]
+    },
+    {
+      "cod_prov": 96,
+      "name": "NOR LÍPEZ",
+      "capital": "Colcha K",
+      "municipalities_count": 2,
+      "municipalities": [
+        "Colcha K",
+        "San Pedro de Quemes"
+      ],
+      "localities_in_database": 60,
+      "representative_localities": [
+        {
+          "cod_loc": 11222,
+          "localidad": "VILLA LOMA"
+        },
+        {
+          "cod_loc": 11235,
+          "localidad": "LAGUNA VERDE"
+        },
+        {
+          "cod_loc": 11238,
+          "localidad": "MINA TOLDOS"
+        },
+        {
+          "cod_loc": 5068,
+          "localidad": "POZO CAVADO"
+        },
+        {
+          "cod_loc": 5010,
+          "localidad": "MAÃICA"
+        },
+        {
+          "cod_loc": 5018,
+          "localidad": "RIO MARQUES"
+        },
+        {
+          "cod_loc": 4725,
+          "localidad": "ALLETA"
+        },
+        {
+          "cod_loc": 5100,
+          "localidad": "TAMBILLO"
+        },
+        {
+          "cod_loc": 5113,
+          "localidad": "SAN AGUSTIN"
+        },
+        {
+          "cod_loc": 5114,
+          "localidad": "MALIL"
+        }
+      ]
+    },
+    {
+      "cod_prov": 97,
+      "name": "SUD LÍPEZ",
+      "capital": "San Pablo de Lípez",
+      "municipalities_count": 3,
+      "municipalities": [
+        "San Pablo de Lípez",
+        "San Antonio de Esmoruco",
+        "Mojinete"
+      ],
+      "localities_in_database": 28,
+      "representative_localities": [
+        {
+          "cod_loc": 11221,
+          "localidad": "QUILLACAS"
+        },
+        {
+          "cod_loc": 1738,
+          "localidad": "QUETENA CHICO"
+        },
+        {
+          "cod_loc": 5103,
+          "localidad": "PEÃA BARROZA"
+        },
+        {
+          "cod_loc": 2840,
+          "localidad": "RIO SAN PABLO"
+        },
+        {
+          "cod_loc": 3040,
+          "localidad": "RIO MOJON"
+        },
+        {
+          "cod_loc": 1731,
+          "localidad": "SAN PABLO DE LIPEZ"
+        },
+        {
+          "cod_loc": 1732,
+          "localidad": "POLULOS"
+        },
+        {
+          "cod_loc": 1733,
+          "localidad": "SANTA ISABEL"
+        },
+        {
+          "cod_loc": 1734,
+          "localidad": "CERRILLOS"
+        },
+        {
+          "cod_loc": 1735,
+          "localidad": "GUADALUPE (SUD LIPEZ)"
+        }
+      ]
+    },
+    {
+      "cod_prov": 98,
+      "name": "JOSÉ MARÍA LINARES",
+      "capital": "Puna",
+      "municipalities_count": 3,
+      "municipalities": [
+        "Puna",
+        "Caiza D",
+        "Ckochas"
+      ],
+      "localities_in_database": 296,
+      "representative_localities": [
+        {
+          "cod_loc": 5556,
+          "localidad": "MOLINO PAMPA"
+        },
+        {
+          "cod_loc": 5233,
+          "localidad": "CATALA"
+        },
+        {
+          "cod_loc": 5036,
+          "localidad": "PACAJA"
+        },
+        {
+          "cod_loc": 5037,
+          "localidad": "SONDORITA"
+        },
+        {
+          "cod_loc": 5038,
+          "localidad": "SALITRAL"
+        },
+        {
+          "cod_loc": 5045,
+          "localidad": "LAJA TAMBO"
+        },
+        {
+          "cod_loc": 5050,
+          "localidad": "CORAHUARI"
+        },
+        {
+          "cod_loc": 5063,
+          "localidad": "LA ESMERALDA"
+        },
+        {
+          "cod_loc": 5069,
+          "localidad": "TRES CRUCES"
+        },
+        {
+          "cod_loc": 5073,
+          "localidad": "SUYCO"
+        }
+      ]
+    },
+    {
+      "cod_prov": 99,
+      "name": "ANTONIO QUIJARRO",
+      "capital": "Uyuni",
+      "municipalities_count": 3,
+      "municipalities": [
+        "Uyuni",
+        "Tomave",
+        "Porco"
+      ],
+      "localities_in_database": 209,
+      "representative_localities": [
+        {
+          "cod_loc": 11230,
+          "localidad": "SUNTURA"
+        },
+        {
+          "cod_loc": 11232,
+          "localidad": "QUIAZA"
+        },
+        {
+          "cod_loc": 11237,
+          "localidad": "HUYLLA  VINTO"
+        },
+        {
+          "cod_loc": 5041,
+          "localidad": "RINCONALES"
+        },
+        {
+          "cod_loc": 5042,
+          "localidad": "VENTILLA"
+        },
+        {
+          "cod_loc": 5046,
+          "localidad": "CHEUTACA"
+        },
+        {
+          "cod_loc": 5051,
+          "localidad": "CERCO"
+        },
+        {
+          "cod_loc": 5054,
+          "localidad": "PUTJANI"
+        },
+        {
+          "cod_loc": 1790,
+          "localidad": "CALASAYA"
+        },
+        {
+          "cod_loc": 4711,
+          "localidad": "ORO INGENIO"
+        }
+      ]
+    },
+    {
+      "cod_prov": 100,
+      "name": "DANIEL CAMPOS",
+      "capital": "Llica",
+      "municipalities_count": 2,
+      "municipalities": [
+        "Llica",
+        "Tahua"
+      ],
+      "localities_in_database": 28,
+      "representative_localities": [
+        {
+          "cod_loc": 5084,
+          "localidad": "SEJCIHUA"
+        },
+        {
+          "cod_loc": 5089,
+          "localidad": "CHILLGUILLA"
+        },
+        {
+          "cod_loc": 1827,
+          "localidad": "LLICA"
+        },
+        {
+          "cod_loc": 1828,
+          "localidad": "CAHUANA"
+        },
+        {
+          "cod_loc": 1829,
+          "localidad": "PALAYA"
+        },
+        {
+          "cod_loc": 1830,
+          "localidad": "CHACOMA"
+        },
+        {
+          "cod_loc": 1831,
+          "localidad": "TRES CRUCES"
+        },
+        {
+          "cod_loc": 1832,
+          "localidad": "CANQUELLA"
+        },
+        {
+          "cod_loc": 1833,
+          "localidad": "SAN PABLO DE NAPA"
+        },
+        {
+          "cod_loc": 1834,
+          "localidad": "TAHUA"
+        }
+      ]
+    },
+    {
+      "cod_prov": 101,
+      "name": "MODESTO OMISTE",
+      "capital": "Villazón",
+      "municipalities_count": 1,
+      "municipalities": [
+        "Villazón"
+      ],
+      "localities_in_database": 61,
+      "representative_localities": [
+        {
+          "cod_loc": 11223,
+          "localidad": "HUANACUNI ALTO"
+        },
+        {
+          "cod_loc": 11233,
+          "localidad": "SANTO ROSARIO"
+        },
+        {
+          "cod_loc": 5058,
+          "localidad": "QUESERA"
+        },
+        {
+          "cod_loc": 5074,
+          "localidad": "SAN PEDRO"
+        },
+        {
+          "cod_loc": 5075,
+          "localidad": "HORNOS"
+        },
+        {
+          "cod_loc": 5076,
+          "localidad": "LA HOYADA"
+        },
+        {
+          "cod_loc": 5078,
+          "localidad": "VILLA ROSARIO"
+        },
+        {
+          "cod_loc": 5080,
+          "localidad": "YOCOMA"
+        },
+        {
+          "cod_loc": 1844,
+          "localidad": "MORAYA"
+        },
+        {
+          "cod_loc": 1841,
+          "localidad": "VILLAZON"
+        }
+      ]
+    },
+    {
+      "cod_prov": 102,
+      "name": "GRAL. BERNARDINO BILBAO",
+      "capital": "Arampampa",
+      "municipalities_count": 2,
+      "municipalities": [
+        "Arampampa",
+        "Acasio"
+      ],
+      "localities_in_database": 18,
+      "representative_localities": [
+        {
+          "cod_loc": 1814,
+          "localidad": "MOLLE VILLQUE"
+        },
+        {
+          "cod_loc": 1811,
+          "localidad": "ARAMPAMPA"
+        },
+        {
+          "cod_loc": 1812,
+          "localidad": "CHARCA MARCAVI"
+        },
+        {
+          "cod_loc": 1813,
+          "localidad": "HUAYCURI"
+        },
+        {
+          "cod_loc": 1815,
+          "localidad": "PARARANI"
+        },
+        {
+          "cod_loc": 1816,
+          "localidad": "TACONI DE CAINE"
+        },
+        {
+          "cod_loc": 1817,
+          "localidad": "SARCURI"
+        },
+        {
+          "cod_loc": 1818,
+          "localidad": "HUMAVIZA"
+        },
+        {
+          "cod_loc": 1819,
+          "localidad": "SANTIAGO(GRAL B.BILBAO)"
+        },
+        {
+          "cod_loc": 1820,
+          "localidad": "CATACORA"
+        }
+      ]
+    },
+    {
+      "cod_prov": 103,
+      "name": "ENRIQUE BALDIVIESO",
+      "capital": "San Agustín",
+      "municipalities_count": 1,
+      "municipalities": [
+        "San Agustín"
+      ],
+      "localities_in_database": 7,
+      "representative_localities": [
+        {
+          "cod_loc": 1854,
+          "localidad": "SAN AGUSTIN"
+        },
+        {
+          "cod_loc": 1855,
+          "localidad": "ALOTA"
+        },
+        {
+          "cod_loc": 1856,
+          "localidad": "CERRO GORDO"
+        },
+        {
+          "cod_loc": 1857,
+          "localidad": "TODOS SANTOS"
+        },
+        {
+          "cod_loc": 4230,
+          "localidad": "MEJILLONES - LOCALIDAD MEJILLONES"
+        },
+        {
+          "cod_loc": 11665,
+          "localidad": "AGUA DE CASTILLA"
+        },
+        {
+          "cod_loc": 11846,
+          "localidad": "ROSARIO"
+        }
+      ]
+    },
+    {
+      "cod_prov": 111,
+      "name": "ALONSO DE IBÁÑEZ",
+      "capital": "Sacaca",
+      "municipalities_count": 2,
+      "municipalities": [
+        "Sacaca",
+        "Caripuyo"
+      ],
+      "localities_in_database": 33,
+      "representative_localities": [
+        {
+          "cod_loc": 1659,
+          "localidad": "OVEJERIA"
+        },
+        {
+          "cod_loc": 1660,
+          "localidad": "VILA VILA."
+        },
+        {
+          "cod_loc": 1661,
+          "localidad": "COLLOMA"
+        },
+        {
+          "cod_loc": 1662,
+          "localidad": "COTAÃA"
+        },
+        {
+          "cod_loc": 1663,
+          "localidad": "HUAYNACHACA"
+        },
+        {
+          "cod_loc": 1664,
+          "localidad": "CHOJLLA"
+        },
+        {
+          "cod_loc": 1665,
+          "localidad": "WILACIRCA"
+        },
+        {
+          "cod_loc": 1666,
+          "localidad": "HUANACOMA"
+        },
+        {
+          "cod_loc": 1667,
+          "localidad": "CHALLVIRI"
+        },
+        {
+          "cod_loc": 1668,
+          "localidad": "JANKHO JANKHO"
+        }
+      ]
+    }
+  ],
+  "urban_potosi": {
+    "city_name": "Villa Imperial de Potosí",
+    "neighborhoods": [
+      "Centro Histórico",
+      "San Roque",
+      "Cantumarca",
+      "San Benito",
+      "Plan 40",
+      "Ciudad Satélite",
+      "San Gerardo",
+      "San Cristóbal",
+      "San Pedro",
+      "San Juan",
+      "Highland Players",
+      "Los Pinos",
+      "Villa Colón",
+      "Villa Victoria",
+      "Karachipampa",
+      "Huari Huari",
+      "Las Delicias",
+      "Villa Banzer",
+      "Villa Copacabana",
+      "Calvario",
+      "Alto Potosí",
+      "Ticka Loma",
+      "Huachacalla",
+      "San Clemente",
+      "Pari Orcko",
+      "Pampa Ingenio",
+      "Villa Mecánicos",
+      "San Marcos"
+    ],
+    "streets_and_avenues": [
+      "Av. El Maestro",
+      "Av. Cívica",
+      "Av. Universitaria",
+      "Av. Litoral",
+      "Av. Tinkuy",
+      "Av. Murillo",
+      "Av. Villazón",
+      "Av. Panamericana",
+      "Av. Antofagasta",
+      "Av. Sevilla",
+      "Av. Ilustres",
+      "Av. H. Vázquez",
+      "Av. Las Banderas",
+      "Calle Bolívar",
+      "Calle Hoyos",
+      "Calle Quijarro",
+      "Calle Matos",
+      "Calle Linares",
+      "Calle Ayacucho",
+      "Calle Bustillos",
+      "Calle Sucre",
+      "Calle Millares",
+      "Calle La Paz",
+      "Calle Chuquisaca",
+      "Calle Oruro",
+      "Calle Nogales",
+      "Calle Cobija",
+      "Calle Tarija",
+      "Calle Cochabamba",
+      "Calle Frías"
+    ],
+    "address_generation_patterns": [
+      "#{street} Nº #{number}, Zona #{neighborhood}",
+      "#{street} Nº #{number}, Barrio #{neighborhood}",
+      "#{street} esq. #{street}, #{neighborhood}",
+      "#{neighborhood}, #{street} s/n"
+    ]
+  }
+}

@@ -80,3 +80,34 @@ GRANT dw_control_service TO dw_control_runtime;
 
 The `\password` command prompts for the secret instead of embedding it in a SQL file or shell
 history. Do not use the cluster administrator or `dw_control_operator` credentials in the service.
+
+## UATF / Dokploy Compose
+
+Use [`dw-control-service/compose.uatf.yml`](../../dw-control-service/compose.uatf.yml) for a
+container deployment. It pins the currently configured release image, runs the `prod` profile,
+disables OpenAPI/Swagger, and joins the external `dokploy-network`. Attach the DW PostgreSQL and
+Keycloak services to that same network, or set their reachable private DNS names in the environment
+file. Configure Dokploy's proxy to route to the Compose service on port `8090`; the API port is not
+published directly on the host.
+
+Copy [`dw-control-service/dw-control-service.uatf.env.example`](../../dw-control-service/dw-control-service.uatf.env.example)
+to `dw-control-service.uatf.env` on the deployment host, replace the examples with UATF values, and
+store the password through the approved secret-management process. Do not commit the populated
+file. `KEYCLOAK_ISSUER_URI` must exactly match the `iss` claim in access tokens; the JWK Set URL
+must be reachable from the container. Set `DW_CONTROL_DB_URL` to the DW host and database, and use
+only the provisioned `dw_control_runtime` login.
+
+Before starting the API, apply the DW schema release migrations that create/update the control
+roles and functions (including migrations `0023`–`0025`), then have the DBA provision
+`dw_control_runtime` and grant it membership in `dw_control_service`. This Compose intentionally
+does not run database migrations or create credentials. Deploy with:
+
+```bash
+docker compose -f compose.uatf.yml pull
+docker compose -f compose.uatf.yml up -d
+docker compose -f compose.uatf.yml ps
+docker compose -f compose.uatf.yml logs --tail=100 dw-control-service
+```
+
+The image tag is pinned in the Compose file. Before changing it, verify that the exact release tag
+is published in Docker Hub and that its corresponding schema migrations have already been applied.

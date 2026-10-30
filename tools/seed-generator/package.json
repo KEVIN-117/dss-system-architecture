@@ -1,0 +1,31 @@
+{
+  "name": "seed-generator",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Reproducible synthetic academic data generator for simulated UATF OLTP (DATA-001 / Issue #206)",
+  "type": "module",
+  "bin": {
+    "seed-generator": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/cli.js",
+    "seed": "node dist/cli.js",
+    "seed:dry-run": "node dist/cli.js --dry-run",
+    "seed:sql": "node dist/cli.js --profile test --output-sql ./out/seed_sample.sql",
+    "test": "node --experimental-strip-types --test tests/suite.test.ts"
+  },
+  "dependencies": {
+    "@faker-js/faker": "^10.6.0",
+    "commander": "^15.0.0",
+    "dotenv": "^18.0.9",
+    "pg": "^8.23.1",
+    "picocolors": "^1.1.1"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.6",
+    "@types/pg": "^8.23.1",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2"
+  }
+}

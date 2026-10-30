@@ -1,0 +1,611 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "metadata": {
+    "title": "UATF OLTP System Lookups & Academic Simulation Reference Codes",
+    "version": "1.0.0",
+    "project": "UATF Academic DSS-DW-ML (DATA-001 / Issue #206)",
+    "author": "Worker M1 (OLTP Schema & Rules Specialist)",
+    "date": "2026-10-29",
+    "description": "Standardized catalog of lookup codes, admission modalities, grading models, DSA abandonment criteria, and DW/ML simulation parameters for synthetic seed generation."
+  },
+  "system_lookups": {
+    "estados_civiles": [
+      {
+        "id_estado_civil": 1,
+        "cod_estado_civil": "SOL",
+        "estado_civil": "SOLTERO(A)",
+        "distribucion_pct": 94.5
+      },
+      {
+        "id_estado_civil": 2,
+        "cod_estado_civil": "CAS",
+        "estado_civil": "CASADO(A)",
+        "distribucion_pct": 4.5
+      },
+      {
+        "id_estado_civil": 3,
+        "cod_estado_civil": "DIV",
+        "estado_civil": "DIVORCIADO(A)",
+        "distribucion_pct": 0.8
+      },
+      {
+        "id_estado_civil": 4,
+        "cod_estado_civil": "VIU",
+        "estado_civil": "VIUDO(A)",
+        "distribucion_pct": 0.2
+      }
+    ],
+    "prs_calificacion": [
+      {
+        "id_calificacion": "1",
+        "calificacion": "FISCAL",
+        "descripcion": "Colegio de dependencia fiscal / estatal",
+        "frecuencia_pct": 78.0
+      },
+      {
+        "id_calificacion": "2",
+        "calificacion": "PARTICULAR",
+        "descripcion": "Colegio de dependencia privada o de convenio",
+        "frecuencia_pct": 20.5
+      },
+      {
+        "id_calificacion": "B",
+        "calificacion": "PROFESIONAL",
+        "descripcion": "Graduado universitario que cursa carrera paralela",
+        "frecuencia_pct": 1.0
+      },
+      {
+        "id_calificacion": "X",
+        "calificacion": "EXTRANJERO",
+        "descripcion": "Bachiller procedente de colegio del exterior",
+        "frecuencia_pct": 0.5
+      }
+    ],
+    "alumnos_estados": [
+      {
+        "estado": "P",
+        "descripcion": "ACTIVO / REGULAR",
+        "es_activo": true,
+        "es_matriculable": true
+      },
+      {
+        "estado": "B",
+        "descripcion": "BLOQUEADO",
+        "es_activo": false,
+        "es_matriculable": false
+      },
+      {
+        "estado": "A",
+        "descripcion": "PROFESIONAL",
+        "es_activo": false,
+        "es_matriculable": false
+      },
+      {
+        "estado": "T",
+        "descripcion": "TITULADO",
+        "es_activo": false,
+        "es_matriculable": false
+      },
+      {
+        "estado": "X",
+        "descripcion": "ANULADO / RETIRO",
+        "es_activo": false,
+        "es_matriculable": false
+      },
+      {
+        "estado": "S",
+        "descripcion": "SIMULTÁNEA",
+        "es_activo": true,
+        "es_matriculable": true
+      }
+    ],
+    "carreras_tipos": [
+      {
+        "tipo": "C",
+        "descripcion": "CARRERA REGULAR DE PREGRADO",
+        "semanas": 20
+      },
+      {
+        "tipo": "P",
+        "descripcion": "PROGRAMA ACADÉMICO DESCONCENTRADO",
+        "semanas": 20
+      }
+    ],
+    "programas_regimen": {
+      "S": {
+        "codigo": "S",
+        "nombre": "SEMESTRAL",
+        "semanas_termino": 20,
+        "periodos_por_gestion": 2,
+        "periodos_validos": [1, 2],
+        "total_carreras": 64
+      },
+      "A": {
+        "codigo": "A",
+        "nombre": "ANUAL",
+        "semanas_termino": 40,
+        "periodos_por_gestion": 1,
+        "periodos_validos": [3],
+        "total_carreras": 21
+      }
+    },
+    "sedes": [
+      {
+        "id_sede": "C",
+        "id_numerico": 1,
+        "sede": "CENTRAL",
+        "localidad": "POTOSI",
+        "cod_dep": 5
+      },
+      {
+        "id_sede": "2",
+        "id_numerico": 2,
+        "sede": "LLICA",
+        "localidad": "LLICA",
+        "cod_dep": 5
+      },
+      {
+        "id_sede": "3",
+        "id_numerico": 3,
+        "sede": "SACACA",
+        "localidad": "SACACA",
+        "cod_dep": 5
+      },
+      {
+        "id_sede": "4",
+        "id_numerico": 4,
+        "sede": "TUPIZA",
+        "localidad": "TUPIZA",
+        "cod_dep": 5
+      },
+      {
+        "id_sede": "5",
+        "id_numerico": 5,
+        "sede": "UNCIA",
+        "localidad": "UNCIA",
+        "cod_dep": 5
+      },
+      {
+        "id_sede": "6",
+        "id_numerico": 6,
+        "sede": "UYUNI",
+        "localidad": "UYUNI",
+        "cod_dep": 5
+      },
+      {
+        "id_sede": "7",
+        "id_numerico": 7,
+        "sede": "VILLAZON",
+        "localidad": "VILLAZON",
+        "cod_dep": 5
+      },
+      {
+        "id_sede": "8",
+        "id_numerico": 8,
+        "sede": "SAN CRISTOBAL",
+        "localidad": "SAN CRISTOBAL",
+        "cod_dep": 5
+      }
+    ],
+    "periodos": [
+      {
+        "id_periodo": 1,
+        "descripcion": "Primer Semestre",
+        "tipo": "REGULAR",
+        "es_semestre": true
+      },
+      {
+        "id_periodo": 2,
+        "descripcion": "Segundo Semestre",
+        "tipo": "REGULAR",
+        "es_semestre": true
+      },
+      {
+        "id_periodo": 3,
+        "descripcion": "Gestión Anual",
+        "tipo": "REGULAR",
+        "es_semestre": false
+      },
+      {
+        "id_periodo": 0,
+        "descripcion": "Curso de Verano",
+        "tipo": "INTENSIVO",
+        "es_semestre": false
+      },
+      {
+        "id_periodo": 4,
+        "descripcion": "Exámenes de Mesa / Invierno 1",
+        "tipo": "EXTRAORDINARIO",
+        "es_semestre": false
+      },
+      {
+        "id_periodo": 5,
+        "descripcion": "Curso de Invierno 2",
+        "tipo": "INTENSIVO",
+        "es_semestre": false
+      },
+      {
+        "id_periodo": 6,
+        "descripcion": "Reposición de Acta / Mesa Ext. 1",
+        "tipo": "EXTRAORDINARIO",
+        "es_semestre": false
+      },
+      {
+        "id_periodo": 7,
+        "descripcion": "Mesa Extraordinaria 2",
+        "tipo": "EXTRAORDINARIO",
+        "es_semestre": false
+      }
+    ],
+    "docentes_tiempo": [
+      {
+        "tiempo": "TC",
+        "descripcion": "TIEMPO COMPLETO",
+        "horas_semana": 40
+      },
+      {
+        "tiempo": "MT",
+        "descripcion": "MEDIO TIEMPO",
+        "horas_semana": 20
+      },
+      {
+        "tiempo": "TH",
+        "descripcion": "TIEMPO HORARIO",
+        "horas_semana": 12
+      }
+    ],
+    "departamentos_bolivia": [
+      {
+        "cod_dep": 5,
+        "departamento": "POTOSI",
+        "expedido": "PT",
+        "peso_origen_pct": 74.0
+      },
+      {
+        "cod_dep": 1,
+        "departamento": "CHUQUISACA",
+        "expedido": "CH",
+        "peso_origen_pct": 10.0
+      },
+      {
+        "cod_dep": 4,
+        "departamento": "ORURO",
+        "expedido": "OR",
+        "peso_origen_pct": 6.5
+      },
+      {
+        "cod_dep": 2,
+        "departamento": "LA PAZ",
+        "expedido": "LP",
+        "peso_origen_pct": 3.5
+      },
+      {
+        "cod_dep": 3,
+        "departamento": "COCHABAMBA",
+        "expedido": "CB",
+        "peso_origen_pct": 2.5
+      },
+      {
+        "cod_dep": 7,
+        "departamento": "SANTA CRUZ",
+        "expedido": "SC",
+        "peso_origen_pct": 1.5
+      },
+      {
+        "cod_dep": 6,
+        "departamento": "TARIJA",
+        "expedido": "TJ",
+        "peso_origen_pct": 1.2
+      },
+      {
+        "cod_dep": 8,
+        "departamento": "BENI",
+        "expedido": "BE",
+        "peso_origen_pct": 0.5
+      },
+      {
+        "cod_dep": 9,
+        "departamento": "PANDO",
+        "expedido": "PA",
+        "peso_origen_pct": 0.3
+      }
+    ]
+  },
+  "admission_modalities": [
+    {
+      "id_mod": 1,
+      "codigo_oficial": "PSA",
+      "id_acceso": "PA",
+      "denominacion": "Examen Prueba de Suficiencia Académica (1ra a 4ta opción)",
+      "cuota_poblacional_pct": 55.0,
+      "tasa_admision_pct": 52.0,
+      "requiere_examen_cuantitativo": true,
+      "puntaje_media": 53.5,
+      "puntaje_desv_estandar": 14.0,
+      "puntaje_min": 15,
+      "puntaje_max": 95
+    },
+    {
+      "id_mod": 2,
+      "codigo_oficial": "CPU",
+      "id_acceso": "CN",
+      "denominacion": "Curso Pre-Universitario / Prefacultativo (Nivelación)",
+      "cuota_poblacional_pct": 27.0,
+      "tasa_admision_pct": 68.0,
+      "requiere_examen_cuantitativo": true,
+      "puntaje_media": 59.2,
+      "puntaje_desv_estandar": 11.5,
+      "puntaje_min": 30,
+      "puntaje_max": 96
+    },
+    {
+      "id_mod": 3,
+      "codigo_oficial": "ID",
+      "id_acceso": "ID",
+      "denominacion": "Ingreso Directo (Normativa Universitaria y Casos Especiales)",
+      "cuota_poblacional_pct": 1.5,
+      "tasa_admision_pct": 100.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 80.0,
+      "puntaje_desv_estandar": 5.0,
+      "puntaje_min": 70,
+      "puntaje_max": 90
+    },
+    {
+      "id_mod": 4,
+      "codigo_oficial": "ADEA",
+      "id_acceso": "EX",
+      "denominacion": "Admisión por Excelencia Académica (Mejores Bachilleres)",
+      "cuota_poblacional_pct": 4.5,
+      "tasa_admision_pct": 100.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 88.5,
+      "puntaje_desv_estandar": 6.2,
+      "puntaje_min": 75,
+      "puntaje_max": 100
+    },
+    {
+      "id_mod": 5,
+      "codigo_oficial": "ADED",
+      "id_acceso": "ED",
+      "denominacion": "Admisión Extraordinaria Deportiva (Atletas de Élite)",
+      "cuota_poblacional_pct": 0.8,
+      "tasa_admision_pct": 85.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 62.0,
+      "puntaje_desv_estandar": 8.0,
+      "puntaje_min": 51,
+      "puntaje_max": 78
+    },
+    {
+      "id_mod": 6,
+      "codigo_oficial": "AEP",
+      "id_acceso": "PR",
+      "denominacion": "Admisión Especial para Profesionales (Segunda Carrera)",
+      "cuota_poblacional_pct": 1.2,
+      "tasa_admision_pct": 92.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 75.0,
+      "puntaje_desv_estandar": 7.5,
+      "puntaje_min": 60,
+      "puntaje_max": 90
+    },
+    {
+      "id_mod": 7,
+      "codigo_oficial": "ADC",
+      "id_acceso": "CP",
+      "denominacion": "Admisión Directa por Convenios Campesinos y Mineros (CAOP, FSUTCOQP, CENAQ, FENCOMIN)",
+      "cuota_poblacional_pct": 4.8,
+      "tasa_admision_pct": 95.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 65.0,
+      "puntaje_desv_estandar": 6.5,
+      "puntaje_min": 55,
+      "puntaje_max": 80
+    },
+    {
+      "id_mod": 8,
+      "codigo_oficial": "ESC",
+      "id_acceso": "ES",
+      "denominacion": "Estudios Simultáneos de Dos Carreras",
+      "cuota_poblacional_pct": 0.6,
+      "tasa_admision_pct": 90.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 70.0,
+      "puntaje_desv_estandar": 6.0,
+      "puntaje_min": 60,
+      "puntaje_max": 85
+    },
+    {
+      "id_mod": 9,
+      "codigo_oficial": "CC",
+      "id_acceso": "CC",
+      "denominacion": "Cambio de Carrera (Transferencia Interna)",
+      "cuota_poblacional_pct": 1.2,
+      "tasa_admision_pct": 88.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 60.0,
+      "puntaje_desv_estandar": 7.0,
+      "puntaje_min": 51,
+      "puntaje_max": 75
+    },
+    {
+      "id_mod": 10,
+      "codigo_oficial": "APTSS",
+      "id_acceso": "TS",
+      "denominacion": "Admisión por Transferencia de Sub-Sedes Provinciales",
+      "cuota_poblacional_pct": 0.8,
+      "tasa_admision_pct": 95.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 63.0,
+      "puntaje_desv_estandar": 6.0,
+      "puntaje_min": 52,
+      "puntaje_max": 78
+    },
+    {
+      "id_mod": 11,
+      "codigo_oficial": "ADGOC",
+      "id_acceso": "OC",
+      "denominacion": "Ganadores de Olimpiadas Científicas Plurinacionales",
+      "cuota_poblacional_pct": 0.4,
+      "tasa_admision_pct": 100.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 95.0,
+      "puntaje_desv_estandar": 4.0,
+      "puntaje_min": 85,
+      "puntaje_max": 100
+    },
+    {
+      "id_mod": 12,
+      "codigo_oficial": "APTU",
+      "id_acceso": "TR",
+      "denominacion": "Admisión por Traspaso de Universidad del Sistema CEUB",
+      "cuota_poblacional_pct": 1.0,
+      "tasa_admision_pct": 85.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 65.0,
+      "puntaje_desv_estandar": 7.5,
+      "puntaje_min": 51,
+      "puntaje_max": 80
+    },
+    {
+      "id_mod": 13,
+      "codigo_oficial": "ADEIOC",
+      "id_acceso": "IO",
+      "denominacion": "Estudiantes Indígenas Originarios Campesinos (Ayllus)",
+      "cuota_poblacional_pct": 0.6,
+      "tasa_admision_pct": 96.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 64.0,
+      "puntaje_desv_estandar": 6.0,
+      "puntaje_min": 53,
+      "puntaje_max": 77
+    },
+    {
+      "id_mod": 14,
+      "codigo_oficial": "AEPD",
+      "id_acceso": "CD",
+      "denominacion": "Personas con Capacidades Diferentes o Discapacidad (CODEPEDIS)",
+      "cuota_poblacional_pct": 0.4,
+      "tasa_admision_pct": 100.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 70.0,
+      "puntaje_desv_estandar": 5.0,
+      "puntaje_min": 60,
+      "puntaje_max": 80
+    },
+    {
+      "id_mod": 15,
+      "codigo_oficial": "AEPTI",
+      "id_acceso": "IN",
+      "denominacion": "Admisión Especial por Trabajo de Investigación Destacado",
+      "cuota_poblacional_pct": 0.2,
+      "tasa_admision_pct": 90.0,
+      "requiere_examen_cuantitativo": false,
+      "puntaje_media": 82.0,
+      "puntaje_desv_estandar": 6.5,
+      "puntaje_min": 70,
+      "puntaje_max": 95
+    }
+  ],
+  "grading_simulation_rules": {
+    "umbral_aprobacion_general": 51.0,
+    "umbral_aprobacion_auditoria": 56.0,
+    "ponderacion_parciales": {
+      "pparcial": 0.30,
+      "sparcial": 0.30,
+      "tparcial": 0.20,
+      "exfinal_cparcial": 0.20
+    },
+    "segundo_turno": {
+      "habilitado": true,
+      "nota_minima_habilitacion": 40.0,
+      "nota_maxima_habilitacion": 50.99,
+      "nota_minima_aprobacion": 51.0,
+      "maximo_materias_permitidas": 2,
+      "estado_origen_resultante": "S"
+    },
+    "examen_mesa": {
+      "habilitado": true,
+      "nota_minima_aprobacion": 51.0,
+      "tipo_acta": "M"
+    },
+    "estados_evaluacion": {
+      "A": {
+        "codigo": "A",
+        "descripcion": "APROBADO",
+        "condicion": "mejor_nota >= 51.0"
+      },
+      "R": {
+        "codigo": "R",
+        "descripcion": "REPROBADO",
+        "condicion": "mejor_nota < 51.0 Y parciales_rendidos >= 2"
+      },
+      "X": {
+        "codigo": "X",
+        "descripcion": "ABANDONO FORMAL",
+        "condicion": "parciales_rendidos < 2"
+      },
+      "H": {
+        "codigo": "H",
+        "descripcion": "HOMOLOGADO",
+        "condicion": "cambio_plan = true"
+      },
+      "C": {
+        "codigo": "C",
+        "descripcion": "CONVALIDADO",
+        "condicion": "procedencia_externa = true"
+      },
+      "S": {
+        "codigo": "S",
+        "descripcion": "COMPENSADO",
+        "condicion": "resolucion_carrera = true"
+      },
+      "D": {
+        "codigo": "D",
+        "descripcion": "DICTAMEN",
+        "condicion": "resolucion_facultativa = true"
+      }
+    },
+    "regla_abandono_dsa": {
+      "parciales_minimos_requeridos": 2,
+      "criterio_abandono": "parciales_rendidos < 2",
+      "accion_abandono": {
+        "estado_planilla": "X",
+        "nota_final": null,
+        "observacion": "DW_TEST_SEED_V2:abandono_lt2_parciales"
+      }
+    }
+  },
+  "downstream_dw_and_ml_rules": {
+    "filtros_apache_hop_programas": {
+      "tipo_academico_permitidos": ["CAR", "PRO", "TES", "TEM"],
+      "activo_permitidos": ["A"],
+      "comentario": "Valores 'SI' o null provocan rechazo del 100% en los pipelines de Hop."
+    },
+    "integridad_referencial_demografica": {
+      "exigir_coincidencia_uatf_datos": true,
+      "error_si_huerfano": "No existe perfil uatf_datos para el id_ra informado; snapshot SCD2 bloqueado"
+    },
+    "creditos_academicos_materias": {
+      "campo_fisico": "_creditos",
+      "rango_valido_min": 3,
+      "rango_valido_max": 6,
+      "default_creditos": 4,
+      "comentario": "Valores en 0 invalidan el cálculo del PPA en la tabla fact_retencion_desercion."
+    },
+    "dinamica_longitudinal_cohortes": {
+      "gestiones_simuladas": {
+        "inicio": 2018,
+        "fin": 2026
+      },
+      "tasa_desercion_anual_primer_año": 0.22,
+      "tasa_desercion_anual_segundo_año": 0.10,
+      "tasa_desercion_anual_años_superiores": 0.02,
+      "tasa_reprobacion_materias_filtro": 0.45,
+      "tasa_reprobacion_materias_regulares": 0.20,
+      "maximo_materias_arrastre": 2,
+      "criterio_clasificacion_desercion_dw": "no_matricula_en_t_mas_1 Y parciales_en_t < 2"
+    }
+  }
+}
