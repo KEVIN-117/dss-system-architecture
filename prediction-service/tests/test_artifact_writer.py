@@ -37,6 +37,7 @@ class ArtifactWriterTests(unittest.TestCase):
             "algorithm": "random_forest",
             "dataset_id": "dataset-uuid-123",
             "lifecycle_state": "CANDIDATE",
+            "classes": {"positive_class": "RISK", "negative_class": "NO_RISK", "event_code": "RETENTION_RISK"},
         }
         metrics = {"accuracy": 0.85, "f1_score": 0.82}
         training_config = {"algorithm": "random_forest", "seed": 42}
@@ -68,6 +69,7 @@ class ArtifactWriterTests(unittest.TestCase):
         self.assertTrue((job_dir / "feature_names.json").exists())
         self.assertTrue((job_dir / "dependency_lock.json").exists())
         self.assertTrue((job_dir / "dataset_ref.json").exists())
+        self.assertTrue((job_dir / "evaluation_report.json").exists())
         self.assertTrue((job_dir / "manifest.json").exists())
 
         # Verify digest was computed and added
@@ -78,6 +80,9 @@ class ArtifactWriterTests(unittest.TestCase):
         saved_manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(saved_manifest["artifact_digest"], result_manifest["artifact_digest"])
         self.assertEqual(saved_manifest["lifecycle_state"], "CANDIDATE")
+        self.assertIn("pipeline.joblib", saved_manifest["artifact_files"])
+        self.assertEqual(saved_manifest["input_schema"]["feature_names"], feature_names)
+        self.assertEqual(saved_manifest["probability_definition"]["positive_class"], "RISK")
 
 
 if __name__ == "__main__":

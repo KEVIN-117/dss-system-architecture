@@ -154,13 +154,14 @@ class TrainingApiTests(unittest.TestCase):
         response = self.client.get("/v1/training-jobs/non-existent-job-uuid")
         self.assertEqual(response.status_code, 404)
 
-    def test_legacy_endpoints_unaffected(self) -> None:
+    def test_prediction_never_returns_simulated_result_without_active_model(self) -> None:
         root_resp = self.client.get("/")
         self.assertEqual(root_resp.status_code, 200)
 
         predict_resp = self.client.post("/predict", json={"student_id": "123"})
-        self.assertEqual(predict_resp.status_code, 200)
-        self.assertIn("prediction", predict_resp.json())
+        self.assertEqual(predict_resp.status_code, 503)
+        self.assertEqual(predict_resp.json()["detail"]["code"], "NO_ACTIVE_MODEL")
+        self.assertNotIn("confidence", predict_resp.json())
 
 
 if __name__ == "__main__":

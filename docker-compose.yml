@@ -272,6 +272,8 @@ services:
       RABBITMQ_VHOST: ${PREDICTION_RABBITMQ_VHOST:-${RABBITMQ_VHOST:-/}}
       WORKER_ARTIFACTS_DIR: /app/artifacts
       PREDICTION_DATASET_ROOT: ${PREDICTION_DATASET_ROOT:-/app/snapshots}
+    volumes:
+      - prediction_artifacts:/app/artifacts
     depends_on:
       postgres-dw:
         condition: service_healthy

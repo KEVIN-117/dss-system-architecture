@@ -44,6 +44,7 @@ class TrainingResult:
 
 def get_dependency_versions() -> dict[str, str]:
     import imblearn
+    import joblib
     import sklearn
     import xgboost
 
@@ -51,6 +52,7 @@ def get_dependency_versions() -> dict[str, str]:
         "python": sys.version.split()[0],
         "scikit_learn": sklearn.__version__,
         "xgboost": xgboost.__version__,
+        "joblib": joblib.__version__,
         "imbalanced_learn": imblearn.__version__,
         "pandas": pd.__version__,
         "numpy": np.__version__,
@@ -418,7 +420,8 @@ def train_model(
         metrics=metrics,
         training_config=training_config,
         balance_report=balance_report,
-        feature_names=transformed_names,
+        # Serving accepts this raw schema and applies the saved transformer.
+        feature_names=partition.feature_names,
         dependency_lock=dep_versions,
         duration_seconds=duration,
     )
