@@ -3,6 +3,9 @@ import type {
   EntityUatfDatos,
   EntityPostulante,
   EntityAlumno,
+  EntityMatricula,
+  EntityCajaTransaccion,
+  EntityValorTransaccion,
   EntityProgramacion,
   EntityNotaPlanilla,
   EntityGraduado,
@@ -17,6 +20,9 @@ export interface SimulationResult {
   uatfDatos: EntityUatfDatos[];
   postulantes: EntityPostulante[];
   alumnos: EntityAlumno[];
+  matriculas: EntityMatricula[];
+  cajasTransacciones: EntityCajaTransaccion[];
+  valoresTransacciones: EntityValorTransaccion[];
   programaciones: EntityProgramacion[];
   notasPlanilla: EntityNotaPlanilla[];
   graduados: EntityGraduado[];
@@ -37,6 +43,9 @@ export class LongitudinalCohortSimulator {
   private uatfDatosList: EntityUatfDatos[] = [];
   private postulantesList: EntityPostulante[] = [];
   private alumnosList: EntityAlumno[] = [];
+  private matriculasList: EntityMatricula[] = [];
+  private cajasTransaccionesList: EntityCajaTransaccion[] = [];
+  private valoresTransaccionesList: EntityValorTransaccion[] = [];
   private programacionesList: EntityProgramacion[] = [];
   private notasPlanillaList: EntityNotaPlanilla[] = [];
   private graduadosList: EntityGraduado[] = [];
@@ -47,9 +56,14 @@ export class LongitudinalCohortSimulator {
   private nextPostulanteId = 1;
   private nextProgramacionId = 1;
   private nextMatriculaId = 1;
+  private nextEnrollmentId = 1;
+  private nextPurchaseTransactionId = 1;
+  private nextValueTransactionId = 1;
   private nextGraduadoId = 1;
 
   private modalityWeights: WeightedItem<{ id: number; sigla: string; passRate: number }>[] = [];
+  private readonly coveredPurchasePeriods = new Set<string>();
+  private readonly studentsWithPreviousPurchase = new Set<number>();
 
   constructor(
     private demographicGen: DemographicGenerator,
@@ -86,18 +100,21 @@ export class LongitudinalCohortSimulator {
    */
   public simulate(
     cohortSize: number,
-    startYear = 2018,
+    startYear = 2000,
     endYear = 2026
   ): SimulationResult {
     for (let gestion = startYear; gestion <= endYear; gestion++) {
-      // 1. Proceso de Admisión e Ingreso de nueva cohorte
-      this.simulateAdmissionCohort(gestion, cohortSize);
+      // Los programas semestrales reciben dos cohortes (periodos 1 y 2);
+      // los anuales reciben una cohorte ligada al periodo anual 3.
+      this.simulateAdmissionCohort(gestion, 1, cohortSize);
+      this.simulateAdmissionCohort(gestion, 3, cohortSize);
 
-      // 2. Semestre I (Período 1 para semestrales, y anuales)
+      // Períodos semestrales y cierre anual, con la cadencia del catálogo OLTP.
       this.simulateAcademicPeriod(gestion, 1);
 
-      // 3. Semestre II (Período 2 para semestrales)
+      this.simulateAdmissionCohort(gestion, 2, cohortSize);
       this.simulateAcademicPeriod(gestion, 2);
+      this.simulateAcademicPeriod(gestion, 3);
 
       // 4. Cierre anual de gestión: Titulación de cohortes avanzadas
       this.simulateGraduations(gestion);
@@ -107,13 +124,21 @@ export class LongitudinalCohortSimulator {
       uatfDatos: this.uatfDatosList,
       postulantes: this.postulantesList,
       alumnos: this.alumnosList,
+      matriculas: this.matriculasList,
+      cajasTransacciones: this.cajasTransaccionesList,
+      valoresTransacciones: this.valoresTransaccionesList,
       programaciones: this.programacionesList,
       notasPlanilla: this.notasPlanillaList,
       graduados: this.graduadosList,
     };
   }
 
-  private simulateAdmissionCohort(gestion: number, cohortSize: number): void {
+  private simulateAdmissionCohort(gestion: number, periodo: 1 | 2 | 3, cohortSize: number): void {
+    const eligiblePrograms = this.academicGen.programs.filter(
+      (program) => program.regime === (periodo === 3 ? 'A' : 'S')
+    );
+    if (eligiblePrograms.length === 0) return;
+
     for (let i = 0; i < cohortSize; i++) {
       const gender = i % 2 === 0 ? 'M' : 'F';
       const person = this.demographicGen.generatePerson(gender, gestion);
@@ -125,7 +150,7 @@ export class LongitudinalCohortSimulator {
       this.uatfDatosList.push(uatfDato);
 
       // Seleccionar carrera a postular
-      const targetProgram = sampleUniform(this.academicGen.programs);
+      const targetProgram = sampleUniform(eligiblePrograms);
       const modality = sampleWeighted(this.modalityWeights);
 
       // Determinar si aprueba el examen de ingreso
@@ -137,7 +162,7 @@ export class LongitudinalCohortSimulator {
         id_alumno: postulanteId,
         id_programa: targetProgram.id_programa,
         id_ra: idRa,
-        fec_inscripcion: `${gestion}-01-${randomInt(10, 25).toString().padStart(2, '0')}`,
+        fec_inscripcion: `${gestion}-${periodo === 2 ? '07' : '01'}-${randomInt(10, 25).toString().padStart(2, '0')}`,
         id_plan: 2018,
         id_grado: 'A',
         estado: isApproved ? 'A' : 'P',
@@ -146,7 +171,7 @@ export class LongitudinalCohortSimulator {
         nro_dip: person.nro_dip,
         examen: modality.id,
         id_acceso: modality.sigla,
-        id_periodo: 1,
+        id_periodo: periodo,
         id_gestion: gestion,
         nota: examGrade,
         _estado: 'A',
@@ -161,7 +186,7 @@ export class LongitudinalCohortSimulator {
           id_alumno: alumnoId,
           id_programa: targetProgram.id_programa,
           id_ra: idRa,
-          fec_inscripcion: `${gestion}-02-05`,
+          fec_inscripcion: `${gestion}-${periodo === 2 ? '08' : '02'}-05`,
           fec_egreso: null,
           id_plan: 2018,
           id_grado: 'A',
@@ -170,7 +195,7 @@ export class LongitudinalCohortSimulator {
           id_tipo_aprobacion: modality.id,
           carrera: 1,
           ssu: 'S',
-          _fecha_registro: `${gestion}-02-05 10:00:00`,
+          _fecha_registro: `${gestion}-${periodo === 2 ? '08' : '02'}-05 10:00:00`,
         };
         this.alumnosList.push(alumno);
 
@@ -195,9 +220,12 @@ export class LongitudinalCohortSimulator {
 
     for (const st of this.activeStudents) {
       if (st.isDroppedOut) continue;
+      if (st.alumno.estado === 'T') continue;
 
-      // Las carreras anuales solo se evalúan y registran en período 1 (o cierre anual)
-      if (st.regime === 'A' && periodo === 2) continue;
+      // Los períodos 1/2 son semestrales; el período 3 representa la gestión anual.
+      if ((st.regime === 'A' && periodo !== 3) || (st.regime === 'S' && periodo === 3)) continue;
+
+      this.registerMatriculaPurchase(st, gestion, periodo);
 
       // Obtener asignaturas del nivel actual del estudiante
       const availableCourses = this.academicGen.getCoursesForProgramAndLevel(st.idPrograma, st.currentLevel);
@@ -234,7 +262,7 @@ export class LongitudinalCohortSimulator {
             id_gestion: gestion,
             id_periodo: periodo,
             id_grupo: 1,
-            fecha: `${gestion}-${periodo === 1 ? '02' : '08'}-10 09:00:00`,
+            fecha: `${gestion}-${periodo === 2 ? '08' : '02'}-10 09:00:00`,
             ult_usuario: 'system_enroll',
             estado: 'A',
             pparcial,
@@ -318,7 +346,7 @@ export class LongitudinalCohortSimulator {
             id_gestion: gestion,
             id_periodo: periodo,
             id_grupo: 1,
-            fecha: `${gestion}-${periodo === 1 ? '02' : '08'}-10 09:00:00`,
+            fecha: `${gestion}-${periodo === 2 ? '08' : '02'}-10 09:00:00`,
             ult_usuario: 'system_enroll',
             estado: 'A',
             pparcial: p1,
@@ -379,6 +407,87 @@ export class LongitudinalCohortSimulator {
     }
   }
 
+  /**
+   * Simula una compra efectiva de matrícula y los registros académicos que cubre.
+   * En programas semestrales la compra de período 1 cubre ambos períodos, por
+   * lo que el período 2 no crea una segunda transacción para el mismo alumno.
+   */
+  private registerMatriculaPurchase(st: StudentTracking, gestion: number, periodo: number): void {
+    const periodKey = `${st.alumno.id_alumno}:${gestion}:${periodo}`;
+    if (this.coveredPurchasePeriods.has(periodKey)) return;
+
+    const coveredPeriods: number[] = st.regime === 'A'
+      ? [3]
+      : periodo === 1
+        ? [1, 2]
+        : [2];
+    const transactionId = this.nextPurchaseTransactionId++;
+    const firstEnrollmentId = this.nextEnrollmentId;
+    const purchaseDate = `${gestion}-${periodo === 2 ? '08' : '02'}-05`;
+    const purchaseTimestamp = `${purchaseDate} 10:00:00`;
+    const clave = String(10000 + (transactionId % 90000)).padStart(5, '0');
+    const amount = st.regime === 'A' ? 240 : 140;
+    const matriculaType = this.studentsWithPreviousPurchase.has(st.alumno.id_alumno) ? 'ER' : 'EN';
+
+    for (const coveredPeriod of coveredPeriods) {
+      const enrollmentId = this.nextEnrollmentId++;
+      this.matriculasList.push({
+        id_matricula: enrollmentId,
+        id_gestion: gestion,
+        id_periodo: coveredPeriod,
+        id_alumno: st.alumno.id_alumno,
+        clave,
+        fec_registro: purchaseDate,
+        ult_usuario: 'seed_matricula',
+        estado: 'A',
+        tramite: 'N',
+        tipo: 'A',
+        registrado: purchaseTimestamp,
+        id_tipo_matricula: matriculaType,
+      });
+      this.coveredPurchasePeriods.add(`${st.alumno.id_alumno}:${gestion}:${coveredPeriod}`);
+    }
+
+    this.cajasTransaccionesList.push({
+      id_transaccion: transactionId,
+      id_ra: st.alumno.id_ra,
+      id_alumno: st.alumno.id_alumno,
+      id_cargo: 'MAT1',
+      fec_transaccion: purchaseDate,
+      envia: 'seed_matricula',
+      id_tipo_transaccion: 7,
+      estado: 'A',
+      fec_pago: purchaseTimestamp,
+      costo: amount,
+      id_gestion: gestion,
+      id_periodo: periodo,
+    });
+
+    this.valoresTransaccionesList.push({
+      id_transaccion: this.nextValueTransactionId++,
+      id_alumno: st.alumno.id_alumno,
+      id_programa: st.idPrograma,
+      id_cargo: 'MAT1',
+      id_concepto: '0001',
+      costo: amount,
+      fecha: purchaseDate,
+      id_gestion: gestion,
+      id_periodo: periodo,
+      ult_usuario: 'seed_matricula',
+      estado: 'A',
+      id_ra: st.alumno.id_ra,
+      envia: 'seed_matricula',
+      id_tipo_transaccion: 7,
+      sistema: 'D',
+      id_caja_tran: transactionId,
+    });
+    this.studentsWithPreviousPurchase.add(st.alumno.id_alumno);
+
+    if (this.nextEnrollmentId - firstEnrollmentId !== coveredPeriods.length) {
+      throw new Error(`Cobertura de matrícula inconsistente para transacción ${transactionId}`);
+    }
+  }
+
   private simulateGraduations(gestion: number): void {
     for (const st of this.activeStudents) {
       if (st.isDroppedOut) continue;
@@ -394,7 +503,7 @@ export class LongitudinalCohortSimulator {
           id_alumno: st.alumno.id_alumno,
           id_programa: st.idPrograma,
           id_gestion: gestion,
-          id_periodo: 2,
+          id_periodo: st.regime === 'A' ? 3 : 2,
           fecha_graduacion: `${gestion}-11-25`,
           modalidad_graduacion: sampleUniform(modalities),
           nota_defensa: notaDefensa,

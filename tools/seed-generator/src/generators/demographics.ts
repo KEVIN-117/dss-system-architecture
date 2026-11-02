@@ -24,6 +24,7 @@ export interface GeneratedPerson {
 }
 
 export class DemographicGenerator {
+  private usedDipNumbers = new Set<string>();
   private surnameWeights: WeightedItem<string>[];
   private extensionWeights: WeightedItem<string>[];
   private maritalStatusWeights: WeightedItem<number>[];
@@ -91,12 +92,16 @@ export class DemographicGenerator {
 
     // 3. Cédula de Identidad (DIP) con complementos
     const ciConfig = this.demographicCatalog.document_identification.ci_dip;
-    const baseDip = randomInt(ciConfig.min_number, ciConfig.max_number);
+    let nroDip: string;
+    do {
+      const baseDip = randomInt(ciConfig.min_number, ciConfig.max_number);
+      const hasComplement = chance(ciConfig.complement_probability);
+      nroDip = hasComplement
+        ? `${baseDip}-${randomInt(1, 9)}A`
+        : baseDip.toString();
+    } while (this.usedDipNumbers.has(nroDip));
+    this.usedDipNumbers.add(nroDip);
     const tipoNroDip = sampleWeighted(this.extensionWeights); // ~70% 'PT'
-    const hasComplement = chance(ciConfig.complement_probability);
-    const nroDip = hasComplement
-      ? `${baseDip}-${randomInt(1, 9)}A`
-      : baseDip.toString();
 
     // 4. Fecha de nacimiento coherente (edad entre 17 y 25 años al postular)
     const age = randomInt(17, 24);

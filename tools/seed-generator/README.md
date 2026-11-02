@@ -54,14 +54,14 @@ bun run src/cli.ts --dry-run
 ```
 
 ### 2. Generación de Script SQL Determinista
-Genera un archivo `.sql` reproducible envuelto en transacciones (`BEGIN ... COMMIT`) y ordenado en 8 niveles topológicos:
+Genera un archivo `.sql` reproducible envuelto en transacciones (`BEGIN ... COMMIT`) y ordenado según dependencias OLTP:
 
 ```bash
 # Perfil rápido (test)
 node dist/cli.js --profile test --output-sql ./out/seed_sample.sql
 
 # Perfil mediano o completo con semilla específica
-node dist/cli.js --profile medium --seed 42 --start-year 2018 --end-year 2026 --output-sql ./out/seed_full.sql
+node dist/cli.js --profile medium --seed 42 --start-year 2000 --end-year 2026 --output-sql ./out/seed_full.sql
 ```
 
 ### 3. Inserción directa en PostgreSQL local
@@ -80,14 +80,16 @@ node dist/cli.js --profile test --clean --execute
 |---|---|---|
 | `-s, --seed <number>` | Semilla pseudoaleatoria para reproducibilidad | `12345` |
 | `-p, --profile <profile>` | Perfil de simulación (`test`, `medium`, `full`) | `test` |
-| `-c, --cohort-size <number>` | Cantidad de postulantes por gestión anual | `150` (test), `600` (med), `1500` (full) |
-| `--start-year <number>` | Año inicial de simulación longitudinal | `2018` |
-| `--end-year <number>` | Año final de simulación longitudinal | `2026` |
+| `-c, --cohort-size <number>` | Postulantes por ingreso; el período 2 solo admite carreras semestrales | `150` (test), `600` (med), `1500` (full) |
+| `--start-year <number>` | Año inicial de simulación longitudinal | `2000` |
+| `--end-year <number>` | Año final de generación longitudinal; 2026 amplía la cobertura sintética | `2026` |
 | `--dry-run` | Simular en memoria sin persistir | `false` |
 | `-o, --output-sql <path>` | Guardar sentencias SQL en archivo | `null` |
 | `--clean` | Incluir truncado previo en orden inverso | `false` |
 | `--execute` | Ejecutar inserción en PostgreSQL local | `false` |
 | `--catalogs-dir <path>` | Ruta personalizada a catálogos JSON | Auto-detectada |
+
+`--clean` incluye `TRUNCATE ... CASCADE` dentro de la transacción y el SQL generado se niega a continuar si `current_database()` no es `jachasun_test`. Usarlo solo en la instancia efímera de prueba; sin `--clean`, el script conserva los datos existentes.
 
 ---
 
@@ -102,6 +104,12 @@ El ejecutable cuenta con una guarda estricta en `src/config/security.ts` que **a
 
 ## 🔄 Flujo Downstream (OLTP → ETL Hop → ML Prediction)
 
-1. **Población OLTP:** El seed puebla `public.uatf_datos`, `public.postulantes`, `academico.alumnos`, `academico.pln_materias`, `academico.alm_programaciones`, `academico.notas_planilla` y `actas_graduacion.graduados`.
+1. **Población OLTP:** El seed puebla `public.uatf_datos`, `public.postulantes`, `academico.alumnos`, `public.matriculas`, `public.cajas_transacciones`, `public.valores_transacciones`, `academico.pln_materias`, `academico.alm_programaciones`, `academico.notas_planilla` y `actas_graduacion.graduados`. Por gestión, los programas semestrales tienen ingresos/cursados en periodos 1 y 2; los programas anuales tienen un ingreso/cursado en periodo 3.
+   - Cada compra de matrícula es un evento único `public.cajas_transacciones.id_transaccion`, con un detalle vinculado por `public.valores_transacciones.id_caja_tran`.
+   - En programas semestrales, una compra de período 1 crea las filas académicas de matrícula para períodos 1 y 2; el simulador no genera una segunda compra en período 2 para ese alumno/gestión.
+   - La marca `cajas_transacciones.fec_pago` coincide con `matriculas._registrado`; los campos `fec_transaccion`, `valores_transacciones.fecha` y `matriculas.fec_registro` conservan la fecha académica sin hora.
+   - Importes, cargo (`MAT1`) y concepto (`0001`) son marcadores sintéticos de prueba, no aranceles institucionales.
 2. **Extracción ETL (Apache Hop):** Los registros incluyen `_tipo_academico = 'CAR'`, `activo = 'A'` y `_creditos > 0`, cumpliendo 100% de los filtros de los pipelines `pl_dim_estudiante_scd2_mvp` y `pl_fact_cursado_mvp`.
 3. **Modelado Predictivo (PRED-002 / PRED-003):** Las notas simulan la regla DSA de deserción temprana (estudiantes con menos de 2 parciales tienen estado `'X'` y abandono), permitiendo entrenar clasificadores de deserción sobre cohortes longitudinales sin fuga temporal.
+
+El rango predeterminado 2000–2026 permite construir trayectorias históricas y deja 2026 como último año sintético. Los programas semestrales generan cohortes y cursados en los periodos 1 y 2; los anuales generan una cohorte y cursados en el periodo 3 (`GESTION ANUAL`). Ejecutar la generación no garantiza por sí sola etiquetas evaluables en el DW: deben existir y procesarse los cierres sucesores (`1→2`, `2→1` de la siguiente gestión, `3→3` de la siguiente gestión). Los datos generados en 2026 son sintéticos; el ETL solo debe cerrar un período cuando su fecha efectiva configurada ya haya ocurrido.
