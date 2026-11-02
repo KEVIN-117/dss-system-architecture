@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <pipeline>
-  <info><name>pl_fact_admision_mvp</name><name_sync_with_filename>Y</name_sync_with_filename><description>Prepara FACT_ADMISION desde public.postulantes para el cierre solicitado</description><extended_description>Grano: una fila por public.postulantes.id_alumno (UNIQUE en DDL Jachasun). Lee solo el periodo del cierre, aplica el filtro de programas contractual y escribe exclusivamente en el landing privado del publisher atómico. Este pipeline prepara filas; el lote se sella en una acción posterior para respetar el commit del JDBC writer. No publica en dw.fact_admision.</extended_description><pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type><parameters>
+  <info><name>pl_fact_admision_mvp</name><name_sync_with_filename>Y</name_sync_with_filename><description>Prepara FACT_ADMISION desde public.postulantes para el cierre solicitado</description><extended_description>Grano: una fila por public.postulantes.id_alumno (UNIQUE en DDL Jachasun). Para la identidad académica enlaza public.postulantes con academico.alumnos por id_ra; el id_alumno de postulantes se conserva solo como trazabilidad de la postulación. Solo se acepta una coincidencia de alumno por id_ra. Lee el periodo del cierre, aplica el filtro de programas contractual y escribe exclusivamente en el landing privado del publisher atómico.</extended_description><pipeline_version>1.0</pipeline_version><pipeline_type>Normal</pipeline_type><parameters>
     <parameter><name>P_RUN_ID</name><default_value/><description>UUID de ejecución activa</description></parameter>
     <parameter><name>P_REQUESTED_GESTION</name><default_value/><description>Gestión autorizada del cierre</description></parameter>
     <parameter><name>P_REQUESTED_PERIODO</name><default_value/><description>Periodo autorizado del cierre</description></parameter>
@@ -15,19 +15,27 @@
     <field><currency/><decimal/><format/><group/><length>4</length><name>gestion</name><precision>0</precision><trim_type>both</trim_type><type>Integer</type><variable>${P_REQUESTED_GESTION}</variable></field>
     <field><currency/><decimal/><format/><group/><length>2</length><name>periodo</name><precision>0</precision><trim_type>both</trim_type><type>Integer</type><variable>${P_REQUESTED_PERIODO}</variable></field>
   </fields><attributes/><GUI><xloc>128</xloc><yloc>128</yloc></GUI></transform>
-  <transform><name>Read admission source rows</name><type>TableInput</type><description>Filtra postulaciones del corte y programas incluidos en DW-001; orden determinista por id_alumno</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>WITH params AS MATERIALIZED (
+  <transform><name>Read admission source rows</name><type>TableInput</type><description>Filtra postulaciones del corte, resuelve alumno por id_ra y detecta vínculos ambiguos</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>WITH params AS MATERIALIZED (
     SELECT ?::uuid AS run_id, ?::smallint AS gestion, ?::smallint AS periodo
 )
 SELECT params.run_id, params.run_id AS staging_run_id,
        row_number() OVER (ORDER BY p.id_alumno)::bigint AS row_ordinal,
        jsonb_build_object(
-           'id_alumno', p.id_alumno, 'id_ra', p.id_ra,
+           'id_alumno', alumno.id_alumno,
+           'id_alumno_postulante', p.id_alumno,
+           'alumno_ra_match_count', alumno.match_count,
+           'id_ra', p.id_ra,
            'id_programa', p.id_programa, 'id_gestion', p.id_gestion,
            'id_periodo', p.id_periodo, 'id_acceso', p.id_acceso,
            'nota', p.nota, 'estado', p.estado
        ) AS source_data
 FROM public.postulantes p CROSS JOIN params
 JOIN academico.alm_programas programa ON programa.id_programa=p.id_programa
+LEFT JOIN LATERAL (
+    SELECT count(*)::integer AS match_count, min(a.id_alumno)::integer AS id_alumno
+    FROM academico.alumnos a
+    WHERE a.id_ra=p.id_ra
+) alumno ON TRUE
 WHERE p.id_gestion=params.gestion AND p.id_periodo=params.periodo
   AND upper(btrim(programa._tipo_academico)) IN ('CAR','PRO','TES','TEM')
   AND upper(btrim(coalesce(programa.activo,''))) = 'A'

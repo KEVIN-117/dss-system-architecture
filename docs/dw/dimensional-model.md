@@ -33,13 +33,15 @@ Se conservan únicamente `dw.fact_admision`, `dw.fact_cursado` y `dw.fact_retenc
 
 ### Identidad de estudiante
 
-`DIM_ESTUDIANTE` mantiene una fila temporal por identidad académica `id_alumno`, identificador histórico confirmado por DSA/TI. `id_ra` enriquece la fila con el perfil de `public.uatf_datos`, pero no fusiona alumnos ni es clave única: más de un `id_alumno` puede compartirlo. Los hechos académicos resuelven la dimensión mediante `id_alumno` y la versión vigente para el cierre correspondiente.
+`DIM_ESTUDIANTE` mantiene una fila temporal por identidad académica `id_alumno`, identificador histórico confirmado por DSA/TI. `id_ra` enriquece la fila con el perfil de `public.uatf_datos`; no reemplaza la identidad canónica ni autoriza fusionar alumnos. En admisiones, `postulantes.id_alumno` identifica el registro de postulación, por lo que la identidad académica se obtiene enlazando `postulantes.id_ra` con `academico.alumnos.id_ra` y tomando el `academico.alumnos.id_alumno` correspondiente. El enlace debe resolver a cero o un alumno; más de una coincidencia se rechaza como ambigua. Los hechos de cursado y retención usan directamente el `id_alumno` académico y la versión SCD2 vigente al cierre.
 
 Si faltan ambos identificadores o no es posible resolver la identidad, el hecho no se atribuye a una persona artificial ni se rellena con cero: el flujo usa el miembro `UNKNOWN` y registra la incidencia de calidad. Colegio y localidad no son dimensiones independientes en esta primera constelación, porque describen al estudiante y no habilitan un proceso de negocio con grano propio.
 
 ### Periodos y sucesión temporal
 
-La clave natural del periodo es siempre `(gestion, periodo)`. Un periodo puede usar cualquier código positivo; el modelo no presupone los semestres I y II ni calcula un sucesor mediante `periodo + 1`. Para retención, el periodo posterior válido es el siguiente cierre académico autorizado por DSA según `effective_at` y el orden operativo de `etl_control.academic_period_closure`. Esta regla absorbe cursos de verano, invierno u otros periodos institucionales.
+Para el seed sintético y el contrato temporal predictivo se usan los códigos OLTP de `academico.alm_periodos`: `1` y `2` son cierres semestrales consecutivos; `3` es el cierre anual de 12 meses. El sucesor esperado es `1→2` en la misma gestión, `2→1` en la gestión siguiente y `3→3` en la gestión siguiente. El código de periodo forma parte de `(gestion, periodo)` y permite resolver la cadencia sin inferirla de una ausencia de cursado.
+
+La clave natural del periodo es siempre `(gestion, periodo)`. Para el contrato académico actual, los códigos de OLTP acreditados definen la cadencia: `1→2` para el semestre 1, `2→1` de la gestión siguiente para el semestre 2, y `3→3` de la gestión siguiente para el anual. La resolución se realiza por `(gestion, periodo)`, no por el siguiente cierre global ni por `periodo + 1`; así los cierres semestrales y anuales que comparten fecha no se confunden. La dimensión aún no transporta un atributo de cadencia del programa, por lo que la consistencia entre `id_programa` y su régimen debe validarse en la extracción/seed antes de usar estas etiquetas; si la fuente permite cambiar régimen, la cadencia debe historizarse como atributo de programa.
 
 ## Constelación de hechos
 
@@ -120,7 +122,8 @@ Las líneas del diagrama representan relaciones uno-a-muchos desde una dimensió
 | --- | --- |
 | Proceso | Postulación y resultado de admisión a un programa. |
 | Grano | Una fila por registro operativo de `public.postulantes`, identificado por `postulantes.id_alumno`, asociado al programa y periodo informados. |
-| Clave operacional de trazabilidad | `postulantes.id_alumno`, con `id_programa`, `id_gestion` e `id_periodo` conservados para conciliación, conforme al grano adoptado e implementado en el MVP. |
+| Identidad académica | Enlace por `id_ra` a `academico.alumnos`; cuando existe exactamente una coincidencia, se resuelve `estudiante_sk` usando el `id_alumno` académico. Sin coincidencia, se conserva `UNKNOWN`; una coincidencia múltiple bloquea la preparación. |
+| Clave operacional de trazabilidad | `postulantes.id_alumno` permanece en `id_alumno_origen`; se conserva además `id_programa`, `id_gestion` e `id_periodo` para conciliación. |
 | Claves dimensionales | `estudiante_sk`, `programa_sk`, `periodo_academico_sk`, `admision_sk`. |
 | Fuente y dependencias | Contrato 03 de DW-001 (`public.postulantes`), `DIM_ESTUDIANTE`, `DIM_PROGRAMA`, `DIM_PERIODO_ACADEMICO`, `DIM_ADMISION` y filtro de programas aprobado. |
 | Linaje técnico | `run_id` de la ejecución publicada y versión del contrato/manifiesto de origen. |

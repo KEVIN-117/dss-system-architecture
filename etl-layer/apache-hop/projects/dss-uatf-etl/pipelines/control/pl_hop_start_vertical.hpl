@@ -3,8 +3,8 @@
   <info>
     <name>pl_hop_start_vertical</name>
     <name_sync_with_filename>Y</name_sync_with_filename>
-    <description>Preflight y apertura de una ejecución asociada al cierre DSA solicitado</description>
-    <extended_description>P_RUN_ID, P_REQUESTED_GESTION y P_REQUESTED_PERIODO identifican el intento y cierre. Todo se enlaza como parámetros JDBC preparados.</extended_description>
+    <description>Preflight y apertura de ejecución CIERRE_ACADEMICO o REPROCESO asociada al cierre DSA</description>
+    <extended_description>P_RUN_ID, P_REQUESTED_GESTION y P_REQUESTED_PERIODO identifican el intento y cierre. Para REPROCESO, P_RETRY_OF_RUN_ID enlaza el intento terminal anterior. Todo se enlaza como parámetros JDBC preparados.</extended_description>
     <pipeline_version>1.0</pipeline_version>
     <pipeline_type>Normal</pipeline_type>
     <parameters>
@@ -15,6 +15,8 @@
       </parameter>
       <parameter><name>P_REQUESTED_GESTION</name><default_value/><description>Gestión del cierre autorizado</description></parameter>
       <parameter><name>P_REQUESTED_PERIODO</name><default_value/><description>Código de periodo del cierre autorizado</description></parameter>
+      <parameter><name>P_EXECUTION_KIND</name><default_value>CIERRE_ACADEMICO</default_value><description>Tipo de ejecución: CIERRE_ACADEMICO o REPROCESO</description></parameter>
+      <parameter><name>P_RETRY_OF_RUN_ID</name><default_value/><description>Run terminal anterior, obligatorio para REPROCESO</description></parameter>
     </parameters>
     <capture_transform_performance>N</capture_transform_performance>
     <transform_performance_capturing_delay>1000</transform_performance_capturing_delay>
@@ -41,6 +43,8 @@
     <field><currency/><decimal/><format/><group/><length>36</length><name>run_id</name><precision>-1</precision><trim_type>both</trim_type><type>String</type><variable>${P_RUN_ID}</variable></field>
     <field><currency/><decimal/><format/><group/><length>4</length><name>gestion</name><precision>0</precision><trim_type>both</trim_type><type>Integer</type><variable>${P_REQUESTED_GESTION}</variable></field>
     <field><currency/><decimal/><format/><group/><length>2</length><name>periodo</name><precision>0</precision><trim_type>both</trim_type><type>Integer</type><variable>${P_REQUESTED_PERIODO}</variable></field>
+    <field><currency/><decimal/><format/><group/><length>24</length><name>execution_kind</name><precision>-1</precision><trim_type>both</trim_type><type>String</type><variable>${P_EXECUTION_KIND}</variable></field>
+    <field><currency/><decimal/><format/><group/><length>36</length><name>retry_of_run_id</name><precision>-1</precision><trim_type>both</trim_type><type>String</type><variable>${P_RETRY_OF_RUN_ID}</variable></field>
     </fields>
     <attributes/>
     <GUI><xloc>128</xloc><yloc>160</yloc></GUI>
@@ -55,16 +59,19 @@
     <partitioning><method>none</method><schema_name/></partitioning>
     <connection>DSS DW</connection>
     <sql>WITH params AS MATERIALIZED (
-    SELECT ?::uuid AS run_id, ?::smallint AS gestion, ?::smallint AS periodo
+    SELECT ?::uuid AS run_id, ?::smallint AS gestion, ?::smallint AS periodo,
+           ?::varchar(24) AS execution_kind, NULLIF(?, '')::uuid AS retry_of_run_id
 ), closure AS MATERIALIZED (
     SELECT c.closure_id, c.gestion, c.periodo, c.effective_at
     FROM etl_control.academic_period_closure c CROSS JOIN params p
     WHERE c.gestion = p.gestion AND c.periodo = p.periodo AND c.status = 'CERRADO'
 ), created AS MATERIALIZED (
     SELECT (etl_control.create_hop_etl_execution(
-        params.run_id, 'CIERRE_ACADEMICO'::varchar(24), closure.closure_id, closure.gestion,
-        closure.periodo, closure.effective_at, NULL::uuid,
-        'Ejecución Hop vertical por cierre académico solicitado'::text
+        params.run_id, params.execution_kind, closure.closure_id, closure.gestion,
+        closure.periodo, closure.effective_at, params.retry_of_run_id,
+        CASE WHEN params.execution_kind = 'REPROCESO'
+            THEN 'Reproceso Hop vertical para recalcular con cierre sucesor procesado'::text
+            ELSE 'Ejecución Hop vertical por cierre académico solicitado'::text END
     )).run_id AS run_id
     -- LEFT JOIN deliberately calls the preflight function even when there is no
     -- eligible closure. Passing NULL makes create_hop_etl_execution reject the
@@ -87,7 +94,7 @@ SELECT run_id FROM started;</sql>
   <transform>
     <name>Run initialized</name>
     <type>Dummy</type>
-    <description>El control rechazará UUID duplicados, cierres y roles no autorizados antes de leer Jachasun</description>
+    <description>El control rechazará UUID duplicados, cierres, enlaces de reintento y roles no autorizados antes de leer Jachasun</description>
     <distribute>Y</distribute>
     <custom_distribution/>
     <copies>1</copies>
