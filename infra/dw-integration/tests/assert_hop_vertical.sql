@@ -54,10 +54,10 @@ BEGIN
        OR (SELECT count(*) FROM etl_work.hop_publication_row WHERE run_id=v_run_id) <> 0
        OR (SELECT count(*) FROM dw.fact_admision
            WHERE id_alumno_origen=1003 AND es_admitido IS TRUE AND puntaje_examen=76) <> 1
-       OR (SELECT count(*) FROM dw.fact_admision f
-           JOIN dw.dim_estudiante d USING (estudiante_sk)
-           WHERE f.id_alumno_origen=1002 AND f.es_admitido IS FALSE
-             AND d.id_alumno=1002 AND d.id_ra IS NULL) <> 1
+        OR (SELECT count(*) FROM dw.fact_admision f
+            JOIN dw.dim_estudiante d USING (estudiante_sk)
+            WHERE f.id_alumno_origen=1002 AND f.es_admitido IS FALSE
+              AND d.estudiante_sk=-1 AND d.member_type='UNKNOWN') <> 1
        OR (SELECT count(*) FROM dw.fact_admision f
            JOIN dw.dim_estudiante d USING (estudiante_sk)
            WHERE f.id_alumno_origen=1004 AND d.estudiante_sk=-1
