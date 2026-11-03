@@ -65,9 +65,37 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
+  vi.unstubAllGlobals();
 });
 
 describe('BFF analytic GraphQL resolvers', () => {
+  it('reads prediction publications through the authenticated Prediction Service', async () => {
+    vi.stubEnv('PREDICTION_SERVICE_URL', 'http://prediction-service:8000/');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ publication: { status: 'PUBLISHED', result_count: 4 } }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await resolver().predictionPublication({}, {
+      programRef: '025', cutId: '2020-2', limit: 1200, offset: 0,
+    }, ctx()) as { publication: { status: string; result_count: number } };
+
+    expect(result).toEqual({ publication: { status: 'PUBLISHED', result_count: 4 } });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://prediction-service:8000/v1/prediction-publications?program_ref=025&cut_id=2020-2&limit=1000&offset=0',
+      expect.objectContaining({ headers: { Authorization: `Bearer ${auth.token}` }, cache: 'no-store' }),
+    );
+  });
+
+  it('rejects publication reads for identities without analytics scope before calling Prediction Service', async () => {
+    vi.stubEnv('PREDICTION_SERVICE_URL', 'http://prediction-service:8000');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(resolver().predictionPublication({}, { programRef: '025', cutId: '2020-2' }, ctx({
+      ...auth, roles: ['SUPERADMIN'] as never,
+    }))).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it('derives director scope only from Auth Service contexts', () => {
     expect(deriveAcademicScope(['DIRECTOR'], [academicContext])).toEqual({ kind: 'career', contexts: [academicContext] });
     expect(() => deriveAcademicScope(['DIRECTOR'], [])).toThrowError(/career context is required/i);

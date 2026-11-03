@@ -5,10 +5,10 @@ El OpenAPI `prediction-api-v1.yaml` es el contrato de referencia PRED-001; la in
 ## Flujos cubiertos
 
 - Inferencia sincrónica individual desde perfil/corte confiable. El body identifica la entidad/corte; no acepta features libres como prueba de elegibilidad.
-- Inferencia de `course_abandonment` (estudiante–materia–período, requiere `course_ref`) y `program_dropout` (estudiante–programa–corte), cada una con bundle y cadencia propios.
+- Inferencia aceptada de `program_dropout` (estudiante–programa–corte). La ruta `course_abandonment` permanece experimental y no forma parte de la capacidad publicable de PRED-007: `fact_cursado.es_abandono` solo se conoce tras procesar el cierre.
 - Envío de entrenamiento asíncrono y consulta de job; `202 Accepted`, `job_id`, URI de estado, idempotency key y error estable.
 - Snapshot de datos y manifiesto reproducibles; artefacto de modelo separado de candidato/promoción/rollback.
-- Contrato de publicación poblacional conceptual. Su endpoint/DDL final pertenece a PRED-007 con OLAP/DW; no se crea una tabla por deducción.
+- Publicación poblacional de `program_dropout` mediante `prediction_batch`, outbox y `prediction_result` en `ml_workspace`; los resultados solo aparecen por la vista de consulta cuando el estado del lote es `PUBLISHED`. No se escribe en `fact_retencion_desercion`.
 
 ## Semántica provisional
 
@@ -51,5 +51,5 @@ No registrar perfiles, features, tokens, notas ni identificadores naturales comp
 4. Confirmar modo de inferencia y scoring poblacional, idempotencia y estados de publicación.
 5. Decidir almacenamiento de artefactos/jobs/snapshots, cifrado, límites, retención y rollback.
 6. Resolver si el progreso se consulta por HTTP/polling o requiere SSE; el esquema permite evolución sin fijar transporte ahora.
-7. Definir publicación transaccional y acceso OLAP/BFF en PRED-007.
+7. Publicación transaccional y acceso BFF por ámbito implementados en PRED-007; validar migración, flujo Compose y panel con los datos Faker.
 8. Para abandono de materia prospectivo, exponer en DW las inscripciones/cargas de materias disponibles antes del cierre y con disponibilidad temporal comprobable; `fact_cursado` solo aparece tras procesar el resultado del período.

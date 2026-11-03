@@ -8,6 +8,7 @@ export default function Index() {
       <RoleGuard rolesAllowed={['RECTOR']} fallback={<AccessDeniedForPortal />}>
         <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
           <h1 className="text-2xl font-bold">Rector Dashboard</h1>
+          <a className="text-primary underline" href="/predictions">Consultar predicciones de abandono</a>
           <div className="flex gap-2">
             <Button variant="default">Aprobar Presupuesto</Button>
             <Button variant="outline">Ver Historial</Button>

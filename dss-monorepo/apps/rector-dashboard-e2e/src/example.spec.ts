@@ -24,7 +24,8 @@ test('shows access denied to an authenticated user without the rector role', asy
 });
 
 async function mockSession(page: import('@playwright/test').Page, origin: string, roles: string[]) {
-  await page.route('http://localhost:3006/api/auth/me', (route) => route.fulfill({
+  const bffBaseURL = process.env.NEXT_PUBLIC_BFF_URL ?? 'http://localhost:3006';
+  await page.route(`${bffBaseURL}/api/auth/me`, (route) => route.fulfill({
     status: 200,
     contentType: 'application/json',
     headers: {

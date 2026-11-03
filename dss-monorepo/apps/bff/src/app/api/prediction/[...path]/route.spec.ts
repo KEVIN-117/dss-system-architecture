@@ -23,7 +23,7 @@ vi.mock('@dss-monorepo/ml-connector', () => ({
   submitTrainingJob: vi.fn(),
 }));
 
-import { POST } from './route';
+import { GET, POST } from './route';
 
 const authentication = {
   authenticated: true as const,
@@ -36,6 +36,7 @@ const authentication = {
 
 afterEach(() => {
   vi.clearAllMocks();
+  vi.unstubAllGlobals();
   delete process.env.PREDICTION_SERVICE_URL;
 });
 
@@ -110,5 +111,38 @@ describe('Prediction BFF route', () => {
     });
     expect(response.status).toBe(404);
     expect(predict).not.toHaveBeenCalled();
+  });
+
+  it('forwards a population batch request only with the authenticated token', async () => {
+    process.env.PREDICTION_SERVICE_URL = 'http://prediction-service:8000';
+    authenticateRequest.mockResolvedValue(authentication);
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ batch_id: 'batch-1', status: 'QUEUED' }), { status: 202 }));
+    vi.stubGlobal('fetch', upstream);
+    const request = new Request('http://localhost:3006/api/prediction/v1/prediction-batches', {
+      method: 'POST', headers: { 'Idempotency-Key': 'population-batch-key-001', 'content-type': 'application/json' },
+      body: JSON.stringify({ contract_version: '1.0', program_ref: 'P01', academic_cut: { cut_id: '42' } }),
+    });
+
+    const response = await POST(request, { params: Promise.resolve({ path: ['v1', 'prediction-batches'] }) });
+    expect(response.status).toBe(202);
+    expect(upstream).toHaveBeenCalledTimes(1);
+    const [url, options] = upstream.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe('http://prediction-service:8000/v1/prediction-batches');
+    expect(new Headers(options.headers).get('authorization')).toBe('Bearer verified-access-token');
+    expect(new Headers(options.headers).get('idempotency-key')).toBe('population-batch-key-001');
+  });
+
+  it('forwards authorized publication reads and preserves selection filters', async () => {
+    process.env.PREDICTION_SERVICE_URL = 'http://prediction-service:8000';
+    authenticateRequest.mockResolvedValue(authentication);
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ publication: null }), { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    const response = await GET(new Request('http://localhost:3006/api/prediction/v1/prediction-publications?program_ref=P01&cut_id=42'), {
+      params: Promise.resolve({ path: ['v1', 'prediction-publications'] }),
+    });
+    expect(response.status).toBe(200);
+    const [url, options] = upstream.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe('http://prediction-service:8000/v1/prediction-publications?program_ref=P01&cut_id=42');
+    expect(new Headers(options.headers).get('authorization')).toBe('Bearer verified-access-token');
   });
 });

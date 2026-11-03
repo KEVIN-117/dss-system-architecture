@@ -101,7 +101,7 @@ def _sample(database_url: str) -> tuple[str, str, str, str, str]:
     return str(student), str(program), str(cut), str(course), str(cadence)
 
 
-def _create_test_bundle(root: Path, event_type: str, cadence: str) -> str:
+def _create_test_bundle(root: Path, event_type: str, cadence: str, version: str = "integration-v1") -> str:
     if event_type == "course_abandonment":
         event_code = "COURSE_ABANDONMENT"
         evaluation_unit = "student_course_academic_period"
@@ -131,8 +131,7 @@ def _create_test_bundle(root: Path, event_type: str, cadence: str) -> str:
     preprocessor = build_preprocessing_pipeline(feature_names, categorical)
     transformed = preprocessor.fit_transform(x)
     model = DummyClassifier(strategy="prior").fit(transformed, np.asarray([0, 1, 0, 1]))
-    model_id = f"faker-e2e-{event_type}-{cadence.lower()}"
-    version = "integration-v1"
+    model_id = f"faker-e2e-{event_type}-{cadence.lower()}-{version}"
     manifest = {
         "contract_version": "1.0", "model_id": model_id, "version": version,
         "algorithm": "random_forest", "dataset_id": "faker-dw-e2e-integration",
@@ -179,8 +178,8 @@ def main() -> None:
         }
         registry = ModelRegistry(root)
         data = DwPredictionDataProvider(database_url)
-        service = PredictionService(registry, IntegrationIdentity(), data, ConfiguredAcademicPolicy())
         os.environ["PREDICTION_ALLOWED_ROLES"] = '["RECTOR"]'
+        service = PredictionService(registry, IntegrationIdentity(), data, ConfiguredAcademicPolicy())
         app.state.prediction_service = service
         try:
             with TestClient(app) as client:

@@ -36,6 +36,7 @@ export function proxy(request: NextRequest): NextResponse {
 /** OAuth redirects start before a BFF session exists. Keep this allowlist narrow. */
 function isPublicAuthenticationRoute(request: NextRequest): boolean {
   return request.method === 'GET' && (
+    request.nextUrl.pathname === '/api/health' ||
     request.nextUrl.pathname === '/api/auth/login' ||
     request.nextUrl.pathname === '/api/auth/callback'
   );
@@ -67,7 +68,7 @@ function resolveCorsHeaders(origin: string | null): Headers | null {
 
   return new Headers({
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type',
+    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Credentials': 'true',
     Vary: 'Origin',

@@ -48,8 +48,14 @@ celery_app.conf.update(
     task_reject_on_worker_lost=True,
     worker_prefetch_multiplier=1,
     task_default_queue="prediction.train_model",
-    task_routes={"prediction.train_model": {"queue": "prediction.train_model"}},
-    task_queues=(Queue("prediction.train_model", Exchange("prediction", type="direct", durable=True), routing_key="prediction.train_model", durable=True),),
+    task_routes={
+        "prediction.train_model": {"queue": "prediction.train_model"},
+        "prediction.publish_population": {"queue": "prediction.publish_population"},
+    },
+    task_queues=(
+        Queue("prediction.train_model", Exchange("prediction", type="direct", durable=True), routing_key="prediction.train_model", durable=True),
+        Queue("prediction.publish_population", Exchange("prediction", type="direct", durable=True), routing_key="prediction.publish_population", durable=True),
+    ),
     task_create_missing_queues=False,
     broker_transport_options={"confirm_publish": True},
 )
@@ -222,7 +228,6 @@ def train_model_task(
             "model_candidate": model_candidate,
             "metrics": train_result.metrics,
         }
-
     except Exception as exc:
         logger.exception("Training job %s FAILED: %s", job_id, exc)
         finished_iso = datetime.now(timezone.utc).isoformat()
@@ -248,6 +253,64 @@ def train_model_task(
         }
 
 
+@celery_app.task(bind=True, name="prediction.publish_population")
+def publish_population_task(self: Any, batch_id: str, artifacts_dir: str) -> dict[str, Any]:
+    """Score one authorized program/cut and atomically expose the completed batch."""
+    from inference import InferenceFailure, score_loaded_model
+    from inference_adapters import DwPredictionDataProvider
+    from training.model_registry import ModelRegistry
+    from training.prediction_publication_store import PredictionPublicationStore
+
+    store = PredictionPublicationStore()
+    if not store.claim(batch_id, worker_settings.job_timeout_seconds + 300):
+        current = store.get(batch_id)
+        if current and current["status"] == "RUNNING":
+            raise self.retry(countdown=60, max_retries=None)
+        return {"batch_id": batch_id, "status": current["status"] if current else "MISSING"}
+
+    try:
+        batch = store.get(batch_id)
+        if batch is None:
+            raise ValueError("Prediction batch does not exist.")
+        context = DwPredictionDataProvider().resolve_context(batch["program_ref"], str(batch["closure_id"]))
+        registry = ModelRegistry(Path(artifacts_dir))
+        bundle = registry.active("PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", context.cadence)
+        if bundle.model_id != batch["model_id"] or bundle.version != batch["model_version"]:
+            raise ValueError("The approved active model changed before scoring; resubmit against the current model.")
+        data = DwPredictionDataProvider()
+        subjects, source_runs = data.list_program_population(context)
+        generated_at = datetime.now(timezone.utc).isoformat()
+        results: list[dict[str, Any]] = []
+        for subject_ref in subjects:
+            try:
+                features = data.load_features(subject_ref, context, bundle.manifest, "program_dropout")
+                predicted_class, probability, _ = score_loaded_model(bundle, features)
+            except InferenceFailure as exc:
+                if exc.code in {"INELIGIBLE_PROFILE", "RESOURCE_NOT_FOUND"}:
+                    continue
+                raise
+            results.append({
+                "subject_ref": subject_ref,
+                "program_ref": batch["program_ref"],
+                "closure_id": str(batch["closure_id"]),
+                "predicted_class": predicted_class,
+                "event_probability": probability,
+                "model_id": bundle.model_id,
+                "model_version": bundle.version,
+                "generated_at": generated_at,
+            })
+        store.publish(batch_id, results, source_runs)
+        logger.info("Prediction batch %s published rows=%s model=%s:%s", batch_id, len(results), bundle.model_id, bundle.version)
+        return {"batch_id": batch_id, "status": "PUBLISHED", "result_count": len(results)}
+    except Exception as exc:
+        logger.exception("Prediction batch %s failed", batch_id)
+        store.fail(batch_id, {
+            "code": getattr(exc, "code", "PREDICTION_PUBLICATION_FAILED"),
+            "detail": "Population scoring failed; no complete publication is available.",
+            "request_id": batch_id,
+        })
+        return {"batch_id": batch_id, "status": "FAILED"}
+
 @worker_ready.connect
 def _republish_pending_outbox(sender: Any = None, **kwargs: Any) -> None:
     """Recover committed jobs whose API process died before publishing."""
@@ -267,3 +330,18 @@ def _republish_pending_outbox(sender: Any = None, **kwargs: Any) -> None:
             store.mark_published(pending_id)
         except Exception as exc:
             store.mark_published(pending_id, error=exc)
+    from training.prediction_publication_store import PredictionPublicationStore
+    publication_store = PredictionPublicationStore()
+    for batch_id in publication_store.pending():
+        batch = publication_store.get(batch_id)
+        if batch is None:
+            continue
+        try:
+            publish_population_task.apply_async(
+                kwargs={"batch_id": batch_id, "artifacts_dir": worker_settings.artifacts_dir},
+                task_id=batch_id,
+                queue="prediction.publish_population",
+            )
+            publication_store.mark_dispatched(batch_id)
+        except Exception as exc:
+            publication_store.mark_dispatched(batch_id, error=exc)

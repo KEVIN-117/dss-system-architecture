@@ -14,10 +14,15 @@ describe('BFF proxy', () => {
     expect(response.status).toBe(401);
   });
 
-  it('allows only the OAuth start and callback routes before a session exists', () => {
+  it('allows the OAuth start and callback routes before a session exists', () => {
     expect(proxy(new NextRequest('http://localhost:3006/api/auth/login')).status).toBe(200);
     expect(proxy(new NextRequest('http://localhost:3006/api/auth/callback')).status).toBe(200);
     expect(proxy(new NextRequest('http://localhost:3006/api/auth/me')).status).toBe(401);
+  });
+
+  it('allows the readiness endpoint without exposing authenticated API routes', () => {
+    expect(proxy(new NextRequest('http://localhost:3006/api/health')).status).toBe(200);
+    expect(proxy(new NextRequest('http://localhost:3006/api/health', { method: 'POST' })).status).toBe(401);
   });
 
   it('allows CORS preflight only for configured dashboard origins', () => {
@@ -30,6 +35,7 @@ describe('BFF proxy', () => {
     expect(response.status).toBe(204);
     expect(response.headers.get('Access-Control-Allow-Origin')).toBe('http://localhost:3001');
     expect(response.headers.get('Access-Control-Allow-Credentials')).toBe('true');
+    expect(response.headers.get('Access-Control-Allow-Headers')).toContain('Idempotency-Key');
   });
 
   it('allows API calls authenticated by the BFF session cookie', () => {

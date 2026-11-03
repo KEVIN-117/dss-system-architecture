@@ -1,13 +1,30 @@
 import { defineConfig, devices } from '@playwright/test';
 import { nxE2EPreset } from '@nx/playwright/preset';
 import { workspaceRoot } from '@nx/devkit';
+import { resolve } from 'node:path';
 import { loadE2EEnv, resolveBaseURL } from '../../tools/load-e2e-env.mjs';
 
 // For CI, you may want to set BASE_URL to the deployed application.
-const env = loadE2EEnv(import.meta.dirname, 'rector-dashboard');
+const bffEnv = loadE2EEnv(import.meta.dirname, 'bff');
+const portalEnv = loadE2EEnv(import.meta.dirname, 'rector-dashboard');
+const env = { ...bffEnv, ...portalEnv };
 const configuredPort = Number(env['RECTOR_DASHBOARD_PORT_E2E']);
 const port = Number.isInteger(configuredPort) && configuredPort > 0 ? configuredPort : 3004;
-process.env['RECTOR_DASHBOARD_PORT'] ??= String(port);
+const configuredBffPort = Number(env['BFF_PORT_E2E']);
+// The BFF E2E project uses 3006 in the same Nx affected run. Give the Rector
+// E2E an isolated BFF port in CI so the two Playwright webServers can run in
+// parallel without racing to bind the same address. Local runs keep the
+// explicitly configured port and can reuse the developer's running BFF.
+const bffPort = Number.isInteger(configuredBffPort) && configuredBffPort > 0
+  ? configuredBffPort
+  : process.env.CI ? 3016 : 3006;
+const bffBaseURL = resolveBaseURL(env['BFF_BASE_URL'], bffPort);
+env['BFF_BASE_URL'] = bffBaseURL;
+env['NEXT_PUBLIC_BFF_URL'] = bffBaseURL;
+env['KEYCLOAK_BFF_REDIRECT_URI'] = `${bffBaseURL}/api/auth/callback`;
+process.env['BFF_PORT'] = String(bffPort);
+process.env['NEXT_PUBLIC_BFF_URL'] = bffBaseURL;
+process.env['RECTOR_DASHBOARD_PORT'] = String(port);
 process.env.PORT = String(port);
 const baseURL = resolveBaseURL(
   env['RECTOR_DASHBOARD_BASE_URL'] ?? env['RECTOR_DASHBOARD_URL'],
@@ -35,16 +52,42 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     baseURL,
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    /* Keep authentication artifacts disabled in the credentialed PRED-007 run. */
+    trace: process.env['PREDICTION_E2E_FORCE_SERVER'] === '1' ? 'off' : 'on-first-retry',
+    screenshot: process.env['PREDICTION_E2E_FORCE_SERVER'] === '1' ? 'off' : 'only-on-failure',
+    video: 'off',
   },
+  workers: process.env['PREDICTION_E2E_FORCE_SERVER'] === '1' ? 1 : undefined,
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'bun nx run @dss-monorepo/rector-dashboard:dev',
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    cwd: workspaceRoot,
-  },
+  webServer: [
+    {
+      name: 'BFF',
+      command: `bun run next dev --webpack --port ${bffPort}`,
+      url: `${bffBaseURL}/api/health`,
+      timeout: 180_000,
+      stdout: 'pipe',
+      reuseExistingServer: !process.env.CI && process.env['PREDICTION_E2E_FORCE_SERVER'] !== '1',
+      env: {
+        BFF_PORT: String(bffPort),
+        PORT: String(bffPort),
+        NEXT_PUBLIC_BFF_URL: bffBaseURL,
+        KEYCLOAK_BFF_REDIRECT_URI: env['KEYCLOAK_BFF_REDIRECT_URI'],
+      },
+      cwd: resolve(workspaceRoot, 'apps/bff'),
+    },
+    {
+      name: 'Rector Dashboard',
+      command: `bun run next dev --webpack --port ${port}`,
+      url: baseURL,
+      timeout: 180_000,
+      stdout: 'pipe',
+      reuseExistingServer: !process.env.CI && process.env['PREDICTION_E2E_FORCE_SERVER'] !== '1',
+      env: {
+        NEXT_PUBLIC_BFF_URL: bffBaseURL,
+      },
+      cwd: resolve(workspaceRoot, 'apps/rector-dashboard'),
+    },
+  ],
   projects: [
     {
       name: 'chromium',

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
@@ -117,6 +117,14 @@ class PredictionResponse(BaseModel):
     model: ModelReference
     academic_cut: AcademicCutRef
     generated_at: datetime
+
+
+class PredictionBatchRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    contract_version: str = Field(default="1.0", pattern=r"^1\.0$")
+    event_type: str = Field(default="program_dropout", pattern=r"^program_dropout$")
+    program_ref: str = Field(min_length=1, max_length=64)
+    academic_cut: AcademicCutRef
 
 
 class TrainingJobResponse(BaseModel):
@@ -231,6 +239,112 @@ def predict_v1(
         )
 
 
+def _publication_service():
+    service = getattr(app.state, "publication_service", None)
+    if service is None:
+        from training.population_publication import PopulationPublicationService
+        service = PopulationPublicationService()
+    return service
+
+
+def _publication_error(exc: InferenceFailure, request_id: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        media_type="application/problem+json",
+        content={"type": "about:blank", "title": "Prediction publication request failed",
+                 "status": exc.status_code, "detail": exc.detail, "code": exc.code,
+                 "request_id": request_id},
+    )
+
+
+@app.get("/v1/academic-options")
+def get_prediction_academic_options(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    """List processed programs and cuts filtered by the caller's academic role scope."""
+    request_id = x_request_id or str(uuid4())
+    if not authorization or not authorization.startswith("Bearer "):
+        return _make_problem(401, "Unauthorized", "INVALID_TOKEN", request_id)
+    try:
+        options = _publication_service().academic_options(authorization[7:].strip())
+        return JSONResponse(content=options, headers={"Cache-Control": "no-store"})
+    except InferenceFailure as exc:
+        return _publication_error(exc, request_id)
+    except Exception:
+        logger.exception("Prediction academic options query failed request_id=%s", request_id)
+        return _make_problem(503, "Academic options unavailable", "PREDICTION_OPTIONS_UNAVAILABLE", request_id)
+
+
+@app.post("/v1/prediction-batches", status_code=202)
+def submit_prediction_batch(
+    body: PredictionBatchRequest,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=16, max_length=128),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    """Authorize one program/cut, pin its active model, then enqueue population scoring."""
+    request_id = x_request_id or str(uuid4())
+    if not authorization or not authorization.startswith("Bearer "):
+        return _make_problem(401, "Unauthorized", "INVALID_TOKEN", request_id)
+    try:
+        service = _publication_service()
+        batch = service.submit(authorization[7:].strip(), body.program_ref,
+                               body.academic_cut.cut_id, idempotency_key)
+        _dispatch_pending_prediction_batches(service.store)
+        return JSONResponse(status_code=202, content=batch, headers={"Cache-Control": "no-store"})
+    except InferenceFailure as exc:
+        return _publication_error(exc, request_id)
+    except Exception:
+        logger.exception("Prediction batch submission failed request_id=%s", request_id)
+        return _make_problem(503, "Publication unavailable", "PREDICTION_PUBLICATION_UNAVAILABLE", request_id)
+
+
+@app.get("/v1/prediction-publications")
+def get_current_prediction_publication(
+    program_ref: str = Query(min_length=1, max_length=64),
+    cut_id: str = Query(min_length=1, max_length=128),
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0, le=25000),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    """Return only the latest complete batch after server-side academic authorization."""
+    request_id = x_request_id or str(uuid4())
+    if not authorization or not authorization.startswith("Bearer "):
+        return _make_problem(401, "Unauthorized", "INVALID_TOKEN", request_id)
+    try:
+        result = _publication_service().current(authorization[7:].strip(), program_ref, cut_id, limit, offset)
+        return JSONResponse(content=result, headers={"Cache-Control": "no-store"})
+    except InferenceFailure as exc:
+        return _publication_error(exc, request_id)
+    except Exception:
+        logger.exception("Prediction publication query failed request_id=%s", request_id)
+        return _make_problem(503, "Publication unavailable", "PREDICTION_PUBLICATION_UNAVAILABLE", request_id)
+
+
+@app.get("/v1/prediction-batches/{batch_id}")
+def get_prediction_batch(
+    batch_id: str,
+    limit: int = Query(default=100, ge=1, le=1000),
+    offset: int = Query(default=0, ge=0, le=25000),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    if not authorization or not authorization.startswith("Bearer "):
+        return _make_problem(401, "Unauthorized", "INVALID_TOKEN", request_id)
+    try:
+        UUID(batch_id)
+        result = _publication_service().get_batch(authorization[7:].strip(), batch_id, limit, offset)
+        return JSONResponse(content=result, headers={"Cache-Control": "no-store"})
+    except ValueError:
+        return _make_problem(404, "Prediction batch not found", "RESOURCE_NOT_FOUND", request_id)
+    except InferenceFailure as exc:
+        return _publication_error(exc, request_id)
+    except Exception:
+        logger.exception("Prediction batch query failed request_id=%s", request_id)
+        return _make_problem(503, "Publication unavailable", "PREDICTION_PUBLICATION_UNAVAILABLE", request_id)
 # ---------------------------------------------------------------------------
 # Training Jobs — POST /v1/training-jobs
 # ---------------------------------------------------------------------------
@@ -412,6 +526,29 @@ def _dispatch_pending(store: JobStore) -> None:
         except Exception as exc:
             logger.warning("Outbox dispatch pending for job %s: %s", job_id, exc)
             store.mark_published(job_id, error=exc)
+    _dispatch_pending_prediction_batches()
+
+
+def _dispatch_pending_prediction_batches(store: Any | None = None) -> None:
+    """Dispatch committed population batches; failed sends remain retryable."""
+    from training.prediction_publication_store import PredictionPublicationStore
+    from training.tasks import publish_population_task
+
+    store = store or PredictionPublicationStore()
+    for batch_id in store.pending():
+        batch = store.get(batch_id)
+        if batch is None:
+            continue
+        try:
+            publish_population_task.apply_async(
+                kwargs={"batch_id": batch_id, "artifacts_dir": os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts")},
+                task_id=batch_id,
+                queue="prediction.publish_population",
+            )
+            store.mark_dispatched(batch_id)
+        except Exception as exc:
+            logger.warning("Outbox dispatch pending for prediction batch %s: %s", batch_id, exc)
+            store.mark_dispatched(batch_id, error=exc)
 
 
 # ---------------------------------------------------------------------------

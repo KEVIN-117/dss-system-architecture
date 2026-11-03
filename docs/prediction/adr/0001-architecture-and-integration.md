@@ -5,7 +5,7 @@
 - **Issue:** [PRED-001](https://github.com/KEVIN-117/dss-system-architecture/issues/144)
 - **Alcance:** límites, integración y contratos iniciales. Las reglas de negocio marcadas como pendientes no se consideran aprobadas por este ADR.
 
-> **Actualización PRED-006 (2026-11-03):** para la implementación técnica se amplió el alcance a abandono de materia (`fact_cursado.es_abandono`) y abandono de programa (`fact_retencion_desercion`), con cohortes de tres años académicos y bundles independientes por evento/cadencia. Esta definición de implementación sustituye la ventana propuesta de primer/segundo año descrita más abajo; no sustituye la aprobación DSA/IAM ni autoriza despliegue institucional. Ver [PRED-006 implementación](../PRED-006-implementation.md).
+> **Actualización PRED-006/PRED-007 (2026-11-03):** PRED-006 habilita inferencia por solicitud para abandono de programa con cohortes de tres años académicos y bundles por cadencia. La ruta de abandono de materia sigue experimental/diferida porque el DW actual observa `fact_cursado.es_abandono` después del cierre. PRED-007 publica poblaciones de abandono de programa con lotes inmutables y acceso autenticado por BFF. Estas capacidades técnicas no sustituyen la aprobación DSA/IAM ni autorizan despliegue institucional. Ver [PRED-006 implementación](../PRED-006-implementation.md) y [PRED-007 implementación](../PRED-007-implementation.md).
 
 ## Contexto
 

@@ -45,11 +45,21 @@ async function handle(
     segments[0] === 'v1' &&
     segments[1] === 'training-jobs' &&
     /^[A-Za-z0-9_-]{1,128}$/.test(segments[2]);
+  const isBatchCollection =
+    segments.length === 2 && segments[0] === 'v1' && segments[1] === 'prediction-batches';
+  const isBatchItem =
+    segments.length === 3 && segments[0] === 'v1' && segments[1] === 'prediction-batches' &&
+    /^[0-9a-f-]{36}$/i.test(segments[2]);
+  const isPublicationQuery =
+    segments.length === 2 && segments[0] === 'v1' && segments[1] === 'prediction-publications';
+  const isAcademicOptions =
+    segments.length === 2 && segments[0] === 'v1' && segments[1] === 'academic-options';
 
   if (
     !(
       (request.method === 'POST' && (isPrediction || isTrainingCollection)) ||
-      (request.method === 'GET' && isTrainingItem)
+      (request.method === 'POST' && isBatchCollection) ||
+      (request.method === 'GET' && (isTrainingItem || isBatchItem || isPublicationQuery || isAcademicOptions))
     )
   ) {
     return withCors(
@@ -85,6 +95,35 @@ async function handle(
     signal: request.signal,
     requestId: request.headers.get('x-request-id') ?? undefined,
   };
+
+  if (isBatchCollection || isBatchItem || isPublicationQuery || isAcademicOptions) {
+    try {
+      const upstream = new URL(`${segments.join('/')}`, `${serviceUrl.replace(/\/+$/, '')}/`);
+      if (isPublicationQuery) upstream.search = new URL(request.url).search;
+      const headers = new Headers({
+        Authorization: `Bearer ${authentication.value.token}`,
+        'X-Request-ID': options.requestId ?? crypto.randomUUID(),
+      });
+      const idempotencyKey = request.headers.get('idempotency-key');
+      if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
+      let body: string | undefined;
+      if (request.method === 'POST') {
+        body = await request.text();
+        headers.set('Content-Type', 'application/json');
+      }
+      const response = await fetch(upstream, { method: request.method, headers, body, signal: request.signal, cache: 'no-store' });
+      return withCors(request, new Response(response.body, {
+        status: response.status,
+        headers: {
+          'Content-Type': response.headers.get('content-type') ?? 'application/json',
+          'Cache-Control': 'no-store',
+        },
+      }));
+    } catch (error) {
+      console.error('[bff-ml] Prediction publication request failed', error);
+      return withCors(request, NextResponse.json({ error: 'Prediction Service is unavailable' }, { status: 502 }));
+    }
+  }
 
   try {
     if (isPrediction) {

@@ -1,0 +1,100 @@
+name: ${COMPOSE_PROJECT_NAME:-pred007-e2e}
+
+services:
+  prediction-e2e-rabbitmq:
+    image: rabbitmq:4.3-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: prediction_e2e
+      RABBITMQ_DEFAULT_PASS: prediction_e2e_local_only
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - dss-net
+
+  prediction-e2e-prepare:
+    image: ghcr.io/kevin-117/prediction-service-worker:${PREDICTION_IMAGE_TAG:-local}
+    build:
+      context: ./prediction-service
+      dockerfile: Dockerfile.worker
+    entrypoint: ["python", "/app/tests/integration/prediction_e2e_prepare.py"]
+    environment:
+      PREDICTION_DW_DATABASE_URL: ${PREDICTION_DW_DATABASE_URL:?PREDICTION_DW_DATABASE_URL must be configured}
+      PREDICTION_E2E_PROGRAM_REF: ${PREDICTION_E2E_PROGRAM_REF:?Set PREDICTION_E2E_PROGRAM_REF in rector-dashboard-e2e/.env.e2e}
+      PREDICTION_E2E_CUT_ID: ${PREDICTION_E2E_CUT_ID:?Set PREDICTION_E2E_CUT_ID in rector-dashboard-e2e/.env.e2e}
+      WORKER_ARTIFACTS_DIR: /app/artifacts
+      PYTHONPATH: /app
+    volumes:
+      - prediction_e2e_artifacts:/app/artifacts
+    networks:
+      - dss-net
+
+  prediction-e2e-api:
+    image: ghcr.io/kevin-117/prediction-service-api:${PREDICTION_IMAGE_TAG:-local}
+    build:
+      context: ./prediction-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    environment: &prediction_e2e_environment
+      PREDICTION_ENV: development
+      PREDICTION_HOST: 0.0.0.0
+      PREDICTION_PORT: 8000
+      PREDICTION_LOG_LEVEL: info
+      PREDICTION_DATABASE_URL: sqlite:///app/artifacts/prediction-publications.sqlite
+      PREDICTION_DW_DATABASE_URL: ${PREDICTION_DW_DATABASE_URL:?PREDICTION_DW_DATABASE_URL must be configured}
+      PREDICTION_ALLOWED_ROLES: '["RECTOR","DECANO","DIRECTOR"]'
+      PREDICTION_BATCH_SUBMITTER_ROLES: '["RECTOR"]'
+      PREDICTION_IDEMPOTENCY_SCOPE: prediction-e2e
+      PREDICTION_OUTBOX_POLL_SECONDS: 1
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: uatf-dss-realm
+      KEYCLOAK_AUDIENCE: uatf-auth-service
+      KEYCLOAK_ROLE_CLIENT_ID: uatf-auth-service
+      KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/uatf-dss-realm
+      KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs
+      AUTH_SERVICE_URL: http://auth-service:8000
+      RABBITMQ_HOST: prediction-e2e-rabbitmq
+      RABBITMQ_PORT: 5672
+      RABBITMQ_USERNAME: prediction_e2e
+      RABBITMQ_PASSWORD: prediction_e2e_local_only
+      RABBITMQ_VHOST: /
+      WORKER_ARTIFACTS_DIR: /app/artifacts
+      WORKER_MAX_CONCURRENT_JOBS: 1
+      WORKER_JOB_TIMEOUT_SECONDS: 600
+    volumes:
+      - prediction_e2e_artifacts:/app/artifacts
+    ports:
+      - "127.0.0.1:18007:8000"
+    depends_on:
+      prediction-e2e-rabbitmq:
+        condition: service_healthy
+    networks:
+      - dss-net
+
+  prediction-e2e-worker:
+    image: ghcr.io/kevin-117/prediction-service-worker:${PREDICTION_IMAGE_TAG:-local}
+    build:
+      context: ./prediction-service
+      dockerfile: Dockerfile.worker
+    restart: unless-stopped
+    environment:
+      <<: *prediction_e2e_environment
+      WORKER_ARTIFACTS_DIR: /app/artifacts
+    volumes:
+      - prediction_e2e_artifacts:/app/artifacts
+    depends_on:
+      prediction-e2e-rabbitmq:
+        condition: service_healthy
+    command: ["celery", "-A", "training.tasks.celery_app", "worker", "--loglevel=info", "-c", "1", "--without-mingle", "--without-gossip", "--without-heartbeat"]
+    networks:
+      - dss-net
+
+networks:
+  dss-net:
+    external: true
+    name: ${PREDICTION_E2E_DOCKER_NETWORK:-dss-system-architecture_dss-net}
+
+volumes:
+  prediction_e2e_artifacts:

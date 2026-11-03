@@ -62,6 +62,116 @@ paths:
           $ref: '#/components/responses/Timeout'
         '500':
           $ref: '#/components/responses/InternalError'
+  /v1/prediction-batches:
+    post:
+      tags: [Predictions]
+      operationId: submitPredictionBatch
+      summary: Solicita scoring poblacional de un programa y corte
+      description: >-
+        El API valida el token, el permiso explícito de submitter y el ámbito
+        académico. El lote fija una versión aprobada de modelo y se publica solo
+        al terminar completo. Requiere una configuración separada de roles de
+        submitter; no se infiere de los roles de lectura analítica.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PredictionBatchRequest' }
+      responses:
+        '202':
+          description: Lote aceptado para scoring asíncrono.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PredictionBatch' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/academic-options:
+    get:
+      tags: [Predictions]
+      operationId: getAuthorizedAcademicOptions
+      summary: Lista programas y cierres procesados dentro del ámbito del usuario
+      description: >-
+        Devuelve programas activos y cierres con hechos de retención publicados
+        por ejecuciones exitosas. Prediction Service valida el JWT y filtra cada
+        opción usando los roles permitidos y los academicContexts de Auth Service.
+        El cliente debe limitar los cierres al programa seleccionado; las
+        operaciones de publicación vuelven a validar el ámbito en el servidor.
+      responses:
+        '200':
+          description: Opciones académicas autorizadas para el usuario actual.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [programs, cuts]
+                properties:
+                  programs:
+                    type: array
+                    items:
+                      type: object
+                      required: [program_ref, name, faculty_id]
+                      properties:
+                        program_ref: { type: string }
+                        name: { type: string }
+                        faculty_id: { type: integer }
+                  cuts:
+                    type: array
+                    items:
+                      type: object
+                      required: [program_ref, cut_id, academic_year, academic_period, cadence]
+                      properties:
+                        program_ref: { type: string }
+                        cut_id: { type: string }
+                        academic_year: { type: integer }
+                        academic_period: { type: integer }
+                        cadence: { type: string, enum: [ANUAL, SEMESTRAL, OTRO] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/prediction-publications:
+    get:
+      tags: [Predictions]
+      operationId: getCurrentPredictionPublication
+      summary: Consulta la publicación completa vigente para programa y corte
+      parameters:
+        - { name: program_ref, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 64 } }
+        - { name: cut_id, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 128 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 1000, default: 100 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 25000, default: 0 } }
+      responses:
+        '200':
+          description: Lote publicado o publicación nula si aún no existe.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentPublication' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/prediction-batches/{batchId}:
+    get:
+      tags: [Predictions]
+      operationId: getPredictionBatch
+      summary: Consulta estado e historial de un lote dentro del ámbito autorizado
+      parameters:
+        - { name: batchId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 1000, default: 100 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 25000, default: 0 } }
+      responses:
+        '200':
+          description: Estado del lote; resultados solo cuando status es PUBLISHED.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PredictionBatch' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
   /v1/training-jobs:
     post:
       tags: [Training]
@@ -295,6 +405,57 @@ components:
           $ref: '#/components/schemas/ModelReference'
         academic_cut:
           $ref: '#/components/schemas/AcademicCutRef'
+        generated_at: { type: string, format: date-time }
+    PredictionBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [contract_version, program_ref, academic_cut]
+      properties:
+        contract_version: { type: string, const: '1.0' }
+        event_type: { type: string, const: program_dropout, default: program_dropout }
+        program_ref: { type: string, minLength: 1, maxLength: 64 }
+        academic_cut: { $ref: '#/components/schemas/AcademicCutRef' }
+    PredictionBatch:
+      type: object
+      required: [batch_id, event_code, program_ref, closure_id, model_id, model_version, status, result_count]
+      properties:
+        batch_id: { type: string, format: uuid }
+        event_code: { type: string, const: PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE }
+        program_ref: { type: string }
+        closure_id: { type: [string, integer] }
+        model_id: { type: string }
+        model_version: { type: string }
+        status: { type: string, enum: [QUEUED, RUNNING, PUBLISHED, FAILED] }
+        result_count: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+        published_at: { type: [string, 'null'], format: date-time }
+        source_execution_ids: { type: array, items: { type: string, format: uuid } }
+        error: { type: [object, 'null'] }
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/PublishedPrediction' }
+        result_offset: { type: integer, minimum: 0 }
+        result_limit: { type: integer, minimum: 1 }
+        has_more: { type: boolean }
+    CurrentPublication:
+      type: object
+      required: [publication]
+      properties:
+        publication:
+          oneOf:
+            - { $ref: '#/components/schemas/PredictionBatch' }
+            - { type: 'null' }
+    PublishedPrediction:
+      type: object
+      required: [subject_ref, program_ref, closure_id, predicted_class, model_id, model_version, generated_at]
+      properties:
+        subject_ref: { type: string, description: Estudiante; solo se revela tras validar rol y ámbito en servidor. }
+        program_ref: { type: string }
+        closure_id: { type: integer }
+        predicted_class: { type: string, enum: [POSITIVE_EVENT, NEGATIVE_EVENT] }
+        event_probability: { type: [number, 'null'], minimum: 0, maximum: 1 }
+        model_id: { type: string }
+        model_version: { type: string }
         generated_at: { type: string, format: date-time }
     AcademicCutRef:
       type: object
