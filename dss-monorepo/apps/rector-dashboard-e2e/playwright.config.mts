@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { nxE2EPreset } from '@nx/playwright/preset';
 import { workspaceRoot } from '@nx/devkit';
+import { resolve } from 'node:path';
 import { loadE2EEnv, resolveBaseURL } from '../../tools/load-e2e-env.mjs';
 
 // For CI, you may want to set BASE_URL to the deployed application.
@@ -61,7 +62,7 @@ export default defineConfig({
   webServer: [
     {
       name: 'BFF',
-      command: 'bun nx run @dss-monorepo/bff:dev',
+      command: `bun run next dev --webpack --port ${bffPort}`,
       url: `${bffBaseURL}/api/health`,
       timeout: 180_000,
       stdout: 'pipe',
@@ -72,11 +73,11 @@ export default defineConfig({
         NEXT_PUBLIC_BFF_URL: bffBaseURL,
         KEYCLOAK_BFF_REDIRECT_URI: env['KEYCLOAK_BFF_REDIRECT_URI'],
       },
-      cwd: workspaceRoot,
+      cwd: resolve(workspaceRoot, 'apps/bff'),
     },
     {
       name: 'Rector Dashboard',
-      command: 'bun nx run @dss-monorepo/rector-dashboard:dev',
+      command: `bun run next dev --webpack --port ${port}`,
       url: baseURL,
       timeout: 180_000,
       stdout: 'pipe',
@@ -84,7 +85,7 @@ export default defineConfig({
       env: {
         NEXT_PUBLIC_BFF_URL: bffBaseURL,
       },
-      cwd: workspaceRoot,
+      cwd: resolve(workspaceRoot, 'apps/rector-dashboard'),
     },
   ],
   projects: [
