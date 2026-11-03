@@ -32,9 +32,17 @@ export class SqlEmitter {
       lines.push('-- ----------------------------------------------------------------------------');
       lines.push('-- LIMPIEZA CONTROLADA DE TABLAS OLTP (Orden inverso de dependencias)');
       lines.push('-- ----------------------------------------------------------------------------');
+      lines.push(`DO $$ BEGIN
+  IF current_database() <> 'jachasun_test' THEN
+    RAISE EXCEPTION 'La opción --clean solo puede ejecutarse en jachasun_test (base actual: %)', current_database();
+  END IF;
+END $$;`);
       lines.push('TRUNCATE TABLE actas_graduacion.graduados CASCADE;');
       lines.push('TRUNCATE TABLE academico.notas_planilla CASCADE;');
       lines.push('TRUNCATE TABLE academico.alm_programaciones CASCADE;');
+      lines.push('TRUNCATE TABLE public.valores_transacciones CASCADE;');
+      lines.push('TRUNCATE TABLE public.cajas_transacciones CASCADE;');
+      lines.push('TRUNCATE TABLE public.matriculas CASCADE;');
       lines.push('TRUNCATE TABLE academico.alumnos CASCADE;');
       lines.push('TRUNCATE TABLE public.postulantes CASCADE;');
       lines.push('TRUNCATE TABLE public.uatf_datos CASCADE;');
@@ -74,12 +82,12 @@ VALUES
   ('4', 'INSTITUTO', now(), now(), 'A')
 ON CONFLICT (id_calificacion) DO NOTHING;
 
-INSERT INTO public.prs_examen (id_examen, examen, _registrado, _modificado, _estado)
+INSERT INTO public.prs_examen (id_examen, examen)
 VALUES
-  (1, 'PRUEBA DE SUFICIENCIA ACADEMICA (PSA)', now(), now(), 'A'),
-  (2, 'CURSO PREUNIVERSITARIO', now(), now(), 'A'),
-  (3, 'EXCELENCIA ACADEMICA', now(), now(), 'A'),
-  (5, 'BECA BACHILLER', now(), now(), 'A')
+  (1, 'PRUEBA DE SUFICIENCIA ACADEMICA (PSA)'),
+  (2, 'CURSO PREUNIVERSITARIO'),
+  (3, 'EXCELENCIA ACADEMICA'),
+  (5, 'BECA BACHILLER')
 ON CONFLICT (id_examen) DO NOTHING;
 
 INSERT INTO academico.carreras_tipos (tipo_c, tipo)
@@ -126,10 +134,10 @@ ON CONFLICT (tiempo) DO NOTHING;
     // Facultades
     lines.push('-- Facultades UATF');
     const facRows = academicGen.faculties
-      .map((f) => `(${f.id_facultad}, '${f.facultad.replace(/'/g, "''")}', '${f.sigla}')`)
+      .map((f) => `(${f.id_facultad}, '${f.facultad.replace(/'/g, "''")}', '${f.facu_abre.replace(/'/g, "''")}')`)
       .join(',\n  ');
     lines.push(`
-INSERT INTO academico.alm_programas_facultades (id_facultad, facultad, sigla)
+INSERT INTO academico.alm_programas_facultades (id_facultad, facultad, facu_abre)
 VALUES
   ${facRows}
 ON CONFLICT (id_facultad) DO NOTHING;
@@ -426,6 +434,89 @@ ON CONFLICT (id_dct_asignaciones) DO NOTHING;
     );
 
     // =========================================================================
+    // NIVEL 6b: COMPRAS DE MATRÍCULA Y PERIODOS CUBIERTOS
+    // =========================================================================
+    lines.push('-- ----------------------------------------------------------------------------');
+    lines.push(`-- NIVEL 6b: COMPRAS DE MATRÍCULA (${simulation.cajasTransacciones.length} eventos)`);
+    lines.push('-- Una transacción semestral del período 1 puede cubrir dos filas académicas.');
+    lines.push('-- ----------------------------------------------------------------------------');
+    SqlEmitter.appendBatchedInserts(
+      lines,
+      'public.matriculas',
+      [
+        'id_matricula', 'id_gestion', 'id_periodo', 'id_alumno', 'clave',
+        'fec_registro', 'ult_usuario', 'estado', 'tramite', 'tipo',
+        '_registrado', 'id_tipo_matricula'
+      ],
+      simulation.matriculas.map((m) => [
+        m.id_matricula,
+        m.id_gestion,
+        m.id_periodo,
+        m.id_alumno,
+        `'${m.clave}'`,
+        `'${m.fec_registro}'`,
+        `'${m.ult_usuario}'`,
+        `'${m.estado}'`,
+        `'${m.tramite}'`,
+        `'${m.tipo}'`,
+        `'${m.registrado}'`,
+        `'${m.id_tipo_matricula}'`,
+      ])
+    );
+
+    SqlEmitter.appendBatchedInserts(
+      lines,
+      'public.cajas_transacciones',
+      [
+        'id_transaccion', 'id_ra', 'id_alumno', 'id_cargo', 'fec_transaccion',
+        'envia', 'id_tipo_transaccion', 'estado', 'fec_pago', 'costo',
+        'id_gestion', 'id_periodo'
+      ],
+      simulation.cajasTransacciones.map((t) => [
+        t.id_transaccion,
+        `'${t.id_ra}'`,
+        t.id_alumno,
+        `'${t.id_cargo}'`,
+        `'${t.fec_transaccion}'`,
+        `'${t.envia}'`,
+        t.id_tipo_transaccion,
+        `'${t.estado}'`,
+        `'${t.fec_pago}'`,
+        t.costo,
+        t.id_gestion,
+        t.id_periodo,
+      ])
+    );
+
+    SqlEmitter.appendBatchedInserts(
+      lines,
+      'public.valores_transacciones',
+      [
+        'id_transaccion', 'id_alumno', 'id_programa', 'id_cargo', 'id_concepto',
+        'costo', 'fecha', 'id_gestion', 'id_periodo', 'ult_usuario', 'estado',
+        'id_ra', 'envia', 'id_tipo_transaccion', 'sistema', 'id_caja_tran'
+      ],
+      simulation.valoresTransacciones.map((v) => [
+        v.id_transaccion,
+        v.id_alumno,
+        `'${v.id_programa}'`,
+        `'${v.id_cargo}'`,
+        `'${v.id_concepto}'`,
+        v.costo,
+        `'${v.fecha}'`,
+        v.id_gestion,
+        v.id_periodo,
+        `'${v.ult_usuario}'`,
+        `'${v.estado}'`,
+        `'${v.id_ra}'`,
+        `'${v.envia}'`,
+        v.id_tipo_transaccion,
+        `'${v.sistema}'`,
+        v.id_caja_tran,
+      ])
+    );
+
+    // =========================================================================
     // NIVEL 7: PROGRAMACIONES, NOTAS Y GRADUADOS
     // =========================================================================
     lines.push('-- ----------------------------------------------------------------------------');
@@ -512,20 +603,16 @@ ON CONFLICT (id_dct_asignaciones) DO NOTHING;
         lines,
         'actas_graduacion.graduados',
         [
-          'id', 'id_alumno', 'id_programa', 'id_gestion', 'id_periodo',
-          'fecha_graduacion', 'modalidad_graduacion', 'nota_defensa',
-          'nro_acta', '_registrado'
+          'id', 'id_alumno', 'id_programa', 'id_gestion',
+          'fecha_graduacion', 'nota_graduacion', '_registrado'
         ],
         simulation.graduados.map((g) => [
           g.id,
           g.id_alumno,
           `'${g.id_programa}'`,
           g.id_gestion,
-          g.id_periodo,
           `'${g.fecha_graduacion}'`,
-          `'${g.modalidad_graduacion}'`,
           g.nota_defensa,
-          `'${g.nro_acta}'`,
           `'${g._registrado}'`,
         ])
       );

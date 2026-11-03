@@ -13,15 +13,16 @@ El Perfil del Proyecto propone clasificación binaria `En Riesgo / Sin Riesgo` p
 
 - **Evento:** deserción, usando la semántica vigente de `dw.fact_retencion_desercion`.
 - **Instante de predicción:** corte de un periodo cerrado; todas las features deben estar disponibles a ese corte.
-- **Horizonte:** siguiente cierre académico procesado después del corte.
+- **Ventana de observación:** snapshots durante los primeros dos años académicos. En programas semestrales, los cortes disponibles al completar cada semestre (hasta cuatro en dos años); en programas anuales, al completar cada gestión de 12 meses (hasta dos en dos años). No se emite predicción antes de concluir el periodo académico correspondiente.
+- **Horizonte del objetivo:** continuidad/deserción según la semántica vigente de `dw.fact_retencion_desercion`, observada en el siguiente cierre que corresponda al régimen del programa. La selección de ese cierre debe respetar si el programa es semestral o anual; el cierre global siguiente no basta para programas anuales.
 - **Grano:** estudiante-programa-corte. Se debe evaluar solapamiento de la misma persona entre particiones.
 - **Clase positiva:** `DESERTOR` o el boolean `es_desercion = true` de filas evaluables.
 - **Clase negativa:** `RETENIDO` o `es_desercion = false` de filas evaluables.
 - **Exclusión:** `NO_EVALUABLE`, egreso no validado, corte abierto/reabierto/ambiguo y perfiles fuera de la población acordada. Reportar cantidad y razones; no convertirlos en clase negativa.
-- **Población:** primer/segundo año según regla académica aprobada, todavía no disponible en el contrato DW revisado.
+- **Población:** estudiantes de programas elegibles durante sus primeros dos años académicos; el régimen del programa define qué cierres representan esos años.
 - **Variables candidatas:** campos académicos presentes y disponibles antes del horizonte. No se presuponen socioeconómicos, becas o bloqueos, porque no hay contrato actual del DW revisado que los exponga.
 
-**Estado de esta propuesta:** no aprobada como definición del objetivo ML. La regla DW de retención/deserción fue confirmada para el indicador del almacén, pero la reutilización como etiqueta predictiva, el horizonte, las exclusiones y la población deben aprobarse para este caso de uso.
+**Estado de esta propuesta:** la ventana de observación por régimen y la población de los primeros dos años quedan definidas por las decisiones de trabajo de DSA. La semántica de retención/deserción existente se conserva. Antes de entrenar, el DW debe exponer el régimen por programa y asociar cada snapshot al siguiente cierre esperado de ese régimen; la etiqueta predictiva y su criterio de aptitud se documentarán con cada experimento.
 
 ## 2. Usuarios y decisiones que apoyará
 

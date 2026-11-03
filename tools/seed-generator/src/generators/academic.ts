@@ -6,6 +6,28 @@ import type {
 } from '../types/index.js';
 import { sampleUniform, randomInt } from '../utils/discrete-cdf.js';
 
+function academicLevelCode(level: number): string {
+  if (level >= 1 && level <= 9) return String(level);
+  if (level >= 10 && level <= 35) return String.fromCharCode(55 + level);
+  throw new Error(`Nivel académico fuera del rango codificable: ${level}`);
+}
+
+function fitCourseSigla(sigla: string): string {
+  if (sigla.length <= 7) return sigla;
+
+  const match = /^([A-Z0-9]{3})-(\d{2})(\d{2})$/i.exec(sigla);
+  if (!match) {
+    throw new Error(`La sigla '${sigla}' excede char(7) y no sigue el formato académico esperado.`);
+  }
+
+  const level = Number(match[2]);
+  return `${match[1]}-${academicLevelCode(level)}${match[3]}`;
+}
+
+function fallbackCourseSigla(programId: string, level: number, subject: number): string {
+  return `${programId}-${academicLevelCode(level)}${String(subject).padStart(2, '0')}`;
+}
+
 export interface PreparedCourse extends CourseCatalogItem {
   id_materia: number;
 }
@@ -36,7 +58,7 @@ export class AcademicGenerator {
     this.faculties = this.facultiesCatalog.faculties.map((f: any) => ({
       id_facultad: f.id_facultad_numeric,
       facultad: f.name,
-      sigla: f.abbreviation || f.name.substring(0, 10),
+      facu_abre: f.abbreviation || f.name.substring(0, 10),
     }));
   }
 
@@ -63,7 +85,7 @@ export class AcademicGenerator {
           const courseId = nextMateriaId++;
           const prepared: PreparedCourse = {
             id_materia: courseId,
-            sigla: c.sigla,
+            sigla: fitCourseSigla(c.sigla),
             materia: (c.name || c.materia || c.sigla).toUpperCase(),
             ciclo: c.level || c.ciclo || 1,
             _creditos: c.credits || 4,
@@ -89,7 +111,7 @@ export class AcademicGenerator {
         for (let lvl = 1; lvl <= totalLevels; lvl++) {
           for (let m = 1; m <= 4; m++) {
             const courseId = nextMateriaId++;
-            const sigla = `${prog.id_programa}-${lvl}0${m}`;
+            const sigla = fallbackCourseSigla(prog.id_programa, lvl, m);
             const prepared: PreparedCourse = {
               id_materia: courseId,
               sigla,
@@ -104,7 +126,7 @@ export class AcademicGenerator {
               id_programa: prog.id_programa,
               id_plan: 2018,
               materia_graduacion: lvl === totalLevels && m === 1 ? 'SI' : 'NO',
-              prerrequisitos: lvl > 1 ? [`${prog.id_programa}-${lvl - 1}0${m}`] : [],
+              prerrequisitos: lvl > 1 ? [fallbackCourseSigla(prog.id_programa, lvl - 1, m)] : [],
             };
             this.siglaToCourseMap.set(`${prog.id_programa}:${sigla}`, prepared);
             this.allCourses.push(prepared);
@@ -178,8 +200,8 @@ export class AcademicGenerator {
 
       const progCourses = this.allCourses.filter((c) => c.id_programa === prog.id_programa);
 
-      // Si es régimen anual, solo ofertar en período 3 (o 1)
-      if (prog.regime === 'A' && periodo === 2) continue;
+      // Periodos 1/2 son semestrales; el periodo 3 representa la gestión anual.
+      if ((prog.regime === 'A' && periodo !== 3) || (prog.regime === 'S' && periodo === 3)) continue;
 
       for (const course of progCourses) {
         // 1 paralelo por materia en modo seed test

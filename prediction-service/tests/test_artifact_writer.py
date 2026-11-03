@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from sklearn.dummy import DummyClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from training.artifact_writer import write_training_artifacts
+from training.artifact_writer import _publish_directory, write_training_artifacts
 
 
 class ArtifactWriterTests(unittest.TestCase):
@@ -37,6 +39,7 @@ class ArtifactWriterTests(unittest.TestCase):
             "algorithm": "random_forest",
             "dataset_id": "dataset-uuid-123",
             "lifecycle_state": "CANDIDATE",
+            "classes": {"positive_class": "RISK", "negative_class": "NO_RISK", "event_code": "RETENTION_RISK"},
         }
         metrics = {"accuracy": 0.85, "f1_score": 0.82}
         training_config = {"algorithm": "random_forest", "seed": 42}
@@ -68,6 +71,7 @@ class ArtifactWriterTests(unittest.TestCase):
         self.assertTrue((job_dir / "feature_names.json").exists())
         self.assertTrue((job_dir / "dependency_lock.json").exists())
         self.assertTrue((job_dir / "dataset_ref.json").exists())
+        self.assertTrue((job_dir / "evaluation_report.json").exists())
         self.assertTrue((job_dir / "manifest.json").exists())
 
         # Verify digest was computed and added
@@ -78,6 +82,32 @@ class ArtifactWriterTests(unittest.TestCase):
         saved_manifest = json.loads((job_dir / "manifest.json").read_text(encoding="utf-8"))
         self.assertEqual(saved_manifest["artifact_digest"], result_manifest["artifact_digest"])
         self.assertEqual(saved_manifest["lifecycle_state"], "CANDIDATE")
+        self.assertIn("pipeline.joblib", saved_manifest["artifact_files"])
+        self.assertEqual(saved_manifest["input_schema"]["feature_names"], feature_names)
+        self.assertEqual(saved_manifest["probability_definition"]["positive_class"], "RISK")
+
+    def test_directory_publish_retries_transient_permission_error(self) -> None:
+        staging = self.artifacts_dir / ".candidate.tmp"
+        destination = self.artifacts_dir / "candidate"
+        staging.mkdir()
+        (staging / "complete.marker").write_text("complete", encoding="utf-8")
+        real_replace = os.replace
+        calls = 0
+
+        def flaky_replace(source, target):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise PermissionError("temporary Windows file lock")
+            return real_replace(source, target)
+
+        with patch("training.artifact_writer.os.replace", side_effect=flaky_replace):
+            with patch("training.artifact_writer.time.sleep"):
+                _publish_directory(staging, destination)
+
+        self.assertEqual(calls, 2)
+        self.assertEqual((destination / "complete.marker").read_text(encoding="utf-8"), "complete")
+        self.assertFalse(staging.exists())
 
 
 if __name__ == "__main__":

@@ -187,6 +187,11 @@ def train_model_task(
                 "split_method": partition.partition_metadata.get("split_method"),
                 "target_definition": manifest.get("target_definition"),
             },
+            feature_schema=[
+                {"name": field["name"], "logical_type": field["logical_type"], "nullable": field.get("nullable", True)}
+                for field in manifest.get("fields", [])
+                if field.get("role") == "feature"
+            ],
         )
 
         # 6. Update store to SUCCEEDED

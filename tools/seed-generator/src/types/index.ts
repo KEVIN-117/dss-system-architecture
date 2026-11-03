@@ -225,6 +225,55 @@ export interface EntityAlumno {
   _fecha_registro: string;
 }
 
+export interface EntityMatricula {
+  id_matricula: number;
+  id_gestion: number;
+  id_periodo: number;
+  id_alumno: number;
+  clave: string;
+  fec_registro: string;
+  ult_usuario: string;
+  estado: 'A';
+  tramite: string;
+  tipo: string;
+  registrado: string;
+  id_tipo_matricula: string;
+}
+
+export interface EntityCajaTransaccion {
+  id_transaccion: number;
+  id_ra: string;
+  id_alumno: number;
+  id_cargo: string;
+  fec_transaccion: string;
+  envia: string;
+  id_tipo_transaccion: 7;
+  estado: 'A';
+  fec_pago: string;
+  costo: number;
+  id_gestion: number;
+  id_periodo: number;
+}
+
+export interface EntityValorTransaccion {
+  id_transaccion: number;
+  id_alumno: number;
+  id_programa: string;
+  id_cargo: string;
+  id_concepto: string;
+  costo: number;
+  fecha: string;
+  id_gestion: number;
+  id_periodo: number;
+  ult_usuario: string;
+  estado: 'A';
+  id_ra: string;
+  envia: string;
+  id_tipo_transaccion: 7;
+  sistema: 'D';
+  id_caja_tran: number;
+}
+
 export interface EntityDocente {
   id_docente: number;
   nombres: string;

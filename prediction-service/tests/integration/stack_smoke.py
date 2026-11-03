@@ -6,7 +6,6 @@ prediction-service and prediction-worker containers are running.
 
 from __future__ import annotations
 
-import hashlib
 import json
 import os
 import time
@@ -54,8 +53,8 @@ def wait_succeeded(job_id: str) -> TrainingJobRecord:
 def assert_artifact_exists(job_id: str, attempt: int) -> None:
     artifact_dir = Path(worker_settings.artifacts_dir) / f"{job_id}-attempt-{attempt}"
     manifest = json.loads((artifact_dir / "manifest.json").read_text(encoding="utf-8"))
-    model_path = artifact_dir / "model.joblib"
-    digest = hashlib.sha256(model_path.read_bytes()).hexdigest()
+    from training.artifact_writer import _compute_bundle_digest
+    digest = _compute_bundle_digest(manifest)
     if manifest["artifact_digest"] != digest:
         raise AssertionError(f"Artifact digest mismatch at {artifact_dir}")
 

@@ -2,6 +2,8 @@
 
 Las nueve consultas contractuales versionadas están en `sql/`; se ejecutan como `SELECT` de columnas explícitas sobre la tabla aprobada, sin joins analíticos ni derivaciones. Las nueve ya están conectadas a pipelines Hop con validación del esquema/filas, conteo y manifiesto auditado, y se invocan desde el smoke workflow. `test_hop_source_queries.sh` ejecuta las consultas con el principal sintético de solo lectura y comprueba conteos y filtros de corte. La prueba integrada también verifica los nueve manifiestos completos.
 
+`sql/select_matricula_purchase_events.sql` define una extracción adicional de evidencia transaccional, de grano una fila por `cajas_transacciones.id_transaccion`. Vincula detalle por `valores_transacciones.id_caja_tran` y matrículas por alumno/gestión y coincidencia exacta de `fec_pago` con `_registrado`. Esta consulta todavía no forma parte de los nueve contratos ejecutados por el workflow ni de la publicación atómica del DW; su contrato y límites están en `docs/dw/source-contracts/matricula-purchase-event.md`.
+
 Respetar los filtros de snapshot y programa de cada contrato; ordenar por su clave estable; controlar timeout, nulos obligatorios, duplicados y esquema antes de declarar el manifiesto `COMPLETO`.
 
 Usar `Table Input` con parámetros tipados y, para valores provenientes de campos, placeholders JDBC preparados; nunca construir SQL concatenando texto del usuario. Los catálogos y snapshots históricos se leen completos según la política del contrato. El workflow usa explícitamente `public.postulantes` y el grano documentado en su contrato; las reglas de tipos/calidad se ejercitan en el entorno de integración contra fixtures alineados al DDL versionado.

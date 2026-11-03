@@ -35,6 +35,9 @@ CREATE SEQUENCE IF NOT EXISTS public.lugar_localidad_n_cod_loc_seq START WITH 10
 CREATE SEQUENCE IF NOT EXISTS public.prs_colegios_id_seq START WITH 1000 INCREMENT BY 1;
 CREATE SEQUENCE IF NOT EXISTS public.seq_postulantes_id START WITH 1 INCREMENT BY 1;
 CREATE SEQUENCE IF NOT EXISTS public.notas_planilla_id_matricula_seq START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE IF NOT EXISTS public.matriculas_id_matricula_seq START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE IF NOT EXISTS public.cajas_transac_id_transaccio_seq START WITH 1 INCREMENT BY 1;
+CREATE SEQUENCE IF NOT EXISTS public.valores_trans_id_trans_seq START WITH 1 INCREMENT BY 1;
 
 -- Secuencias en esquema academico
 CREATE SEQUENCE IF NOT EXISTS academico.alm_programas_f_id_facultad_seq START WITH 20 INCREMENT BY 1;
@@ -195,7 +198,7 @@ CREATE TABLE IF NOT EXISTS academico.alm_periodos (
 -- 4.3. Programas Académicos / Carreras (Esquema canónico auditado de 42 columnas)
 CREATE TABLE IF NOT EXISTS academico.alm_programas (
     id_programa char(3) NOT NULL PRIMARY KEY,
-    programa varchar(100) NOT NULL,
+    programa varchar(50) NOT NULL,
     id_facultad smallint NOT NULL REFERENCES academico.alm_programas_facultades(id_facultad),
     facultad integer REFERENCES academico.alm_programas_facultades(id_facultad),
     id_nivel smallint DEFAULT 1 NOT NULL,
@@ -374,7 +377,7 @@ CREATE TABLE IF NOT EXISTS academico.planes (
 CREATE TABLE IF NOT EXISTS public.prs_colegios (
     id_colegio integer DEFAULT nextval('public.prs_colegios_id_seq'::regclass) NOT NULL PRIMARY KEY,
     id_colegio_original smallint DEFAULT 0 NOT NULL,
-    colegio varchar(100) NOT NULL,
+    colegio varchar(65) NOT NULL,
     tipo char(1) DEFAULT 'F'::bpchar NOT NULL,
     turno char(1) DEFAULT 'M'::bpchar NOT NULL,
     area char(1) DEFAULT 'U'::bpchar NOT NULL,
@@ -529,6 +532,105 @@ CREATE TABLE IF NOT EXISTS academico.alumnos (
 -- 10. NIVEL 7: MATRÍCULAS, CALIFICACIONES Y TITULACIÓN
 -- ============================================================================
 
+-- 10.0. Matrícula administrativa por alumno, gestión y período
+-- Se conservan las dos claves únicas observadas en el DDL OLTP de referencia.
+CREATE TABLE IF NOT EXISTS public.matriculas (
+    id_matricula integer DEFAULT nextval('public.matriculas_id_matricula_seq'::regclass) NOT NULL PRIMARY KEY,
+    id_gestion smallint NOT NULL,
+    id_periodo smallint NOT NULL,
+    id_alumno integer NOT NULL,
+    clave varchar(10),
+    fec_registro date DEFAULT now() NOT NULL,
+    ult_usuario varchar(64) NOT NULL,
+    estado char(1) DEFAULT 'A'::bpchar NOT NULL,
+    carrera smallint,
+    programacion char(1),
+    tramite varchar(64) DEFAULT 'REGULAR'::character varying NOT NULL,
+    tipo char(1),
+    _registrado timestamp without time zone DEFAULT now() NOT NULL,
+    _ip_usuario varchar,
+    tipo_verificado varchar(20),
+    _modificado timestamp without time zone DEFAULT now() NOT NULL,
+    id_tipo_matricula varchar(3) DEFAULT 'ER'::character varying,
+    _costo numeric,
+    id_tipo_mat varchar,
+    id_tipo varchar DEFAULT 'E'::character varying,
+    tipo_matricula char(1) DEFAULT 'R'::bpchar,
+    _id_tipo_matricula integer,
+    fecha_pago_pasarela timestamp without time zone,
+    niv_acad smallint DEFAULT 0,
+    CONSTRAINT uq_public_matricula_gestion_periodo_alumno
+        UNIQUE (id_gestion, id_periodo, id_alumno),
+    CONSTRAINT uq_public_matricula_gestion_periodo_alumno_fecha
+        UNIQUE (id_gestion, id_periodo, id_alumno, fec_registro)
+);
+
+-- 10.0.1. Transacciones de caja; id_transaccion identifica un evento de compra.
+CREATE TABLE IF NOT EXISTS public.cajas_transacciones (
+    id_transaccion integer DEFAULT nextval('public.cajas_transac_id_transaccio_seq'::regclass) NOT NULL PRIMARY KEY,
+    id_ra varchar(10),
+    id_alumno integer,
+    id_cargo varchar(4) NOT NULL,
+    fec_transaccion date DEFAULT now() NOT NULL,
+    cajero varchar,
+    envia varchar NOT NULL,
+    id_tipo_transaccion integer DEFAULT (-1) NOT NULL,
+    estado char(1) DEFAULT 'A'::bpchar NOT NULL,
+    fec_pago timestamp(0) without time zone DEFAULT now() NOT NULL,
+    costo numeric(12,2) DEFAULT 0,
+    id_recibo varchar(10),
+    hora varchar(10),
+    nro_pago varchar(3),
+    fec_ult_cancelacion timestamp(0) without time zone,
+    fec_prox_cancelacion date,
+    monto_prox_cuota numeric(7,2),
+    cuotas_canceladas varchar(300),
+    estado_credito varchar(15),
+    saldo_ant_pago numeric(7,2),
+    saldo_actual numeric(7,2),
+    tc numeric(5,2),
+    montobs numeric(7,2),
+    id_sede smallint,
+    nit varchar(10),
+    nro_orden varchar(15),
+    nro_factura varchar,
+    alfanumerico varchar(10),
+    a_nombre_de varchar(50),
+    nit_factura varchar(10),
+    id_gestion smallint,
+    id_periodo smallint,
+    id_trans integer,
+    _id_usuario varchar(64),
+    _fec_guia date,
+    num_control varchar DEFAULT '-'::character varying,
+    tipo_alumno varchar DEFAULT 'ER'::character varying,
+    importe_deposito numeric DEFAULT 0,
+    comprobante_deposito varchar DEFAULT ''::character varying,
+    tipo_pago varchar DEFAULT 'EFECTIVO'::character varying NOT NULL,
+    id_matricula integer,
+    nro_cuota smallint DEFAULT 1 NOT NULL
+);
+
+-- 10.0.2. Detalle de cargos y conceptos, vinculado con caja por id_caja_tran.
+CREATE TABLE IF NOT EXISTS public.valores_transacciones (
+    id_transaccion integer DEFAULT nextval('public.valores_trans_id_trans_seq'::regclass) NOT NULL PRIMARY KEY,
+    id_alumno integer NOT NULL,
+    id_programa char(3) NOT NULL,
+    id_cargo varchar(4),
+    id_concepto varchar(4) NOT NULL,
+    costo numeric(12,2) DEFAULT 0,
+    fecha date DEFAULT now() NOT NULL,
+    id_gestion smallint NOT NULL,
+    id_periodo smallint NOT NULL,
+    ult_usuario varchar(64),
+    estado char(1),
+    id_ra varchar(10),
+    envia varchar(64),
+    id_tipo_transaccion integer,
+    sistema char(1),
+    id_caja_tran integer
+);
+
 -- 10.1. Programaciones / Inscripciones a Materias
 CREATE TABLE IF NOT EXISTS academico.alm_programaciones (
     id integer DEFAULT nextval('academico.alm_programaciones_id_seq'::regclass) NOT NULL PRIMARY KEY,
@@ -640,6 +742,17 @@ CREATE INDEX IF NOT EXISTS idx_alm_programaciones_materia ON academico.alm_progr
 
 CREATE INDEX IF NOT EXISTS idx_notas_planilla_gestion_periodo ON academico.notas_planilla (id_gestion, id_periodo, id_alumno);
 CREATE INDEX IF NOT EXISTS idx_notas_planilla_materia ON academico.notas_planilla (id_materia, estado);
+
+CREATE INDEX IF NOT EXISTS idx_cajas_transacciones_student_period
+    ON public.cajas_transacciones (id_alumno, id_gestion, id_periodo);
+CREATE INDEX IF NOT EXISTS idx_cajas_transacciones_type_status
+    ON public.cajas_transacciones (id_tipo_transaccion, estado, id_gestion, id_periodo);
+CREATE INDEX IF NOT EXISTS idx_valores_transacciones_caja
+    ON public.valores_transacciones (id_caja_tran);
+CREATE INDEX IF NOT EXISTS idx_valores_transacciones_student_period
+    ON public.valores_transacciones (id_alumno, id_gestion, id_periodo);
+CREATE INDEX IF NOT EXISTS idx_matriculas_student_period_timestamp
+    ON public.matriculas (id_alumno, id_gestion, _registrado);
 
 CREATE INDEX IF NOT EXISTS idx_graduados_alumno ON actas_graduacion.graduados (id_alumno);
 CREATE INDEX IF NOT EXISTS idx_graduados_programa ON actas_graduacion.graduados (id_programa, id_gestion);

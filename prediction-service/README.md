@@ -71,7 +71,7 @@ El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.
 ## Endpoints de la API
 
 - `GET /`: Health check básico del servicio.
-- `POST /predict`: Inferencia simulada de backward compatibility.
+- `POST /predict`: ruta heredada deshabilitada para scoring. Devuelve `503` si no hay modelo aprobado; con uno activo informa que falta el adaptador confiable de features DW. Nunca fabrica una predicción ni acepta features del cliente como datos institucionales.
 - `POST /v1/training-jobs`: Solicita un trabajo asíncrono de entrenamiento para `random_forest` o `xgboost`. Requiere header `Idempotency-Key`. Retorna `202 Accepted` con `job_id` y estado `QUEUED`.
 - `GET /v1/training-jobs/{jobId}`: Consulta el estado, progreso, candidato generado o detalle de error según el estándar RFC 7807 Problem Details.
 
@@ -91,6 +91,13 @@ El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.
   - `balance_report.json`: Decisión y registro de la técnica de balanceo.
   - `dependency_lock.json`: Versiones exactas de Python y librerías ML.
   - `feature_names.json`: Lista ordenada de variables predictoras.
+  - `evaluation_report.json`: Métricas y protocolo del holdout final asociados al `evaluation_ref`.
+
+El `artifact_digest` identifica los hashes SHA-256 de **todos** los archivos del bundle y los metadatos inmutables (identidad, algoritmo, dataset, clases, esquema y definición de probabilidad). El loader verifica ruta dentro del workspace, integridad, contrato y versiones de runtime antes de deserializar. El puntero activo conserva además el hash del manifiesto aprobado. Modelos y preprocesadores se cargan como una única unidad inmutable; una petición consulta el puntero una vez y no puede mezclar versiones.
+
+Los artefactos recién entrenados siempre quedan `CANDIDATE`. La aprobación es una operación de operador por CLI (`python -m training.model_registry`), no un endpoint público. Exige un reporte comparativo con decisión `APTO`, `deployment_allowed: true`, coincidencia exacta de `model_id`, versión, digest y dataset, y evidencia institucional no sintética. La evidencia PRED-004 actual (`EVIDENCIA_INSUFICIENTE`, sintética) no permite promoción. El estado activo, el reporte aprobatorio y el historial viven en el volumen persistente compartido `prediction_artifacts`; ver [PRED-005 — Operación de modelos](../docs/prediction/PRED-005-operations.md) para activación, recuperación y rollback.
+
+El contenedor API instala las dependencias ML fijadas porque necesita cargar el estimador y el preprocesador serializados; el contenedor Worker continúa separado y añade las herramientas de entrenamiento. Por eso la imagen API aumenta respecto a la variante ligera anterior.
 
 Para generar un reporte comparativo a partir de dos jobs completados, ejecutar `uv run python -m evaluation.comparison --output artifacts/pred004-comparison.json artifacts/<job-rf> artifacts/<job-xgb>`. El resultado registra la elección hecha con validación y muestra las métricas test sin usarlas para seleccionar.
 

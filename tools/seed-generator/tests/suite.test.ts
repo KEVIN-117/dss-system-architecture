@@ -98,6 +98,9 @@ describe('Suite de Pruebas Unitarias y de Integración — DATA-001', () => {
 
     // Comprobar que _tipo_academico = 'CAR' está presente para Apache Hop
     assert.ok(sql.includes("'CAR'"), "Debe incluir '_tipo_academico = CAR' requerido por Apache Hop");
+
+    const cleanSql = SqlEmitter.generateSql(res, academic, school, metadata, true);
+    assert.ok(cleanSql.includes("current_database() <> 'jachasun_test'"));
   });
 
   it('5. Cronología Académica y Regla DSA de Abandono', () => {
@@ -121,6 +124,28 @@ describe('Suite de Pruebas Unitarias y de Integración — DATA-001', () => {
     for (const c of academic.allCourses) {
       assert.ok(c._creditos > 0, `Materia ${c.sigla} debe tener créditos mayores a 0`);
     }
+  });
+
+  it('5a. Ingresos por cohorte respetan el régimen anual y semestral', () => {
+    initializeFaker(45678);
+    const demo = new DemographicGenerator(catalogs.demographic, catalogs.geographic);
+    const school = new SchoolGenerator(catalogs.schools);
+    const academic = new AcademicGenerator(catalogs.facultiesAndCareers, catalogs.studyPlansAndCourses, 'test');
+    const sim = new LongitudinalCohortSimulator(demo, school, academic, catalogs.lookups);
+    const res = sim.simulate(100, 2020, 2020);
+    const regimeByProgram = new Map(academic.programs.map((program) => [program.id_programa, program.regime]));
+    const firstSemesterIntake = res.postulantes.filter((applicant) => applicant.id_periodo === 1);
+    const secondSemesterIntake = res.postulantes.filter((applicant) => applicant.id_periodo === 2);
+    const annualIntake = res.postulantes.filter((applicant) => applicant.id_periodo === 3);
+
+    assert.equal(firstSemesterIntake.length, 100);
+    assert.equal(secondSemesterIntake.length, 100);
+    assert.equal(annualIntake.length, 100);
+    assert.equal(new Set(res.uatfDatos.map((person) => person.nro_dip)).size, res.uatfDatos.length);
+    assert.ok([...firstSemesterIntake, ...secondSemesterIntake].every((applicant) => regimeByProgram.get(applicant.id_programa) === 'S'));
+    assert.ok(annualIntake.every((applicant) => regimeByProgram.get(applicant.id_programa) === 'A'));
+    assert.ok(secondSemesterIntake.every((applicant) => applicant.fec_inscripcion.startsWith('2020-07-')));
+    assert.ok(annualIntake.every((applicant) => applicant.fec_inscripcion.startsWith('2020-01-')));
   });
 
   it('6. Integridad Topológica: Materias Ciclo 1 no tienen padre y Ciclo 2+ tienen padre', () => {

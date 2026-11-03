@@ -11,6 +11,7 @@ import json
 import logging
 import os
 import shutil
+import time
 from uuid import uuid4
 from pathlib import Path
 from typing import Any
@@ -20,6 +21,24 @@ import joblib
 logger = logging.getLogger(__name__)
 
 
+def _publish_directory(staging_dir: Path, destination: Path) -> None:
+    """Atomically publish a complete artifact directory, retrying transient locks.
+
+    Windows security scanners can briefly hold a newly written directory open.
+    A bounded retry avoids turning that short-lived sharing violation into a
+    failed training attempt while preserving the same-filesystem atomic rename.
+    """
+    attempts = 5
+    for attempt in range(attempts):
+        try:
+            os.replace(staging_dir, destination)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.05 * (attempt + 1))
+
+
 def _compute_file_digest(file_path: Path) -> str:
     """Compute lowercase SHA-256 hex digest of a file."""
     hasher = hashlib.sha256()
@@ -27,6 +46,22 @@ def _compute_file_digest(file_path: Path) -> str:
         while chunk := f.read(65536):
             hasher.update(chunk)
     return hasher.hexdigest()
+
+
+def _compute_bundle_digest(manifest: dict[str, Any]) -> str:
+    """Hash payloads and immutable model metadata, excluding approval state."""
+    identity_keys = (
+        "contract_version", "model_id", "version", "algorithm", "dataset_id",
+        "input_schema_version", "classes", "created_at", "evaluation_ref",
+        "artifact_uri", "preprocessing_ref", "dependency_lock_ref", "training_config_ref",
+        "input_schema", "probability_definition",
+    )
+    bundle = {
+        "artifact_files": manifest["artifact_files"],
+        "identity": {key: manifest.get(key) for key in identity_keys},
+    }
+    canonical = json.dumps(bundle, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
+    return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 
 
 def write_training_artifacts(
@@ -41,6 +76,7 @@ def write_training_artifacts(
     feature_names: list[str],
     dependency_lock: dict[str, str],
     dataset_ref: dict[str, Any],
+    feature_schema: list[dict[str, Any]] | None = None,
 ) -> dict[str, Any]:
     """Write artifacts in a staging directory and atomically promote the set.
 
@@ -71,9 +107,6 @@ def write_training_artifacts(
     pipeline_path = staging_dir / "pipeline.joblib"
     joblib.dump(preprocessing_pipeline, pipeline_path)
 
-    # 2. Compute digest of the model artifact
-    model_digest = _compute_file_digest(model_path)
-
     # 3. Save JSON metadata files
     (staging_dir / "metrics.json").write_text(
         json.dumps(metrics, indent=2, sort_keys=True, ensure_ascii=False),
@@ -100,13 +133,49 @@ def write_training_artifacts(
         encoding="utf-8",
     )
 
-    # 4. Finalize ModelManifest with digest and paths
+    # Include the actual evaluation evidence, not just a dangling reference.
+    evaluation_report = {
+        "evaluation_ref": manifest.get("evaluation_ref"),
+        "metrics": metrics,
+        "protocol": training_config.get("evaluation_protocol", {}),
+    }
+    (staging_dir / "evaluation_report.json").write_text(
+        json.dumps(evaluation_report, indent=2, sort_keys=True, ensure_ascii=False),
+        encoding="utf-8",
+    )
+
+    # Hash every serving and provenance payload. The manifest is excluded to
+    # avoid a circular digest; its canonical content is covered by bundle_digest.
+    payload_names = [
+        "model.joblib", "pipeline.joblib", "metrics.json", "evaluation_report.json",
+        "training_config.json", "balance_report.json", "feature_names.json",
+        "dependency_lock.json", "dataset_ref.json",
+    ]
+    files = {name: _compute_file_digest(staging_dir / name) for name in payload_names}
+    # 4. Finalize ModelManifest with bundle integrity and serving schema.
     final_manifest = dict(manifest)
-    final_manifest["artifact_digest"] = model_digest
+    final_manifest["artifact_files"] = files
     final_manifest["artifact_uri"] = str((job_dir / "model.joblib").as_posix())
     final_manifest["preprocessing_ref"] = str((job_dir / "pipeline.joblib").as_posix())
     final_manifest["dependency_lock_ref"] = str((job_dir / "dependency_lock.json").as_posix())
     final_manifest["training_config_ref"] = str((job_dir / "training_config.json").as_posix())
+    final_manifest["input_schema"] = {
+        "version": final_manifest.get("input_schema_version", "prepared-dataset-v1"),
+        "feature_names": feature_names,
+        "fields": feature_schema or [
+            {"name": name, "logical_type": "number", "nullable": True}
+            for name in feature_names
+        ],
+        "required": feature_names,
+        "additional_properties": False,
+    }
+    final_manifest["probability_definition"] = {
+        "positive_class": final_manifest.get("classes", {}).get("positive_class"),
+        "class_order": [final_manifest.get("classes", {}).get("negative_class"),
+                        final_manifest.get("classes", {}).get("positive_class")],
+        "meaning": "probability of the positive/event class",
+    }
+    final_manifest["artifact_digest"] = _compute_bundle_digest(final_manifest)
 
     (staging_dir / "manifest.json").write_text(
         json.dumps(final_manifest, indent=2, sort_keys=True, ensure_ascii=False),
@@ -115,6 +184,10 @@ def write_training_artifacts(
 
     # Promote the complete directory in one same-filesystem rename. No reader
     # can observe a partial candidate as a finished artifact set.
-    os.replace(staging_dir, job_dir)
+    try:
+        _publish_directory(staging_dir, job_dir)
+    except Exception:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
     logger.info("Artifacts for job %s successfully written to %s", job_id, job_dir)
     return final_manifest

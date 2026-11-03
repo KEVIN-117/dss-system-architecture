@@ -7,6 +7,8 @@ import os
 import asyncio
 from contextlib import asynccontextmanager, suppress
 from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -16,8 +18,14 @@ from pydantic import BaseModel, Field
 
 from config import settings
 from training.job_store import IdempotencyConflict, JobStore
+from training.model_registry import InvalidModelArtifact, ModelRegistry, NoActiveModel
 
 logger = logging.getLogger(__name__)
+
+
+@lru_cache(maxsize=8)
+def _model_registry(artifacts_dir: str) -> ModelRegistry:
+    return ModelRegistry(Path(artifacts_dir))
 
 # ---------------------------------------------------------------------------
 # FastAPI application
@@ -112,25 +120,30 @@ def read_root() -> dict[str, str]:
 
 
 # ---------------------------------------------------------------------------
-# Legacy simulated prediction (kept for backward compatibility)
+# Prediction from one explicitly activated, integrity-checked bundle
 # ---------------------------------------------------------------------------
 
 @app.post("/predict")
 def predict(data: dict) -> dict:
-    """Endpoint para realizar predicciones.
-    Recibe datos en formato JSON y devuelve una predicción simulada.
-    """
-    # Aquí iría la lógica de machine learning real. Esta respuesta es temporal.
+    """Legacy route: refuse fake inference until a trusted DW adapter exists."""
+    registry = _model_registry(os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"))
+    try:
+        bundle = registry.active()
+    except NoActiveModel as exc:
+        raise HTTPException(status_code=503, detail={"code": "NO_ACTIVE_MODEL", "detail": str(exc)}) from exc
+    except InvalidModelArtifact as exc:
+        logger.exception("Active model failed integrity/compatibility validation")
+        raise HTTPException(status_code=503, detail={"code": "ACTIVE_MODEL_UNAVAILABLE", "detail": str(exc)}) from exc
 
-    # Simular una predicción
-    result = {
-        "input_data": data,
-        "prediction": "95% probabilidad de éxito",
-        "confidence": 0.95,
-        "model_used": "modelo_prescriptivo_v2",
-    }
-
-    return result
+    # PRED-001 requires server-side resolution of an authorized subject/program
+    # and cut. This legacy route accepts only client JSON, so it must not score
+    # those values as if they were trusted DW features.
+    raise HTTPException(status_code=503, detail={
+        "code": "TRUSTED_FEATURE_SOURCE_UNAVAILABLE",
+        "model_id": bundle.model_id,
+        "model_version": bundle.version,
+        "detail": "The approved bundle is loaded as one pinned version, but no trusted DW feature adapter is configured.",
+    })
 
 
 # ---------------------------------------------------------------------------

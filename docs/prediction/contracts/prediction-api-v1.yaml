@@ -389,7 +389,7 @@ components:
     ModelManifest:
       type: object
       additionalProperties: false
-      required: [contract_version, model_id, version, algorithm, dataset_id, input_schema_version, classes, created_at, evaluation_ref, lifecycle_state, artifact_digest]
+      required: [contract_version, model_id, version, algorithm, dataset_id, input_schema_version, classes, created_at, evaluation_ref, lifecycle_state, artifact_digest, artifact_files, input_schema, probability_definition]
       properties:
         contract_version: { type: string, const: '1.0' }
         model_id: { type: string, format: uuid }
@@ -409,12 +409,42 @@ components:
         evaluation_ref: { type: string, minLength: 1 }
         lifecycle_state: { type: string, enum: [CANDIDATE, APPROVED, REJECTED, RETIRED] }
         artifact_digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+        artifact_files:
+          type: object
+          minProperties: 1
+          additionalProperties: { type: string, pattern: '^[a-f0-9]{64}$' }
+        input_schema:
+          type: object
+          required: [version, feature_names, fields, required, additional_properties]
+          properties:
+            version: { type: string }
+            feature_names: { type: array, minItems: 1, items: { type: string } }
+            fields:
+              type: array
+              minItems: 1
+              items:
+                type: object
+                required: [name, logical_type, nullable]
+                properties:
+                  name: { type: string }
+                  logical_type: { type: string, enum: [string, integer, number, boolean, date, datetime, category] }
+                  nullable: { type: boolean }
+            required: { type: array, items: { type: string } }
+            additional_properties: { type: boolean, const: false }
+        probability_definition:
+          type: object
+          required: [positive_class, class_order, meaning]
+          properties:
+            positive_class: { type: string }
+            class_order: { type: array, minItems: 2, maxItems: 2, items: { type: string } }
+            meaning: { type: string }
         artifact_uri: { type: string, minLength: 1 }
         preprocessing_ref: { type: string, minLength: 1 }
         dependency_lock_ref: { type: string, minLength: 1 }
         training_config_ref: { type: string, minLength: 1 }
         approved_at: { type: [string, 'null'], format: date-time }
         approved_by: { type: [string, 'null'] }
+        approval_evaluation_ref: { type: [string, 'null'] }
     Problem:
       type: object
       additionalProperties: false

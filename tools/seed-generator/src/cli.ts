@@ -29,9 +29,9 @@ program
   .version('1.0.0')
   .option('-s, --seed <number>', 'Semilla determinista para Faker', '12345')
   .option('-p, --profile <profile>', 'Perfil de generación (test | medium | full)', 'test')
-  .option('-c, --cohort-size <number>', 'Tamaño de cohorte anual de postulantes')
-  .option('--start-year <number>', 'Año inicial de simulación longitudinal', '2018')
-  .option('--end-year <number>', 'Año final de simulación longitudinal', '2026')
+  .option('-c, --cohort-size <number>', 'Cantidad de postulantes por ingreso académico')
+  .option('--start-year <number>', 'Año inicial de simulación longitudinal', '2000')
+  .option('--end-year <number>', 'Año final de simulación longitudinal (incluye horizonte para etiquetas)', '2026')
   .option('--dry-run', 'Simular en memoria y emitir resumen métrico sin conectar a la BD', false)
   .option('-o, --output-sql <path>', 'Ruta de archivo para guardar el script SQL generado')
   .option('--clean', 'Incluir truncado controlado previo en orden inverso de dependencias', false)
@@ -55,7 +55,7 @@ program
     console.log(pc.bold(pc.cyan('======================================================================')));
     console.log(pc.gray(`• Semilla determinista : `) + pc.yellow(seed.toString()));
     console.log(pc.gray(`• Perfil seleccionado  : `) + pc.green(profile));
-    console.log(pc.gray(`• Cohorte por gestión  : `) + pc.white(`${cohortSize} postulantes/año`));
+    console.log(pc.gray(`• Cohorte por ingreso  : `) + pc.white(`${cohortSize} postulantes`));
     console.log(pc.gray(`• Rango temporal       : `) + pc.white(`${startYear} a ${endYear} (${endYear - startYear + 1} gestiones)`));
     console.log(pc.gray(`• Modo de ejecución    : `) + (options.dryRun ? pc.magenta('DRY-RUN (Simulación)') : options.execute ? pc.red('EXECUTE (PostgreSQL)') : pc.blue('SQL GENERATION')));
 
@@ -77,7 +77,7 @@ program
       console.log(pc.green(`      ✓ Cuerpo docente: ${academicGen.teachers.length} docentes asignados.`));
       console.log(pc.green(`      ✓ Unidades educativas: ${schoolGen.getAllSchools().length} colegios registrados.`));
 
-      // 3. Simulación Longitudinal de Cohortes (2018 a 2026)
+      // 3. Simulación longitudinal de cohortes (horizonte predeterminado 2000–2026)
       console.log(pc.blue(`\n[3/5] Simulando cohortes longitudinales (${startYear} - ${endYear})...`));
       const simulator = new LongitudinalCohortSimulator(demoGen, schoolGen, academicGen, catalogs.lookups);
       const simResult = simulator.simulate(cohortSize, startYear, endYear);
@@ -93,6 +93,9 @@ program
         'public.uatf_datos': simResult.uatfDatos.length,
         'public.postulantes': simResult.postulantes.length,
         'academico.alumnos': simResult.alumnos.length,
+        'public.matriculas': simResult.matriculas.length,
+        'public.cajas_transacciones': simResult.cajasTransacciones.length,
+        'public.valores_transacciones': simResult.valoresTransacciones.length,
         'academico.alm_programaciones': simResult.programaciones.length,
         'academico.notas_planilla': simResult.notasPlanilla.length,
         'actas_graduacion.graduados': simResult.graduados.length,
