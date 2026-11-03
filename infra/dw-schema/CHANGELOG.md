@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.3.0...dw-migrator-v1.4.0) (2026-11-03)
+
+
+### Features
+
+* **prediction:** add scoped inference for program dropout ([#149](https://github.com/KEVIN-117/dss-system-architecture/issues/149)) ([#226](https://github.com/KEVIN-117/dss-system-architecture/issues/226)) ([b368950](https://github.com/KEVIN-117/dss-system-architecture/commit/b3689500e2a3826024bf3d5551070da56e657320))
+
 ## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.2.0...dw-migrator-v1.3.0) (2026-11-03)
 
 
