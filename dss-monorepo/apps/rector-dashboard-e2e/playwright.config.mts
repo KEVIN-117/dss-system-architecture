@@ -62,7 +62,7 @@ export default defineConfig({
     {
       name: 'BFF',
       command: 'bun nx run @dss-monorepo/bff:dev',
-      url: `${bffBaseURL}/api/auth/me`,
+      url: `${bffBaseURL}/api/health`,
       timeout: 180_000,
       stdout: 'pipe',
       reuseExistingServer: !process.env.CI && process.env['PREDICTION_E2E_FORCE_SERVER'] !== '1',
