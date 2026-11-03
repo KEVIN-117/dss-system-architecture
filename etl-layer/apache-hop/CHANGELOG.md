@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/apache-hop-v1.2.1...apache-hop-v1.3.0) (2026-11-03)
+
+
+### Features
+
+* **prediction:** version and activate evaluated model bundles ([#148](https://github.com/KEVIN-117/dss-system-architecture/issues/148)) ([#223](https://github.com/KEVIN-117/dss-system-architecture/issues/223)) ([d6c8429](https://github.com/KEVIN-117/dss-system-architecture/commit/d6c84291e17a347f374b1508f43605de366d62fb))
+
 ## [1.2.1](https://github.com/KEVIN-117/dss-system-architecture/compare/apache-hop-v1.2.0...apache-hop-v1.2.1) (2026-10-30)
 
 
