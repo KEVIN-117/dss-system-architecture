@@ -2,7 +2,7 @@
   "auth-service": "1.1.0",
   "olap-service": "1.1.0",
   "infra/keycloak": "1.3.0",
-  "infra/dw-schema": "1.4.0",
+  "infra/dw-schema": "1.5.0",
   "etl-layer/apache-hop": "1.3.0",
   "dw-control-service": "1.2.0",
   "dss-monorepo/apps/admin-portal": "1.0.0",
