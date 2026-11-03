@@ -4,7 +4,9 @@ import { workspaceRoot } from '@nx/devkit';
 import { loadE2EEnv, resolveBaseURL } from '../../tools/load-e2e-env.mjs';
 
 // For CI, you may want to set BASE_URL to the deployed application.
-const env = loadE2EEnv(import.meta.dirname, 'rector-dashboard');
+const bffEnv = loadE2EEnv(import.meta.dirname, 'bff');
+const portalEnv = loadE2EEnv(import.meta.dirname, 'rector-dashboard');
+const env = { ...bffEnv, ...portalEnv };
 const configuredPort = Number(env['RECTOR_DASHBOARD_PORT_E2E']);
 const port = Number.isInteger(configuredPort) && configuredPort > 0 ? configuredPort : 3004;
 process.env['RECTOR_DASHBOARD_PORT'] ??= String(port);
@@ -35,16 +37,33 @@ export default defineConfig({
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     baseURL,
-    /* Collect trace when retrying the failed test. See https://playwright.dev/docs/trace-viewer */
-    trace: 'on-first-retry',
+    /* Keep authentication artifacts disabled in the credentialed PRED-007 run. */
+    trace: process.env['PREDICTION_E2E_FORCE_SERVER'] === '1' ? 'off' : 'on-first-retry',
+    screenshot: process.env['PREDICTION_E2E_FORCE_SERVER'] === '1' ? 'off' : 'only-on-failure',
+    video: 'off',
   },
+  workers: process.env['PREDICTION_E2E_FORCE_SERVER'] === '1' ? 1 : undefined,
   /* Run your local dev server before starting the tests */
-  webServer: {
-    command: 'bun nx run @dss-monorepo/rector-dashboard:dev',
-    url: baseURL,
-    reuseExistingServer: !process.env.CI,
-    cwd: workspaceRoot,
-  },
+  webServer: [
+    {
+      name: 'BFF',
+      command: 'bun nx run @dss-monorepo/bff:dev',
+      url: `${env['BFF_BASE_URL'] ?? 'http://localhost:3006'}/api/auth/me`,
+      timeout: 180_000,
+      stdout: 'pipe',
+      reuseExistingServer: !process.env.CI && process.env['PREDICTION_E2E_FORCE_SERVER'] !== '1',
+      cwd: workspaceRoot,
+    },
+    {
+      name: 'Rector Dashboard',
+      command: 'bun nx run @dss-monorepo/rector-dashboard:dev',
+      url: baseURL,
+      timeout: 180_000,
+      stdout: 'pipe',
+      reuseExistingServer: !process.env.CI && process.env['PREDICTION_E2E_FORCE_SERVER'] !== '1',
+      cwd: workspaceRoot,
+    },
+  ],
   projects: [
     {
       name: 'chromium',

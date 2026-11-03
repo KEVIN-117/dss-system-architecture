@@ -55,6 +55,7 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `KEYCLOAK_JWKS_URL` | Derivado del issuer | URL para descargar claves de firma; permite hostname interno del contenedor. |
 | `AUTH_SERVICE_URL` | `http://auth-service:8000` | Servicio que devuelve el perfil activo y sus `academicContexts` confiables. |
 | `PREDICTION_ALLOWED_ROLES` | *(sin configurar)* | Lista JSON de roles académicos aprobados (`DIRECTOR`, `DECANO`, `RECTOR`). Vacío o inválido bloquea autorización con `503`. |
+| `PREDICTION_BATCH_SUBMITTER_ROLES` | `[]` | Lista JSON explícita de roles que pueden iniciar scoring poblacional. No hereda permisos de lectura; vacía bloquea el submit con `503`. |
 
 ### Variables del Worker y Broker
 
@@ -71,6 +72,7 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `WORKER_CPU_LIMIT` | `2` | Hilos/CPU máximos del estimador y cuota dura del contenedor. |
 | `WORKER_MEMORY_LIMIT_MB` | `2048` | Límite duro de memoria del contenedor en Compose. |
 | `WORKER_ARTIFACTS_DIR` | `/app/artifacts` | Ruta del volumen para persistencia de artefactos. |
+| `PREDICTION_DW_DATABASE_URL` | *(sin configurar)* | Conexión de solo lectura al DW requerida también por el worker para resolver la población y sus features. |
 | `WORKER_RANDOM_SEED` | `42` | Semilla por defecto para reproducibilidad. |
 
 Las migraciones `0026` y `0027` crean el registro, el outbox y el grupo SQL `dw_prediction_runtime`, con acceso únicamente a esas tablas. Para entornos fuera de desarrollo, provisionar logins independientes para API/worker y asignarles ese grupo; no usar `dw_ml_writer` para el API. El API inserta job y outbox en una transacción; si falla el broker, el sondeo periódico vuelve a publicar el outbox con backoff exponencial. La entrega es al menos una vez: Celery usa `job_id` como identificador estable y el worker reclama el registro con una lease atómica. PostgreSQL es la fuente de estado y resultados, por eso Celery no usa backend RPC ni colas temporales de control/mingle. Si el worker cae, el reintento espera a que expire la lease y escribe en un directorio de artefactos por intento.
@@ -82,6 +84,10 @@ El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.
 - `GET /`: Health check básico del servicio.
 - `POST /predict`: ruta heredada deshabilitada para scoring. Devuelve `503` si no hay modelo aprobado; con uno activo informa que falta el adaptador confiable de features DW. Nunca fabrica una predicción ni acepta features del cliente como datos institucionales.
 - `POST /v1/predictions`: inferencia puntual. `event_type=program_dropout` predice abandono de programa; `event_type=course_abandonment` requiere además `course_ref`. Requiere bearer JWT, estudiante/programa/corte y bundle aprobado para el evento y cadencia correspondientes. La población abarca los tres primeros años académicos (tres cortes anuales o seis semestrales). El cliente no puede enviar features.
+- `POST /v1/prediction-batches`: crea un lote asíncrono de abandono de programa para programa/corte, con idempotencia y modelo aprobado fijado al aceptar el trabajo. Requiere ámbito académico válido y rol explícito en `PREDICTION_BATCH_SUBMITTER_ROLES`.
+- `GET /v1/prediction-batches/{batch_id}`: consulta estado e historial; devuelve filas únicamente tras `PUBLISHED` y si el solicitante conserva ámbito para el programa/corte.
+- `GET /v1/prediction-publications?program_ref=…&cut_id=…`: obtiene la publicación completa vigente; devuelve `publication: null` si aún no existe. Los lotes históricos se consultan por `batch_id`.
+- `GET /v1/academic-options`: devuelve programas activos y cierres procesados visibles para el usuario autenticado; filtra las opciones por rol y ámbito académico.
 - `POST /v1/training-jobs`: Solicita un trabajo asíncrono de entrenamiento para `random_forest` o `xgboost`. Requiere header `Idempotency-Key`. Retorna `202 Accepted` con `job_id` y estado `QUEUED`.
 - `GET /v1/training-jobs/{jobId}`: Consulta el estado, progreso, candidato generado o detalle de error según el estándar RFC 7807 Problem Details.
 
@@ -108,6 +114,10 @@ El `artifact_digest` identifica los hashes SHA-256 de **todos** los archivos del
 Los artefactos recién entrenados siempre quedan `CANDIDATE`. La aprobación es una operación de operador por CLI (`python -m training.model_registry`), no un endpoint público. Exige un reporte comparativo con decisión `APTO`, `deployment_allowed: true`, coincidencia exacta de `model_id`, versión, digest y dataset, y evidencia institucional no sintética. La evidencia PRED-004 actual (`EVIDENCIA_INSUFICIENTE`, sintética) no permite promoción. El estado activo, el reporte aprobatorio y el historial viven en el volumen persistente compartido `prediction_artifacts`; ver [PRED-005 — Operación de modelos](../docs/prediction/PRED-005-operations.md) para activación, recuperación y rollback.
 
 La inferencia institucional requiere configuración aprobada para Keycloak, Auth Service, roles académicos y `PREDICTION_DW_DATABASE_URL`. El servicio consulta el DW con transacciones de solo lectura; la migración `0031_prediction_inference_read_access.sql` crea el rol `dw_prediction_reader` y le otorga `SELECT` únicamente sobre las tablas de hechos, dimensiones y control necesarias. Mantén esta conexión separada de la conexión del job store, que usa `dw_prediction_runtime`. El endpoint permanece indisponible si faltan esos valores, no existe bundle aprobado, el esquema del modelo solicita una feature no permitida o no hay evidencia de `available_at_cut=true`. La lista de roles debe reflejar la decisión IAM/DSA; no se asigna un valor por defecto.
+
+La migración `0034_prediction_publications.sql` crea `ml_workspace.prediction_batch`, su outbox y las filas de `prediction_result`. El lote y sus resultados pasan a `PUBLISHED` en una transacción; `v_published_prediction` oculta los demás estados. Las predicciones nunca se insertan en `fact_retencion_desercion` y las tablas no se otorgan a `dw_reader`, `dw_ml_writer` ni `dw_prediction_reader`. El API aplica permisos y ámbito antes de devolver resultados. Las recalculaciones crean lotes nuevos e inmutables; la consulta vigente selecciona el último lote publicado para el mismo programa/corte.
+
+El worker comprueba que el modelo activo todavía coincida con el fijado al crear el lote. Si cambió antes de puntuar, falla el lote y debe enviarse una solicitud nueva. Mantén `PREDICTION_BATCH_SUBMITTER_ROLES` separado de los roles de consulta: iniciar un scoring poblacional requiere asignación explícita de IAM/DSA. Configura el worker con `PREDICTION_DW_DATABASE_URL` de solo lectura y su conexión de publicación con los grants necesarios de `dw_prediction_runtime`.
 
 Detalles de implementación, cobertura y pendientes de aprobación: [PRED-006 — Inferencia puntual](../docs/prediction/PRED-006-implementation.md).
 

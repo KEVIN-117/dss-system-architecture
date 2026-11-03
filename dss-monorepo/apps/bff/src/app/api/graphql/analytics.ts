@@ -1,6 +1,6 @@
 import { GraphQLError, GraphQLScalarType, Kind } from 'graphql';
 import type { AuthenticatedRequest } from '../_lib/auth-guard';
-import { getOlapServiceUrl } from '../../../lib/bff-config';
+import { getOlapServiceUrl, getPredictionServiceUrl } from '../../../lib/bff-config';
 import {
   executeServerOlapQuery,
   getServerOlapCubeSchema,
@@ -71,6 +71,9 @@ export const analyticsTypeDefs = `#graphql
     totalRows: Int
     runtimeMs: Int
   }
+  type PredictionPublicationResult {
+    publication: JSON
+  }
   input CubeAxisInput {
     dimension: String!
     hierarchy: String
@@ -102,6 +105,7 @@ export const analyticsTypeDefs = `#graphql
     olapCubes: [OlapCube!]!
     olapCubeSchema(cubeId: ID!): JSON!
     analyticQuery(input: AnalyticQueryInput!): AnalyticResult!
+    predictionPublication(programRef: String!, cutId: String!, limit: Int, offset: Int): PredictionPublicationResult!
   }
 `;
 
@@ -134,6 +138,42 @@ export function createAnalyticsResolvers() {
         validateCubeId(args.cubeId);
         await requireVisibleCube(context.authentication, args.cubeId);
         return olapCall(() => getServerOlapCubeSchema(serverConfig(context.authentication), args.cubeId));
+      },
+      predictionPublication: async (
+        _: unknown,
+        args: { programRef: string; cutId: string; limit?: number | null; offset?: number | null },
+        context: { authentication: AuthenticatedRequest },
+      ) => {
+        // Resolve the analytics role/scope from trusted Auth Service data first.
+        // Prediction Service repeats the scope check against the selected program/cut.
+        deriveAcademicScope(context.authentication.roles, context.authentication.user.academicContexts ?? []);
+        if (!args.programRef.trim() || !args.cutId.trim()) {
+          throw new GraphQLError('Program and academic cut are required', { extensions: { code: 'BAD_USER_INPUT' } });
+        }
+        let baseUrl: string;
+        try { baseUrl = getPredictionServiceUrl(); }
+        catch { throw new GraphQLError('Prediction Service is unavailable', { extensions: { code: 'PREDICTION_UNAVAILABLE', http: { status: 503 } } }); }
+        const query = new URLSearchParams({
+          program_ref: args.programRef,
+          cut_id: args.cutId,
+          limit: String(Math.min(Math.max(args.limit ?? 100, 1), 1000)),
+          offset: String(Math.min(Math.max(args.offset ?? 0, 0), 25000)),
+        });
+        try {
+          const response = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/prediction-publications?${query}`, {
+            headers: { Authorization: `Bearer ${context.authentication.token}` },
+            cache: 'no-store',
+            signal: AbortSignal.timeout(15000),
+          });
+          if (!response.ok) {
+            const code = response.status === 403 ? 'FORBIDDEN' : response.status === 404 ? 'NOT_FOUND' : 'PREDICTION_QUERY_FAILED';
+            throw new GraphQLError('Prediction publication query failed', { extensions: { code, http: { status: response.status } } });
+          }
+          return await response.json() as { publication: unknown };
+        } catch (error) {
+          if (error instanceof GraphQLError) throw error;
+          throw new GraphQLError('Prediction Service is unavailable', { extensions: { code: 'PREDICTION_UNAVAILABLE', http: { status: 503 } } });
+        }
       },
       analyticQuery: async (_: unknown, args: { input: AnalyticQueryInput }, context: { authentication: AuthenticatedRequest }) => {
         const { authentication } = context;

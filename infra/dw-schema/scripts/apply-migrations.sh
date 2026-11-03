@@ -25,12 +25,21 @@ recorded_checksum() {
 recognized_legacy_checksum() {
   version="$1"
   checksum="$2"
-  # Migration 0030 was applied in development with the per-run/per-student
-  # advisory-lock implementation before the immutable migration was restored
-  # to its committed version. Migration 0032 upgrades that function safely.
-  # Accept only this exact deployed digest; arbitrary edits still fail closed.
-  [ "$version:$checksum" = \
-    '0030:d548a3203261269b76fe06a00f306a54d9474c720d5c29a5d74c25e15da62972' ]
+  # 0030 was applied in development with the per-run/per-student advisory-lock
+  # implementation before the immutable migration was restored. Migration
+  # 0032 upgrades that function safely.
+  # 0031 was also applied in development from a prior read-grant variant. The
+  # deployed DW was checked and contains every grant in the committed 0031.
+  # Accept only these exact deployed digests; arbitrary edits still fail closed.
+  case "$version:$checksum" in
+    '0030:d548a3203261269b76fe06a00f306a54d9474c720d5c29a5d74c25e15da62972'|\
+    '0031:9f464213c2396c80f4d77be14c1dcae22e90ca6d0636f85766e5b097936aae1d')
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
 }
 
 apply_migration() {

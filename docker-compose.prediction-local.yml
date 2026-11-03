@@ -1,0 +1,6 @@
+# Local host access for the host-run BFF and browser-based development flows.
+# Keep the Prediction API bound to loopback; the DW and worker remain private.
+services:
+  prediction-service:
+    ports:
+      - "127.0.0.1:18007:8000"

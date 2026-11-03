@@ -62,7 +62,9 @@ class KeycloakIdentityProvider:
             if isinstance(client_access, dict) and isinstance(client_access.get("roles"), list):
                 role_names.update(role for role in client_access["roles"] if isinstance(role, str))
 
-        auth_url = _required_env("AUTH_SERVICE_URL").rstrip("/") + "/auth/me"
+        # AUTH_SERVICE_URL is the service origin (for example,
+        # http://auth-service:8000); Auth Service is mounted below /api/v1.
+        auth_url = _required_env("AUTH_SERVICE_URL").rstrip("/") + "/api/v1/auth/me"
         try:
             response = httpx.get(auth_url, headers={"Authorization": f"Bearer {access_token}"}, timeout=5.0)
             response.raise_for_status()
@@ -123,6 +125,16 @@ class DwPredictionDataProvider:
               AND c.status = 'PROCESADO'
               AND c.processed_at IS NOT NULL
               AND c.effective_at <= clock_timestamp()
+              AND EXISTS (
+                  SELECT 1
+                  FROM dw.fact_retencion_desercion f
+                  WHERE f.programa_sk = p.programa_sk
+                    AND f.closure_id = c.closure_id
+                    AND EXISTS (
+                        SELECT 1 FROM etl_control.etl_execution run
+                        WHERE run.run_id = f.run_id AND run.status = 'EXITOSA'
+                    )
+              )
         """
         try:
             with psycopg.connect(self.database_url, connect_timeout=5, options="-c default_transaction_read_only=on") as connection:
@@ -142,6 +154,93 @@ class DwPredictionDataProvider:
             effective_at=effective_at.astimezone(timezone.utc).isoformat(),
             cadence="ANUAL" if int(period) == 3 else "SEMESTRAL" if int(period) in (1, 2) else "OTRO",
         )
+
+    def list_available_contexts(self) -> list[tuple[ProgramContext, str]]:
+        """List active program/cut pairs backed by successful processed DW facts."""
+        if not self.database_url:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "The read-only prediction DW connection is not configured.")
+        sql = """
+            SELECT DISTINCT p.id_programa, p.id_facultad, p.programa,
+                   c.closure_id::text, c.gestion, c.periodo, c.effective_at
+            FROM dw.dim_programa p
+            JOIN dw.fact_retencion_desercion f ON f.programa_sk=p.programa_sk
+            JOIN etl_control.academic_period_closure c ON c.closure_id=f.closure_id
+              AND c.status='PROCESADO' AND c.processed_at IS NOT NULL
+              AND c.effective_at<=clock_timestamp()
+            WHERE p.member_type='STANDARD' AND p.activo='A'
+              AND EXISTS (SELECT 1 FROM etl_control.etl_execution run
+                          WHERE run.run_id=f.run_id AND run.status='EXITOSA')
+            ORDER BY p.programa, c.gestion DESC, c.periodo DESC, p.id_programa
+        """
+        try:
+            with psycopg.connect(self.database_url, connect_timeout=5, options="-c default_transaction_read_only=on") as connection:
+                rows = connection.execute(sql).fetchall()
+        except Exception as exc:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "Available academic programs and cuts could not be loaded.") from exc
+        contexts: list[tuple[ProgramContext, str]] = []
+        for program_code, faculty_id, program_name, closure, year, period, effective_at in rows:
+            if faculty_id is None:
+                continue
+            academic_period = int(period)
+            contexts.append((ProgramContext(
+                program_ref=program_code,
+                program_code=program_code,
+                faculty_id=int(faculty_id),
+                cut_id=closure,
+                academic_year=int(year),
+                academic_period=academic_period,
+                effective_at=effective_at.astimezone(timezone.utc).isoformat(),
+                cadence="ANUAL" if academic_period == 3 else "SEMESTRAL" if academic_period in (1, 2) else "OTRO",
+            ), program_name or program_code))
+        return contexts
+
+    def list_program_population(self, context: ProgramContext, limit: int = 25000) -> tuple[list[str], list[str]]:
+        """Return student references and source executions visible in one processed cut.
+
+        Eligibility is intentionally checked again per student by ``load_features``;
+        this query only finds the closed-cut candidate population and its ETL lineage.
+        """
+        if not self.database_url:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "The read-only prediction DW connection is not configured.")
+        sql = """
+            SELECT DISTINCT e.id_alumno::text AS subject_ref
+            FROM dw.fact_retencion_desercion f
+            JOIN etl_control.academic_period_closure c ON c.closure_id=f.closure_id
+              AND c.status='PROCESADO' AND c.processed_at IS NOT NULL AND c.effective_at<=clock_timestamp()
+            JOIN dw.dim_estudiante e ON e.estudiante_sk=f.estudiante_sk AND e.member_type='STANDARD'
+              AND e.valid_from<=c.effective_at AND (e.valid_to IS NULL OR e.valid_to>c.effective_at)
+              AND e.fec_inscripcion<=c.effective_at::date
+            JOIN dw.dim_programa p ON p.programa_sk=f.programa_sk AND p.member_type='STANDARD'
+              AND p.id_programa=%s AND p.activo='A'
+            WHERE f.closure_id=%s::bigint
+              AND EXISTS (SELECT 1 FROM etl_control.etl_execution run
+                          WHERE run.run_id=f.run_id AND run.status='EXITOSA')
+            ORDER BY subject_ref
+            LIMIT %s
+        """
+        try:
+            with psycopg.connect(self.database_url, connect_timeout=5, options="-c default_transaction_read_only=on") as connection:
+                rows = connection.execute(sql, (context.program_code, int(context.cut_id), limit + 1)).fetchall()
+        except Exception as exc:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "The program population could not be loaded from the DW.") from exc
+        if len(rows) > limit:
+            raise InferenceFailure("POPULATION_LIMIT_EXCEEDED", 422, "The requested program population exceeds the configured batch limit.")
+        lineage_sql = """
+            SELECT DISTINCT f.run_id::text AS run_id
+            FROM dw.fact_retencion_desercion f
+            JOIN dw.dim_programa p ON p.programa_sk=f.programa_sk
+              AND p.member_type='STANDARD' AND p.id_programa=%s AND p.activo='A'
+            WHERE f.closure_id=%s::bigint
+              AND EXISTS (SELECT 1 FROM etl_control.etl_execution run
+                          WHERE run.run_id=f.run_id AND run.status='EXITOSA')
+            ORDER BY run_id
+        """
+        try:
+            with psycopg.connect(self.database_url, connect_timeout=5, options="-c default_transaction_read_only=on") as connection:
+                source_runs = connection.execute(lineage_sql, (context.program_code, int(context.cut_id))).fetchall()
+        except Exception as exc:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "The program population lineage could not be loaded from the DW.") from exc
+        return ([row[0] for row in rows], sorted({row[0] for row in source_runs if row[0]}))
 
     def load_features(self, subject_ref: str, context: ProgramContext, manifest: Mapping[str, Any],
                       event_type: str = "program_dropout", course_ref: str | None = None) -> Mapping[str, Any]:
