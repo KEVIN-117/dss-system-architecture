@@ -26,7 +26,6 @@ DECLARE
     v_current dw.dim_estudiante%ROWTYPE;
     v_match_count BIGINT;
     v_identity_key TEXT;
-    v_lock_key TEXT;
     v_canonical TEXT := '';
     v_hash CHAR(64);
     v_new_sk BIGINT;
@@ -80,20 +79,13 @@ BEGIN
 
     v_identity_key := 'ALUMNO:' || v_incoming.id_alumno::TEXT;
 
-    -- The run lock serializes row ordinals for this snapshot; the second lock
-    -- protects concurrent attempts to version the same academic student.
-    FOR v_lock_key IN
-        SELECT lock_key
-        FROM unnest(ARRAY[
-            'DW-HOP-RUN:' || p_run_id::TEXT,
-            v_identity_key
-        ]) AS lock_keys(lock_key)
-        ORDER BY lock_key
-    LOOP
-        PERFORM pg_advisory_xact_lock(
-            hashtextextended('dw.dim_estudiante.scd2:' || v_lock_key, 0)
-        );
-    END LOOP;
+    -- Serialize the publication batch with one transaction-scoped lock. A
+    -- per-student lock here accumulates one lock entry per row until the ETL
+    -- transaction commits and exhausts PostgreSQL shared lock memory on
+    -- historical snapshots. The same global lock is used by the SCD2 trigger.
+    PERFORM pg_advisory_xact_lock(
+        hashtextextended('dw.dim_estudiante.scd2:GLOBAL', 0)
+    );
 
     SELECT count(*) INTO v_match_count
     FROM dw.dim_estudiante d
