@@ -9,7 +9,21 @@ const portalEnv = loadE2EEnv(import.meta.dirname, 'rector-dashboard');
 const env = { ...bffEnv, ...portalEnv };
 const configuredPort = Number(env['RECTOR_DASHBOARD_PORT_E2E']);
 const port = Number.isInteger(configuredPort) && configuredPort > 0 ? configuredPort : 3004;
-process.env['RECTOR_DASHBOARD_PORT'] ??= String(port);
+const configuredBffPort = Number(env['BFF_PORT_E2E']);
+// The BFF E2E project uses 3006 in the same Nx affected run. Give the Rector
+// E2E an isolated BFF port in CI so the two Playwright webServers can run in
+// parallel without racing to bind the same address. Local runs keep the
+// explicitly configured port and can reuse the developer's running BFF.
+const bffPort = Number.isInteger(configuredBffPort) && configuredBffPort > 0
+  ? configuredBffPort
+  : process.env.CI ? 3016 : 3006;
+const bffBaseURL = resolveBaseURL(env['BFF_BASE_URL'], bffPort);
+env['BFF_BASE_URL'] = bffBaseURL;
+env['NEXT_PUBLIC_BFF_URL'] = bffBaseURL;
+env['KEYCLOAK_BFF_REDIRECT_URI'] = `${bffBaseURL}/api/auth/callback`;
+process.env['BFF_PORT'] = String(bffPort);
+process.env['NEXT_PUBLIC_BFF_URL'] = bffBaseURL;
+process.env['RECTOR_DASHBOARD_PORT'] = String(port);
 process.env.PORT = String(port);
 const baseURL = resolveBaseURL(
   env['RECTOR_DASHBOARD_BASE_URL'] ?? env['RECTOR_DASHBOARD_URL'],
@@ -48,10 +62,16 @@ export default defineConfig({
     {
       name: 'BFF',
       command: 'bun nx run @dss-monorepo/bff:dev',
-      url: `${env['BFF_BASE_URL'] ?? 'http://localhost:3006'}/api/auth/me`,
+      url: `${bffBaseURL}/api/auth/me`,
       timeout: 180_000,
       stdout: 'pipe',
       reuseExistingServer: !process.env.CI && process.env['PREDICTION_E2E_FORCE_SERVER'] !== '1',
+      env: {
+        BFF_PORT: String(bffPort),
+        PORT: String(bffPort),
+        NEXT_PUBLIC_BFF_URL: bffBaseURL,
+        KEYCLOAK_BFF_REDIRECT_URI: env['KEYCLOAK_BFF_REDIRECT_URI'],
+      },
       cwd: workspaceRoot,
     },
     {
@@ -61,6 +81,9 @@ export default defineConfig({
       timeout: 180_000,
       stdout: 'pipe',
       reuseExistingServer: !process.env.CI && process.env['PREDICTION_E2E_FORCE_SERVER'] !== '1',
+      env: {
+        NEXT_PUBLIC_BFF_URL: bffBaseURL,
+      },
       cwd: workspaceRoot,
     },
   ],

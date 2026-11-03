@@ -65,7 +65,11 @@ export default function PredictionsPage() {
         });
         const payload = await response.json();
         if (!response.ok) throw new Error(payload.detail ?? payload.error ?? 'No se pudieron cargar los programas autorizados.');
-        const options = payload as AcademicOptions;
+        const rawOptions = payload as Partial<AcademicOptions> | null;
+        const options: AcademicOptions = {
+          programs: Array.isArray(rawOptions?.programs) ? rawOptions.programs : [],
+          cuts: Array.isArray(rawOptions?.cuts) ? rawOptions.cuts : [],
+        };
         if (cancelled) return;
         setAcademicOptions(options);
         const initialProgram = options.programs[0]?.program_ref ?? '';
