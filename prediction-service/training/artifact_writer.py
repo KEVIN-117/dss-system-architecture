@@ -10,6 +10,8 @@ import hashlib
 import json
 import logging
 import os
+import shutil
+import time
 from uuid import uuid4
 from pathlib import Path
 from typing import Any
@@ -17,6 +19,24 @@ from typing import Any
 import joblib
 
 logger = logging.getLogger(__name__)
+
+
+def _publish_directory(staging_dir: Path, destination: Path) -> None:
+    """Atomically publish a complete artifact directory, retrying transient locks.
+
+    Windows security scanners can briefly hold a newly written directory open.
+    A bounded retry avoids turning that short-lived sharing violation into a
+    failed training attempt while preserving the same-filesystem atomic rename.
+    """
+    attempts = 5
+    for attempt in range(attempts):
+        try:
+            os.replace(staging_dir, destination)
+            return
+        except PermissionError:
+            if attempt == attempts - 1:
+                raise
+            time.sleep(0.05 * (attempt + 1))
 
 
 def _compute_file_digest(file_path: Path) -> str:
@@ -164,6 +184,10 @@ def write_training_artifacts(
 
     # Promote the complete directory in one same-filesystem rename. No reader
     # can observe a partial candidate as a finished artifact set.
-    os.replace(staging_dir, job_dir)
+    try:
+        _publish_directory(staging_dir, job_dir)
+    except Exception:
+        shutil.rmtree(staging_dir, ignore_errors=True)
+        raise
     logger.info("Artifacts for job %s successfully written to %s", job_id, job_dir)
     return final_manifest

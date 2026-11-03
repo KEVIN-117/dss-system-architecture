@@ -3,15 +3,17 @@
 from __future__ import annotations
 
 import json
+import os
 import tempfile
 import unittest
+from unittest.mock import patch
 from pathlib import Path
 
 from sklearn.dummy import DummyClassifier
 from sklearn.pipeline import Pipeline
 from sklearn.preprocessing import StandardScaler
 
-from training.artifact_writer import write_training_artifacts
+from training.artifact_writer import _publish_directory, write_training_artifacts
 
 
 class ArtifactWriterTests(unittest.TestCase):
@@ -83,6 +85,29 @@ class ArtifactWriterTests(unittest.TestCase):
         self.assertIn("pipeline.joblib", saved_manifest["artifact_files"])
         self.assertEqual(saved_manifest["input_schema"]["feature_names"], feature_names)
         self.assertEqual(saved_manifest["probability_definition"]["positive_class"], "RISK")
+
+    def test_directory_publish_retries_transient_permission_error(self) -> None:
+        staging = self.artifacts_dir / ".candidate.tmp"
+        destination = self.artifacts_dir / "candidate"
+        staging.mkdir()
+        (staging / "complete.marker").write_text("complete", encoding="utf-8")
+        real_replace = os.replace
+        calls = 0
+
+        def flaky_replace(source, target):
+            nonlocal calls
+            calls += 1
+            if calls == 1:
+                raise PermissionError("temporary Windows file lock")
+            return real_replace(source, target)
+
+        with patch("training.artifact_writer.os.replace", side_effect=flaky_replace):
+            with patch("training.artifact_writer.time.sleep"):
+                _publish_directory(staging, destination)
+
+        self.assertEqual(calls, 2)
+        self.assertEqual((destination / "complete.marker").read_text(encoding="utf-8"), "complete")
+        self.assertFalse(staging.exists())
 
 
 if __name__ == "__main__":

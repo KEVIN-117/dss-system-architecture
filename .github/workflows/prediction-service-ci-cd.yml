@@ -66,6 +66,9 @@ jobs:
           KEYCLOAK_BFF_CLIENT_SECRET: ci-validation-only
         run: docker compose --env-file .env.example config --quiet
 
+      - name: Validate isolated lifecycle smoke Compose
+        run: docker compose -f prediction-service/docker-compose.lifecycle-smoke.yml config --quiet
+
   publish-images:
     name: Publish API and worker images
     needs: verify

@@ -1,0 +1,63 @@
+services:
+  rabbitmq:
+    image: rabbitmq:4.3-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: pred005-smoke
+      RABBITMQ_DEFAULT_PASS: pred005-smoke-only
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  api:
+    image: prediction-service-api:pred005-smoke
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      PREDICTION_ENV: test
+      PREDICTION_DATABASE_URL: sqlite:////app/state/jobs.sqlite
+      PREDICTION_PORT: "8000"
+      WORKER_ARTIFACTS_DIR: /app/artifacts
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: pred005-smoke
+      RABBITMQ_PASSWORD: pred005-smoke-only
+    ports:
+      - "127.0.0.1:${PREDICTION_SMOKE_PORT:-18135}:8000"
+    volumes:
+      - smoke_artifacts:/app/artifacts
+      - smoke_job_state:/app/state
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+  worker:
+    image: prediction-service-worker:pred005-smoke
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    environment:
+      PREDICTION_ENV: test
+      PREDICTION_DATABASE_URL: sqlite:////app/state/jobs.sqlite
+      WORKER_ARTIFACTS_DIR: /app/artifacts
+      WORKER_MAX_CONCURRENT_JOBS: "1"
+      WORKER_CPU_LIMIT: "1"
+      WORKER_MEMORY_LIMIT_MB: "1024"
+      RABBITMQ_HOST: rabbitmq
+      RABBITMQ_PORT: "5672"
+      RABBITMQ_USERNAME: pred005-smoke
+      RABBITMQ_PASSWORD: pred005-smoke-only
+    volumes:
+      - smoke_artifacts:/app/artifacts
+      - smoke_job_state:/app/state
+    cpus: 1
+    mem_limit: 1024m
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+
+volumes:
+  smoke_artifacts:
+  smoke_job_state:
