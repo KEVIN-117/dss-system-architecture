@@ -182,7 +182,7 @@ C4Dynamic
 - No se confirmó el uso de GraphQL activo, cola, broker, registry, bucket ni filesystem persistente de modelos.
 - No se confirmaron permisos productivos, requisitos de latencia, disponibilidad ni escala; RNF-09 se demostrará midiendo, no por el hecho de usar otro proceso.
 - Publicación física, tabla/vista, grants y actualización OLAP se especificarán con el contrato de DW en PRED-007.
-- Evento/horizonte, regla de población de primer/segundo año, umbral visual, target, criterios de aptitud y contexto de autorización requieren aprobación DSA/IAM.
+- Los targets técnicos de PRED-006 se separan en abandono de materia y abandono de programa, con cohortes de tres años (tres cortes anuales o seis semestrales). La aprobación institucional de ambos targets/horizontes, oportunidad de predicción de materia, utilidad y roles sigue pendiente de DSA/IAM.
 
 ## Archivos Mermaid por diagrama
 

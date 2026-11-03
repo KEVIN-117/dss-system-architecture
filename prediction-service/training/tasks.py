@@ -188,7 +188,13 @@ def train_model_task(
                 "target_definition": manifest.get("target_definition"),
             },
             feature_schema=[
-                {"name": field["name"], "logical_type": field["logical_type"], "nullable": field.get("nullable", True)}
+                {
+                    "name": field["name"],
+                    "logical_type": field["logical_type"],
+                    "nullable": field.get("nullable", True),
+                    "available_at_cut": field.get("available_at_cut"),
+                    "source_field": field.get("source_field"),
+                }
                 for field in manifest.get("fields", [])
                 if field.get("role") == "feature"
             ],

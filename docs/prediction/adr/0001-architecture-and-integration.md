@@ -5,6 +5,8 @@
 - **Issue:** [PRED-001](https://github.com/KEVIN-117/dss-system-architecture/issues/144)
 - **Alcance:** límites, integración y contratos iniciales. Las reglas de negocio marcadas como pendientes no se consideran aprobadas por este ADR.
 
+> **Actualización PRED-006 (2026-11-03):** para la implementación técnica se amplió el alcance a abandono de materia (`fact_cursado.es_abandono`) y abandono de programa (`fact_retencion_desercion`), con cohortes de tres años académicos y bundles independientes por evento/cadencia. Esta definición de implementación sustituye la ventana propuesta de primer/segundo año descrita más abajo; no sustituye la aprobación DSA/IAM ni autoriza despliegue institucional. Ver [PRED-006 implementación](../PRED-006-implementation.md).
+
 ## Contexto
 
 El DSS ya cuenta con un DW PostgreSQL, una aplicación BFF Next.js que autentica sesiones con Keycloak y llama OLAP por proxy REST, y una aplicación FastAPI de predicción cuya ruta actual es simulada. El DW publica hechos de admisión, cursado y retención/deserción; la última conserva `RETENIDO`, `DESERTOR` y `NO_EVALUABLE`, además del periodo/cierre y linaje de carga. El rol `dw_ml_writer` puede leer `dw` y escribir en `ml_workspace`. No se encontró un contrato productivo de trabajos ML, una tabla de publicación de predicciones ni un registro de artefactos materializado.

@@ -30,7 +30,7 @@ En los cortes recientes, 2025/1 tiene 499 snapshots: 398 `RETENIDO`, 19 `DESERTO
 
 La migración `0030_exclude_future_enrollments_from_scd2.sql` filtra alumnos cuya `fec_inscripcion` es posterior al corte efectivo autorizado. En la carga actual, las 7.772 filas estándar no tienen `valid_from` anterior a `fec_inscripcion`; hay 53 valores distintos de `valid_from` entre 2000/1 y 2026/1.
 
-El contrato de cierres usa la cadencia validada en el seed: `1→2` dentro de la misma gestión, `2→1` de la gestión siguiente y `3→3` de la gestión siguiente. La dimensión de programa no transporta la cadencia; por ello, la compatibilidad entre programa y tipo de periodo debe permanecer como control de calidad antes de certificar las etiquetas para cada modalidad.
+El contrato de cierres usa la cadencia validada en el seed: `1→2` dentro de la misma gestión, `2→1` de la gestión siguiente y `3→3` de la gestión siguiente. La implementación PRED-006 deriva modalidad del historial procesado del estudiante–programa y excluye cadencias mixtas; la certificación institucional de cada modalidad aún requiere DSA.
 
 ## Aptitud para entrenamiento
 
@@ -40,7 +40,7 @@ Antes de entrenar con datos institucionales todavía se requiere:
 
 1. Una extracción DW autorizada y versionada.
 2. Aprobación DSA del evento objetivo, horizonte, cohorte elegible, exclusiones y reglas de notas.
-3. Una ventana de observación que respete la predicción durante los primeros dos años para programas anuales y semestrales.
+3. La ventana de trabajo PRED-006 comprende tres años académicos: tres cierres anuales o seis semestrales desde el primer cursado procesado del estudiante–programa.
 4. Perfilado de cobertura, faltantes, clases, continuidad estudiante–programa y disponibilidad temporal de cada feature.
 5. Verificación del contrato de snapshot de solo lectura y partición temporal agrupada por estudiante.
 

@@ -46,6 +46,15 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `PREDICTION_DATASET_ROOT` | `/app/snapshots` | Raíz de solo lectura para snapshots preparados. |
 | `PREDICTION_CONFIG_ROOT` | `/app/configurations` (worker) | Catálogo de configuraciones versionadas; Compose lo monta en solo lectura. |
 | `PREDICTION_OUTBOX_POLL_SECONDS` | `5` | Intervalo de recuperación de mensajes pendientes en outbox. |
+| `PREDICTION_DW_DATABASE_URL` | *(sin configurar)* | Conexión de solo lectura al DW para resolver cortes y features. Sin DSN, la inferencia falla cerrada. |
+| `KEYCLOAK_URL` | *(sin configurar)* | URL base del issuer Keycloak. |
+| `KEYCLOAK_REALM` | *(sin configurar)* | Realm usado para validar firma e issuer del bearer token. |
+| `KEYCLOAK_AUDIENCE` | *(sin configurar)* | Audience requerido en el access token. |
+| `KEYCLOAK_ROLE_CLIENT_ID` | *(sin configurar)* | Cliente cuyas roles se leen del token, además de realm roles. |
+| `KEYCLOAK_ISSUER_URI` | Derivado de URL + realm | Emisor exacto que debe coincidir con el claim `iss`; admite hostname externo distinto. |
+| `KEYCLOAK_JWKS_URL` | Derivado del issuer | URL para descargar claves de firma; permite hostname interno del contenedor. |
+| `AUTH_SERVICE_URL` | `http://auth-service:8000` | Servicio que devuelve el perfil activo y sus `academicContexts` confiables. |
+| `PREDICTION_ALLOWED_ROLES` | *(sin configurar)* | Lista JSON de roles académicos aprobados (`DIRECTOR`, `DECANO`, `RECTOR`). Vacío o inválido bloquea autorización con `503`. |
 
 ### Variables del Worker y Broker
 
@@ -72,6 +81,7 @@ El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.
 
 - `GET /`: Health check básico del servicio.
 - `POST /predict`: ruta heredada deshabilitada para scoring. Devuelve `503` si no hay modelo aprobado; con uno activo informa que falta el adaptador confiable de features DW. Nunca fabrica una predicción ni acepta features del cliente como datos institucionales.
+- `POST /v1/predictions`: inferencia puntual. `event_type=program_dropout` predice abandono de programa; `event_type=course_abandonment` requiere además `course_ref`. Requiere bearer JWT, estudiante/programa/corte y bundle aprobado para el evento y cadencia correspondientes. La población abarca los tres primeros años académicos (tres cortes anuales o seis semestrales). El cliente no puede enviar features.
 - `POST /v1/training-jobs`: Solicita un trabajo asíncrono de entrenamiento para `random_forest` o `xgboost`. Requiere header `Idempotency-Key`. Retorna `202 Accepted` con `job_id` y estado `QUEUED`.
 - `GET /v1/training-jobs/{jobId}`: Consulta el estado, progreso, candidato generado o detalle de error según el estándar RFC 7807 Problem Details.
 
@@ -96,6 +106,12 @@ El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.
 El `artifact_digest` identifica los hashes SHA-256 de **todos** los archivos del bundle y los metadatos inmutables (identidad, algoritmo, dataset, clases, esquema y definición de probabilidad). El loader verifica ruta dentro del workspace, integridad, contrato y versiones de runtime antes de deserializar. El puntero activo conserva además el hash del manifiesto aprobado. Modelos y preprocesadores se cargan como una única unidad inmutable; una petición consulta el puntero una vez y no puede mezclar versiones.
 
 Los artefactos recién entrenados siempre quedan `CANDIDATE`. La aprobación es una operación de operador por CLI (`python -m training.model_registry`), no un endpoint público. Exige un reporte comparativo con decisión `APTO`, `deployment_allowed: true`, coincidencia exacta de `model_id`, versión, digest y dataset, y evidencia institucional no sintética. La evidencia PRED-004 actual (`EVIDENCIA_INSUFICIENTE`, sintética) no permite promoción. El estado activo, el reporte aprobatorio y el historial viven en el volumen persistente compartido `prediction_artifacts`; ver [PRED-005 — Operación de modelos](../docs/prediction/PRED-005-operations.md) para activación, recuperación y rollback.
+
+La inferencia institucional requiere configuración aprobada para Keycloak, Auth Service, roles académicos y `PREDICTION_DW_DATABASE_URL`. El servicio consulta el DW con transacciones de solo lectura; la migración `0031_prediction_inference_read_access.sql` crea el rol `dw_prediction_reader` y le otorga `SELECT` únicamente sobre las tablas de hechos, dimensiones y control necesarias. Mantén esta conexión separada de la conexión del job store, que usa `dw_prediction_runtime`. El endpoint permanece indisponible si faltan esos valores, no existe bundle aprobado, el esquema del modelo solicita una feature no permitida o no hay evidencia de `available_at_cut=true`. La lista de roles debe reflejar la decisión IAM/DSA; no se asigna un valor por defecto.
+
+Detalles de implementación, cobertura y pendientes de aprobación: [PRED-006 — Inferencia puntual](../docs/prediction/PRED-006-implementation.md).
+
+La inferencia individual solo devuelve la respuesta y un `prediction_id` de correlación; no la guarda en el DW. La persistencia/publicación poblacional pertenece a PRED-007 y no debe mezclarse con los hechos observados. Para abandono de materia, `fact_cursado` aparece al procesar el período; se necesita una fuente de inscripción con disponibilidad al inicio del período antes de afirmar que el score es prospectivo.
 
 El contenedor API instala las dependencias ML fijadas porque necesita cargar el estimador y el preprocesador serializados; el contenedor Worker continúa separado y añade las herramientas de entrenamiento. Por eso la imagen API aumenta respecto a la variante ligera anterior.
 

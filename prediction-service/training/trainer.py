@@ -366,6 +366,14 @@ def train_model(
     dep_versions = get_dependency_versions()
     model_id = str(uuid4())
     version = f"{algorithm}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{seed}"
+    serving_scope = None
+    cadence = partition.partition_metadata.get("cadence")
+    if target_meta["event_code"] in {"COURSE_ABANDONMENT", "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"} and cadence in {"ANUAL", "SEMESTRAL"}:
+        serving_scope = {
+            "event_type": "course_abandonment" if target_meta["event_code"] == "COURSE_ABANDONMENT" else "program_dropout",
+            "cadence": cadence,
+            "evaluation_unit": partition.partition_metadata.get("evaluation_unit"),
+        }
     manifest = {
         "contract_version": "1.0",
         "model_id": model_id,
@@ -383,6 +391,8 @@ def train_model(
         "dependency_lock_ref": "",
         "training_config_ref": "",
     }
+    if serving_scope is not None:
+        manifest["serving_scope"] = serving_scope
     training_config = {
         "algorithm": algorithm,
         "seed": seed,

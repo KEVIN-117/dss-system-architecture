@@ -4,7 +4,7 @@
 
 El worker publica cada intento como un directorio inmutable de candidato (`/artifacts/{job_id}-attempt-{n}`). El manifiesto identifica el algoritmo, versión, snapshot/dataset, definición y orden de clases, esquema de entrada, semántica de probabilidad, configuración, dependencias y evaluación. `artifact_digest` cubre los hashes SHA-256 de todos los payloads y los metadatos inmutables del manifiesto. `manifest.json` no se auto-hashea; al aprobar, su hash se registra junto al puntero activo.
 
-El estado activo y el historial de cambios viven juntos en `.model-registry/active.json` y se reemplazan en una sola operación atómica, evitando que la versión activa y el historial queden desincronizados. El reporte aprobatorio se conserva bajo `.model-registry/approvals/` y su hash queda ligado al puntero y al manifiesto. API y worker montan el mismo volumen Docker `prediction_artifacts`; no se debe borrar ni sustituir ese volumen durante despliegues. En instalaciones con más de un host, el volumen debe ser compartido con semántica de renombre atómico. Un almacenamiento local independiente por réplica no es compatible.
+El estado activo y el historial viven en `.model-registry/active.json` y se reemplazan en una sola operación atómica. `active_by_scope` conserva un puntero por evento/cadencia (abandono de materia o de programa; anual o semestral); el campo `active` se conserva para compatibilidad operativa del puntero legado. El reporte aprobatorio se guarda bajo `.model-registry/approvals/` y su hash queda ligado al puntero y manifiesto. API y worker montan el mismo volumen Docker `prediction_artifacts`; no se debe borrar ni sustituir ese volumen durante despliegues.
 
 ## Evaluar y aprobar
 
@@ -30,10 +30,12 @@ El operador ejecuta la promoción con acceso de escritura al workspace y al repo
 
 ```powershell
 uv run --project prediction-service python -m training.model_registry rollback `
-  --approved-by "<identidad-operador>"
+  --approved-by "<identidad-operador>" `
+  --event-code "COURSE_ABANDONMENT" `
+  --cadence "SEMESTRAL"
 ```
 
-El rollback verifica y carga el bundle previo completo y luego reemplaza atómicamente el puntero. Si no existe una versión previa aprobada o no supera validaciones de integridad/compatibilidad, el rollback falla sin cambiar el modelo activo.
+Para revertir el puntero legado se omiten `--event-code` y `--cadence`. Para un bundle de PRED-006 se requieren ambos argumentos. El rollback valida y carga el bundle completo, modifica solo ese scope y deja intactos los otros eventos/cadencias.
 
 Tras reiniciar API o worker, los candidatos, el puntero y el historial se recuperan del volumen persistente. El primer acceso a una versión activa vuelve a verificar su manifiesto, hashes, esquema, clases y compatibilidad exacta de Python, scikit-learn, XGBoost y joblib antes de deserializar. Si la comprobación falla, la API responde `503 ACTIVE_MODEL_UNAVAILABLE`; no usa un candidato alternativo ni fabrica una predicción. Se puede restaurar desde el último evento `PROMOTE` válido o efectuar rollback a una versión aprobada íntegra.
 
@@ -63,8 +65,8 @@ cd prediction-service
 
 El test de integración no constituye evaluación CRISP-DM, aprobación institucional ni evidencia para promover un modelo real. Los casos de reload exitoso, incompatibilidad de dependencias, fallo de deserialización sin cambio del activo y cambio de versión con pareja modelo/preprocesador también se cubren en `tests/test_model_registry.py`.
 
-## Límites de este issue
+## Relación con PRED-006
 
-PRED-005 deja versionado, aprobación, carga y rollback. El contrato de inferencia institucional también exige resolver identidad, programa, autorización y corte, y leer features confiables del DW. La ruta heredada `/predict` no cumple ese contrato: sin modelo devuelve `503 NO_ACTIVE_MODEL`; con un bundle cargado devuelve `503 TRUSTED_FEATURE_SOURCE_UNAVAILABLE`. El endpoint contractual `/v1/predictions`, su autorización y el adaptador de features DW deben completarse en el alcance de inferencia correspondiente. No enviar perfiles/features libres del cliente para sustituir el origen confiable.
+PRED-005 implementa versionado, aprobación, carga y rollback. PRED-006 conecta esos bundles con `/v1/predictions`, identidad, ámbito académico y features DW. No enviar perfiles/features libres del cliente para sustituir el origen confiable. La promoción de cualquier modelo aún exige evaluación y aprobación institucional no sintética.
 
 Los artefactos `joblib` se aceptan únicamente desde el workspace configurado, con digest válido y manifiesto aprobado; no existe una operación para subir archivos de modelo desde una petición. La cuenta que opera el contenedor debe ser la única con escritura sobre artefactos y estado de registro.

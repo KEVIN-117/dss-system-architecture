@@ -1,28 +1,26 @@
 # PRED-001 — Acta de comprensión del negocio y plan CRISP-DM
 
-**Estado:** definición de trabajo propuesta; objetivos institucionales finales pendientes de aprobación.
+**Estado:** alcance técnico de PRED-006 acordado para experimentación Faker; aprobación institucional de targets, utilidad y despliegue sigue pendiente.
 **Trazabilidad:** issue PRED-001, RF-10, RF-11, RF-12, RNF-08 y RNF-09.
 
 ## 1. Problema institucional
 
 El DSS busca producir evidencia anticipada sobre riesgo de deserción académica para que las autoridades puedan focalizar revisión e intervenciones oportunas. La decisión del motor es una **estimación de apoyo**. No determina por sí sola el abandono real, no asigna tutorías y no ejecuta decisiones pedagógicas o administrativas.
 
-El Perfil del Proyecto propone clasificación binaria `En Riesgo / Sin Riesgo` para estudiantes de primer y segundo año. El DW vigente implementa un resultado observado de retención (`RETENIDO`, `DESERTOR`, `NO_EVALUABLE`) en snapshots por estudiante-programa-periodo cerrado. El hecho existente no define aún qué cohorte, horizonte ni instante de decisión debe usar el primer modelo. Por tanto, este acta conserva como propuesta el evento de deserción en el siguiente cierre DSA procesado, y exige confirmación antes del entrenamiento con datos institucionales.
+El Perfil del Proyecto propone clasificación de riesgo. Para la implementación de PRED-006 se separan dos problemas supervisados: abandono de materia y abandono de programa. Se conservan en datasets y bundles distintos porque cambian la unidad de evaluación, el evento y la temporalidad. Los resultados Faker solo validan la integración técnica; DSA aún debe aprobar el uso institucional y los criterios de utilidad.
 
-### Propuesta para aprobación de DSA
+### Definición de trabajo para PRED-006
 
-- **Evento:** deserción, usando la semántica vigente de `dw.fact_retencion_desercion`.
-- **Instante de predicción:** corte de un periodo cerrado; todas las features deben estar disponibles a ese corte.
-- **Ventana de observación:** snapshots durante los primeros dos años académicos. En programas semestrales, los cortes disponibles al completar cada semestre (hasta cuatro en dos años); en programas anuales, al completar cada gestión de 12 meses (hasta dos en dos años). No se emite predicción antes de concluir el periodo académico correspondiente.
-- **Horizonte del objetivo:** continuidad/deserción según la semántica vigente de `dw.fact_retencion_desercion`, observada en el siguiente cierre que corresponda al régimen del programa. La selección de ese cierre debe respetar si el programa es semestral o anual; el cierre global siguiente no basta para programas anuales.
-- **Grano:** estudiante-programa-corte. Se debe evaluar solapamiento de la misma persona entre particiones.
-- **Clase positiva:** `DESERTOR` o el boolean `es_desercion = true` de filas evaluables.
-- **Clase negativa:** `RETENIDO` o `es_desercion = false` de filas evaluables.
-- **Exclusión:** `NO_EVALUABLE`, egreso no validado, corte abierto/reabierto/ambiguo y perfiles fuera de la población acordada. Reportar cantidad y razones; no convertirlos en clase negativa.
-- **Población:** estudiantes de programas elegibles durante sus primeros dos años académicos; el régimen del programa define qué cierres representan esos años.
+- **Abandono de materia:** etiqueta `dw.fact_cursado.es_abandono`; grano estudiante–materia–período; features limitadas a metadatos de la materia y cursados anteriores.
+- **Abandono de programa:** `DESERTOR` frente a `RETENIDO` en `dw.fact_retencion_desercion`; grano estudiante–programa–corte; el resultado observado usa el siguiente cierre esperado por cadencia.
+- **Población:** primeros tres años académicos desde el primer cursado procesado del estudiante–programa: hasta tres cortes anuales o seis semestrales. Se excluyen cadencias mixtas.
+- **Instante de observación:** cierre académico procesado. La feature debe acreditarse disponible al corte; la etiqueta no puede entrar en el esquema de entrada.
+- **Exclusión de programa:** `NO_EVALUABLE`, egreso no validado, corte abierto/reabierto/ambiguo y perfiles fuera de población. No convertirlos en clase negativa.
+- **Partición:** temporal, agrupada por estudiante; el mismo estudiante no puede cruzar train/test.
+- **Estado de evidencia:** los datos Faker y las comparaciones RF/XGBoost sirven para pruebas de software. No certifican métricas institucionales ni habilitan promoción.
 - **Variables candidatas:** campos académicos presentes y disponibles antes del horizonte. No se presuponen socioeconómicos, becas o bloqueos, porque no hay contrato actual del DW revisado que los exponga.
 
-**Estado de esta propuesta:** la ventana de observación por régimen y la población de los primeros dos años quedan definidas por las decisiones de trabajo de DSA. La semántica de retención/deserción existente se conserva. Antes de entrenar, el DW debe exponer el régimen por programa y asociar cada snapshot al siguiente cierre esperado de ese régimen; la etiqueta predictiva y su criterio de aptitud se documentarán con cada experimento.
+**Pendiente de aprobación institucional:** coste relativo de errores, umbrales de utilidad/capacidad, cobertura aceptable, instante oportuno para inferencia de materia y autorización para usar datos reales/desplegar. La cadencia se deriva de los cierres procesados (`1/2` semestral, `3` anual) y el código resuelve un bundle por evento/cadencia.
 
 ## 2. Usuarios y decisiones que apoyará
 
@@ -87,7 +85,7 @@ PRED-001 define el vocabulario, criterios, responsabilidad y contratos iniciales
 |---|---|---|
 | Evento u horizonte ambiguo | Etiquetas inconsistentemente definidas; modelo sin interpretación útil. | No entrenar con datos institucionales hasta aprobar definición; retornar a Business Understanding. |
 | Etiquetas `NO_EVALUABLE` o cierres no comparables | Falsos negativos o contaminación temporal. | Excluir y cuantificar; revisar calendario, cierre, reglas y cohortes en Data Understanding. |
-| No se puede identificar primer/segundo año o historial incompleto | Población equivocada o sesgo de cobertura. | Validar dato y regla institucional en PRED-002; registrar bloqueo si falta fuente. |
+| Historial incompleto para los tres primeros años/cortes | Población equivocada o sesgo de cobertura. | Derivar el inicio del primer cursado procesado, medir cobertura y excluir cadencias mixtas. |
 | Fuga temporal/por alumno | Métricas infladas que no representan operación. | Snapshot en instante, split temporal/agrupado y test reservado; retornar a Data Preparation. |
 | Desbalance | Accuracy engañosa; recall insuficiente. | Reportar soporte/métricas por clase; evaluar ponderación/balance dentro de folds de entrenamiento y sin tocar evaluación. |
 | Training compite con DW/OLAP | Dashboards lentos o errores en consultas. | Worker separado y límites medidos; PRED-008 instrumenta contención. |
@@ -115,10 +113,9 @@ PRED-001 define el vocabulario, criterios, responsabilidad y contratos iniciales
 
 ## 8. Preguntas abiertas para las próximas decisiones
 
-1. ¿DSA aprueba deserción del siguiente cierre como evento/horizonte del primer modelo y `NO_EVALUABLE` como exclusión?
-2. ¿Cuál regla verificable y fuente identifica primer/segundo año con historial suficiente?
-3. ¿El consumo requiere ambas modalidades (inferencia puntual y scoring de población), con qué frecuencia y latencia?
-4. ¿Quién puede solicitar training/promoción y quién autoriza consulta de estudiante para cada contexto académico?
-5. ¿Qué métricas y costos fijará DSA como criterio de aptitud antes de evaluar el test final?
+1. ¿DSA aprueba formalmente los dos targets, horizontes, elegibilidad de tres años y el instante de predicción para abandono de materia?
+2. ¿Qué métricas/costes y capacidad de atención fijará DSA como criterio de aptitud antes de abrir el test final?
+3. ¿El consumo requiere scoring poblacional además de inferencia puntual, con qué frecuencia y latencia?
+4. ¿Quién puede solicitar training/promoción y quién autoriza consultas individuales para cada contexto académico?
 
 Estas preguntas no impiden especificar interfaces con campos semánticos versionados, pero deben quedar resueltas antes de certificar un modelo para uso institucional.

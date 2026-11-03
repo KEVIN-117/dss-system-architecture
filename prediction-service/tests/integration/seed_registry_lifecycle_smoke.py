@@ -37,7 +37,12 @@ def main() -> None:
         "classes": {
             "negative_class": "NO_RISK",
             "positive_class": "RISK",
-            "event_code": "RETENTION_RISK",
+            "event_code": "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE",
+        },
+        "serving_scope": {
+            "event_type": "program_dropout",
+            "cadence": "ANUAL",
+            "evaluation_unit": "student_program_academic_cut",
         },
         "created_at": "2026-11-02T00:00:00Z",
         "evaluation_ref": "compose-smoke-only",

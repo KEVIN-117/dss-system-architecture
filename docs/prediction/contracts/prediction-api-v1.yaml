@@ -2,11 +2,11 @@ openapi: 3.1.0
 info:
   title: DSS-UATF Prediction Service API
   version: 1.0.0-draft
-  summary: Contratos iniciales PRED-001 para trabajos y predicciones académicas.
+  summary: Contratos iniciales PRED-001; inferencia puntual implementada en PRED-006.
   description: >-
-    Borrador de diseño. Las decisiones de población, horizonte, target, permisos,
-    infraestructura y publicación indicadas en contract-notes.md requieren
-    aprobación antes de usarlo como contrato de implementación.
+    La ruta de inferencia puntual y sus validaciones técnicas están implementadas.
+    Las decisiones institucionales de target/horizonte, audiencia/roles y publicación
+    descritas en contract-notes.md aún requieren aprobación antes de habilitar uso real.
 servers:
   - url: /api/prediction
     description: Ruta interna del BFF; proxy efectivo y prefijo por confirmar.
@@ -20,11 +20,12 @@ paths:
     post:
       tags: [Predictions]
       operationId: predictOne
-      summary: Inferencia puntual sobre un estudiante y un corte autorizados
+      summary: Inferencia puntual de abandono de materia o programa
       description: >-
         El servidor obtiene features desde un corte confiable; el cliente no
         envía una declaración libre de elegibilidad ni sustituye la fuente
-        académica. La autorización se evalúa para cada estudiante/programa.
+        académica. `event_type` distingue abandono de materia y de programa;
+        la autorización se evalúa para cada estudiante/programa.
         What-If y explicaciones SHAP no forman parte de este borrador base.
       security:
         - keycloakBearer: []
@@ -146,7 +147,8 @@ components:
       bearerFormat: JWT
       description: >-
         Access token DSS validado por firma, issuer, audience, nbf y exp.
-        Audience/roles exactos para Prediction Service por confirmar.
+        Audience, realm y cliente de roles se configuran por entorno; no hay
+        valores predeterminados. La política académica debe aprobarse por IAM/DSA.
   parameters:
     RequestId:
       name: X-Request-ID
@@ -218,26 +220,64 @@ components:
       type: object
       additionalProperties: false
       required: [contract_version, subject_ref, program_ref, academic_cut]
+      allOf:
+        - if:
+            properties:
+              event_type: { const: course_abandonment }
+          then:
+            required: [course_ref]
+        - if:
+            properties:
+              event_type: { const: program_dropout }
+          then:
+            properties:
+              course_ref: { type: 'null' }
       properties:
         contract_version: { type: string, const: '1.0' }
+        event_type:
+          type: string
+          enum: [course_abandonment, program_dropout]
+          default: program_dropout
         subject_ref:
           type: string
           minLength: 1
           maxLength: 128
-          description: Identificador académico; clasificado como dato sensible y excluido de logs.
+          description: >-
+            Identificador académico resuelto contra el DW; sensible, excluido de logs
+            y solo reflejado en la respuesta autorizada de la misma solicitud.
         program_ref:
           type: string
           minLength: 1
           maxLength: 64
+        course_ref:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 128
+          description: Requerido únicamente para event_type=course_abandonment.
         academic_cut:
           $ref: '#/components/schemas/AcademicCutRef'
     PredictionResponse:
       type: object
       additionalProperties: false
-      required: [contract_version, prediction_id, event_code, predicted_class, model, academic_cut, generated_at]
+      required: [contract_version, prediction_id, subject_ref, program_ref, event_type, event_code, predicted_class, model, academic_cut, generated_at]
       properties:
         contract_version: { type: string, const: '1.0' }
         prediction_id: { type: string, format: uuid }
+        subject_ref:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Referencia de estudiante solicitada; sensible y excluida de logs.
+        program_ref:
+          type: string
+          minLength: 1
+          maxLength: 64
+        event_type:
+          type: string
+          enum: [course_abandonment, program_dropout]
+        course_ref:
+          type: [string, 'null']
+          description: Materia evaluada; null para abandono del programa.
         event_code:
           type: string
           minLength: 1
@@ -459,5 +499,5 @@ components:
           description: Mensaje saneado; no incluir datos personales, SQL ni paths.
         code:
           type: string
-          enum: [INVALID_REQUEST, INVALID_TOKEN, INSUFFICIENT_SCOPE, RESOURCE_NOT_FOUND, INCOMPATIBLE_SCHEMA, INELIGIBLE_PROFILE, DATA_UNAVAILABLE, NO_ACTIVE_MODEL, JOB_CAPACITY, JOB_FAILED, CONFLICT, TIMEOUT, INTERNAL_ERROR]
+          enum: [INVALID_REQUEST, INVALID_TOKEN, INSUFFICIENT_SCOPE, RESOURCE_NOT_FOUND, INCOMPATIBLE_SCHEMA, INELIGIBLE_PROFILE, DATA_UNAVAILABLE, AUTHORIZATION_UNAVAILABLE, NO_ACTIVE_MODEL, JOB_CAPACITY, JOB_FAILED, CONFLICT, TIMEOUT, INTERNAL_ERROR]
         request_id: { type: string, minLength: 1, maxLength: 128 }
