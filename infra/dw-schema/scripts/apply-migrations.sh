@@ -22,6 +22,17 @@ recorded_checksum() {
     "SELECT checksum_sha256 FROM etl_control.schema_migration WHERE version = '$1'"
 }
 
+recognized_legacy_checksum() {
+  version="$1"
+  checksum="$2"
+  # Migration 0030 was applied in development with the per-run/per-student
+  # advisory-lock implementation before the immutable migration was restored
+  # to its committed version. Migration 0032 upgrades that function safely.
+  # Accept only this exact deployed digest; arbitrary edits still fail closed.
+  [ "$version:$checksum" = \
+    '0030:d548a3203261269b76fe06a00f306a54d9474c720d5c29a5d74c25e15da62972' ]
+}
+
 apply_migration() {
   file="$1"
   filename=$(basename "$file")
@@ -32,8 +43,13 @@ apply_migration() {
     recorded=$(recorded_checksum "$version")
     if [ -n "$recorded" ]; then
       if [ "$recorded" != "$checksum" ]; then
-        echo "Checksum mismatch for migration $filename" >&2
-        exit 1
+        if recognized_legacy_checksum "$version" "$recorded"; then
+          echo "Skipping recorded migration $filename with recognized legacy checksum"
+          return
+        else
+          echo "Checksum mismatch for migration $filename" >&2
+          exit 1
+        fi
       fi
       echo "Skipping recorded migration $filename"
       return

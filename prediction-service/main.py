@@ -14,11 +14,13 @@ from uuid import UUID, uuid4
 
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from config import settings
 from training.job_store import IdempotencyConflict, JobStore
 from training.model_registry import InvalidModelArtifact, ModelRegistry, NoActiveModel
+from inference import InferenceFailure, PredictionService
+from inference_adapters import ConfiguredAcademicPolicy, DwPredictionDataProvider, KeycloakIdentityProvider
 
 logger = logging.getLogger(__name__)
 
@@ -81,6 +83,42 @@ class ModelReference(BaseModel):
     version: str = Field(min_length=1, max_length=128)
 
 
+class PredictionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contract_version: str = Field(pattern=r"^1\.0$")
+    event_type: str = Field(default="program_dropout", pattern=r"^(course_abandonment|program_dropout)$")
+    subject_ref: str = Field(min_length=1, max_length=128)
+    program_ref: str = Field(min_length=1, max_length=64)
+    course_ref: str | None = Field(default=None, min_length=1, max_length=128)
+    academic_cut: AcademicCutRef
+
+    @model_validator(mode="after")
+    def validate_event_scope(self):
+        if self.event_type == "course_abandonment" and not self.course_ref:
+            raise ValueError("course_ref is required for course_abandonment")
+        if self.event_type == "program_dropout" and self.course_ref is not None:
+            raise ValueError("course_ref is only valid for course_abandonment")
+        return self
+
+
+class PredictionResponse(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    contract_version: str = "1.0"
+    prediction_id: UUID
+    subject_ref: str
+    program_ref: str
+    event_type: str = Field(default="program_dropout", pattern=r"^(course_abandonment|program_dropout)$")
+    course_ref: str | None = None
+    event_code: str
+    predicted_class: str = Field(pattern=r"^(POSITIVE_EVENT|NEGATIVE_EVENT)$")
+    event_probability: float | None = Field(default=None, ge=0, le=1)
+    model: ModelReference
+    academic_cut: AcademicCutRef
+    generated_at: datetime
+
+
 class TrainingJobResponse(BaseModel):
     """Response for training job endpoints."""
 
@@ -124,7 +162,7 @@ def read_root() -> dict[str, str]:
 # ---------------------------------------------------------------------------
 
 @app.post("/predict")
-def predict(data: dict) -> dict:
+def predict_legacy(data: dict) -> dict:
     """Legacy route: refuse fake inference until a trusted DW adapter exists."""
     registry = _model_registry(os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"))
     try:
@@ -144,6 +182,53 @@ def predict(data: dict) -> dict:
         "model_version": bundle.version,
         "detail": "The approved bundle is loaded as one pinned version, but no trusted DW feature adapter is configured.",
     })
+
+
+@app.post("/v1/predictions", response_model=PredictionResponse)
+def predict_v1(
+    body: PredictionRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    """Score one eligible student using trusted DW features and one approved bundle."""
+    request_id = x_request_id or str(uuid4())
+    if not authorization or not authorization.startswith("Bearer ") or not authorization[7:].strip():
+        return JSONResponse(
+            status_code=401,
+            media_type="application/problem+json",
+            content={"type": "about:blank", "title": "Unauthorized", "status": 401,
+                     "code": "INVALID_TOKEN", "request_id": request_id},
+        )
+    try:
+        service = getattr(app.state, "prediction_service", None)
+        if service is None:
+            registry = _model_registry(os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"))
+            service = PredictionService(
+                registry,
+                KeycloakIdentityProvider(),
+                DwPredictionDataProvider(),
+                ConfiguredAcademicPolicy(),
+            )
+        return service.predict(
+            authorization[7:].strip(), body.subject_ref, body.program_ref, body.academic_cut.cut_id,
+            body.event_type, body.course_ref,
+        )
+    except InferenceFailure as exc:
+        return JSONResponse(
+            status_code=exc.status_code,
+            media_type="application/problem+json",
+            content={"type": "about:blank", "title": "Prediction request failed", "status": exc.status_code,
+                     "detail": exc.detail, "code": exc.code, "request_id": request_id},
+        )
+    except Exception:
+        logger.exception("Prediction inference failed request_id=%s", request_id)
+        return JSONResponse(
+            status_code=500,
+            media_type="application/problem+json",
+            content={"type": "about:blank", "title": "Prediction failed", "status": 500,
+                     "detail": "The prediction could not be completed.", "code": "INTERNAL_ERROR",
+                     "request_id": request_id},
+        )
 
 
 # ---------------------------------------------------------------------------

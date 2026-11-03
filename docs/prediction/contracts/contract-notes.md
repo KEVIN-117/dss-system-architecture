@@ -1,10 +1,11 @@
 # Notas de contrato — Prediction API v1 (borrador)
 
-El OpenAPI `prediction-api-v1.yaml` es un **borrador de diseño PRED-001**, no un contrato desplegado. Convención de versionado: la ruta externa `/v1` fija compatibilidad de API; cada objeto de datos/modelo lleva `contract_version`; cualquier cambio incompatible exige una nueva versión mayor. El archivo usa `1.0.0-draft` hasta que DSA/TI aprueben decisiones de negocio, seguridad e infraestructura.
+El OpenAPI `prediction-api-v1.yaml` es el contrato de referencia PRED-001; la inferencia puntual está implementada en PRED-006, aunque el API no queda habilitado para uso institucional hasta aprobar y configurar las decisiones pendientes. Convención de versionado: la ruta externa `/v1` fija compatibilidad de API; cada objeto de datos/modelo lleva `contract_version`; cualquier cambio incompatible exige una nueva versión mayor. El archivo conserva `1.0.0-draft` hasta que DSA/TI aprueben decisiones de negocio, seguridad e infraestructura.
 
 ## Flujos cubiertos
 
 - Inferencia sincrónica individual desde perfil/corte confiable. El body identifica la entidad/corte; no acepta features libres como prueba de elegibilidad.
+- Inferencia de `course_abandonment` (estudiante–materia–período, requiere `course_ref`) y `program_dropout` (estudiante–programa–corte), cada una con bundle y cadencia propios.
 - Envío de entrenamiento asíncrono y consulta de job; `202 Accepted`, `job_id`, URI de estado, idempotency key y error estable.
 - Snapshot de datos y manifiesto reproducibles; artefacto de modelo separado de candidato/promoción/rollback.
 - Contrato de publicación poblacional conceptual. Su endpoint/DDL final pertenece a PRED-007 con OLAP/DW; no se crea una tabla por deducción.
@@ -14,6 +15,8 @@ El OpenAPI `prediction-api-v1.yaml` es un **borrador de diseño PRED-001**, no u
 - `event_code`, clase positiva/negativa, horizonte, instante de predicción y elegibilidad se declaran en `TargetDefinition` y el manifiesto de modelo. Ningún valor se fija en el esquema mientras falta aprobación DSA.
 - El DW ya distingue `RETENIDO`, `DESERTOR` y `NO_EVALUABLE`; la propuesta de binarización trata solo los dos primeros como evento/no evento y excluye/reporta el último. Validar que el horizonte del modelo coincida con la regla implementada para el cierre siguiente.
 - `predicted_class` representa la clase que emite el modelo. `event_probability` se asocia al evento definido, está en [0,1] y puede ser `null` si no se produce. La versión de artefacto guarda el orden de clases. La API no calcula banda alto/medio/bajo hasta aprobar umbrales y calibración.
+- La elegibilidad solicitada para el MVP cubre tres años académicos: tres cierres anuales o seis semestrales desde el primer cursado procesado. `event_type` determina evento y grano; los modelos se resuelven por evento/cadencia para evitar mezclar targets.
+- La inferencia online no guarda la respuesta en el DW. El endpoint devuelve un `prediction_id` de correlación, pero no crea un registro persistente. PRED-007 define el contrato de publicación; las predicciones jamás se escribirán como resultados observados en `fact_retencion_desercion`.
 - El modelo se carga completo para una inferencia; no se cambia entre resolución de preprocesamiento y clasificación. Solo artefactos con `lifecycle_state=APPROVED` se sirven.
 - `academic_cut.cut_id` es referencia contractual, no afirma que el campo se llame `closure_id`; el adaptador DW fijará el mapeo.
 
@@ -49,3 +52,4 @@ No registrar perfiles, features, tokens, notas ni identificadores naturales comp
 5. Decidir almacenamiento de artefactos/jobs/snapshots, cifrado, límites, retención y rollback.
 6. Resolver si el progreso se consulta por HTTP/polling o requiere SSE; el esquema permite evolución sin fijar transporte ahora.
 7. Definir publicación transaccional y acceso OLAP/BFF en PRED-007.
+8. Para abandono de materia prospectivo, exponer en DW las inscripciones/cargas de materias disponibles antes del cierre y con disponibilidad temporal comprobable; `fact_cursado` solo aparece tras procesar el resultado del período.

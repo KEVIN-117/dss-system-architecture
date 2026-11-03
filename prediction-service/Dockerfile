@@ -15,7 +15,7 @@ ARG UV_VERSION=0.11.32
 RUN pip install --no-cache-dir "uv==${UV_VERSION}" \
     && uv sync --locked --extra ml --no-dev --no-install-project
 
-COPY --chown=app:app config.py main.py dataset_contract.py ./
+COPY --chown=app:app config.py main.py dataset_contract.py inference.py inference_adapters.py ./
 COPY --chown=app:app training/ ./training/
 
 ENV PATH="/app/.venv/bin:${PATH}" \

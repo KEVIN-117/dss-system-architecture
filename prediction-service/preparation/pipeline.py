@@ -87,17 +87,66 @@ def prepare_dataset(
     apply_balancing: bool = True,
     imbalance_threshold: float = 0.4,
 ) -> PreparedPartition:
-    """Filter eligible rows and make a student-grouped temporal holdout.
+    """Prepare the established program-retention contract.
 
     No imputer, encoder, feature statistic, or sampler is fitted here. Those
     operations belong inside each cross-validation training fold in trainer.py.
     """
+    return _prepare_binary_dataset(
+        manifest, rows, seed, test_ratio, apply_balancing, imbalance_threshold,
+        require_retention_outcome=True,
+    )
+
+
+def prepare_event_dataset(
+    manifest: dict[str, Any],
+    rows: list[dict[str, Any]],
+    seed: int = 42,
+    test_ratio: float = 0.2,
+    apply_balancing: bool = True,
+    imbalance_threshold: float = 0.4,
+) -> PreparedPartition:
+    """Prepare a non-retention event while grouping temporal splits by student.
+
+    Event-specific adapters must remove rows with an unknown target before
+    calling this function. This is intended for distinct grains such as
+    student-course-period and must not reinterpret retention outcomes.
+    """
+    return _prepare_binary_dataset(
+        manifest, rows, seed, test_ratio, apply_balancing, imbalance_threshold,
+        require_retention_outcome=False,
+    )
+
+
+def _prepare_binary_dataset(
+    manifest: dict[str, Any],
+    rows: list[dict[str, Any]],
+    seed: int,
+    test_ratio: float,
+    apply_balancing: bool,
+    imbalance_threshold: float,
+    require_retention_outcome: bool,
+) -> PreparedPartition:
+    """Filter the declared population and make a student-grouped temporal holdout."""
     df = pd.DataFrame(rows)
     if "population_status" not in df:
         raise ValueError("Column 'population_status' is required for eligibility filtering.")
-    if "resultado_retencion" not in df:
-        raise ValueError("Column 'resultado_retencion' is required for evaluability filtering.")
-    df = df.loc[(df["population_status"] == "ELIGIBLE") & (df["resultado_retencion"] != "NO_EVALUABLE")].copy()
+    target_field = manifest.get("target_field")
+    if not isinstance(target_field, str) or not target_field:
+        raise ValueError("Manifest does not declare a target_field.")
+    if require_retention_outcome:
+        if "resultado_retencion" not in df:
+            raise ValueError("Column 'resultado_retencion' is required for evaluability filtering.")
+        df = df.loc[
+            (df["population_status"] == "ELIGIBLE")
+            & (df["resultado_retencion"] != "NO_EVALUABLE")
+        ].copy()
+    else:
+        if target_field not in df:
+            raise ValueError(f"Target field '{target_field}' is missing from event records.")
+        df = df.loc[
+            (df["population_status"] == "ELIGIBLE") & df[target_field].notna()
+        ].copy()
     if df.empty:
         raise ValueError("No evaluable, eligible rows remain after filtering.")
     if manifest.get("target_approved") is not True:
@@ -106,11 +155,8 @@ def prepare_dataset(
         raise ValueError("A DSA-approved population rule (eligibility_approved: true) is required before preparation.")
 
     feature_names: list[str] = manifest.get("feature_fields", [])
-    target_field: str | None = manifest.get("target_field")
     if not feature_names:
         raise ValueError("Manifest declares no feature_fields.")
-    if not target_field:
-        raise ValueError("Manifest does not declare a target_field.")
     missing = sorted((set(feature_names) | {target_field}) - set(df.columns))
     if missing:
         raise ValueError(f"Required fields missing from data: {missing}")
@@ -175,8 +221,10 @@ def prepare_dataset(
             "max": int(test_rows_per_student.max()),
         },
         "target_definition": manifest.get("target_definition"),
+        "cadence": manifest.get("coverage", {}).get("cadence"),
+        "event_code": (manifest.get("target_definition") or {}).get("event_code"),
         "cv_method": "stratified_group_k_fold",
-        "evaluation_unit": "student_program_academic_cut",
+        "evaluation_unit": manifest.get("evaluation_unit", "student_program_academic_cut"),
         "evidence_kind": "synthetic_fixture" if manifest.get("fixture_only") is True and str(manifest.get("snapshot_ref", "")).startswith(("fixture:", "synthetic:")) else "institutional_unverified",
     }
     return PreparedPartition(

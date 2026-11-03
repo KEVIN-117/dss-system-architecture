@@ -127,6 +127,14 @@ class ModelRegistry:
         classes = manifest.get("classes", {})
         if not isinstance(classes, dict) or not all(classes.get(key) for key in ("positive_class", "negative_class", "event_code")):
             raise InvalidModelArtifact("Model class order or event definition is incomplete.")
+        scope = manifest.get("serving_scope")
+        if scope is not None:
+            expected_type = "course_abandonment" if classes["event_code"] == "COURSE_ABANDONMENT" else "program_dropout" if classes["event_code"] == "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE" else None
+            if (not isinstance(scope, dict) or expected_type is None
+                    or scope.get("event_type") != expected_type
+                    or scope.get("cadence") not in {"ANUAL", "SEMESTRAL"}
+                    or not isinstance(scope.get("evaluation_unit"), str)):
+                raise InvalidModelArtifact("Model serving scope conflicts with its event or cadence.")
         schema = manifest.get("input_schema", {})
         features = schema.get("feature_names")
         if not isinstance(features, list) or not features or any(not isinstance(name, str) or not name for name in features) or len(features) != len(set(features)) or schema.get("additional_properties") is not False:
@@ -231,7 +239,13 @@ class ModelRegistry:
         self._cache[key] = loaded
         return loaded
 
-    def active(self) -> LoadedModel:
+    @staticmethod
+    def _scope_key(event_code: str, cadence: str) -> str:
+        if event_code not in {"COURSE_ABANDONMENT", "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"} or cadence not in {"ANUAL", "SEMESTRAL"}:
+            raise NoActiveModel("No approved model exists for the requested event/cadence scope.")
+        return f"{event_code}|{cadence}"
+
+    def active(self, event_code: str | None = None, cadence: str | None = None) -> LoadedModel:
         try:
             state = json.loads(self.active_path.read_text(encoding="utf-8"))
         except FileNotFoundError as exc:
@@ -240,11 +254,26 @@ class ModelRegistry:
             raise InvalidModelArtifact("Active model registry state is invalid JSON.") from exc
         if not isinstance(state, dict):
             raise InvalidModelArtifact("Active model registry state is malformed.")
-        pointer = state.get("active", state)
+        if event_code is not None or cadence is not None:
+            if not event_code or not cadence:
+                raise NoActiveModel("Both event and cadence are required to resolve a scoped model.")
+            active_by_scope = state.get("active_by_scope", {})
+            if not isinstance(active_by_scope, dict):
+                raise InvalidModelArtifact("Scoped active model registry state is malformed.")
+            pointer = active_by_scope.get(self._scope_key(event_code, cadence))
+            if not pointer:
+                raise NoActiveModel("No approved model is active for the requested event and cadence.")
+        else:
+            pointer = state.get("active", state)
         if not pointer:
             raise NoActiveModel("No approved model is active.")
         try:
-            return self._load(pointer["model_id"], pointer["version"], pointer["artifact_digest"], True, pointer.get("manifest_digest"), pointer)
+            loaded = self._load(pointer["model_id"], pointer["version"], pointer["artifact_digest"], True, pointer.get("manifest_digest"), pointer)
+            if event_code is not None:
+                scope = loaded.manifest.get("serving_scope", {})
+                if loaded.manifest.get("classes", {}).get("event_code") != event_code or scope.get("cadence") != cadence:
+                    raise InvalidModelArtifact("Active scoped pointer does not match the requested event/cadence.")
+            return loaded
         except (KeyError, TypeError) as exc:
             raise InvalidModelArtifact("Active model pointer is malformed.") from exc
 
@@ -294,25 +323,45 @@ class ModelRegistry:
             manifest["approved_by"] = approved_by
             manifest["approval_evaluation_ref"] = str(approval_report_path.relative_to(self.root).as_posix())
             _atomic_json(folder / "manifest.json", manifest)
+            scope = manifest.get("serving_scope", {})
+            event_code = manifest.get("classes", {}).get("event_code")
+            cadence = scope.get("cadence")
+            scoped = bool(event_code and cadence)
+            scope_key = self._scope_key(event_code, cadence) if scoped else None
+            active_by_scope = dict(state.get("active_by_scope", {}))
+            previous_scope = active_by_scope.get(scope_key) if scope_key else None
             pointer = {"model_id": model_id, "version": version, "artifact_digest": manifest["artifact_digest"], "manifest_digest": _sha256(folder / "manifest.json"), "approval_report_ref": str(approval_report_path.relative_to(self.root).as_posix()), "approval_report_digest": approval_report_digest, "activated_at": now, "approved_by": approved_by}
+            if scoped:
+                active_by_scope[scope_key] = pointer
             history = state.get("events", [])
-            history.append({"action": "PROMOTE", "previous": previous, "active": pointer, "evaluation_ref": pointer["approval_report_ref"], "evaluation_digest": approval_report_digest})
-            _atomic_json(self.active_path, {"active": pointer, "events": history})
+            history.append({"action": "PROMOTE", "scope_key": scope_key, "previous": previous_scope if scoped else previous, "active": pointer, "evaluation_ref": pointer["approval_report_ref"], "evaluation_digest": approval_report_digest})
+            _atomic_json(self.active_path, {"active": pointer, "active_by_scope": active_by_scope, "events": history})
         return pointer
 
-    def rollback(self, approved_by: str) -> dict[str, Any]:
+    def rollback(self, approved_by: str, event_code: str | None = None, cadence: str | None = None) -> dict[str, Any]:
+        if not approved_by.strip():
+            raise ValueError("An operator identity is required for rollback.")
         with _registry_lock(self.lock_path):
             state = json.loads(self.active_path.read_text(encoding="utf-8"))
             state = state if "active" in state else {"active": state, "events": []}
             history = state.get("events", [])
-            previous = next((event.get("previous") for event in reversed(history) if event.get("action") in {"PROMOTE", "ROLLBACK"} and event.get("previous")), None)
+            scoped = event_code is not None or cadence is not None
+            if scoped and (not event_code or not cadence):
+                raise ValueError("Scoped rollback requires both event_code and cadence.")
+            scope_key = self._scope_key(event_code, cadence) if scoped else None
+            previous = next((event.get("previous") for event in reversed(history)
+                             if event.get("action") in {"PROMOTE", "ROLLBACK"}
+                             and event.get("scope_key") == scope_key and event.get("previous")), None)
             if not previous:
                 raise NoActiveModel("No previous approved version is available for rollback.")
             self._load(previous["model_id"], previous["version"], previous["artifact_digest"], True, previous.get("manifest_digest"), previous)
-            current = state.get("active")
+            current = state.get("active_by_scope", {}).get(scope_key) if scoped else state.get("active")
             pointer = {**previous, "activated_at": datetime.now(timezone.utc).isoformat(), "approved_by": approved_by}
-            history.append({"action": "ROLLBACK", "previous": current, "active": pointer, "approved_by": approved_by})
-            _atomic_json(self.active_path, {"active": pointer, "events": history})
+            history.append({"action": "ROLLBACK", "scope_key": scope_key, "previous": current, "active": pointer, "approved_by": approved_by})
+            active_by_scope = dict(state.get("active_by_scope", {}))
+            if scoped:
+                active_by_scope[scope_key] = pointer
+            _atomic_json(self.active_path, {"active": pointer, "active_by_scope": active_by_scope, "events": history})
             return pointer
 
 
@@ -327,6 +376,8 @@ def main() -> None:
     parser.add_argument("--version")
     parser.add_argument("--approved-by")
     parser.add_argument("--evaluation-report", type=Path)
+    parser.add_argument("--event-code", choices=("COURSE_ABANDONMENT", "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"))
+    parser.add_argument("--cadence", choices=("ANUAL", "SEMESTRAL"))
     args = parser.parse_args()
     registry = ModelRegistry(args.artifacts_dir)
     if args.action == "show":
@@ -338,7 +389,7 @@ def main() -> None:
     else:
         if not args.approved_by:
             parser.error("rollback requires --approved-by")
-        print(json.dumps(registry.rollback(args.approved_by), indent=2))
+        print(json.dumps(registry.rollback(args.approved_by, args.event_code, args.cadence), indent=2))
 
 
 if __name__ == "__main__":

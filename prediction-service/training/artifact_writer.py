@@ -56,10 +56,12 @@ def _compute_bundle_digest(manifest: dict[str, Any]) -> str:
         "artifact_uri", "preprocessing_ref", "dependency_lock_ref", "training_config_ref",
         "input_schema", "probability_definition",
     )
-    bundle = {
-        "artifact_files": manifest["artifact_files"],
-        "identity": {key: manifest.get(key) for key in identity_keys},
-    }
+    identity = {key: manifest.get(key) for key in identity_keys}
+    # Keep pre-scoped bundles' digest stable; scoped bundles bind event/cadence
+    # into the immutable digest when the field is explicitly present.
+    if "serving_scope" in manifest:
+        identity["serving_scope"] = manifest["serving_scope"]
+    bundle = {"artifact_files": manifest["artifact_files"], "identity": identity}
     canonical = json.dumps(bundle, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
 

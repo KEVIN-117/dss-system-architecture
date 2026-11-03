@@ -37,6 +37,8 @@ class ModelRegistryTests(unittest.TestCase):
         model_id: str,
         version: str = "v1",
         feature_names: tuple[str, ...] = ("score",),
+        event_code: str = "RETENTION_RISK",
+        cadence: str | None = None,
     ) -> tuple[Path, Path]:
         values = [
             [float(row + column) for column in range(len(feature_names))]
@@ -47,9 +49,11 @@ class ModelRegistryTests(unittest.TestCase):
         manifest = {
             "contract_version": "1.0", "model_id": model_id, "version": version, "algorithm": "random_forest",
             "dataset_id": "dataset-v1", "input_schema_version": "raw-v1",
-            "classes": {"positive_class": "RISK", "negative_class": "NO_RISK", "event_code": "RETENTION_RISK"},
+            "classes": {"positive_class": "RISK", "negative_class": "NO_RISK", "event_code": event_code},
             "created_at": "2026-11-02T00:00:00Z", "evaluation_ref": f"eval-{name}", "lifecycle_state": "CANDIDATE",
         }
+        if cadence:
+            manifest["serving_scope"] = {"event_type": "course_abandonment" if event_code == "COURSE_ABANDONMENT" else "program_dropout", "cadence": cadence, "evaluation_unit": "test_unit"}
         folder = self.root / name
         write_training_artifacts(
             name, self.root, model, pipeline, manifest, {"accuracy": 0.8}, {"evaluation_protocol": {}},
@@ -173,6 +177,30 @@ class ModelRegistryTests(unittest.TestCase):
         self.assertEqual(new_bundle.pipeline.transform([[2.0, 3.0]]).shape, (1, 2))
         self.assertEqual(old_bundle.model.n_features_in_, 1)
         self.assertEqual(old_bundle.pipeline.n_features_in_, 1)
+
+    def test_event_and_cadence_have_independent_active_pointers(self) -> None:
+        _, program_report = self._candidate("program", "program-annual", event_code="PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", cadence="ANUAL")
+        _, course_report = self._candidate("course", "course-semester", event_code="COURSE_ABANDONMENT", cadence="SEMESTRAL")
+        self.registry.promote("program-annual", "v1", "operator", program_report)
+        self.registry.promote("course-semester", "v1", "operator", course_report)
+
+        self.assertEqual(self.registry.active("PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", "ANUAL").model_id, "program-annual")
+        self.assertEqual(self.registry.active("COURSE_ABANDONMENT", "SEMESTRAL").model_id, "course-semester")
+        with self.assertRaises(NoActiveModel):
+            self.registry.active("COURSE_ABANDONMENT", "ANUAL")
+
+    def test_scoped_rollback_restores_only_the_requested_event_and_cadence(self) -> None:
+        _, first_report = self._candidate("course-first", "course-1", event_code="COURSE_ABANDONMENT", cadence="SEMESTRAL")
+        _, other_report = self._candidate("program-other", "program-1", event_code="PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", cadence="ANUAL")
+        _, second_report = self._candidate("course-second", "course-2", event_code="COURSE_ABANDONMENT", cadence="SEMESTRAL")
+        self.registry.promote("course-1", "v1", "operator", first_report)
+        self.registry.promote("program-1", "v1", "operator", other_report)
+        self.registry.promote("course-2", "v1", "operator", second_report)
+
+        self.registry.rollback("operator", "COURSE_ABANDONMENT", "SEMESTRAL")
+
+        self.assertEqual(self.registry.active("COURSE_ABANDONMENT", "SEMESTRAL").model_id, "course-1")
+        self.assertEqual(self.registry.active("PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", "ANUAL").model_id, "program-1")
 
     def test_tampered_bundle_is_rejected_after_restart(self) -> None:
         folder, report = self._candidate("candidate", "model-1")

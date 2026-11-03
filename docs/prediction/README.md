@@ -15,7 +15,8 @@ Documentación de las issues PRED-001 y PRED-002 del motor predictivo. Los contr
 - [Contrato del dataset preparado v1](contracts/prepared-dataset-v1.yaml)
 - [Fixture sintético PRED-002](../../prediction-service/tests/fixtures/pred002_synthetic/README.md)
 - [Plan propuesto PRED-003](PRED-003-plan.md)
+- [PRED-006 — Implementación de inferencia puntual](PRED-006-implementation.md)
 
 ## Estado
 
-PRED-001 está fusionada. PRED-002 tiene evidencia estática del esquema DW, contrato, validador estructural y un fixture DW-shaped sintético que permanece bloqueado mientras falten aprobaciones. No se ha recibido ni perfilado una extracción institucional autorizada; evento, horizonte y elegibilidad continúan pendientes de DSA. No se ha declarado viable ni entrenado un modelo.
+PRED-001 está fusionada. PRED-002 implementó el contrato del dataset preparado; se perfilaron cargas DW Faker para pruebas, sin tratarlas como evidencia institucional. PRED-006 implementa inferencia puntual separada para abandono de materia y abandono de programa, con selección de bundle por cadencia y cohorte técnica de tres años. Los candidatos Faker permanecen sin autorización de activación. Aprobación DSA de utilidad/despliegue, bundle institucional, integración en entorno coordinado y fuente temporal para predecir abandono de materia antes del resultado siguen pendientes.

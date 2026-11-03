@@ -74,7 +74,7 @@ try {
         }
     } while ($true)
 
-    $digestCommand = "from pathlib import Path; from training.model_registry import ModelRegistry; print(ModelRegistry(Path('/app/artifacts')).active().digest)"
+    $digestCommand = "from pathlib import Path; from training.model_registry import ModelRegistry; print(ModelRegistry(Path('/app/artifacts')).active('PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE', 'ANUAL').digest)"
     $workerArgs = $composeArgs + @("exec", "-T", "worker", "python", "-c", $digestCommand)
     $workerDigest = (& docker @workerArgs).Trim()
     if ($LASTEXITCODE -ne 0 -or $workerDigest -ne $seed.artifact_digest) {

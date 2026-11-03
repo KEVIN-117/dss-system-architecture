@@ -163,6 +163,61 @@ class TrainingApiTests(unittest.TestCase):
         self.assertEqual(predict_resp.json()["detail"]["code"], "NO_ACTIVE_MODEL")
         self.assertNotIn("confidence", predict_resp.json())
 
+    def test_v1_prediction_requires_bearer_token(self) -> None:
+        response = self.client.post("/v1/predictions", json={
+            "contract_version": "1.0", "subject_ref": "100", "program_ref": "P01",
+            "academic_cut": {"cut_id": "42"},
+        })
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["code"], "INVALID_TOKEN")
+
+    def test_course_prediction_requires_course_reference(self) -> None:
+        response = self.client.post("/v1/predictions", json={
+            "contract_version": "1.0", "event_type": "course_abandonment",
+            "subject_ref": "100", "program_ref": "P01", "academic_cut": {"cut_id": "42"},
+        }, headers={"Authorization": "Bearer valid-test-token"})
+        self.assertEqual(response.status_code, 422)
+
+    def test_v1_prediction_returns_contract_result_from_injected_service(self) -> None:
+        class PredictionStub:
+            def predict(self, token, subject_ref, program_ref, cut_id, event_type="program_dropout", course_ref=None):
+                self.assertions = (token, subject_ref, program_ref, cut_id, event_type, course_ref)
+                return {
+                    "contract_version": "1.0",
+                    "prediction_id": "c6ea3c27-e3e2-4c43-9d51-5a9519873810",
+                    "subject_ref": subject_ref,
+                    "program_ref": program_ref,
+                    "event_type": event_type,
+                    "course_ref": course_ref,
+                    "event_code": "NEXT_CLOSURE_DROPOUT",
+                    "predicted_class": "POSITIVE_EVENT",
+                    "event_probability": 0.73,
+                    "model": {"model_id": "model-1", "version": "v1"},
+                    "academic_cut": {"cut_id": cut_id},
+                    "generated_at": "2026-11-03T12:00:00Z",
+                }
+
+        stub = PredictionStub()
+        app.state.prediction_service = stub
+        try:
+            response = self.client.post("/v1/predictions", json={
+                "contract_version": "1.0", "subject_ref": "100", "program_ref": "P01",
+                "academic_cut": {"cut_id": "42"},
+            }, headers={"Authorization": "Bearer valid-test-token"})
+            self.assertEqual(response.status_code, 200)
+            self.assertEqual(response.json()["predicted_class"], "POSITIVE_EVENT")
+            self.assertEqual(response.json()["event_probability"], 0.73)
+            self.assertEqual(response.json()["subject_ref"], "100")
+            self.assertEqual(stub.assertions[-2:], ("program_dropout", None))
+            course_response = self.client.post("/v1/predictions", json={
+                "contract_version": "1.0", "event_type": "course_abandonment", "course_ref": "901",
+                "subject_ref": "100", "program_ref": "P01", "academic_cut": {"cut_id": "42"},
+            }, headers={"Authorization": "Bearer valid-test-token"})
+            self.assertEqual(course_response.status_code, 200)
+            self.assertEqual(stub.assertions[-2:], ("course_abandonment", "901"))
+        finally:
+            del app.state.prediction_service
+
 
 if __name__ == "__main__":
     unittest.main()
