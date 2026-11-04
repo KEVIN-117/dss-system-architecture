@@ -1,6 +1,8 @@
 # Arquitectura del Motor Predictivo — C4 e inventario
 
-Documentación de PRED-001 derivada del código y contratos que existen en esta rama. El L1–L3 y los flujos dinámicos describen la arquitectura objetivo **propuesta**, con componentes no implementados identificados en los textos. Los diagramas Mermaid individuales están en [`diagrams/`](diagrams/).
+Este documento conserva el diseño de referencia elaborado para PRED-001. Sus diagramas y flujos etiquetados como propuestos describen el estado de aquella decisión y no deben leerse como inventario vigente.
+
+> **Estado vigente:** Prediction Service ya implementa inferencia puntual de abandono de programa, trabajos de entrenamiento y scoring poblacional asíncrono. PRED-006 y PRED-007 documentan esas entregas; `prediction-service/README.md` mantiene el inventario de rutas actual. La aprobación de un modelo institucional, evidencia no sintética y las decisiones de uso académico siguen pendientes. Los diagramas de esta página requieren una actualización completa para representar el estado actual.
 
 ## C1 — Contexto
 

@@ -1,0 +1,15 @@
+export const metadata = { title: 'Análisis OLAP', audience: ['desarrolladores', 'analistas'], classification: 'public-summary' }
+
+## Consultar datos multidimensionales
+
+El servicio OLAP actual se basa en Saiku y Mondrian. Expone recursos REST para descubrir conexiones, catálogos, esquemas y cubos, y para ejecutar consultas MDX. También mantiene una ruta SQL/OSSIE independiente del motor MDX.
+
+El servicio valida tokens Bearer de Keycloak y aplica permisos por ruta. El BFF valida la sesión del portal y reenvía el token al servicio OLAP.
+
+## Qué tener en cuenta
+
+Un datasource define la conexión; el esquema Mondrian define los cubos, dimensiones, jerarquías y medidas. Guardar un esquema no crea tablas en el Data Warehouse ni garantiza que un datasource activo ya lo utilice.
+
+El filtrado por facultad o carrera depende de la configuración de seguridad del datasource. Antes de usar un resultado para una decisión institucional, confirma que el ámbito aplicado corresponde al perfil autorizado.
+
+<Source path="docs/olap/README.md" label="Índice de arquitectura OLAP" /> · <Source path="olap-service/README.md" label="Documentación del servicio OLAP" />

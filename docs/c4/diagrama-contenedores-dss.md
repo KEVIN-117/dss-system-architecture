@@ -23,7 +23,7 @@ C4Container
     ContainerDb(dw, "Data Warehouse", "PostgreSQL (versión por confirmar)", "Conserva los datos académicos preparados para análisis")
 
     Container(olap, "Servicio de análisis OLAP", "Java 21, Saiku/Mondrian", "Consulta el almacén analítico y entrega resultados multidimensionales")
-    Container(prediction, "Servicio de predicción", "Python, FastAPI", "Expone solicitudes de predicción; la implementación actual devuelve resultados simulados")
+    Container(prediction, "Servicio de predicción", "Python, FastAPI", "Implementa inferencia puntual y trabajos asíncronos; el uso institucional requiere modelos y permisos aprobados")
     Container(graphapi, "Servicio de análisis de grafos", "Go (objetivo)", "Expone consultas sobre relaciones académicas")
     ContainerDb(graphdb, "Base de datos de grafos", "Neo4j (versión por confirmar)", "Almacena relaciones académicas")
   }
@@ -56,17 +56,16 @@ C4Container
 
 | Contenedor o actor | Evidencia y estado |
 |---|---|
-| Aplicación web | `frontend/package.json` y `frontend/Dockerfile` confirman Next.js/React. El `docker-compose.yml` raíz referencia `frontend/nextjs-spa`, ruta que no existe en el repositorio actual. |
+| Aplicaciones web | El Compose raíz conserva la ruta antigua `frontend/nextjs-spa`, que no existe en este checkout. Las aplicaciones activas están en `dss-monorepo/apps`, incluidos el BFF y los portales. Aún debe confirmarse cómo se orquestarán en el despliegue integrado. |
 | API Gateway | La imagen de referencia identifica Traefik v3 y `docker-compose.yml` declara el servicio; falta el directorio `gateway/traefik` para verificar su build y configuración. |
-| BFF GraphQL | La imagen y `docker-compose.yml` declaran el backend GraphQL; falta `gateway/graphql-bff`, por lo que su implementación no está disponible para verificar. |
+| BFF y GraphQL | El BFF activo está en `dss-monorepo/apps/bff`; expone rutas REST y `GET|POST /api/graphql`. El Compose raíz declara además un `graphql-bff` con contexto antiguo `gateway/graphql-bff`, que no existe en este checkout. |
 | Servicio de autenticación y contexto | `auth-service/pom.xml`, `auth-service/Dockerfile` y `auth-service/README.md`; `docker-compose.yml` lo conecta con la base IAM y define configuración de Keycloak. |
 | Proveedor de identidad | `docker-compose.yml` fija Keycloak 26.7.1; `auth-service/docs/keycloak/keycloak_specification.md` describe OIDC, roles y JWT. |
 | Base de datos IAM | `docker-compose.yml` declara PostgreSQL 15 para `auth-service-db`; configuración de conexión en `auth-service/src/main/resources/application-prod.yaml`. |
-| Servicio ETL | `etl-service/pom.xml`, `etl-service/Dockerfile` y `etl-service/README.md` confirman Java 21/Spring Boot y conectores de datos. La orquestación completa hacia el DW del DSS no está demostrada por el código disponible. |
-| Base de datos de metadatos ETL | `etl-service/docker-compose.yml` y `etl-service/src/main/resources/application.yml` declaran PostgreSQL 16 para el despliegue local del ETL; no está integrada en el Compose raíz. |
-| Data Warehouse | La imagen y el `docker-compose.yml` raíz lo identifican como PostgreSQL; falta el contexto `data-layer/postgres-dw` para verificar esquema, versión y despliegue. |
+| Flujo de integración ETL | El servicio `etl-service` que aparece más abajo en el Compose raíz apunta a un contexto de build ausente. El flujo activo del MVP está en `etl-layer/apache-hop/projects/dss-uatf-etl`; el Load Manager Go se conserva como línea separada y pausada. El MVP Hop está integrado con fixtures sintéticos, no validado como carga productiva desde Jachasun. |
+| PostgreSQL DW | `docker-compose.yml` declara `postgres:15-alpine`, y `infra/dw-schema/migrations` contiene el esquema y las funciones de control/publicación. `infra/postgres-dw` almacena datos del Compose local. Esto confirma el entorno local, no una instalación productiva de la UATF. |
 | Servicio OLAP | `olap-service/Dockerfile`, `olap-service/pom.xml` y `docker-compose.yml`; el repositorio contiene Saiku/Mondrian sobre Java 21. |
-| Servicio de predicción | `prediction-service/pyproject.toml`, `prediction-service/main.py` y `Dockerfile`; FastAPI está implementado, pero `/predict` genera una respuesta simulada. La conexión al DW que aparece en la imagen no está implementada en el código consultado. |
+| Servicio de predicción | `prediction-service/main.py`, `prediction-service/training/` y `prediction-service/Dockerfile`; implementa `POST /v1/predictions`, trabajos de entrenamiento y scoring poblacional. La ruta heredada `POST /predict` falla cerrada si no puede usar un bundle aprobado y una fuente confiable de features. La lectura del DW está implementada; la aprobación institucional de modelos, targets y permisos sigue pendiente. |
 | Servicio de análisis de grafos | La imagen y el `docker-compose.yml` raíz sugieren el servicio, pero no existe el código del servicio Graph en el repositorio consultado. |
 | Base de datos de grafos | La imagen y `docker-compose.yml` declaran Neo4j; falta el contexto `data-layer/neo4j` para verificar configuración y versión. |
 | Sistemas y bases académicas UATF | Imagen de referencia y `DSS-PASTED.docx`; no se identifican nombres de sistemas, contratos ni conexiones concretas en el repositorio. |
@@ -75,8 +74,8 @@ C4Container
 ## Suposiciones y pendientes de confirmación
 
 - El diagrama describe una **arquitectura objetivo**, no una topología que hoy pueda desplegarse íntegramente desde el Compose raíz. Varios contextos de build declarados no existen en el repositorio actual.
-- La aplicación web, API Gateway y BFF se representan según el diseño de referencia; las rutas de los builds y la comunicación real entre ellos deben corregirse o confirmarse antes de afirmar que están implementados.
+- La aplicación web y el BFF tienen implementaciones activas en `dss-monorepo/apps`. El API Gateway y la orquestación del Compose raíz siguen el diseño de referencia y requieren confirmación antes de presentarlos como despliegue integrado.
 - El servicio Graph y Neo4j se incluyen porque aparecen en la arquitectura de referencia; faltan código y configuración verificables para el servicio Graph y el contexto de Neo4j.
-- La extracción ETL hacia PostgreSQL DW y la lectura/escritura del servicio de predicción sobre ese almacén reflejan el diseño de referencia. Los conectores actualmente visibles en el código ETL incluyen PostgreSQL y Snowflake; el servicio de predicción aún responde con datos simulados.
+- El flujo activo de Apache Hop publica cortes en PostgreSQL DW y está validado con fixtures sintéticos; eso no acredita una carga productiva desde Jachasun. Prediction Service consulta features del DW y ofrece rutas de inferencia y publicación; la autorización y un bundle institucional aprobado siguen siendo requisitos para uso real.
 - La conexión de OLAP con el DW, el protocolo del servicio Graph y la persistencia configurada de Keycloak requieren confirmación técnica.
 - La base de datos PostgreSQL del ETL se modela porque aparece en su Compose local; falta decidir si también pertenece al despliegue integrado del DSS.

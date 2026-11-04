@@ -1,0 +1,23 @@
+export const metadata = { title: 'Arquitectura', audience: ['directivos', 'desarrolladores'], classification: 'public' }
+
+## Qué hace el DSS
+
+El Sistema de Soporte a Decisiones reúne información académica preparada para análisis institucional. Sus portales presentan indicadores de matrícula, rendimiento y demanda. El motor predictivo añade estimaciones cuando hay datos y modelos autorizados para ese uso.
+
+La gestión de identidades y accesos define qué información puede consultar cada perfil. Las autoridades usan los resultados dentro de su ámbito; las personas administradoras mantienen usuarios y permisos.
+
+## Componentes y estado
+
+- **Identidad y perfiles:** Keycloak autentica a las personas. `auth-service` mantiene el perfil local y sus contextos académicos.
+- **Integración de datos:** Apache Hop prepara los datos académicos y los publica en el Data Warehouse.
+- **Análisis:** OLAP consulta el almacén para entregar resultados multidimensionales.
+- **Predicción:** el servicio técnico implementa inferencia puntual y trabajos asíncronos. Su uso institucional sigue sujeto a la aprobación de modelos, permisos y evidencia.
+- **Portales:** interfaces para autoridades, administración y análisis.
+
+El repositorio también conserva diagramas de arquitectura objetivo. En ellos pueden aparecer componentes que todavía no tienen una implementación verificable. Para conocer el estado actual de un servicio, consulta su guía antes de interpretar un diagrama como inventario de producción.
+
+<Callout title="Alcance de la información">
+  Las guías describen capacidades y estado del código. No certifican una instalación institucional ni sustituyen la aprobación de despliegue de la UATF.
+</Callout>
+
+<Source path="docs/arquitectura/vista-funcional-negocio-dss.md" label="Vista funcional de negocio" /> · <Source path="docs/c4/diagrama-contenedores-dss.md" label="Diagrama de contenedores y evidencias" />

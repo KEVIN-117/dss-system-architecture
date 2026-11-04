@@ -1,0 +1,19 @@
+export const metadata = { title: 'Identidad y acceso', audience: ['desarrolladores', 'administradores'], classification: 'public-summary' }
+
+## Inicio de sesión y perfil
+
+Keycloak realiza el inicio de sesión y emite los tokens OIDC. El BFF gestiona el flujo del navegador y consulta a `auth-service` para comprobar que el perfil local exista y esté activo. El token no se entrega al navegador como parte de la sesión de la aplicación.
+
+`auth-service` valida los tokens, devuelve el perfil y los contextos académicos asociados, y sincroniza los cambios de usuario recibidos desde Keycloak. La asignación de esos contextos queda limitada a administradores con permiso.
+
+## Integración
+
+La consulta de perfil de `auth-service` es `GET /api/v1/auth/me` y requiere un JWT válido. El BFF expone su propia ruta `GET /api/auth/me`, que acepta la sesión del portal o un Bearer token para llamadas servidor a servidor.
+
+El BFF vuelve a validar la sesión y aplica los permisos de cada ruta. Los servicios protegidos también verifican la identidad y los permisos que les corresponden; el paso por el BFF no reemplaza esa validación.
+
+<Callout title="Permisos administrativos">
+  La asignación de contextos académicos y la gestión de cuentas son tareas restringidas. Sus procedimientos detallados se publicarán solo cuando el portal tenga clasificación y control de acceso definidos.
+</Callout>
+
+<Source path="auth-service/docs/auth-service-funcionamiento.md" label="Funcionamiento de auth-service" /> · <Source path="dss-monorepo/apps/bff/README.md" label="BFF de autenticación" />

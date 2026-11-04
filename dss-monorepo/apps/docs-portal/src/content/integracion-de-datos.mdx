@@ -1,0 +1,17 @@
+export const metadata = { title: 'Integración de datos', audience: ['desarrolladores', 'administradores'], classification: 'public-summary' }
+
+## Flujo implementado
+
+El flujo activo del MVP usa Apache Hop para leer las fuentes académicas acordadas, validar y transformar los registros, y preparar su publicación en el Data Warehouse. Un publisher ejecuta el cambio del corte de forma atómica y registra el resultado de la ejecución.
+
+El proyecto incluye workflows y pipelines para dimensiones, hechos y controles de calidad. La implementación se ha integrado con fixtures sintéticos; eso demuestra el recorrido técnico, pero no confirma una carga productiva desde Jachasun.
+
+DW Control administra los cierres académicos y permite consultar ejecuciones ETL. No inicia ni reintenta esas ejecuciones.
+
+## Operación y límites
+
+La puesta en marcha institucional requiere cuentas, redes, secretos, permisos y ambientes aprobados por la UATF. Los procedimientos de instalación y configuración de esos elementos requieren acceso autorizado y no forman parte de esta guía pública.
+
+El Load Manager en Go y el staging de extracción se conservan como una línea aparte; no forman parte del flujo activo de publicación de Apache Hop descrito aquí.
+
+<Source path="docs/dw/mvp-direct-hop.md" label="MVP de integración directa con Hop" /> · <Source path="etl-layer/apache-hop/README.md" label="Guía de Apache Hop" /> · <Source path="dw-control-service/README.md" label="DW Control Service" />

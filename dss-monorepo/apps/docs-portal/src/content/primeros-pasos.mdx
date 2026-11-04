@@ -1,0 +1,21 @@
+export const metadata = { title: 'Primeros pasos', audience: ['directivos', 'desarrolladores', 'administradores'], classification: 'public' }
+
+## Qué encontrarás en el portal
+
+La documentación del DSS está organizada por servicio y por tarea. Desde el explorador puedes abrir una guía o consultar las operaciones disponibles para revisar su propósito, acceso y contrato.
+
+El sistema integra y prepara información académica para su análisis. Sus portales presentan indicadores de matrícula, rendimiento y demanda; el motor predictivo forma parte de la arquitectura, aunque sus resultados y usos institucionales todavía dependen de las aprobaciones documentadas.
+
+## Consultar una API
+
+Antes de integrar una operación, abre el contrato OpenAPI del servicio. Ahí se definen las rutas, los parámetros, el formato de los datos y las respuestas previstas. Revisa también los permisos: pueden variar entre operaciones del mismo servicio.
+
+Para una primera comprobación, `GET /api/health` responde `{ "status": "ok" }` y no requiere autenticación. Las demás operaciones pueden necesitar una sesión o un token Bearer, según el contrato.
+
+## Estado de la documentación
+
+Los contratos de DW Control y Predicción están versionados en `docs/dw/contracts/` y `docs/prediction/contracts/`. Ambos son borradores OpenAPI; el contrato predictivo señala decisiones de uso institucional aún pendientes. El portal debe distinguir estos contratos de las APIs que todavía no tienen una especificación consolidada.
+
+<Callout title="Mantener la referencia al día">
+  Cuando cambie una ruta, un permiso o el comportamiento de un servicio, actualiza su contrato y la guía relacionada en el mismo cambio.
+</Callout>
