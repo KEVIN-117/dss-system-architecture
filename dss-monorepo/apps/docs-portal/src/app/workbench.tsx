@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
-import { BookOpen, ChevronDown, Copy, FileCode2, ListTree, Menu, Search } from 'lucide-react';
+import { BookOpen, ChevronDown, Copy, FileCode2, ListTree, Menu, Moon, Search, Sun } from 'lucide-react';
 import type { ApiOperation, ApiService } from '../lib/api-catalog';
 import ArchitectureGuide from '../content/arquitectura.mdx';
 import IdentityGuide from '../content/identidad-y-acceso.mdx';
@@ -16,6 +16,9 @@ import styles from './page.module.css';
 type Guide = { id: string; name: string; service: 'Guías'; kind: 'guide'; summary: string };
 type ApiItem = ApiOperation & { kind: 'api'; name: string; service: string; contract: string };
 type Entry = Guide | ApiItem;
+type Theme = 'light' | 'dark';
+
+const themePreferenceKey = 'dss-docs-theme';
 
 const guides: Guide[] = [
   { id: 'start', name: 'Primeros pasos', service: 'Guías', kind: 'guide', summary: 'Cómo orientarse en la documentación del DSS.' },
@@ -58,6 +61,7 @@ export default function Workbench({ apiCatalog }: { apiCatalog: ApiService[] }) 
   const [selectedId, setSelectedId] = useState(defaultOperation?.id ?? 'start');
   const [query, setQuery] = useState('');
   const [mobileNav, setMobileNav] = useState(false);
+  const [theme, setTheme] = useState<Theme>('light');
   const searchRef = useRef<HTMLInputElement>(null);
   const selected = entries.find((item) => item.id === selectedId) ?? entries[0];
   const filtered = useMemo(
@@ -85,8 +89,42 @@ export default function Workbench({ apiCatalog }: { apiCatalog: ApiService[] }) 
     return () => window.removeEventListener('keydown', handleShortcut);
   }, []);
 
+  useEffect(() => {
+    const media = window.matchMedia('(prefers-color-scheme: dark)');
+    const storedTheme = () => {
+      try {
+        const stored = window.localStorage.getItem(themePreferenceKey);
+        return stored === 'dark' || stored === 'light' ? stored : null;
+      } catch {
+        return null;
+      }
+    };
+    const applyTheme = (value: Theme) => {
+      document.documentElement.style.colorScheme = value;
+      setTheme(value);
+    };
+
+    applyTheme(storedTheme() ?? (media.matches ? 'dark' : 'light'));
+    const followSystemPreference = (event: MediaQueryListEvent) => {
+      if (!storedTheme()) applyTheme(event.matches ? 'dark' : 'light');
+    };
+    media.addEventListener('change', followSystemPreference);
+    return () => media.removeEventListener('change', followSystemPreference);
+  }, []);
+
+  const toggleTheme = () => {
+    const nextTheme: Theme = theme === 'dark' ? 'light' : 'dark';
+    try {
+      window.localStorage.setItem(themePreferenceKey, nextTheme);
+    } catch {
+      // The in-memory setting still applies if browser storage is unavailable.
+    }
+    document.documentElement.style.colorScheme = nextTheme;
+    setTheme(nextTheme);
+  };
+
   return (
-    <main className={styles.shell}>
+    <main className={styles.shell} data-theme={theme}>
       <a className={styles.skipLink} href="#main-content">Saltar al contenido</a>
       <header className={styles.topbar}>
         <button className={styles.mobileMenu} type="button" aria-label={mobileNav ? 'Cerrar navegación' : 'Abrir navegación'} aria-expanded={mobileNav} onClick={() => setMobileNav(!mobileNav)}><Menu aria-hidden="true" /></button>
@@ -100,6 +138,9 @@ export default function Workbench({ apiCatalog }: { apiCatalog: ApiService[] }) 
           <a href="#guides" onClick={() => setSelectedId('administration')}>Administración</a>
         </nav>
         <span className={styles.topSpacer} />
+        <button className={styles.themeToggle} type="button" onClick={toggleTheme} aria-label={theme === 'dark' ? 'Activar tema claro' : 'Activar tema oscuro'} aria-pressed={theme === 'dark'} title={theme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}>
+          {theme === 'dark' ? <Sun aria-hidden="true" /> : <Moon aria-hidden="true" />}
+        </button>
         <span className={styles.language}>ES <ChevronDown aria-hidden="true" /></span>
       </header>
 

@@ -7,3 +7,50 @@
 .methodPost{background:#fff1e6;color:#ae5714}
 .contractIcon svg{width:14px;height:14px}.parameterList,.responseList{display:grid;overflow:hidden;border:1px solid #e1e7ef;border-radius:6px}.parameterRow,.responseItem{display:grid;grid-template-columns:minmax(110px,1.2fr) minmax(80px,.8fr) minmax(90px,1fr) minmax(88px,.8fr);align-items:start;gap:10px;padding:11px 12px;border-bottom:1px solid #e9edf2;color:#61738a;font-size:10px;line-height:1.55}.parameterRow:last-child,.responseItem:last-child{border-bottom:0}.parameterRow code{color:#29415f;font-size:10px;font-weight:650}.parameterRow small,.responseItem small{grid-column:1/-1;color:#7b899b;font-size:10px}.responseItem{grid-template-columns:55px minmax(140px,1fr) minmax(100px,.7fr)}.errorCode{font-weight:750;color:#b54747}.permission{margin-top:10px!important}.permission code{padding:2px 5px;border-radius:3px;background:#f0f3f8;color:#334c6b}.exampleNote{margin-top:10px!important;color:#78879a!important;font-size:10px!important}.contractTag{display:flex;align-items:center;gap:4px}.guideContent h1,.guideContent h2,.guideContent h3{scroll-margin-top:18px}.guideContent ul{padding-left:21px;color:#536780;font-size:12px;line-height:1.9}.guideContent table{width:100%;border-collapse:collapse;color:#536780;font-size:11px}.guideContent th,.guideContent td{padding:9px;border:1px solid var(--line);text-align:left}.guideContent th{background:#f7f9fc;color:#354b66}
 @media(max-width:600px){.parameterRow{grid-template-columns:1fr 1fr;gap:7px}.parameterRow small{grid-column:1/-1}.responseItem{grid-template-columns:45px 1fr}.responseItem small{grid-column:2}.contractNotice{align-items:flex-start;flex-wrap:wrap}.contractTag{margin-left:38px}}
+
+.shell[data-theme='dark']{--ink:#e4ecf7;--muted:#a7b5c8;--line:#2b3a50;--blue:#91b8ff;--pale:#111c2e;color-scheme:dark;background:#0c1422;color:var(--ink)}
+.shell[data-theme='dark'] .topbar,.shell[data-theme='dark'] .version,.shell[data-theme='dark'] .iconButton{border-color:#26364d;background:#101b2c;color:#c2cee0}
+.shell[data-theme='dark'] .topbar{border-bottom-color:#26364d}
+.shell[data-theme='dark'] .brand,.shell[data-theme='dark'] .productName,.shell[data-theme='dark'] .workspaceLabel b,.shell[data-theme='dark'] .docHeader h1,.shell[data-theme='dark'] .docSection h2,.shell[data-theme='dark'] .guideContent h2,.shell[data-theme='dark'] .guideContent h3,.shell[data-theme='dark'] .railBlock>b,.shell[data-theme='dark'] .contractNotice b{color:#e4ecf7}
+.shell[data-theme='dark'] .brand b,.shell[data-theme='dark'] .topNav a:hover,.shell[data-theme='dark'] .topNav .topActive,.shell[data-theme='dark'] .guideContent a,.shell[data-theme='dark'] .docFooter a{color:#91b8ff}
+.shell[data-theme='dark'] .topNav a,.shell[data-theme='dark'] .language,.shell[data-theme='dark'] .docHeader p,.shell[data-theme='dark'] .docSection>p,.shell[data-theme='dark'] .guideContent>p,.shell[data-theme='dark'] .guideContent ul,.shell[data-theme='dark'] .guideContent ol,.shell[data-theme='dark'] .guideContent table{color:#b4c1d2}
+.shell[data-theme='dark'] .divider{background:#32435a}
+.shell[data-theme='dark'] .sidebar,.shell[data-theme='dark'] .sidebarBottom{border-color:#26364d;background:#0f1929;color:#aebbd0}
+.shell[data-theme='dark'] .workspaceLabel{border-color:#26364d}
+.shell[data-theme='dark'] .workspaceLabel small,.shell[data-theme='dark'] .treeGroup p,.shell[data-theme='dark'] .contractNotice small,.shell[data-theme='dark'] .parameterRow small,.shell[data-theme='dark'] .responseItem small{color:#93a4ba}
+.shell[data-theme='dark'] .workspaceIcon{background:#243957;color:#d6e5ff}
+.shell[data-theme='dark'] .searchBox,.shell[data-theme='dark'] .operation,.shell[data-theme='dark'] .contractNotice,.shell[data-theme='dark'] .railNote,.shell[data-theme='dark'] .code{border-color:#2b3c54;background:#121f32;color:#c5d1e2}
+.shell[data-theme='dark'] .searchBox input{color:#e4ecf7}
+.shell[data-theme='dark'] .searchBox input::placeholder{color:#91a2b9}
+.shell[data-theme='dark'] .searchBox kbd,.shell[data-theme='dark'] .count,.shell[data-theme='dark'] .permission code,.shell[data-theme='dark'] .guideContent code{border-color:#354760;background:#1b2a40;color:#bdcce0}
+.shell[data-theme='dark'] .treeRoot,.shell[data-theme='dark'] .treeItem,.shell[data-theme='dark'] .noResults,.shell[data-theme='dark'] .breadcrumb,.shell[data-theme='dark'] .breadcrumb b,.shell[data-theme='dark'] .operationSummary,.shell[data-theme='dark'] .railBlock a,.shell[data-theme='dark'] .docFooter{color:#aab9cd}
+.shell[data-theme='dark'] .treeRoot svg{color:#91a6c3}
+.shell[data-theme='dark'] .treeSelected{background:#203654;color:#b7d0ff}
+.shell[data-theme='dark'] .treeItem:hover,.shell[data-theme='dark'] .railBlock a:hover{color:#b7d0ff}
+.shell[data-theme='dark'] .method{background:#153a30;color:#8ce0bd}
+.shell[data-theme='dark'] .methodPost{background:#49321f;color:#ffc486}
+.shell[data-theme='dark'] .operation code,.shell[data-theme='dark'] .parameterRow code{color:#e1eafa}
+.shell[data-theme='dark'] .parameterList,.shell[data-theme='dark'] .responseList,.shell[data-theme='dark'] .parameterRow,.shell[data-theme='dark'] .responseItem{border-color:#2b3c54;color:#b4c1d2}
+.shell[data-theme='dark'] .parameterRow code,.shell[data-theme='dark'] .permission code{color:#d4e2f6}
+.shell[data-theme='dark'] .statusCode{color:#8ce0bd}
+.shell[data-theme='dark'] .errorCode{color:#ff9d9d}
+.shell[data-theme='dark'] .exampleNote{color:#a4b2c5!important}
+.shell[data-theme='dark'] .contractIcon{background:#203654;color:#a9c8ff}
+.shell[data-theme='dark'] .contractTag{border-color:#354760;background:#18263a;color:#bdcce0}
+.shell[data-theme='dark'] .contractTag:hover{border-color:#6587b4!important;color:#d9e7ff!important}
+.shell[data-theme='dark'] .docFooter{border-color:#293950}
+.shell[data-theme='dark'] .railBlock a{color:#aab9cd}
+.shell[data-theme='dark'] .railNote>span{color:#9bbcff}
+.shell[data-theme='dark'] .railNote p,.shell[data-theme='dark'] .callout p{color:#aab9cd}
+.shell[data-theme='dark'] .callout,.shell[data-theme='dark'] :global(.mdxCallout){border-color:#344761;background:#142238;color:#bfccdd}
+.shell[data-theme='dark'] :global(.mdxCallout strong){color:#e4ecf7}
+.shell[data-theme='dark'] .guideContent th,.shell[data-theme='dark'] .guideContent td{border-color:#2b3c54}
+.shell[data-theme='dark'] .guideContent th{background:#15243a;color:#dce7f5}
+.shell[data-theme='dark'] ::selection{background:#315985;color:#fff}
+.themeToggle{display:grid;place-items:center;width:34px;height:34px;flex:none;border:1px solid #dfe6ee;border-radius:6px;background:#fff;color:#536780;cursor:pointer}
+.themeToggle:hover{border-color:#b5c7df;background:#f5f8fc;color:#245bb5}
+.themeToggle svg{width:16px;height:16px}
+.shell[data-theme='dark'] .themeToggle{border-color:#354760;background:#17263b;color:#d5e2f5}
+.shell[data-theme='dark'] .themeToggle:hover{border-color:#6a88b2;background:#203654;color:#fff}.shell[data-theme='dark'] .rightRail{border-color:#26364d}
+.shell[data-theme='dark'] .eyebrow{color:#91b8ff}
+.shell[data-theme='dark'] .miniMethod{color:#8ce0bd}
