@@ -48,6 +48,7 @@ Thumbs.db
 
 # Next.js
 .next
+.next-e2e-*/
 out
 
 test-output
