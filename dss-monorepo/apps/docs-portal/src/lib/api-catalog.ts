@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import path from 'node:path';
 import { parse } from 'yaml';
 
@@ -51,11 +51,6 @@ export type ApiService = {
   operations: ApiOperation[];
 };
 
-const contractFiles = [
-  { id: 'dw-control', sourcePath: 'docs/dw/contracts/dw-control-service-v1.yaml' },
-  { id: 'prediction', sourcePath: 'docs/prediction/contracts/prediction-api-v1.yaml' },
-];
-
 function findRepositoryRoot(): string {
   const candidates = [
     path.resolve(process.cwd(), '..', '..', '..'),
@@ -63,15 +58,34 @@ function findRepositoryRoot(): string {
     process.cwd(),
   ];
 
-  const root = candidates.find((candidate) =>
-    existsSync(path.join(candidate, contractFiles[0].sourcePath)),
-  );
+  const root = candidates.find((candidate) => existsSync(path.join(candidate, 'docs')));
 
   if (!root) {
-    throw new Error('No se encontró docs/dw/contracts en el repositorio.');
+    throw new Error('No se encontró el directorio docs del repositorio.');
   }
 
   return root;
+}
+
+function discoverOpenApiContracts(root: string): Array<{ id: string; sourcePath: string }> {
+  const docsRoot = path.join(root, 'docs');
+  const files: string[] = [];
+  const visit = (directory: string) => {
+    for (const entry of readdirSync(directory, { withFileTypes: true })) {
+      const absolutePath = path.join(directory, entry.name);
+      if (entry.isDirectory()) visit(absolutePath);
+      else if (/\.ya?ml$/i.test(entry.name)) files.push(absolutePath);
+    }
+  };
+
+  visit(docsRoot);
+
+  return files.flatMap((absolutePath) => {
+    const document = parse(readFileSync(absolutePath, 'utf8'));
+    if (typeof document?.openapi !== 'string' || !document.paths) return [];
+    const sourcePath = path.relative(root, absolutePath).split(path.sep).join('/');
+    return [{ id: sourcePath.replace(/^docs\//, '').replace(/\.ya?ml$/i, '').replace(/[^a-z0-9]+/gi, '-'), sourcePath }];
+  }).sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
 }
 
 function resolveSchemaRef(document: any, schema: any): any {
@@ -98,7 +112,7 @@ function fieldsForSchema(document: any, schema: any): ApiSchemaField[] {
     const property = resolveSchemaRef(document, field);
     return {
       name,
-      type: schemaType(document, field),
+      type: schemaType(field, document),
       required: required.has(name),
       description: property?.description,
     };
@@ -139,11 +153,14 @@ function parseContract(id: string, sourcePath: string, root: string): ApiService
       const content = body?.content ?? {};
       const requestContentType = Object.keys(content)[0];
       const requestSchema = content[requestContentType]?.schema;
-      const responses = Object.entries<any>(operation.responses ?? {}).map(([status, response]) => ({
-        status,
-        description: response.description ?? 'Sin descripción en el contrato.',
-        contentTypes: Object.keys(response.content ?? {}),
-      }));
+      const responses = Object.entries<any>(operation.responses ?? {}).map(([status, unresolvedResponse]) => {
+        const response = resolveSchemaRef(document, unresolvedResponse);
+        return {
+          status,
+          description: response.description ?? 'Sin descripción en el contrato.',
+          contentTypes: Object.keys(response.content ?? {}),
+        };
+      });
 
       operations.push({
         id: `${id}:${method}:${route}`,
@@ -158,13 +175,15 @@ function parseContract(id: string, sourcePath: string, root: string): ApiService
         tags: operation.tags ?? [],
         auth: operationAuth(document, operation),
         permission: operation['x-required-permission'],
-        parameters: [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])].map((parameter: any) => ({
-          name: parameter.name,
-          location: parameter.in,
-          required: Boolean(parameter.required),
-          description: parameter.description,
-          schemaType: schemaType(parameter.schema, document),
-        })),
+        parameters: [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])]
+          .map((parameter: any) => resolveSchemaRef(document, parameter))
+          .map((parameter: any) => ({
+            name: parameter.name,
+            location: parameter.in,
+            required: Boolean(parameter.required),
+            description: parameter.description,
+            schemaType: schemaType(parameter.schema, document),
+          })),
         requestContentType,
         requestFields: fieldsForSchema(document, requestSchema),
         requestRequired: Boolean(body?.required),
@@ -184,5 +203,5 @@ function parseContract(id: string, sourcePath: string, root: string): ApiService
 
 export function getApiCatalog(): ApiService[] {
   const root = findRepositoryRoot();
-  return contractFiles.map(({ id, sourcePath }) => parseContract(id, sourcePath, root));
+  return discoverOpenApiContracts(root).map(({ id, sourcePath }) => parseContract(id, sourcePath, root));
 }

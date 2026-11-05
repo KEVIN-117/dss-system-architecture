@@ -10,7 +10,7 @@ El sistema integra y prepara información académica para su análisis. Sus port
 
 Antes de integrar una operación, abre el contrato OpenAPI del servicio. Ahí se definen las rutas, los parámetros, el formato de los datos y las respuestas previstas. Revisa también los permisos: pueden variar entre operaciones del mismo servicio.
 
-Para una primera comprobación, `GET /api/health` responde `{ "status": "ok" }` y no requiere autenticación. Las demás operaciones pueden necesitar una sesión o un token Bearer, según el contrato.
+Para comprobar que el BFF está activo, `GET /api/health` responde `{ "status": "ok" }` y no requiere autenticación. Esta ruta de salud pertenece al BFF y no forma parte de los contratos de microservicio que aparecen en el catálogo. Las demás operaciones pueden necesitar una sesión o un token Bearer, según el contrato.
 
 ## Estado de la documentación
 

@@ -10,6 +10,7 @@ import DataGuide from '../content/integracion-de-datos.mdx';
 import OlapGuide from '../content/analisis-olap.mdx';
 import PredictionGuide from '../content/prediccion.mdx';
 import StartGuide from '../content/primeros-pasos.mdx';
+import ExecutiveGuide from '../content/resumen-ejecutivo.mdx';
 import styles from './page.module.css';
 
 type Guide = { id: string; name: string; service: 'Guías'; kind: 'guide'; summary: string };
@@ -18,6 +19,7 @@ type Entry = Guide | ApiItem;
 
 const guides: Guide[] = [
   { id: 'start', name: 'Primeros pasos', service: 'Guías', kind: 'guide', summary: 'Cómo orientarse en la documentación del DSS.' },
+  { id: 'executive', name: 'Resumen ejecutivo', service: 'Guías', kind: 'guide', summary: 'Capacidades, estado y responsabilidades institucionales.' },
   { id: 'architecture', name: 'Arquitectura', service: 'Guías', kind: 'guide', summary: 'Capacidades del DSS y estado de sus componentes.' },
   { id: 'identity', name: 'Identidad y acceso', service: 'Guías', kind: 'guide', summary: 'Cómo se gestionan la sesión, los perfiles y los permisos.' },
   { id: 'data', name: 'Integración de datos', service: 'Guías', kind: 'guide', summary: 'Flujo actual de extracción, transformación y publicación.' },
@@ -28,6 +30,7 @@ const guides: Guide[] = [
 
 const guideContent = {
   start: StartGuide,
+  executive: ExecutiveGuide,
   architecture: ArchitectureGuide,
   identity: IdentityGuide,
   data: DataGuide,
@@ -92,8 +95,9 @@ export default function Workbench({ apiCatalog }: { apiCatalog: ApiService[] }) 
         <span className={styles.productName}>Documentación</span>
         <nav aria-label="Navegación principal" className={styles.topNav}>
           <a className={styles.topActive} href="#apis">APIs</a>
-          <a href="#guides" onClick={() => setSelectedId('start')}>Guías</a>
-          <a href="#guides" onClick={() => setSelectedId('architecture')}>Arquitectura</a>
+          <a href="#guides" onClick={() => setSelectedId('executive')}>Directivos</a>
+          <a href="#guides" onClick={() => setSelectedId('start')}>Desarrolladores</a>
+          <a href="#guides" onClick={() => setSelectedId('administration')}>Administración</a>
         </nav>
         <span className={styles.topSpacer} />
         <span className={styles.language}>ES <ChevronDown aria-hidden="true" /></span>
