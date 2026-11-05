@@ -1,0 +1,20 @@
+export const metadata = { title: 'Resumen ejecutivo', audience: ['directivos'], classification: 'public' }
+
+## Para qué sirve el DSS
+
+El Sistema de Soporte a Decisiones reúne información académica preparada para análisis institucional. Sus portales permiten explorar indicadores; la arquitectura también incorpora un motor predictivo cuya habilitación institucional depende de evidencia y aprobación.
+
+## Capacidades y estado
+
+- **Integración:** los flujos del MVP usan Apache Hop para preparar y publicar datos al Data Warehouse. La documentación técnica no certifica por sí misma una conexión productiva con los sistemas institucionales.
+- **Análisis:** OLAP permite explorar información multidimensional. Los resultados dependen de la actualización de datos y de los permisos asignados.
+- **Predicción:** el servicio implementa inferencia y procesamiento por lotes. El uso institucional de resultados requiere aprobación del modelo, el objetivo, los datos y el ámbito de acceso.
+- **Identidad:** Keycloak autentica a las personas; los servicios aplican permisos de acuerdo con su función.
+
+## Responsabilidades de decisión
+
+La documentación diferencia lo que el código implementa de aquello que requiere una decisión institucional. Antes de basar una acción en resultados predictivos, se debe confirmar la aprobación y evidencia correspondiente. La administración de cuentas, permisos, fuentes de datos y ambientes requiere responsables designados por la UATF.
+
+Esta guía describe el estado documentado del repositorio. No reemplaza informes institucionales, validaciones de producción ni decisiones de las autoridades competentes.
+
+<Source path="docs/c4/diagrama-contenedores-dss.md" label="Arquitectura y estado de componentes" /> · <Source path="docs/prediction/PRED-007-implementation.md" label="Estado de predicción por lotes" />
