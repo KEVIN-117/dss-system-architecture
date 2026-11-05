@@ -14,7 +14,7 @@
       }
     },
     "build": {
-      "dependsOn": [],
+      "dependsOn": ["^build"],
       "syncGenerators": []
     },
     "typecheck": {

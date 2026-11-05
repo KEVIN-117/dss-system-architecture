@@ -93,6 +93,9 @@
   "targetDefaults": {
     "test": {
       "dependsOn": ["^build"]
+    },
+    "e2e": {
+      "parallelism": false
     }
   },
   "generators": {
