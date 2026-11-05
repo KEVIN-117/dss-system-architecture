@@ -14,7 +14,7 @@ import {
   getPredictionServiceUrl,
 } from '../../../../lib/bff-config';
 import { withCors } from '../../../../lib/cors';
-import { authenticateRequest } from '../../_lib/auth-guard';
+import { authenticateRequest, requireRoles } from '../../_lib/auth-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -69,6 +69,14 @@ async function handle(
         { status: 404 },
       ),
     );
+  }
+
+  // Model training changes the candidate registry and consumes worker capacity.
+  // Keep it behind the technical administrator role; academic roles only read
+  // predictions and publications through the separate routes.
+  if (isTrainingCollection || isTrainingItem) {
+    const forbidden = requireRoles(authentication.value, ['SUPERADMIN']);
+    if (forbidden) return withCors(request, forbidden);
   }
 
   let serviceUrl: string;

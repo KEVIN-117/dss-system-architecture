@@ -143,6 +143,9 @@ target/
 # ------------------------------------------
 # 5. Python & Machine Learning (prediction-service)
 # ------------------------------------------
+# Informes y temporales de caracterización de carga: pueden contener detalles
+# locales de ejecución y se regeneran por corrida.
+/prediction-service/.test-tmp/
 __pycache__/
 **/__pycache__/
 *.py[cod]
