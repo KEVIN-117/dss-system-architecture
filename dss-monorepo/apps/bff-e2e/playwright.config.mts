@@ -41,6 +41,9 @@ export default defineConfig({
     url: baseURL,
     reuseExistingServer: !process.env.CI,
     cwd: workspaceRoot,
+    env: {
+      NEXT_DIST_DIR: '.next-e2e-bff',
+    },
   },
   projects: [
     {
