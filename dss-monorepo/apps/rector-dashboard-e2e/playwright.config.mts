@@ -72,6 +72,7 @@ export default defineConfig({
         PORT: String(bffPort),
         NEXT_PUBLIC_BFF_URL: bffBaseURL,
         KEYCLOAK_BFF_REDIRECT_URI: env['KEYCLOAK_BFF_REDIRECT_URI'],
+        NEXT_DIST_DIR: '.next-e2e-rector',
       },
       cwd: resolve(workspaceRoot, 'apps/bff'),
     },

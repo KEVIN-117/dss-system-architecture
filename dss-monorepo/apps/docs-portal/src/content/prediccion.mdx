@@ -1,0 +1,17 @@
+export const metadata = { title: 'Motor predictivo', audience: ['directivos', 'desarrolladores'], classification: 'public-summary' }
+
+## Estado actual
+
+El servicio implementa inferencia individual de abandono de programa y scoring poblacional asíncrono. Para resolver una inferencia, consulta características del Data Warehouse desde el servidor y selecciona un artefacto de modelo aprobado. El cliente no envía las variables predictoras.
+
+El contrato OpenAPI incluye otras operaciones y objetivos experimentales. Su presencia en el contrato no significa que estén aprobados para uso institucional. La predicción prospectiva de abandono de materia sigue diferida por falta de una fuente temporal adecuada.
+
+## Condiciones de uso
+
+Las pruebas con datos sintéticos validan el comportamiento técnico, pero no miden la eficacia del modelo ni autorizan su despliegue. La habilitación institucional requiere evidencia no sintética y decisiones aprobadas sobre el objetivo, el horizonte, los permisos y el modelo.
+
+<Callout title="No interpretar como resultado institucional">
+  La existencia de una ruta de inferencia no implica que haya un modelo institucional aprobado ni que las predicciones deban usarse para tomar decisiones sobre estudiantes.
+</Callout>
+
+<Source path="docs/prediction/PRED-006-implementation.md" label="Alcance de inferencia puntual" /> · <Source path="docs/prediction/PRED-007-implementation.md" label="Publicación de predicciones por lote" /> · <Source path="docs/prediction/contracts/prediction-api-v1.yaml" label="Contrato OpenAPI de Predicción" />

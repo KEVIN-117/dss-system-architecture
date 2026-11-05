@@ -1,13 +1,6 @@
-import { Button } from '@dss-monorepo/design-system';
+import { getApiCatalog } from '../lib/api-catalog';
+import Workbench from './workbench';
 
-export default function Index() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
-      <h1 className="text-2xl font-bold">Docs Portal</h1>
-      <div className="flex gap-2">
-        <Button variant="default">Ver Documentación</Button>
-        <Button variant="outline">Ejemplos de API</Button>
-      </div>
-    </main>
-  );
+export default function Page() {
+  return <Workbench apiCatalog={getApiCatalog()} />;
 }

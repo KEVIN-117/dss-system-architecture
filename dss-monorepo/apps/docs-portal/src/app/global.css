@@ -2,3 +2,31 @@
 
 @source "../../src";
 @source "../../../../libs/ui/design-system/src";
+
+.docsPage { min-height: 100vh; padding: 1.5rem clamp(1rem, 5vw, 5rem); background: var(--docs-bg, #f7f8fa); color: var(--docs-fg, #18202a); }
+.docsPage nav, .docsPage footer { display: flex; flex-wrap: wrap; align-items: center; gap: .8rem; padding: 1rem 0; }
+.docsPage a { color: #2458a6; text-underline-offset: .2em; }
+.docsArticle { max-width: 850px; margin: 2rem auto; padding: clamp(1.25rem, 4vw, 3rem); border: 1px solid #d7dde5; border-radius: 14px; background: #fff; line-height: 1.7; }
+.docsArticle header { margin-bottom: 2rem; }
+.docsArticle header > p:first-child { font-size: .78rem; letter-spacing: .08em; font-weight: 700; }
+.docsArticle h1 { margin: .4rem 0 1.2rem; font-size: clamp(2rem, 5vw, 3rem); line-height: 1.1; }
+.docsArticle h2 { margin-top: 2rem; font-size: 1.35rem; }
+.docsArticle table { display: block; width: 100%; overflow-x: auto; border-collapse: collapse; }
+.docsArticle th, .docsArticle td { padding: .65rem; border: 1px solid #d7dde5; text-align: left; vertical-align: top; }
+.docsArticle pre { max-width: 100%; overflow: auto; padding: 1rem; border-radius: 8px; background: #111827; color: #f3f4f6; }
+.docsArticle code { overflow-wrap: anywhere; }
+.docsArticle .schemaFields { list-style: none; padding-left: 1rem; }
+.docsArticle .schemaFields li { display: grid; gap: .15rem; margin: .5rem 0; }
+.docsAccess { max-width: 600px; margin: 14vh auto; padding: 2rem; border: 1px solid #d7dde5; border-radius: 14px; background: #fff; }
+.docsButton { display: inline-block; margin: 1rem 0; padding: .7rem 1rem; border-radius: 8px; background: #194fa5; color: white !important; text-decoration: none; }
+.mdxCallout { margin: 1.4rem 0; padding: 1rem; border: 1px solid #cbd5e1; border-radius: 8px; background: #f1f5f9; }
+@media (prefers-color-scheme: dark) {
+  html:not([data-docs-theme="light"]) { --docs-bg: #111827; --docs-fg: #e5e7eb; }
+}
+html[data-docs-theme="dark"] { --docs-bg: #111827; --docs-fg: #e5e7eb; }
+html[data-docs-theme="dark"] .docsArticle, html[data-docs-theme="dark"] .docsAccess { background: #182230; border-color: #39475a; }
+html[data-docs-theme="dark"] .docsPage a { color: #9cc2ff; }
+html[data-docs-theme="dark"] .docsArticle th, html[data-docs-theme="dark"] .docsArticle td { border-color: #39475a; }
+html[data-docs-theme="dark"] .mdxCallout { background: #202d3c; border-color: #526275; }
+html[data-docs-theme="light"] { --docs-bg: #f7f8fa; --docs-fg: #18202a; }
+@media (max-width: 600px) { .docsPage { padding: .75rem; } .docsArticle { padding: 1rem; margin: 1rem auto; } }

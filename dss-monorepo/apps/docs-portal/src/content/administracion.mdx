@@ -1,0 +1,13 @@
+export const metadata = { title: 'Administración del portal', audience: ['administradores'], classification: 'restricted', requiredRoles: ['SUPERADMIN'] }
+
+## Acceso
+
+Esta guía requiere una sesión válida del BFF y el rol institucional `SUPERADMIN`. Los cambios de contexto académico también se vuelven a validar en Auth Service.
+
+## Alcance documentado
+
+Auth Service permite consultar el directorio de usuarios y reemplazar sus contextos académicos. DW Control permite administrar cierres con permisos `DW_CLOSURE_MANAGE` y consultar ejecuciones con `DW_ETL_MONITOR_READ`. La asignación de permisos y el uso de cuentas administrativas deben seguir el procedimiento institucional aprobado.
+
+Antes de publicar pasos operativos detallados, el propietario del servicio debe validar el procedimiento, los permisos, el entorno al que aplica y la fecha de revisión. No se incluyen secretos ni direcciones privadas en esta guía.
+
+<Source path="auth-service/README.md" label="Directorio administrativo de Auth Service" /> · <Source path="dss-monorepo/apps/bff/README.md" label="Permisos de las rutas administrativas" />
