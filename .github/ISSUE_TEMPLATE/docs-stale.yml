@@ -1,0 +1,30 @@
+name: "Documentación: contenido desactualizado o incorrecto"
+description: Reportar una página del portal que necesita revisión
+title: "docs: revisar [página o sección]"
+labels: [documentation]
+body:
+  - type: input
+    id: url
+    attributes:
+      label: URL o ruta de la página
+      placeholder: /docs/identidad-y-acceso
+    validations:
+      required: true
+  - type: textarea
+    id: section
+    attributes:
+      label: Sección afectada
+      description: Indica el encabezado o fragmento que requiere revisión.
+    validations:
+      required: true
+  - type: textarea
+    id: issue
+    attributes:
+      label: ¿Qué está desactualizado o incorrecto?
+    validations:
+      required: true
+  - type: textarea
+    id: source
+    attributes:
+      label: Fuente de verificación
+      description: Enlace a contrato, código o decisión aprobada. No incluyas secretos ni datos personales.

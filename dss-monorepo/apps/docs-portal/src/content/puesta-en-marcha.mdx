@@ -1,0 +1,21 @@
+export const metadata = { title: 'Puesta en marcha local', audience: ['desarrolladores'], classification: 'public' }
+
+## Antes de iniciar
+
+El monorepo usa Bun y Nx. Revisa los requisitos en el README raíz y crea los archivos locales de entorno a partir de los `.env.example` de cada aplicación. No copies secretos a commits ni a capturas.
+
+## Iniciar el entorno
+
+1. Desde la raíz del repositorio, instala dependencias con `bun install`.
+2. Inicia las dependencias locales definidas para el entorno DSS con `docker compose up -d`.
+3. Inicia las aplicaciones de desarrollo con el target Nx documentado en el README del monorepo. El BFF requiere además que Auth Service y Keycloak estén disponibles para completar el flujo de acceso.
+4. Ejecuta el portal de documentos con `bun nx serve docs-portal`; Nx configura el puerto 3005.
+5. Comprueba el estado del BFF en `GET /api/health`. La respuesta documentada en `apps/bff/src/app/api/health/route.ts` es `{ "status": "ok" }`.
+
+## Primer uso
+
+Abre la guía de [Identidad y acceso](/docs/identidad-y-acceso) y verifica que el BFF complete el inicio de sesión. Si no hay una sesión activa, consulta los logs del BFF y revisa la disponibilidad de Keycloak y Auth Service; nunca compartas cookies, códigos OAuth o tokens al reportar el problema.
+
+Los comandos de infraestructura pueden depender del perfil de Compose, servicios externos y archivos de entorno aprobados para cada equipo. Usa los README de los componentes como referencia operativa vigente.
+
+<Source path="dss-monorepo/README.md" label="README del monorepo" /> · <Source path="dss-monorepo/apps/bff/README.md" label="Ejecución local del BFF" />

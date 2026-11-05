@@ -8,6 +8,10 @@ export type ApiParameter = {
   required: boolean;
   description?: string;
   schemaType?: string;
+  minimum?: number;
+  maximum?: number;
+  defaultValue?: unknown;
+  enum?: string[];
 };
 
 export type ApiSchemaField = {
@@ -15,12 +19,16 @@ export type ApiSchemaField = {
   type: string;
   required: boolean;
   description?: string;
+  children?: ApiSchemaField[];
+  enum?: string[];
 };
 
 export type ApiResponse = {
   status: string;
   description: string;
   contentTypes: string[];
+  schemaFields: ApiSchemaField[];
+  example?: unknown;
 };
 
 export type ApiOperation = {
@@ -40,6 +48,7 @@ export type ApiOperation = {
   requestContentType?: string;
   requestFields: ApiSchemaField[];
   requestRequired: boolean;
+  requestExample?: unknown;
   responses: ApiResponse[];
 };
 
@@ -98,25 +107,40 @@ function resolveSchemaRef(document: any, schema: any): any {
 
 function schemaType(schema: any, document: any): string {
   const resolved = resolveSchemaRef(document, schema);
+  if (resolved?.type === 'array') return `array<${schemaType(resolved.items, document)}>`;
+  const composed = resolved?.oneOf ?? resolved?.anyOf;
+  if (composed?.length) return composed.map((item: any) => schemaType(item, document)).join(' | ');
   if (resolved?.type) {
     return Array.isArray(resolved.type) ? resolved.type.join(' | ') : resolved.type;
   }
   return resolved?.enum ? resolved.enum.join(' | ') : 'object';
 }
 
-function fieldsForSchema(document: any, schema: any): ApiSchemaField[] {
+function fieldsForSchema(document: any, schema: any, depth = 0): ApiSchemaField[] {
+  if (depth > 5) return [];
   const resolved = resolveSchemaRef(document, schema);
-  const required = new Set<string>(resolved?.required ?? []);
+  const composedSchemas = (resolved?.allOf ?? []).map((part: any) => resolveSchemaRef(document, part));
+  const properties = Object.assign({}, ...composedSchemas.map((part: any) => part?.properties ?? {}), resolved?.properties ?? {});
+  const required = new Set<string>([...(resolved?.required ?? []), ...composedSchemas.flatMap((part: any) => part?.required ?? [])]);
 
-  return Object.entries(resolved?.properties ?? {}).map(([name, field]: [string, any]) => {
+  return Object.entries(properties).map(([name, field]: [string, any]) => {
     const property = resolveSchemaRef(document, field);
+    const nestedSchema = property?.type === 'array' ? property.items : field;
     return {
       name,
       type: schemaType(field, document),
       required: required.has(name),
       description: property?.description,
+      enum: property?.enum?.map(String),
+      children: fieldsForSchema(document, nestedSchema, depth + 1),
     };
   });
+}
+
+function declaredExample(document: any, media: any): unknown {
+  if (media?.example !== undefined) return media.example;
+  const first = Object.values<any>(media?.examples ?? {})[0];
+  return resolveSchemaRef(document, first)?.value;
 }
 
 function joinPath(serverUrl: string | undefined, endpointPath: string): string {
@@ -155,10 +179,14 @@ function parseContract(id: string, sourcePath: string, root: string): ApiService
       const requestSchema = content[requestContentType]?.schema;
       const responses = Object.entries<any>(operation.responses ?? {}).map(([status, unresolvedResponse]) => {
         const response = resolveSchemaRef(document, unresolvedResponse);
+        const responseContent = response.content ?? {};
+        const responseMedia = Object.values<any>(responseContent)[0];
         return {
           status,
           description: response.description ?? 'Sin descripción en el contrato.',
-          contentTypes: Object.keys(response.content ?? {}),
+          contentTypes: Object.keys(responseContent),
+          schemaFields: fieldsForSchema(document, responseMedia?.schema),
+          example: declaredExample(document, responseMedia),
         };
       });
 
@@ -183,10 +211,15 @@ function parseContract(id: string, sourcePath: string, root: string): ApiService
             required: Boolean(parameter.required),
             description: parameter.description,
             schemaType: schemaType(parameter.schema, document),
+            minimum: parameter.schema?.minimum,
+            maximum: parameter.schema?.maximum,
+            defaultValue: parameter.schema?.default,
+            enum: parameter.schema?.enum?.map(String),
           })),
         requestContentType,
         requestFields: fieldsForSchema(document, requestSchema),
         requestRequired: Boolean(body?.required),
+        requestExample: declaredExample(document, content[requestContentType]),
         responses,
       });
     }

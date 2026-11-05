@@ -1,0 +1,42 @@
+export const metadata = { title: 'Inventario de APIs', audience: ['directivos', 'desarrolladores', 'administradores'], classification: 'public' }
+
+## Estado de los contratos
+
+El catálogo del portal carga operaciones únicamente desde archivos OpenAPI YAML versionados en `docs/`. En la revisión del repositorio hay contratos para DW Control y Prediction Service. Ambos se identifican como borradores en sus metadatos; sus ejemplos solo se mostrarán cuando estén declarados en esos contratos.
+
+### DW Control
+
+Contrato `docs/dw/contracts/dw-control-service-v1.yaml`, borrador OpenAPI cargado en el catálogo.
+
+### Prediction Service
+
+Contrato `docs/prediction/contracts/prediction-api-v1.yaml`, borrador OpenAPI. Sus notas registran decisiones institucionales pendientes.
+
+### Auth Service
+
+Swagger/OpenAPI se genera con springdoc y hay controladores REST y guía del servicio. No hay YAML versionado en `docs/`; corresponde exportar y revisar un contrato.
+
+### Saiku / OLAP
+
+OpenAPI se genera desde recursos JAX-RS y existen guías REST y GraphQL en `olap-service/docs/`. Falta un contrato YAML consolidado para el portal; conviene priorizar las rutas que consume el BFF.
+
+### BFF
+
+Las fuentes disponibles son `dss-monorepo/apps/bff/README.md`, las rutas implementadas y el contrato GraphQL en `docs/graphql/bff-analytics.md`. Falta un contrato OpenAPI YAML integral que distinga fachadas públicas de rutas internas.
+
+### ETL Apache Hop
+
+Hay workflows, pipelines y documentación del proyecto. No es un API HTTP del portal; ejecuciones y operación se explican en la guía de integración de datos.
+
+## Prioridad para cerrar brechas
+
+1. Exportar el esquema generado de Auth Service a YAML y revisar modelos, códigos de error y seguridad con su responsable.
+2. Definir el subconjunto de Saiku soportado por el DSS y exportar su OpenAPI generado; mantener las guías de consulta como contexto, no como contrato sustituto.
+3. Elaborar un contrato del BFF desde sus rutas y validadores reales, distinguiendo la sesión web de los accesos servidor a servidor.
+4. Añadir ejemplos de request y response al contrato fuente después de verificarlos contra implementación o fixtures autorizados. El portal no infiere payloads.
+
+<Callout title="Fuente de verdad">
+  La lista anterior indica fuentes y brechas revisadas en el repositorio. No convierte documentación narrativa ni anotaciones parciales en una especificación contractual.
+</Callout>
+
+<Source path="auth-service/README.md" label="Auth Service" /> · <Source path="olap-service/docs/AI-QUERY-API.md" label="Saiku AI Query API" /> · <Source path="dss-monorepo/apps/bff/README.md" label="BFF" />

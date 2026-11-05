@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Link from 'next/link';
 import { BookOpen, ChevronDown, Copy, FileCode2, ListTree, Menu, Moon, Search, Sun } from 'lucide-react';
 import type { ApiOperation, ApiService } from '../lib/api-catalog';
+import { apiOperationSlug } from '../lib/api-routes';
 import ArchitectureGuide from '../content/arquitectura.mdx';
 import IdentityGuide from '../content/identidad-y-acceso.mdx';
 import DataGuide from '../content/integracion-de-datos.mdx';
@@ -11,6 +12,9 @@ import OlapGuide from '../content/analisis-olap.mdx';
 import PredictionGuide from '../content/prediccion.mdx';
 import StartGuide from '../content/primeros-pasos.mdx';
 import ExecutiveGuide from '../content/resumen-ejecutivo.mdx';
+import InventoryGuide from '../content/api-inventory.mdx';
+import SetupGuide from '../content/puesta-en-marcha.mdx';
+import DiagnosticsGuide from '../content/diagnostico.mdx';
 import styles from './page.module.css';
 
 type Guide = { id: string; name: string; service: 'Guías'; kind: 'guide'; summary: string };
@@ -28,6 +32,9 @@ const guides: Guide[] = [
   { id: 'data', name: 'Integración de datos', service: 'Guías', kind: 'guide', summary: 'Flujo actual de extracción, transformación y publicación.' },
   { id: 'olap', name: 'Análisis OLAP', service: 'Guías', kind: 'guide', summary: 'Consultas multidimensionales y límites conocidos.' },
   { id: 'prediction', name: 'Motor predictivo', service: 'Guías', kind: 'guide', summary: 'Capacidades implementadas y condiciones de uso.' },
+  { id: 'inventory', name: 'Inventario de APIs', service: 'Guías', kind: 'guide', summary: 'Contratos disponibles y brechas documentales.' },
+  { id: 'setup', name: 'Puesta en marcha local', service: 'Guías', kind: 'guide', summary: 'Preparar y arrancar el entorno de desarrollo.' },
+  { id: 'diagnostics', name: 'Diagnóstico inicial', service: 'Guías', kind: 'guide', summary: 'Comprobaciones seguras para incidencias frecuentes.' },
   { id: 'administration', name: 'Administración', service: 'Guías', kind: 'guide', summary: 'Guías administrativas requieren clasificación y acceso.' },
 ];
 
@@ -39,6 +46,9 @@ const guideContent = {
   data: DataGuide,
   olap: OlapGuide,
   prediction: PredictionGuide,
+  inventory: InventoryGuide,
+  setup: SetupGuide,
+  diagnostics: DiagnosticsGuide,
 };
 
 function schemaLabel(type: string) {
@@ -101,6 +111,7 @@ export default function Workbench({ apiCatalog }: { apiCatalog: ApiService[] }) 
     };
     const applyTheme = (value: Theme) => {
       document.documentElement.style.colorScheme = value;
+      document.documentElement.dataset.docsTheme = value;
       setTheme(value);
     };
 
@@ -120,6 +131,7 @@ export default function Workbench({ apiCatalog }: { apiCatalog: ApiService[] }) 
       // The in-memory setting still applies if browser storage is unavailable.
     }
     document.documentElement.style.colorScheme = nextTheme;
+    document.documentElement.dataset.docsTheme = nextTheme;
     setTheme(nextTheme);
   };
 
@@ -170,10 +182,11 @@ export default function Workbench({ apiCatalog }: { apiCatalog: ApiService[] }) 
             <div className={styles.docSection}><h2 id="description">Descripción</h2><p>{selected.description ?? selected.summary}</p></div>
             <div className={styles.docSection}><h2 id="authentication">Autenticación</h2><p>{selected.auth}</p>{selected.permission && <p className={styles.permission}>Permiso declarado: <code>{selected.permission}</code></p>}</div>
             <div className={styles.docSection}><h2 id="parameters">Parámetros</h2>{selected.parameters.length ? <div className={styles.parameterList}>{selected.parameters.map((parameter) => <div className={styles.parameterRow} key={`${parameter.location}-${parameter.name}`}><code>{parameter.name}</code><span>{parameter.location}</span><span>{schemaLabel(parameter.schemaType ?? 'string')}</span><span>{parameter.required ? 'Requerido' : 'Opcional'}</span>{parameter.description && <small>{parameter.description}</small>}</div>)}</div> : <p>El contrato no declara parámetros para esta operación.</p>}</div>
-            <div className={styles.docSection}><h2 id="request">Cuerpo de solicitud</h2>{selected.requestContentType ? <><p>{selected.requestRequired ? 'Requerido' : 'Opcional'} · {selected.requestContentType}</p>{selected.requestFields.length ? <div className={styles.parameterList}>{selected.requestFields.map((field) => <div className={styles.parameterRow} key={field.name}><code>{field.name}</code><span>{schemaLabel(field.type)}</span><span>{field.required ? 'Requerido' : 'Opcional'}</span>{field.description && <small>{field.description}</small>}</div>)}</div> : <p>El esquema se define mediante referencias OpenAPI; abre el contrato para ver su detalle.</p>}<p className={styles.exampleNote}>El contrato no declara un ejemplo de solicitud; no se genera un payload de muestra.</p></> : <p>El contrato no define un cuerpo de solicitud.</p>}</div>
-            <div className={styles.docSection}><h2 id="response">Respuestas y errores</h2><div className={styles.responseList}>{selected.responses.map((response) => <div className={styles.responseItem} key={response.status}><span className={response.status.startsWith('2') ? styles.statusCode : styles.errorCode}>{response.status}</span><span>{response.description}</span><small>{response.contentTypes.join(', ')}</small></div>)}</div></div>
+            <div className={styles.docSection}><h2 id="request">Cuerpo de solicitud</h2>{selected.requestContentType ? <><p>{selected.requestRequired ? 'Requerido' : 'Opcional'} · {selected.requestContentType}</p>{selected.requestFields.length ? <div className={styles.parameterList}>{selected.requestFields.map((field) => <div className={styles.parameterRow} key={field.name}><code>{field.name}</code><span>{schemaLabel(field.type)}</span><span>{field.required ? 'Requerido' : 'Opcional'}</span>{field.description && <small>{field.description}</small>}</div>)}</div> : <p>El esquema se define mediante referencias OpenAPI; abre el contrato para ver su detalle.</p>}{selected.requestExample !== undefined ? <pre className={styles.exampleCode}><code>{JSON.stringify(selected.requestExample, null, 2)}</code></pre> : <p className={styles.exampleNote}>El YAML no declara un ejemplo de solicitud; no se genera un payload de muestra.</p>}</> : <p>El contrato no define un cuerpo de solicitud.</p>}</div>
+            <div className={styles.docSection}><h2 id="response">Respuestas y errores</h2><div className={styles.responseList}>{selected.responses.map((response) => <div className={styles.responseItem} key={response.status}><span className={response.status.startsWith('2') ? styles.statusCode : styles.errorCode}>{response.status}</span><span>{response.description}</span><small>{response.contentTypes.join(', ')}</small>{response.schemaFields.map((field) => <small key={field.name}><code>{field.name}</code>: {schemaLabel(field.type)}{field.required ? ' · requerido' : ''}</small>)}{response.example !== undefined ? <pre className={styles.exampleCode}><code>{JSON.stringify(response.example, null, 2)}</code></pre> : <small>Sin ejemplo declarado en YAML.</small>}</div>)}</div></div>
+            <p><Link href={`/reference/${selected.serviceId}/${apiOperationSlug(selected)}`}>Abrir referencia con URL permanente ↗</Link></p>
             <div className={styles.contractNotice}><span className={styles.contractIcon}><FileCode2 aria-hidden="true" /></span><div><b>Contrato OpenAPI de origen</b><small>{selected.contract}</small></div><a className={styles.contractTag} href={`https://github.com/kevin-117/dss-system-architecture/blob/main/${selected.contract}`} target="_blank" rel="noreferrer">Abrir YAML ↗</a></div>
-          </> : <article className={styles.guideContent} id="guides">{selected.id === 'administration' ? <><h2>Contenido administrativo</h2><p>Antes de publicar procedimientos de administración, se debe definir su clasificación, los responsables y el control de acceso. Este espacio no muestra instrucciones operativas.</p><p>Las guías administrativas existentes permanecen en sus áreas de origen mientras se acuerda su audiencia y protección.</p></> : GuideContent && <GuideContent />}</article>}
+          </> : <article className={styles.guideContent} id="guides">{selected.id === 'administration' ? <><h2>Contenido administrativo</h2><p>Esta guía requiere una sesión institucional y el rol SUPERADMIN.</p><p><Link href="/docs/administracion">Abrir guía administrativa protegida ↗</Link></p></> : <><p><Link href={`/docs/${({ start: 'primeros-pasos', executive: 'resumen-ejecutivo', architecture: 'arquitectura', identity: 'identidad-y-acceso', data: 'integracion-de-datos', olap: 'analisis-olap', prediction: 'prediccion', inventory: 'inventario-de-apis', setup: 'puesta-en-marcha', diagnostics: 'diagnostico' } as Record<string, string>)[selected.id] ?? 'primeros-pasos'}`}>Abrir esta guía con URL permanente ↗</Link></p>{GuideContent && <GuideContent />}</>}</article>}
 
           <footer className={styles.docFooter}><span>¿Encontraste información desactualizada?</span><a href="https://github.com/KEVIN-117/dss-system-architecture/issues/232">Reportar un problema ↗</a><span>Fuentes versionadas en el repositorio</span></footer>
         </section>
