@@ -3,6 +3,7 @@
 import type { ReactNode } from 'react';
 import {
   Activity,
+  BrainCircuit,
   CalendarClock,
   Database,
   LayoutDashboard,
@@ -41,6 +42,11 @@ export function AdminPortalLayout({
                 title: 'Schemas',
                 href: '/schemas',
                 icon: <Database className="size-4" />,
+              },
+              {
+                title: 'Operaciones ML',
+                href: '/ml-operations',
+                icon: <BrainCircuit className="size-4" />,
               },
             ]
           : []),

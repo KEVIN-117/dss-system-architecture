@@ -1,12 +1,13 @@
 import { NextResponse } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { authenticateRequest, predict } = vi.hoisted(() => ({
+const { authenticateRequest, requireRoles, predict } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
+  requireRoles: vi.fn(() => null),
   predict: vi.fn(),
 }));
 
-vi.mock('../../_lib/auth-guard', () => ({ authenticateRequest }));
+vi.mock('../../_lib/auth-guard', () => ({ authenticateRequest, requireRoles }));
 vi.mock('@dss-monorepo/ml-connector', () => ({
   getTrainingJob: vi.fn(),
   isPredictionRequest: (value: unknown) =>

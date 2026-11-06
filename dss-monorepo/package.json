@@ -11,6 +11,7 @@
     "dev:landing": "nx run @dss-monorepo/landing:dev",
     "dev:docs": "nx run @dss-monorepo/docs-portal:dev",
     "dev:olap": "nx run @dss-monorepo/olap-workspace:dev",
+    "prediction:load:e2e": "node ../prediction-service/tests/integration/run_prediction_load_playwright.mjs",
     "docker:build:bff": "node tools/build-next-image.mjs bff",
     "docker:build:admin": "node tools/build-next-image.mjs admin-portal",
     "docker:build:director": "node tools/build-next-image.mjs director-dashboard",

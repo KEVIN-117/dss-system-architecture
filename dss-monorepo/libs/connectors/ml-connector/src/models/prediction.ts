@@ -20,6 +20,10 @@ export type PredictedClass = 'POSITIVE_EVENT' | 'NEGATIVE_EVENT';
 export interface PredictionResponse {
   contract_version: '1.0';
   prediction_id: string;
+  subject_ref: string;
+  program_ref: string;
+  event_type: 'course_abandonment' | 'program_dropout';
+  course_ref?: string | null;
   event_code: string;
   predicted_class: PredictedClass;
   event_probability?: number | null;

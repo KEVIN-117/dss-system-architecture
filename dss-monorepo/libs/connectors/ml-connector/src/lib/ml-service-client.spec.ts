@@ -19,6 +19,10 @@ const predictionRequest = {
 const predictionResponse = {
   contract_version: '1.0' as const,
   prediction_id: 'e41806b7-751b-44c5-8d14-11833646fb8b',
+  subject_ref: 'student-ref',
+  program_ref: 'program-ref',
+  event_type: 'program_dropout' as const,
+  course_ref: null,
   event_code: 'WITHDRAWAL',
   predicted_class: 'NEGATIVE_EVENT' as const,
   event_probability: 0.2,

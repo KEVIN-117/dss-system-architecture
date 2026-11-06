@@ -261,6 +261,10 @@ function isPredictionResponse(value: unknown): value is PredictionResponse {
     hasOnlyKeys(value, [
       'contract_version',
       'prediction_id',
+      'subject_ref',
+      'program_ref',
+      'event_type',
+      'course_ref',
       'event_code',
       'predicted_class',
       'event_probability',
@@ -270,6 +274,13 @@ function isPredictionResponse(value: unknown): value is PredictionResponse {
     ]) &&
     value.contract_version === CONTRACT_VERSION &&
     isUuid(value.prediction_id) &&
+    isBoundedString(value.subject_ref, 1, 128) &&
+    isBoundedString(value.program_ref, 1, 64) &&
+    (value.event_type === 'course_abandonment' ||
+      value.event_type === 'program_dropout') &&
+    (value.course_ref === undefined ||
+      value.course_ref === null ||
+      isBoundedString(value.course_ref, 1, 128)) &&
     isBoundedString(value.event_code, 1, 128) &&
     (value.predicted_class === 'POSITIVE_EVENT' ||
       value.predicted_class === 'NEGATIVE_EVENT') &&
