@@ -3,8 +3,8 @@ import { Providers } from './providers';
 import type { ReactNode } from 'react';
 
 export const metadata = {
-  title: 'Welcome to Rector DSS Dashboard',
-  description: 'Rector DSS Dashboard',
+  title: 'Portal de Rectoría | DSS UATF',
+  description: 'Analítica institucional agregada del rendimiento académico.',
 };
 
 function requiredAuthEnv(name: string): string {
@@ -25,7 +25,7 @@ export default function RootLayout({
   children: ReactNode;
 }) {
   return (
-    <html lang="en" data-theme="rector" className="dark">
+    <html lang="es" data-theme="rector" className="dark">
       <body>
         <Providers bffBaseUrl={authConfig.bffBaseUrl}>
           {children}

@@ -5,6 +5,7 @@ import {
   executeServerOlapQuery,
   getServerOlapCubeSchema,
   listServerOlapCubes,
+  searchServerOlapMembers,
   OlapServerClientError,
   type OlapQueryRequest,
   type OlapServerConfig,
@@ -63,6 +64,11 @@ export const analyticsTypeDefs = `#graphql
     defaultMeasure: String
     measureCount: Int
   }
+  type OlapCubeMember {
+    name: String!
+    uniqueName: String!
+    caption: String
+  }
   type AnalyticResult {
     status: String!
     queryId: ID
@@ -104,6 +110,7 @@ export const analyticsTypeDefs = `#graphql
     viewer: Viewer!
     olapCubes: [OlapCube!]!
     olapCubeSchema(cubeId: ID!): JSON!
+    olapCubeMembers(cubeId: ID!, dimension: String!, hierarchy: String!, level: String!, limit: Int): [OlapCubeMember!]!
     analyticQuery(input: AnalyticQueryInput!): AnalyticResult!
     predictionPublication(programRef: String!, cutId: String!, limit: Int, offset: Int): PredictionPublicationResult!
   }
@@ -138,6 +145,34 @@ export function createAnalyticsResolvers() {
         validateCubeId(args.cubeId);
         await requireVisibleCube(context.authentication, args.cubeId);
         return olapCall(() => getServerOlapCubeSchema(serverConfig(context.authentication), args.cubeId));
+      },
+      olapCubeMembers: async (
+        _: unknown,
+        args: { cubeId: string; dimension: string; hierarchy: string; level: string; limit?: number | null },
+        context: { authentication: AuthenticatedRequest },
+      ) => {
+        requireAnalyticsRead(context.authentication.roles);
+        validateCubeId(args.cubeId);
+        for (const value of [args.dimension, args.hierarchy, args.level]) {
+          if (!validName(value)) throw new GraphQLError('A published cube dimension, hierarchy, and level are required', { extensions: { code: 'BAD_USER_INPUT' } });
+        }
+        const limit = args.limit ?? 100;
+        if (!Number.isInteger(limit) || limit < 1 || limit > 500) {
+          throw new GraphQLError('Member limit must be between 1 and 500', { extensions: { code: 'BAD_USER_INPUT' } });
+        }
+        await requireVisibleCube(context.authentication, args.cubeId);
+        const config = serverConfig(context.authentication);
+        const schema = await olapCall(() => getServerOlapCubeSchema(config, args.cubeId));
+        if (!hasPublishedCubeLevel(schema, args.dimension, args.hierarchy, args.level)) {
+          throw new GraphQLError('The requested level is not part of the published cube schema', { extensions: { code: 'BAD_USER_INPUT' } });
+        }
+        return olapCall(() => searchServerOlapMembers(config, {
+          cubeId: args.cubeId,
+          dimension: args.dimension,
+          hierarchy: args.hierarchy,
+          level: args.level,
+          limit,
+        }));
       },
       predictionPublication: async (
         _: unknown,
@@ -224,6 +259,20 @@ export function createAnalyticsResolvers() {
       },
     },
   };
+}
+
+function hasPublishedCubeLevel(schema: Record<string, unknown>, dimensionName: string, hierarchyName: string, levelName: string): boolean {
+  const dimensions = schema.dimensions;
+  if (!isRecord(dimensions)) return false;
+  const dimension = Object.values(dimensions).find((item) => isRecord(item) && sameName(item.name, dimensionName));
+  if (!isRecord(dimension) || !isRecord(dimension.hierarchies)) return false;
+  const hierarchy = Object.values(dimension.hierarchies).find((item) => isRecord(item) && sameName(item.name, hierarchyName));
+  if (!isRecord(hierarchy) || !isRecord(hierarchy.levels)) return false;
+  return Object.values(hierarchy.levels).some((item) => isRecord(item) && sameName(item.name, levelName));
+}
+
+function sameName(left: unknown, right: string): boolean {
+  return typeof left === 'string' && left.toLocaleLowerCase() === right.toLocaleLowerCase();
 }
 
 function normalizeMeasureName(name: string): string {

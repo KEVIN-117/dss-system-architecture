@@ -1,16 +1,23 @@
 'use client';
 
 import type { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import {
   Activity,
   BrainCircuit,
+  Cable,
   CalendarClock,
   Database,
   LayoutDashboard,
   Users,
 } from 'lucide-react';
 import { ProtectedRoute, useAuth } from '@dss-monorepo/auth';
-import { AccessDenied, DashboardTemplate } from '@dss-monorepo/design-system';
+import {
+  AccessDenied,
+  DashboardTemplate,
+  type NavigationGroup,
+  type NavigationItem,
+} from '@dss-monorepo/design-system';
 import { RoleGuard } from '@dss-monorepo/rbac';
 
 export function AdminPortalLayout({
@@ -21,46 +28,96 @@ export function AdminPortalLayout({
   access?: 'superadmin' | 'authenticated';
 }) {
   const { user, logout } = useAuth();
+  const pathname = usePathname();
   const isSuperAdmin = user?.roles.includes('SUPERADMIN') ?? false;
+  const navigationItem = (
+    title: string,
+    href: string,
+    icon: ReactNode,
+  ): NavigationItem => ({
+    title,
+    href,
+    icon,
+    isActive:
+      href === '/'
+        ? pathname === href
+        : pathname === href || pathname.startsWith(`${href}/`),
+  });
+  const navGroups: NavigationGroup[] = [
+    ...(isSuperAdmin
+      ? [
+          {
+            title: 'Plataforma',
+            items: [
+              navigationItem(
+                'Resumen general',
+                '/',
+                <LayoutDashboard aria-hidden="true" />,
+              ),
+            ],
+          },
+          {
+            title: 'Auth Service',
+            items: [
+              navigationItem(
+                'Usuarios',
+                '/users',
+                <Users aria-hidden="true" />,
+              ),
+            ],
+          },
+          {
+            title: 'OLAP Service',
+            items: [
+              navigationItem(
+                'Conexiones',
+                '/datasources',
+                <Cable aria-hidden="true" />,
+              ),
+              navigationItem(
+                'Esquemas y cubos',
+                '/schemas',
+                <Database aria-hidden="true" />,
+              ),
+            ],
+          },
+        ]
+      : []),
+    {
+      title: 'DW Control Service',
+      items: [
+        navigationItem(
+          'Cierres académicos',
+          '/academic-closures',
+          <CalendarClock aria-hidden="true" />,
+        ),
+        navigationItem(
+          'Ejecuciones ETL',
+          '/etl-executions',
+          <Activity aria-hidden="true" />,
+        ),
+      ],
+    },
+    ...(isSuperAdmin
+      ? [
+          {
+            title: 'ML Service',
+            items: [
+              navigationItem(
+                'Operaciones ML',
+                '/ml-operations',
+                <BrainCircuit aria-hidden="true" />,
+              ),
+            ],
+          },
+        ]
+      : []),
+  ];
   const portal = (
     <DashboardTemplate
-      sidebarTitle="DSS ADMIN"
-      navItems={[
-        ...(isSuperAdmin
-          ? [
-              {
-                title: 'System overview',
-                href: '/',
-                icon: <LayoutDashboard className="size-4" />,
-              },
-              {
-                title: 'Users',
-                href: '/users',
-                icon: <Users className="size-4" />,
-              },
-              {
-                title: 'Schemas',
-                href: '/schemas',
-                icon: <Database className="size-4" />,
-              },
-              {
-                title: 'Operaciones ML',
-                href: '/ml-operations',
-                icon: <BrainCircuit className="size-4" />,
-              },
-            ]
-          : []),
-        {
-          title: 'Cierres académicos',
-          href: '/academic-closures',
-          icon: <CalendarClock className="size-4" />,
-        },
-        {
-          title: 'Ejecuciones ETL',
-          href: '/etl-executions',
-          icon: <Activity className="size-4" />,
-        },
-      ]}
+      sidebarTitle="Administración DSS"
+      navGroups={navGroups}
+      surfaceMaterial="frosted"
       user={
         user
           ? {

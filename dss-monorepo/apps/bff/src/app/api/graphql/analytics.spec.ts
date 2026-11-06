@@ -1,15 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { executeServerOlapQuery, getServerOlapCubeSchema, listServerOlapCubes } = vi.hoisted(() => ({
+const { executeServerOlapQuery, getServerOlapCubeSchema, listServerOlapCubes, searchServerOlapMembers } = vi.hoisted(() => ({
   executeServerOlapQuery: vi.fn(),
   getServerOlapCubeSchema: vi.fn(),
   listServerOlapCubes: vi.fn(),
+  searchServerOlapMembers: vi.fn(),
 }));
 
 vi.mock('@dss-monorepo/olap-connector/server', () => ({
   executeServerOlapQuery,
   getServerOlapCubeSchema,
   listServerOlapCubes,
+  searchServerOlapMembers,
   OlapServerClientError: class OlapServerClientError extends Error {
     constructor(message: string, public status: number, public code: string) { super(message); }
   },
@@ -118,6 +120,44 @@ describe('BFF analytic GraphQL resolvers', () => {
     const result = await resolver().olapCubes({}, {}, ctx()) as Array<Record<string, unknown>>;
     expect(result[0]).toMatchObject({ cubeId, cubeName: 'Students' });
     expect(listServerOlapCubes).toHaveBeenCalledWith({ baseUrl: 'http://olap-service:8080', accessToken: auth.token });
+  });
+
+  it('lists members only for dimensions and levels published in the visible cube schema', async () => {
+    getServerOlapCubeSchema.mockResolvedValueOnce({
+      dimensions: {
+        'academic period': {
+          name: 'Academic Period',
+          hierarchies: {
+            'academic period': {
+              name: 'Academic Period',
+              levels: { 'academic year': { name: 'Academic Year' } },
+            },
+          },
+        },
+      },
+    });
+    searchServerOlapMembers.mockResolvedValueOnce([
+      { name: '2026', uniqueName: '[Academic Period].[Academic Period].[Academic Year].&[2026]', caption: '2026' },
+    ]);
+    const result = await resolver().olapCubeMembers({}, {
+      cubeId, dimension: 'Academic Period', hierarchy: 'Academic Period', level: 'Academic Year', limit: 50,
+    }, ctx());
+
+    expect(result).toEqual([
+      { name: '2026', uniqueName: '[Academic Period].[Academic Period].[Academic Year].&[2026]', caption: '2026' },
+    ]);
+    expect(searchServerOlapMembers).toHaveBeenCalledWith(
+      { baseUrl: 'http://olap-service:8080', accessToken: auth.token },
+      { cubeId, dimension: 'Academic Period', hierarchy: 'Academic Period', level: 'Academic Year', limit: 50 },
+    );
+  });
+
+  it('rejects member lookup for levels absent from the published schema', async () => {
+    getServerOlapCubeSchema.mockResolvedValueOnce({ dimensions: {} });
+    await expect(resolver().olapCubeMembers({}, {
+      cubeId, dimension: 'Private Dimension', hierarchy: 'Private Hierarchy', level: 'Private Level',
+    }, ctx())).rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    expect(searchServerOlapMembers).not.toHaveBeenCalled();
   });
 
   it('executes with a server-derived academic filter and never accepts a client context id', async () => {

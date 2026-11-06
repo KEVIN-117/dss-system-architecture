@@ -1,23 +1,34 @@
 import * as React from 'react';
 import { cn } from 'cn';
+import { ChevronDown, Landmark } from 'lucide-react';
 import {
   SidebarProvider,
   Sidebar,
   SidebarContent,
   SidebarHeader,
   SidebarGroup,
+  SidebarGroupContent,
+  SidebarGroupLabel,
   SidebarMenu,
   SidebarMenuItem,
   SidebarMenuButton,
   SidebarFooter,
+  SidebarSeparator,
+  useSidebar,
 } from '../organisms/sidebar';
 import { Header, HeaderProps } from '../organisms/header';
-import { Typography } from '../atoms/typography';
+import { TooltipProvider } from '../atoms/tooltip';
 
 export interface NavigationItem {
   title: string;
   href: string;
   icon?: React.ReactNode;
+  isActive?: boolean;
+}
+
+export interface NavigationGroup {
+  title: string;
+  items: NavigationItem[];
 }
 
 export interface DashboardTemplateProps
@@ -25,6 +36,8 @@ export interface DashboardTemplateProps
   children: React.ReactNode;
   sidebarTitle?: string;
   navItems?: NavigationItem[];
+  navGroups?: NavigationGroup[];
+  surfaceMaterial?: 'solid' | 'frosted';
   user?: HeaderProps['user'];
   onMenuClick?: () => void;
   onSearch?: (query: string) => void;
@@ -35,6 +48,8 @@ export function DashboardTemplate({
   children,
   sidebarTitle = 'DSS MAINFRAME',
   navItems = [],
+  navGroups,
+  surfaceMaterial = 'solid',
   user,
   onMenuClick,
   onSearch,
@@ -43,72 +58,203 @@ export function DashboardTemplate({
   ...props
 }: DashboardTemplateProps) {
   return (
-    <SidebarProvider>
-      <div
-        className={cn('flex min-h-screen w-full bg-background', className)}
-        {...props}
+    <TooltipProvider delayDuration={300}>
+      <SidebarProvider>
+        <DashboardTemplateFrame
+          className={className}
+          navItems={navItems}
+          navGroups={navGroups}
+          sidebarTitle={sidebarTitle}
+          surfaceMaterial={surfaceMaterial}
+          user={user}
+          onMenuClick={onMenuClick}
+          onSearch={onSearch}
+          onDisconnect={onDisconnect}
+          {...props}
+        >
+          {children}
+        </DashboardTemplateFrame>
+      </SidebarProvider>
+    </TooltipProvider>
+  );
+}
+
+function DashboardTemplateFrame({
+  children,
+  sidebarTitle,
+  navItems,
+  navGroups,
+  surfaceMaterial,
+  user,
+  onMenuClick,
+  onSearch,
+  onDisconnect,
+  className,
+  ...props
+}: DashboardTemplateProps) {
+  const { toggleSidebar } = useSidebar();
+  const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(
+    () => new Set(),
+  );
+  const groupIdPrefix = React.useId().replaceAll(':', '');
+  const groups = navGroups?.length
+    ? navGroups
+    : navItems?.length
+      ? [{ title: 'Navegación', items: navItems }]
+      : [];
+  const activeGroupTitle = groups.find((group) =>
+    group.items.some((item) => item.isActive),
+  )?.title;
+
+  React.useEffect(() => {
+    if (!activeGroupTitle) return;
+    setCollapsedGroups((current) => {
+      if (!current.has(activeGroupTitle)) return current;
+      const next = new Set(current);
+      next.delete(activeGroupTitle);
+      return next;
+    });
+  }, [activeGroupTitle]);
+
+  return (
+    <div
+      className={cn('flex min-h-svh w-full bg-background', className)}
+      {...props}
+    >
+      <Sidebar
+        material={surfaceMaterial}
+        collapsible="icon"
+        className="border-r border-sidebar-border/80"
       >
-        {/* Sidebar Left side */}
-        <Sidebar className="border-r border-primary/20 bg-background/80 backdrop-blur-xl">
-          <SidebarHeader className="p-6 border-b border-primary/10">
-            <Typography variant="neon" className="text-xl">
-              {sidebarTitle}
-            </Typography>
-          </SidebarHeader>
-          <SidebarContent>
-            <SidebarGroup className="mt-4">
-              <SidebarMenu>
-                {navItems.map((item) => (
-                  <SidebarMenuItem key={item.href + item.title}>
-                    <SidebarMenuButton
-                      asChild
-                      className="hover:bg-primary/10 hover:text-primary transition-colors data-[active=true]:bg-primary/20 data-[active=true]:text-primary data-[active=true]:border-r-2 data-[active=true]:border-primary"
-                    >
-                      <a
-                        href={item.href}
-                        className="flex items-center gap-3 px-4 py-3 font-mono text-sm"
-                      >
-                        {item.icon}
-                        <span>{item.title}</span>
-                      </a>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroup>
-          </SidebarContent>
-          <SidebarFooter className="p-4 border-t border-primary/20 bg-muted/10">
-            <div className="flex items-center justify-between">
-              <Typography
-                variant="muted"
-                className="text-[10px] uppercase font-mono"
-              >
-                Status: Secure
-              </Typography>
-              <div className="size-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_theme(colors.emerald.500)]" />
-            </div>
-          </SidebarFooter>
-        </Sidebar>
-
-        {/* Main content right side */}
-        <main className="flex-1 flex flex-col relative overflow-x-hidden min-h-screen">
-          {/* Cyberpunk Grid Background */}
-          <div className="absolute inset-0 z-0 bg-[linear-gradient(to_right,theme(colors.primary.DEFAULT/3%)_1px,transparent_1px),linear-gradient(to_bottom,theme(colors.primary.DEFAULT/3%)_1px,transparent_1px)] bg-[size:32px_32px] pointer-events-none" />
-
-          <div className="relative z-10 flex-1 flex flex-col">
-            <Header
-              user={user}
-              onMenuClick={onMenuClick}
-              onSearch={onSearch}
-              onDisconnect={onDisconnect}
-              className="sticky top-0 z-50 border-b border-primary/20 bg-background/70 backdrop-blur-lg"
-            />
-            <div className="flex-1 p-6 md:p-8 lg:p-10 w-full animate-in fade-in zoom-in-95 duration-500">
-              {children}
+        <SidebarHeader className="border-b border-sidebar-border/80 px-4 py-4 group-data-[collapsible=icon]:items-center group-data-[collapsible=icon]:px-0">
+          <div className="flex min-w-0 items-center gap-3 group-data-[collapsible=icon]:justify-center">
+            <span
+              aria-hidden="true"
+              className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-sidebar-border bg-sidebar-accent text-sidebar-primary group-data-[collapsible=icon]:size-9"
+            >
+              <Landmark className="size-5" strokeWidth={1.8} />
+            </span>
+            <div className="min-w-0 group-data-[collapsible=icon]:hidden">
+              <p className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
+                {sidebarTitle}
+              </p>
+              <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                Plataforma institucional
+              </p>
             </div>
           </div>
-        </main>
-      </div>
-    </SidebarProvider>
+        </SidebarHeader>
+        <SidebarContent className="gap-0 px-3 py-3 group-data-[collapsible=icon]:px-2">
+          <nav aria-label="Navegación principal">
+            {groups.map((group, index) => {
+              const isExpanded = !collapsedGroups.has(group.title);
+              const contentId = `${groupIdPrefix}-navigation-group-${index}`;
+              return (
+                <SidebarGroup
+                  key={group.title}
+                  className={cn(
+                    'p-0 pb-2',
+                    index > 0 && 'mt-2 border-t border-sidebar-border/70 pt-2',
+                  )}
+                >
+                  <SidebarGroupLabel
+                    role="heading"
+                    aria-level={2}
+                    className="h-9 px-0 text-muted-foreground"
+                  >
+                    <button
+                      type="button"
+                      aria-expanded={isExpanded}
+                      aria-controls={contentId}
+                      className="flex h-full w-full items-center justify-between rounded-md px-3 text-left text-xs font-semibold tracking-wide transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                      onClick={() =>
+                        setCollapsedGroups((current) => {
+                          const next = new Set(current);
+                          if (next.has(group.title)) next.delete(group.title);
+                          else next.add(group.title);
+                          return next;
+                        })
+                      }
+                    >
+                      <span className="truncate">{group.title}</span>
+                      <ChevronDown
+                        aria-hidden="true"
+                        className={cn(
+                          'size-3.5 shrink-0 transition-transform duration-150 motion-reduce:transition-none',
+                          isExpanded ? 'rotate-0' : '-rotate-90',
+                        )}
+                      />
+                    </button>
+                  </SidebarGroupLabel>
+                  <SidebarGroupContent
+                    id={contentId}
+                    hidden={!isExpanded}
+                    className="pt-1"
+                  >
+                    <SidebarMenu className="gap-1">
+                      {group.items.map((item) => (
+                        <SidebarMenuItem key={`${item.href}-${item.title}`}>
+                          <SidebarMenuButton
+                            asChild
+                            isActive={item.isActive}
+                            tooltip={item.title}
+                            className="relative h-10 rounded-lg px-3 text-sidebar-foreground transition-colors duration-150 hover:bg-sidebar-accent/70 hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring data-[active=true]:bg-sidebar-accent data-[active=true]:font-semibold data-[active=true]:text-sidebar-accent-foreground data-[active=true]:ring-1 data-[active=true]:ring-inset data-[active=true]:ring-sidebar-border [&_svg]:text-muted-foreground data-[active=true]:[&_svg]:text-sidebar-primary"
+                          >
+                            <a
+                              href={item.href}
+                              aria-current={item.isActive ? 'page' : undefined}
+                            >
+                              {item.isActive && (
+                                <span
+                                  aria-hidden="true"
+                                  className="absolute inset-y-2 left-0 w-0.5 rounded-r bg-sidebar-primary"
+                                />
+                              )}
+                              {item.icon && (
+                                <span className="flex size-5 shrink-0 items-center justify-center">
+                                  {item.icon}
+                                </span>
+                              )}
+                              <span>{item.title}</span>
+                            </a>
+                          </SidebarMenuButton>
+                        </SidebarMenuItem>
+                      ))}
+                    </SidebarMenu>
+                  </SidebarGroupContent>
+                </SidebarGroup>
+              );
+            })}
+            {groups.length === 0 && (
+              <p className="px-3 py-4 text-sm text-muted-foreground">
+                No hay secciones disponibles.
+              </p>
+            )}
+          </nav>
+          <SidebarSeparator className="mt-auto group-data-[collapsible=icon]:hidden" />
+          <SidebarFooter className="px-3 py-3 group-data-[collapsible=icon]:hidden">
+            <p className="text-xs leading-5 text-muted-foreground">
+              Sistema de decisiones académicas
+            </p>
+          </SidebarFooter>
+        </SidebarContent>
+      </Sidebar>
+
+      <main className="flex min-h-svh min-w-0 flex-1 flex-col overflow-x-hidden">
+        <Header
+          appName={sidebarTitle}
+          user={user}
+          onMenuClick={() => {
+            onMenuClick?.();
+            toggleSidebar();
+          }}
+          onSearch={onSearch}
+          onDisconnect={onDisconnect}
+          data-dashboard-material={surfaceMaterial}
+          className="sticky top-0 z-30 border-b border-border"
+        />
+        <div className="w-full flex-1 p-4 sm:p-6 lg:p-8">{children}</div>
+      </main>
+    </div>
   );
 }
