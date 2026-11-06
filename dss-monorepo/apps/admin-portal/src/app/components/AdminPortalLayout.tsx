@@ -28,7 +28,7 @@ export function AdminPortalLayout({
   access?: 'superadmin' | 'authenticated';
 }) {
   const { user, logout } = useAuth();
-  const pathname = usePathname();
+  const pathname = usePathname() ?? '';
   const isSuperAdmin = user?.roles.includes('SUPERADMIN') ?? false;
   const navigationItem = (
     title: string,
