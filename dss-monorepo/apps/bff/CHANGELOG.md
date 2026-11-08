@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.1.0...bff-v1.2.0) (2026-11-08)
+
+
+### Features
+
+* **prediction:** add ML operations and load characterization ([#234](https://github.com/KEVIN-117/dss-system-architecture/issues/234)) ([3abe620](https://github.com/KEVIN-117/dss-system-architecture/commit/3abe620e77ae3eccfadd264d40e52a5488be483a))
+
 ## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.0.0...bff-v1.1.0) (2026-11-03)
 
 
