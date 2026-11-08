@@ -34,11 +34,11 @@ const meta: Meta<typeof Sidebar> = {
           <div className="flex flex-1 flex-col gap-4 p-4">
             <div className="min-h-[100vh] flex-1 rounded-xl bg-muted/50 md:min-h-min p-4">
               <h2 className="text-2xl font-bold mb-4 text-primary">
-                Cyberpunk Content
+                Academic workspace
               </h2>
               <p>
-                The glowing edges and neon colors are designed to fit the dark
-                futuristic aesthetic.
+                Navigate the published cubes and review institutional
+                indicators.
               </p>
             </div>
           </div>
@@ -56,8 +56,8 @@ export const Default: Story = {
   render: () => (
     <Sidebar>
       <SidebarHeader>
-        <div className="px-4 py-2 text-xl font-black text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]">
-          NEXUS
+        <div className="px-4 py-2 text-lg font-semibold tracking-tight text-sidebar-foreground">
+          DSS
         </div>
       </SidebarHeader>
       <SidebarContent>
@@ -117,8 +117,8 @@ export const CollapsibleIcon: Story = {
     <Sidebar collapsible="icon">
       <TooltipProvider>
         <SidebarHeader>
-          <div className="flex h-10 w-full items-center justify-center font-black text-primary drop-shadow-[0_0_8px_rgba(var(--primary),0.8)]">
-            NX
+          <div className="flex h-10 w-full items-center justify-center font-semibold text-sidebar-foreground">
+            DSS
           </div>
         </SidebarHeader>
         <SidebarContent>

@@ -1,19 +1,14 @@
-import { AccessDenied, Button } from '@dss-monorepo/design-system';
+import { AccessDenied } from '@dss-monorepo/design-system';
 import { ProtectedRoute } from '@dss-monorepo/auth';
 import { RoleGuard } from '@dss-monorepo/rbac';
+import { RectorAnalyticsDashboard } from './components/rector-analytics-dashboard';
 
 export default function Index() {
   return (
     <ProtectedRoute unauthenticatedFallback={<LoginRequired />}>
       <RoleGuard rolesAllowed={['RECTOR']} fallback={<AccessDeniedForPortal />}>
-        <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
-          <h1 className="text-2xl font-bold">Rector Dashboard</h1>
-          <a className="text-primary underline" href="/predictions">Consultar predicciones de abandono</a>
-          <div className="flex gap-2">
-            <Button variant="default">Aprobar Presupuesto</Button>
-            <Button variant="outline">Ver Historial</Button>
-            <Button variant="destructive">Rechazar Plan</Button>
-          </div>
+        <main className="min-h-screen bg-background text-foreground">
+          <RectorAnalyticsDashboard />
         </main>
       </RoleGuard>
     </ProtectedRoute>
@@ -22,10 +17,10 @@ export default function Index() {
 
 function LoginRequired() {
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
-      <h1 className="text-2xl font-bold">Sesión requerida</h1>
-      <p>Inicia sesión para acceder al portal del rector.</p>
-      <a className="text-primary underline" href="/login">Iniciar sesión</a>
+    <main className="grid min-h-screen place-content-center gap-4 bg-background p-8 text-foreground">
+      <h1 className="text-2xl font-semibold">Sesión requerida</h1>
+      <p className="max-w-prose text-muted-foreground">Inicia sesión para consultar los indicadores institucionales.</p>
+      <a className="w-fit text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" href="/login">Iniciar sesión</a>
     </main>
   );
 }

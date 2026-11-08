@@ -316,3 +316,32 @@
 .schema-viewer-minimap .react-flow__minimap-node:hover {
   fill: var(--role-accent, var(--primary));
 }
+
+/* Restrained frosted material for application chrome. The surface stays nearly
+   opaque so text and focus indicators remain readable over changing content. */
+[data-sidebar-material='frosted'] {
+  background-color: var(--sidebar);
+  background-color: color-mix(in srgb, var(--sidebar) 90%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(112%);
+  backdrop-filter: blur(16px) saturate(112%);
+}
+
+[data-dashboard-material='frosted'] {
+  background-color: var(--card);
+  background-color: color-mix(in srgb, var(--card) 90%, transparent);
+  -webkit-backdrop-filter: blur(16px) saturate(112%);
+  backdrop-filter: blur(16px) saturate(112%);
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  [data-sidebar-material='frosted'],
+  [data-dashboard-material='frosted'] {
+    background-color: var(--sidebar);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  [data-dashboard-material='frosted'] {
+    background-color: var(--card);
+  }
+}

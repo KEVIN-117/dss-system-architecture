@@ -148,6 +148,7 @@ function Sidebar({
   side = 'left',
   variant = 'sidebar',
   collapsible = 'offcanvas',
+  material = 'solid',
   className,
   children,
   dir,
@@ -156,6 +157,7 @@ function Sidebar({
   side?: 'left' | 'right';
   variant?: 'sidebar' | 'floating' | 'inset';
   collapsible?: 'offcanvas' | 'icon' | 'none';
+  material?: 'solid' | 'frosted';
 }) {
   const { isMobile, state, openMobile, setOpenMobile } = useSidebar();
 
@@ -163,8 +165,9 @@ function Sidebar({
     return (
       <div
         data-slot="sidebar"
+        data-sidebar-material={material}
         className={cn(
-          'flex h-full w-(--sidebar-width) flex-col bg-background/80 backdrop-blur-md border-r border-primary/50 shadow-[0_0_15px_-3px_hsla(var(--primary)/0.3)] text-sidebar-foreground',
+          'flex h-full w-(--sidebar-width) flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground',
           className,
         )}
         {...props}
@@ -182,7 +185,8 @@ function Sidebar({
           data-sidebar="sidebar"
           data-slot="sidebar"
           data-mobile="true"
-          className="w-(--sidebar-width) bg-background/90 backdrop-blur-xl border-r border-primary/50 shadow-[0_0_30px_-5px_hsla(var(--primary)/0.3)] p-0 text-sidebar-foreground [&>button]:hidden"
+          data-sidebar-material={material}
+          className="w-(--sidebar-width) border-r border-sidebar-border bg-sidebar p-0 text-sidebar-foreground"
           style={
             {
               '--sidebar-width': SIDEBAR_WIDTH_MOBILE,
@@ -237,7 +241,8 @@ function Sidebar({
         <div
           data-sidebar="sidebar"
           data-slot="sidebar-inner"
-          className="flex size-full flex-col bg-background/80 backdrop-blur-md border-r border-primary/50 shadow-[0_0_20px_-5px_hsla(var(--primary)/0.4)] group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:shadow-[0_0_20px_hsla(var(--primary)/0.5)] group-data-[variant=floating]:border group-data-[variant=floating]:border-primary"
+          data-sidebar-material={material}
+          className="flex size-full flex-col border-sidebar-border bg-sidebar text-sidebar-foreground group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:shadow-md"
         >
           {children}
         </div>
@@ -468,7 +473,7 @@ const sidebarMenuButtonVariants = cva(
       variant: {
         default: 'hover:bg-sidebar-accent hover:text-sidebar-accent-foreground',
         outline:
-          'bg-background shadow-[0_0_0_1px_var(--sidebar-border)] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_var(--sidebar-accent)]',
+          'bg-background ring-1 ring-sidebar-border hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:ring-sidebar-ring',
       },
       size: {
         default: 'h-8 text-sm',
