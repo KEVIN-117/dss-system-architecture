@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.2.0...bff-v1.3.0) (2026-11-08)
+
+
+### Features
+
+* **frontend:** conectar Rector Dashboard con analítica institucional ([#238](https://github.com/KEVIN-117/dss-system-architecture/issues/238)) ([cdc8e08](https://github.com/KEVIN-117/dss-system-architecture/commit/cdc8e08c675ea40583e3284be0f4d171e5269aad))
+
 ## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.1.0...bff-v1.2.0) (2026-11-08)
 
 
