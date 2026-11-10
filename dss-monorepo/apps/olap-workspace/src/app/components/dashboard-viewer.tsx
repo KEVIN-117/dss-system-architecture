@@ -18,7 +18,7 @@ import {
   Button,
   DashboardGrid,
   DashboardToolbar,
-  Skeleton,
+  Loader,
   Tile,
 } from '@dss-monorepo/design-system';
 import { SavedTileQuery } from './saved-tile-query';
@@ -55,19 +55,7 @@ export function DashboardViewer({ dashboardPath }: { dashboardPath: string }) {
   }, [attempt, dashboardPath]);
 
   if (loading) {
-    return (
-      <div
-        className="space-y-6"
-        aria-label="Cargando dashboard"
-        aria-busy="true"
-      >
-        <Skeleton className="h-24 rounded-xl" />
-        <div className="grid gap-4 md:grid-cols-2">
-          <Skeleton className="h-64 rounded-xl" />
-          <Skeleton className="h-64 rounded-xl" />
-        </div>
-      </div>
-    );
+    return <Loader text="Cargando dashboard…" fullScreen={false} className="rounded-xl" />;
   }
 
   if (error || !dashboard) {

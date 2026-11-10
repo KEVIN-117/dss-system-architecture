@@ -4,7 +4,12 @@ import { useEffect, useRef } from 'react';
 import type { EChartsType } from 'echarts/core';
 import { init } from '../core/engine';
 import { resolveChartTheme } from '../core/theme';
-import type { ChartClickEvent, ChartOption, ChartOptionFactory, CommonChartProps } from '../core/types';
+import type {
+  ChartClickEvent,
+  ChartOption,
+  ChartOptionFactory,
+  CommonChartProps,
+} from '../core/types';
 
 export interface BaseChartProps extends CommonChartProps {
   option: ChartOption | ChartOptionFactory;
@@ -32,13 +37,19 @@ export function BaseChart(props: BaseChartProps) {
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const click = (event: ChartClickEvent) => {
       const current = latest.current;
-      if (event.componentType === 'series' && !current.loading && !current.empty && !current.invalid) {
+      if (
+        event.componentType === 'series' &&
+        !current.loading &&
+        !current.empty &&
+        !current.invalid
+      ) {
         current.onChartClick?.(event);
       }
     };
     const update = () => {
       frame = undefined;
-      if (!active || element.clientWidth <= 0 || element.clientHeight <= 0) return;
+      if (!active || element.clientWidth <= 0 || element.clientHeight <= 0)
+        return;
       const current = latest.current;
       if (!current.loading && (current.empty || current.invalid)) {
         chart?.hideLoading();
@@ -52,25 +63,44 @@ export function BaseChart(props: BaseChartProps) {
       }
       chart.resize();
       // Never send invalid data to ECharts, including while showing loading.
-      const option = current.invalid || current.empty ? {} :
-        typeof current.option === 'function' ? current.option(theme, element.clientWidth) : current.option;
-      chart.setOption({
-        ...option,
-        animation: motion.matches ? false : option.animation,
-        aria: {
-          enabled: true,
-          ...option.aria,
-          label: {
+      const option =
+        current.invalid || current.empty
+          ? {}
+          : typeof current.option === 'function'
+            ? current.option(theme, element.clientWidth)
+            : current.option;
+      chart.setOption(
+        {
+          ...option,
+          ...(option.tooltip
+            ? {
+                tooltip: Array.isArray(option.tooltip)
+                  ? option.tooltip.map((tooltip) => ({
+                      confine: true,
+                      ...tooltip,
+                    }))
+                  : { confine: true, ...option.tooltip },
+              }
+            : {}),
+          animation: motion.matches ? false : option.animation,
+          aria: {
             enabled: true,
-            ...option.aria?.label,
-            ...(current.ariaLabel ? { description: current.ariaLabel } : {}),
+            ...option.aria,
+            label: {
+              enabled: true,
+              ...option.aria?.label,
+              ...(current.ariaLabel ? { description: current.ariaLabel } : {}),
+            },
           },
         },
-      }, { notMerge: true });
+        { notMerge: true },
+      );
       if (current.loading) {
         chart.showLoading('default', {
-          text: 'Cargando…', color: theme.primary ?? theme.chartColors[0],
-          textColor: theme.foreground, maskColor: theme.alpha(theme.background, 0.85),
+          text: 'Cargando…',
+          color: theme.primary ?? theme.chartColors[0],
+          textColor: theme.foreground,
+          maskColor: theme.alpha(theme.background, 0.85),
           showSpinner: !motion.matches,
         });
       } else {
@@ -85,8 +115,15 @@ export function BaseChart(props: BaseChartProps) {
     resize.observe(element);
     // Only ancestors' theme attributes: ECharts' own DOM mutations must not loop.
     const mutations = new MutationObserver(schedule);
-    for (let parent: HTMLElement | null = element.parentElement; parent; parent = parent.parentElement) {
-      mutations.observe(parent, { attributes: true, attributeFilter: ['class', 'data-theme', 'style'] });
+    for (
+      let parent: HTMLElement | null = element.parentElement;
+      parent;
+      parent = parent.parentElement
+    ) {
+      mutations.observe(parent, {
+        attributes: true,
+        attributeFilter: ['class', 'data-theme', 'style'],
+      });
     }
     motion.addEventListener('change', schedule);
     schedule();
@@ -103,21 +140,69 @@ export function BaseChart(props: BaseChartProps) {
     };
   }, []);
 
-  const message = props.loading ? 'Cargando…' : props.invalid ?
-    props.invalidMessage ?? 'Datos inválidos: se requieren valores finitos y no negativos.' : props.empty ?
-    props.emptyMessage ?? 'Sin datos disponibles' : null;
+  const message = props.loading
+    ? 'Cargando…'
+    : props.invalid
+      ? (props.invalidMessage ??
+        'Datos inválidos: se requieren valores finitos y no negativos.')
+      : props.empty
+        ? (props.emptyMessage ?? 'Sin datos disponibles')
+        : null;
   return (
-    <div className={props.className} data-chart-state={props.loading ? 'loading' : props.invalid ? 'invalid' : props.empty ? 'empty' : 'ready'}
-      style={{ position: 'relative', width: '100%', height: props.height ?? 360, minWidth: 0, ...props.style }}
-      aria-busy={props.loading || undefined}>
-      <div ref={host} role="img" aria-label={props.ariaLabel ?? props.title ?? 'Gráfico de datos'}
-        style={{ width: '100%', height: '100%', visibility: message && !props.loading ? 'hidden' : 'visible' }} />
-      {message && <div role={props.invalid && !props.loading ? 'alert' : 'status'}
-        style={{ position: 'absolute', inset: 0, display: 'grid', placeItems: 'center', padding: 16,
-          color: 'var(--foreground, #172033)', pointerEvents: 'none',
-          ...(props.loading ? { clipPath: 'inset(50%)', width: 1, height: 1, overflow: 'hidden' } : {}) }}>
-        {message}
-      </div>}
+    <div
+      className={props.className}
+      data-chart-state={
+        props.loading
+          ? 'loading'
+          : props.invalid
+            ? 'invalid'
+            : props.empty
+              ? 'empty'
+              : 'ready'
+      }
+      style={{
+        position: 'relative',
+        width: '100%',
+        height: props.height ?? 360,
+        minWidth: 0,
+        ...props.style,
+      }}
+      aria-busy={props.loading || undefined}
+    >
+      <div
+        ref={host}
+        role="img"
+        aria-label={props.ariaLabel ?? props.title ?? 'Gráfico de datos'}
+        style={{
+          width: '100%',
+          height: '100%',
+          visibility: message && !props.loading ? 'hidden' : 'visible',
+        }}
+      />
+      {message && (
+        <div
+          role={props.invalid && !props.loading ? 'alert' : 'status'}
+          style={{
+            position: 'absolute',
+            inset: 0,
+            display: 'grid',
+            placeItems: 'center',
+            padding: 16,
+            color: 'var(--foreground, #172033)',
+            pointerEvents: 'none',
+            ...(props.loading
+              ? {
+                  clipPath: 'inset(50%)',
+                  width: 1,
+                  height: 1,
+                  overflow: 'hidden',
+                }
+              : {}),
+          }}
+        >
+          {message}
+        </div>
+      )}
     </div>
   );
 }

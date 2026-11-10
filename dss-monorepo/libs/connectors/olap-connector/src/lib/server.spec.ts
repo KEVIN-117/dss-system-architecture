@@ -56,6 +56,37 @@ describe('server-only OLAP transport', () => {
     expect(error).toMatchObject({ message: 'OLAP request failed', code: 'OLAP_FORBIDDEN', status: 403 });
   });
 
+  it('preserves only the field name from a structured query validation error', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json(
+          {
+            status: 'VALIDATION_ERROR',
+            field: 'filters[0].hierarchy',
+            error: 'Do not expose this backend detail',
+            available: ['sensitive-member'],
+          },
+          { status: 400 },
+        ),
+      ),
+    );
+
+    const error = await executeServerOlapQuery(config, {
+      cube: 'academic/UATF/UATF/Academic Performance',
+      measures: [{ name: 'Enrollment Attempts' }],
+    }).catch((caught: unknown) => caught);
+
+    expect(error).toBeInstanceOf(OlapServerClientError);
+    expect(error).toMatchObject({
+      code: 'OLAP_INVALID_QUERY',
+      status: 400,
+      field: 'filters[0].hierarchy',
+    });
+    expect((error as Error).message).not.toContain('sensitive-member');
+    expect((error as Error).message).not.toContain('Do not expose');
+  });
+
   it('normalizes network errors and request timeouts', async () => {
     vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('socket closed')));
     await expect(listServerOlapCubes(config)).rejects.toMatchObject({

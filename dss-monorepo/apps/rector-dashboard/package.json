@@ -9,6 +9,8 @@
     "@dss-monorepo/rbac": "workspace:*",
     "next": "~16.1.6",
     "react": "^19.0.0",
-    "react-dom": "^19.0.0"
+    "react-dom": "^19.0.0",
+    "@dss-monorepo/academic-analytics": "workspace:*",
+    "lucide-react": "^1.43.0"
   }
 }

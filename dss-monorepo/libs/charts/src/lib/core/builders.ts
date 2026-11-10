@@ -46,12 +46,22 @@ export function buildBarOption(
       data: data.map((d) => d.label),
       axisTick: { alignWithLabel: true },
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
     },
     yAxis: {
       type: 'value',
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
       splitLine: {
         lineStyle: {
           color: theme.gridLine,
@@ -110,20 +120,38 @@ export function buildDonutOption(
 
     tooltip: {
       trigger: 'item',
+      confine: true,
+      extraCssText: `max-width: ${Math.max(0, width - 32)}px; white-space: normal; overflow-wrap: anywhere;`,
       backgroundColor: theme.alpha(theme.background, 0.9),
       textStyle: { color: theme.foreground },
     },
 
-    title: title ? { text: title, left: 'center', textStyle: { color: theme.foreground, fontSize: 14, width: Math.max(width - 32, 0), overflow: 'truncate' } } : undefined,
+    title: title
+      ? {
+          text: title,
+          left: 'center',
+          textStyle: {
+            color: theme.foreground,
+            fontSize: 14,
+            width: Math.max(width - 32, 0),
+            overflow: 'truncate',
+          },
+        }
+      : undefined,
     legend: {
       type: 'scroll',
-      orient: compact ? 'horizontal' : 'vertical',
-      left: compact ? 'center' : 'left',
-      top: compact ? undefined : 'middle',
-      bottom: compact ? 0 : undefined,
+      orient: 'horizontal',
+      left: 'center',
+      right: 12,
+      bottom: 0,
       icon: 'roundRect',
       itemGap: 14,
-      textStyle: { color: theme.foreground, fontSize: 13 },
+      textStyle: {
+        color: theme.foreground,
+        fontSize: 13,
+        width: Math.max(80, Math.min(200, width - 110)),
+        overflow: 'truncate',
+      },
       // Muestra el % directamente en la leyenda, no solo el nombre
       formatter: (name: string) => {
         const item = data.find((d) => d.label === name);
@@ -137,8 +165,8 @@ export function buildDonutOption(
       {
         name: 'Risk Level',
         type: 'pie',
-        radius: compact ? ['35%', '58%'] : ['35%', '60%'],
-        center: compact ? ['50%', '47%'] : ['65%', '50%'],
+        radius: compact ? ['32%', '52%'] : ['35%', '58%'],
+        center: ['50%', '42%'],
         stillShowZeroSum: false,
         avoidLabelOverlap: true,
         padAngle: 5,
@@ -148,14 +176,14 @@ export function buildDonutOption(
           borderWidth: 2,
         },
         label: {
-          show: !compact,
+          show: false,
           position: 'outer',
           formatter: '{d}%',
           color: theme.foreground,
           fontSize: 13,
           fontWeight: 'bold',
         },
-        labelLine: { show: true, length: 10, length2: 10 },
+        labelLine: { show: false },
         emphasis: {
           scale: true,
           scaleSize: 6,
@@ -166,7 +194,14 @@ export function buildDonutOption(
           },
         },
         data: data.map((d, index) => {
-          const color = d.tone === 'destructive' ? theme.riskColors.high : d.tone === 'warning' ? theme.riskColors.medium : d.tone === 'success' ? theme.riskColors.none : theme.chartColors[index % theme.chartColors.length];
+          const color =
+            d.tone === 'destructive'
+              ? theme.riskColors.high
+              : d.tone === 'warning'
+                ? theme.riskColors.medium
+                : d.tone === 'success'
+                  ? theme.riskColors.none
+                  : theme.chartColors[index % theme.chartColors.length];
           return {
             value: d.value,
             name: d.label,
@@ -216,12 +251,22 @@ export function buildLineOption(
       boundaryGap: false,
       data: data.map((d) => d.label),
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
     },
     yAxis: {
       type: 'value',
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
       splitLine: {
         lineStyle: {
           color: theme.gridLine,
@@ -327,7 +372,12 @@ export function buildStackedAreaOption(
         axisLine: {
           lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
         },
-        axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+        axisLabel: {
+          color: theme.mutedForeground,
+          hideOverlap: true,
+          overflow: 'truncate',
+          width: 90,
+        },
       },
     ],
     yAxis: [
@@ -336,7 +386,12 @@ export function buildStackedAreaOption(
         axisLine: {
           lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
         },
-        axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+        axisLabel: {
+          color: theme.mutedForeground,
+          hideOverlap: true,
+          overflow: 'truncate',
+          width: 90,
+        },
         splitLine: {
           lineStyle: {
             color: theme.gridLine,
@@ -433,14 +488,24 @@ export function buildScatterOption(
       type: 'value',
       scale: true,
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
       splitLine: { show: false },
     },
     yAxis: {
       type: 'value',
       scale: true,
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
       splitLine: { lineStyle: { color: theme.gridLine, type: 'dashed' } },
     },
     series: [
@@ -496,7 +561,12 @@ export function buildClusteringScatterOption(
       axisLine: {
         lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
       },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
       splitLine: { show: false },
     },
     yAxis: {
@@ -505,7 +575,12 @@ export function buildClusteringScatterOption(
       axisLine: {
         lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
       },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
       splitLine: { lineStyle: { color: theme.gridLine, type: 'dashed' } },
     },
     series: data.clusters.map((cluster, index) => {
@@ -554,14 +629,24 @@ export function buildRegressionScatterOption(
       type: 'value',
       scale: true,
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
       splitLine: { show: false },
     },
     yAxis: {
       type: 'value',
       scale: true,
       axisLine: { lineStyle: { color: theme.alpha(primary, 0.2) } },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
       splitLine: { lineStyle: { color: theme.gridLine, type: 'dashed' } },
     },
     series: [
@@ -685,7 +770,12 @@ export function buildHeatmapOption(
       type: 'category',
       data: data.xAxisLabels,
       splitArea: { show: true, areaStyle: { color: ['transparent'] } },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
       axisLine: {
         lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
       },
@@ -694,7 +784,12 @@ export function buildHeatmapOption(
       type: 'category',
       data: data.yAxisLabels,
       splitArea: { show: true, areaStyle: { color: ['transparent'] } },
-      axisLabel: { color: theme.mutedForeground, hideOverlap: true, overflow: 'truncate', width: 90 },
+      axisLabel: {
+        color: theme.mutedForeground,
+        hideOverlap: true,
+        overflow: 'truncate',
+        width: 90,
+      },
       axisLine: {
         lineStyle: { color: theme.alpha(theme.chartColors[0], 0.2) },
       },

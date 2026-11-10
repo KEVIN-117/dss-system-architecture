@@ -1,5 +1,6 @@
 import './global.css';
 import { Providers } from './providers';
+import { PortalBoundary } from './components/portal-frame';
 import type { ReactNode } from 'react';
 
 export const metadata = {
@@ -19,16 +20,12 @@ function requiredAuthEnv(name: string): string {
 
 const authConfig = { bffBaseUrl: requiredAuthEnv('NEXT_PUBLIC_BFF_URL') };
 
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="es" data-theme="rector" className="dark">
       <body>
         <Providers bffBaseUrl={authConfig.bffBaseUrl}>
-          {children}
+          <PortalBoundary>{children}</PortalBoundary>
         </Providers>
       </body>
     </html>

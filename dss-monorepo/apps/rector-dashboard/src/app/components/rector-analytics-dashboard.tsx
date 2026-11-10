@@ -1,7 +1,8 @@
 'use client';
 
+import Link from 'next/link';
+
 import {
-  Badge,
   Button,
   Card,
   CardContent,
@@ -9,8 +10,14 @@ import {
   CardHeader,
   CardTitle,
 } from '@dss-monorepo/design-system';
-import { AcademicBarChart, TrendLineChart } from '@dss-monorepo/charts';
+import { RiskDonutChart, TrendLineChart } from '@dss-monorepo/charts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  BookOpenCheck,
+  CalendarDays,
+  GraduationCap,
+  UsersRound,
+} from 'lucide-react';
 import {
   readDimensionSeries,
   readDimensionSeriesByLevels,
@@ -60,7 +67,7 @@ const ANALYTIC_QUERY = `query RectorAnalyticQuery($input: AnalyticQueryInput!) {
   analyticQuery(input: $input) { status data totalRows runtimeMs }
 }`;
 const CARD_CLASS =
-  'border border-border bg-card shadow-sm ring-0 backdrop-blur-none';
+  'border border-border bg-card shadow-none ring-0 backdrop-blur-none';
 
 async function graphql<T>(
   query: string,
@@ -125,6 +132,8 @@ export function RectorAnalyticsDashboard() {
   const [paths, setPaths] = useState<AcademicCubePaths | null>(null);
   const [periodMembers, setPeriodMembers] = useState<PublishedMember[]>([]);
   const [selectedYear, setSelectedYear] = useState('');
+  const [tableFilter, setTableFilter] = useState('');
+  const [tablePage, setTablePage] = useState(0);
   const [analytics, setAnalytics] = useState<AnalyticsState>(EMPTY_ANALYTICS);
   const [initialLoading, setInitialLoading] = useState(true);
   const [queryLoading, setQueryLoading] = useState(false);
@@ -334,15 +343,11 @@ export function RectorAnalyticsDashboard() {
         );
 
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-8 px-4 py-8 sm:px-6 lg:px-8">
-      <header className="flex flex-col gap-5 border-b border-border pb-6 md:flex-row md:items-end md:justify-between">
+    <div className="mx-auto w-full max-w-[1600px] space-y-5">
+      <header className="flex flex-col gap-4 pb-1 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge variant="outline">Analítica institucional</Badge>
-            <Badge variant="secondary">Alcance global</Badge>
-          </div>
           <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
-            Rendimiento académico
+            Resumen institucional
           </h1>
           <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
             Indicadores agregados del cubo institucional de rendimiento
@@ -359,48 +364,46 @@ export function RectorAnalyticsDashboard() {
             ? 'Actualizando…'
             : 'Actualizar datos'}
         </Button>
-        <a
+        <Link
           className="w-fit text-sm font-medium text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           href="/predictions"
         >
           Consultar predicciones de abandono
-        </a>
-      </header>
-
-      <section
-        aria-label="Filtros de analítica"
-        className="flex flex-col gap-3 rounded-xl border border-border bg-card p-4 sm:flex-row sm:items-end sm:justify-between"
-      >
-        <div className="space-y-1">
-          <label
-            htmlFor="academic-year"
-            className="text-sm font-medium text-foreground"
-          >
-            Gestión académica
-          </label>
-          <p id="academic-year-help" className="text-xs text-muted-foreground">
-            Filtra los indicadores por una gestión publicada en el cubo.
-          </p>
-        </div>
-        <select
-          id="academic-year"
-          aria-describedby="academic-year-help"
-          className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-xs"
-          value={selectedYear}
-          onChange={(event) => setSelectedYear(event.target.value)}
-          disabled={initialLoading || periodMembers.length === 0}
+        </Link>
+        <section
+          aria-label="Filtros de analítica"
+          className="flex flex-wrap items-center gap-3"
         >
-          <option value="">Todas las gestiones</option>
-          {periodMembers.map((member) => {
-            const label = member.caption ?? member.name;
-            return (
-              <option value={label} key={member.uniqueName}>
-                {label}
-              </option>
-            );
-          })}
-        </select>
-      </section>
+          <div className="space-y-1">
+            <label
+              htmlFor="academic-year"
+              className="text-sm font-medium text-foreground"
+            >
+              Gestión académica
+            </label>
+          </div>
+          <select
+            id="academic-year"
+            className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-xs"
+            value={selectedYear}
+            onChange={(event) => {
+              setSelectedYear(event.target.value);
+              setTablePage(0);
+            }}
+            disabled={initialLoading || periodMembers.length === 0}
+          >
+            <option value="">Todas las gestiones</option>
+            {periodMembers.map((member) => {
+              const label = member.caption ?? member.name;
+              return (
+                <option value={label} key={member.uniqueName}>
+                  {label}
+                </option>
+              );
+            })}
+          </select>
+        </section>
+      </header>
 
       {error && (
         <div
@@ -429,9 +432,10 @@ export function RectorAnalyticsDashboard() {
       <section
         aria-label="Indicadores institucionales"
         aria-busy={initialLoading || queryLoading}
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <MetricCard
+          icon={<UsersRound aria-hidden="true" className="size-6" />}
           label={
             selectedMember
               ? `Intentos acumulados · gestión ${selectedMember.caption ?? selectedMember.name}`
@@ -442,6 +446,7 @@ export function RectorAnalyticsDashboard() {
           loading={initialLoading || queryLoading}
         />
         <MetricCard
+          icon={<GraduationCap aria-hidden="true" className="size-6" />}
           label={
             selectedMember
               ? `Nota final promedio · gestión ${selectedMember.caption ?? selectedMember.name}`
@@ -452,11 +457,27 @@ export function RectorAnalyticsDashboard() {
           loading={initialLoading || queryLoading}
         />
         <MetricCard
+          icon={<BookOpenCheck aria-hidden="true" className="size-6" />}
           label="Facultades con actividad"
           formattedValue={formatInteger(
             initialLoading || queryLoading ? null : analytics.facultyCount,
           )}
           unit="facultades"
+          loading={initialLoading || queryLoading}
+        />
+        <MetricCard
+          icon={<CalendarDays aria-hidden="true" className="size-6" />}
+          label="Periodos con actividad"
+          formattedValue={formatInteger(
+            initialLoading || queryLoading || selectedMember
+              ? null
+              : analytics.periodSeries.length,
+          )}
+          unit={
+            selectedMember
+              ? 'selecciona todas las gestiones'
+              : 'periodos publicados'
+          }
           loading={initialLoading || queryLoading}
         />
       </section>
@@ -475,23 +496,23 @@ export function RectorAnalyticsDashboard() {
 
       <section
         aria-label="Visualizaciones institucionales"
-        className="grid gap-5 xl:grid-cols-2"
+        className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"
       >
-        <Card className={`min-w-0 ${CARD_CLASS}`}>
-          <CardHeader>
+        <Card className={`min-w-0 xl:order-2 ${CARD_CLASS}`}>
+          <CardHeader className="px-6 pt-2">
             <CardTitle>Intentos por facultad</CardTitle>
             <CardDescription>
               Suma de intentos de inscripción agrupada por facultad para la
               cobertura seleccionada.
             </CardDescription>
           </CardHeader>
-          <CardContent className="min-h-80">
+          <CardContent className="min-h-80 px-6 pb-4">
             {initialLoading ? (
               <ChartSkeleton />
             ) : (
-              <AcademicBarChart
+              <RiskDonutChart
                 data={analytics.facultySeries}
-                title="Intentos de inscripción por facultad"
+                title="Distribución de intentos por facultad"
                 ariaLabel={`Intentos de inscripción por facultad, ${analytics.facultySeries.length} facultades. ${analytics.cutLabel}.`}
                 loading={queryLoading}
                 emptyMessage="No hay actividad de inscripción para esta gestión."
@@ -502,7 +523,7 @@ export function RectorAnalyticsDashboard() {
         </Card>
 
         <Card className={`min-w-0 ${CARD_CLASS}`}>
-          <CardHeader>
+          <CardHeader className="px-6 pt-2">
             <CardTitle>Tendencia por periodo académico</CardTitle>
             <CardDescription>
               {selectedMember
@@ -510,7 +531,7 @@ export function RectorAnalyticsDashboard() {
                 : 'Intentos agregados por gestión y periodo del cubo publicado.'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="min-h-80">
+          <CardContent className="min-h-80 px-6 pb-4">
             {initialLoading ? (
               <ChartSkeleton />
             ) : selectedMember ? (
@@ -535,6 +556,109 @@ export function RectorAnalyticsDashboard() {
         </Card>
       </section>
 
+      <section
+        aria-labelledby="overview-table-title"
+        className="rounded-xl border border-border bg-card px-5 py-5 sm:px-6"
+      >
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h2 id="overview-table-title" className="text-lg font-semibold">
+              Actividad por facultad
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Las 12 facultades con más intentos en la selección actual.
+            </p>
+          </div>
+          <label className="grid gap-1 text-sm">
+            <span className="sr-only">Buscar facultad</span>
+            <input
+              type="search"
+              value={tableFilter}
+              onChange={(event) => {
+                setTableFilter(event.target.value);
+                setTablePage(0);
+              }}
+              placeholder="Buscar facultad…"
+              className="min-h-10 w-full rounded-md border border-input bg-background px-3 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-64"
+            />
+          </label>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[24rem] text-left text-sm">
+            <caption className="sr-only">
+              Facultad e intentos de cursado
+            </caption>
+            <thead className="bg-muted/50 text-muted-foreground">
+              <tr>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Facultad
+                </th>
+                <th scope="col" className="px-4 py-3 text-right font-medium">
+                  Intentos de cursado
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {analytics.facultySeries
+                .filter((row) =>
+                  row.label
+                    .toLocaleLowerCase()
+                    .includes(tableFilter.toLocaleLowerCase().trim()),
+                )
+                .slice(tablePage * 5, tablePage * 5 + 5)
+                .map((row, index) => (
+                  <tr key={`${tablePage * 5 + index}-${row.label}`}>
+                    <td className="px-4 py-3">{row.label}</td>
+                    <td className="px-4 py-3 text-right tabular-nums">
+                      {formatInteger(row.value)}
+                    </td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </div>
+        {analytics.facultySeries.length === 0 && (
+          <p className="px-4 py-6 text-sm text-muted-foreground">
+            No hay datos disponibles para esta selección.
+          </p>
+        )}
+        <div className="mt-4 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+          <span>
+            Resultados:{' '}
+            {
+              analytics.facultySeries.filter((row) =>
+                row.label
+                  .toLocaleLowerCase()
+                  .includes(tableFilter.toLocaleLowerCase().trim()),
+              ).length
+            }
+          </span>
+          <div className="flex gap-2">
+            <Button
+              variant="outline"
+              disabled={tablePage === 0}
+              onClick={() => setTablePage((page) => page - 1)}
+            >
+              Anterior
+            </Button>
+            <Button
+              variant="outline"
+              disabled={
+                (tablePage + 1) * 5 >=
+                analytics.facultySeries.filter((row) =>
+                  row.label
+                    .toLocaleLowerCase()
+                    .includes(tableFilter.toLocaleLowerCase().trim()),
+                ).length
+              }
+              onClick={() => setTablePage((page) => page + 1)}
+            >
+              Siguiente
+            </Button>
+          </div>
+        </div>
+      </section>
+
       <footer className="border-t border-border pt-4 text-xs leading-5 text-muted-foreground">
         Las cifras corresponden a agregados disponibles en el cubo OLAP. Los
         filtros refinan la consulta; el BFF conserva la autorización y el
@@ -545,11 +669,13 @@ export function RectorAnalyticsDashboard() {
 }
 
 function MetricCard({
+  icon,
   label,
   formattedValue,
   unit,
   loading,
 }: {
+  icon: React.ReactNode;
   label: string;
   formattedValue: string;
   unit: string;
@@ -557,19 +683,24 @@ function MetricCard({
 }) {
   return (
     <Card className={CARD_CLASS}>
-      <CardContent className="p-5">
-        <p className="text-sm font-medium text-muted-foreground">{label}</p>
-        {loading ? (
-          <div
-            className="mt-3 h-9 w-28 animate-pulse rounded bg-muted"
-            aria-label="Cargando indicador"
-          />
-        ) : (
-          <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-            {formattedValue}
-          </p>
-        )}
-        <p className="mt-1 text-xs text-muted-foreground">{unit}</p>
+      <CardContent className="flex items-center gap-4 px-6 py-3">
+        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
+          {icon}
+        </div>
+        <div className="min-w-0">
+          <p className="text-sm font-medium text-muted-foreground">{label}</p>
+          {loading ? (
+            <div
+              className="mt-3 h-9 w-28 animate-pulse rounded bg-muted"
+              aria-label="Cargando indicador"
+            />
+          ) : (
+            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
+              {formattedValue}
+            </p>
+          )}
+          <p className="mt-1 text-xs text-muted-foreground">{unit}</p>
+        </div>
       </CardContent>
     </Card>
   );

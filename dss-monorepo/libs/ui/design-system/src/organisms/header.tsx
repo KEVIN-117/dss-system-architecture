@@ -22,11 +22,13 @@ import {
 
 export interface HeaderProps extends React.HTMLAttributes<HTMLElement> {
   appName?: string;
+  logo?: React.ReactNode;
   contextLabel?: string;
   user?: { name: string; email: string; avatarUrl?: string };
   notificationCount?: number;
   onMenuClick?: () => void;
   onSearch?: (query: string) => void;
+  showSearch?: boolean;
   onNotificationsClick?: () => void;
   onProfileClick?: () => void;
   onSignIn?: () => void;
@@ -36,11 +38,13 @@ export interface HeaderProps extends React.HTMLAttributes<HTMLElement> {
 export function Header({
   className,
   appName = 'DSS académico',
+  logo,
   contextLabel,
   user,
   notificationCount = 0,
   onMenuClick,
   onSearch,
+  showSearch = true,
   onNotificationsClick,
   onProfileClick,
   onSignIn,
@@ -62,7 +66,9 @@ export function Header({
   return (
     <header
       className={cn(
-        'sticky top-0 z-30 grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 border-b border-border bg-card px-4 py-3 text-foreground sm:px-6 md:grid-cols-[minmax(0,1fr)_minmax(14rem,28rem)_minmax(0,1fr)]',
+        'sticky top-0 z-30 grid w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 border-b border-border bg-card px-4 py-3 text-foreground sm:px-6',
+        showSearch &&
+          'md:grid-cols-[minmax(0,1fr)_minmax(14rem,28rem)_minmax(0,1fr)]',
         '[&_:focus-visible]:outline-2 [&_:focus-visible]:outline-offset-2 [&_:focus-visible]:outline-foreground [&_[data-slot=avatar]::after]:shadow-none [&_[data-slot=avatar]::after]:border-border [&_[data-slot=avatar]::after]:mix-blend-normal',
         className,
       )}
@@ -81,10 +87,12 @@ export function Header({
             <Menu aria-hidden="true" />
           </Button>
         )}
-        <GraduationCap
-          className="size-7 shrink-0 text-primary"
-          aria-hidden="true"
-        />
+        {logo ?? (
+          <GraduationCap
+            className="size-7 shrink-0 text-primary"
+            aria-hidden="true"
+          />
+        )}
         <div className="min-w-0">
           <p className="truncate text-base font-semibold leading-6">
             {appName}
@@ -97,34 +105,36 @@ export function Header({
         </div>
       </div>
 
-      <div
-        role="search"
-        aria-label="Búsqueda académica"
-        className="order-3 col-span-2 min-w-0 md:order-none md:col-span-1"
-      >
-        <label htmlFor={searchId} className="sr-only">
-          Buscar en el espacio académico
-        </label>
-        <InputGroup className="min-h-11 bg-background">
-          <InputGroupAddon>
-            <Search
-              className="size-4 text-muted-foreground"
-              aria-hidden="true"
+      {showSearch && (
+        <div
+          role="search"
+          aria-label="Búsqueda académica"
+          className="order-3 col-span-2 min-w-0 md:order-none md:col-span-1"
+        >
+          <label htmlFor={searchId} className="sr-only">
+            Buscar en el espacio académico
+          </label>
+          <InputGroup className="min-h-11 bg-background">
+            <InputGroupAddon>
+              <Search
+                className="size-4 text-muted-foreground"
+                aria-hidden="true"
+              />
+            </InputGroupAddon>
+            <InputGroupInput
+              id={searchId}
+              type="search"
+              placeholder="Buscar informes, cubos o recursos…"
+              value={searchQuery}
+              onChange={(event) => {
+                setSearchQuery(event.target.value);
+                onSearch?.(event.target.value);
+              }}
+              className="text-foreground placeholder:text-muted-foreground"
             />
-          </InputGroupAddon>
-          <InputGroupInput
-            id={searchId}
-            type="search"
-            placeholder="Buscar informes, cubos o recursos…"
-            value={searchQuery}
-            onChange={(event) => {
-              setSearchQuery(event.target.value);
-              onSearch?.(event.target.value);
-            }}
-            className="text-foreground placeholder:text-muted-foreground"
-          />
-        </InputGroup>
-      </div>
+          </InputGroup>
+        </div>
+      )}
 
       <div className="flex min-w-0 items-center justify-end gap-2 md:order-3">
         {onNotificationsClick && (

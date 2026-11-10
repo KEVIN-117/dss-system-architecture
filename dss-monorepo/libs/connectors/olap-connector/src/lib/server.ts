@@ -69,6 +69,7 @@ export class OlapServerClientError extends Error {
     message: string,
     public readonly status: number,
     public readonly code: string,
+    public readonly field?: string,
   ) {
     super(message);
     this.name = 'OlapServerClientError';
@@ -173,12 +174,23 @@ async function requestJson<T>(
           : response.status === 400
             ? 'OLAP_INVALID_QUERY'
             : 'OLAP_UPSTREAM_ERROR';
+      const field =
+        typeof body === 'object' &&
+        body !== null &&
+        'field' in body &&
+        typeof body.field === 'string' &&
+        body.field.length <= 180 &&
+        !body.field.includes(String.fromCharCode(0)) &&
+        !/[\r\n]/.test(body.field)
+          ? body.field
+          : undefined;
       throw new OlapServerClientError(
         response.status === 504
           ? 'OLAP request timed out'
           : 'OLAP request failed',
         response.status,
         code,
+        field,
       );
     }
     if (body === null || typeof body !== 'object') {
