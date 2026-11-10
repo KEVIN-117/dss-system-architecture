@@ -45,6 +45,8 @@ async def _outbox_recovery_loop() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    # Validar configuración de entorno de forma Fail-Fast en startup
+    settings.validate_runtime()
     task = asyncio.create_task(_outbox_recovery_loop())
     try:
         yield
@@ -155,8 +157,32 @@ class ProblemResponse(BaseModel):
     request_id: str
 
 
+COMMON_ERROR_RESPONSES = {
+    400: {"model": ProblemResponse, "description": "Solicitud inválida (RFC 7807)"},
+    401: {"model": ProblemResponse, "description": "No autorizado / Token inválido"},
+    403: {"model": ProblemResponse, "description": "Ámbito o permisos insuficientes"},
+    404: {"model": ProblemResponse, "description": "Recurso no encontrado"},
+    409: {"model": ProblemResponse, "description": "Conflicto de idempotencia"},
+    422: {"model": ProblemResponse, "description": "Perfil no elegible o parámetros no procesables"},
+    500: {"model": ProblemResponse, "description": "Error interno del servidor"},
+    503: {"model": ProblemResponse, "description": "Servicio o modelo no disponible"},
+}
+
+
+class DetailedHealthResponse(BaseModel):
+    """Diagnóstico operativo y métricas de salud del servicio."""
+
+    status: str
+    service: str = "prediction-service"
+    environment: str
+    active_model: dict[str, Any] | None = None
+    database: dict[str, Any]
+    outbox: dict[str, Any]
+    timestamp: str
+
+
 # ---------------------------------------------------------------------------
-# Health check
+# Health check & Operability diagnostics
 # ---------------------------------------------------------------------------
 
 @app.get("/")
@@ -165,11 +191,112 @@ def read_root() -> dict[str, str]:
     return {"message": "Prediction Service is running", "service": "prediction-service"}
 
 
+@app.get(
+    "/v1/health/ready",
+    response_model=DetailedHealthResponse,
+    summary="Readiness probe y diagnóstico de componentes",
+    description="Verifica conectividad básica al JobStore/PostgreSQL, estado de outbox y disponibilidad de modelo activo.",
+    responses={503: {"model": ProblemResponse, "description": "Servicio degradado o no disponible"}},
+)
+def readiness_check() -> Any:
+    now_iso = datetime.now(timezone.utc).isoformat()
+    db_status = {"connected": False, "error": None}
+    outbox_status = {"pending_count": 0, "error": None}
+    active_model_info = None
+
+    # Verificar conectividad a store
+    try:
+        store = JobStore()
+        active_jobs = store.list_active()
+        pending = store.pending_outbox(limit=10)
+        db_status["connected"] = True
+        db_status["active_jobs_count"] = len(active_jobs)
+        outbox_status["pending_count"] = len(pending)
+    except Exception as exc:
+        db_status["error"] = str(exc)
+        outbox_status["error"] = str(exc)
+
+    # Verificar modelo activo
+    try:
+        registry = _model_registry(os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"))
+        bundle = registry.active()
+        active_model_info = {
+            "model_id": bundle.model_id,
+            "version": bundle.version,
+            "algorithm": bundle.manifest.get("algorithm"),
+            "event_code": bundle.manifest.get("classes", {}).get("event_code"),
+        }
+    except Exception as exc:
+        active_model_info = {"status": "NO_ACTIVE_MODEL", "detail": str(exc)}
+
+    is_healthy = db_status["connected"]
+    status_str = "READY" if is_healthy else "DEGRADED"
+
+    response_payload = {
+        "status": status_str,
+        "service": "prediction-service",
+        "environment": settings.environment,
+        "active_model": active_model_info,
+        "database": db_status,
+        "outbox": outbox_status,
+        "timestamp": now_iso,
+    }
+
+    if not is_healthy:
+        return JSONResponse(status_code=503, content=response_payload)
+    return response_payload
+
+
+@app.get(
+    "/metrics",
+    summary="Métricas operativas en formato texto Prometheus",
+    description="Expone métricas del estado del servicio, jobs activos y outbox para observabilidad.",
+)
+def get_metrics() -> Any:
+    from fastapi.responses import PlainTextResponse
+
+    lines = [
+        "# HELP prediction_service_up Indicates whether the service is operational (1) or degraded (0)",
+        "# TYPE prediction_service_up gauge",
+    ]
+    try:
+        store = JobStore()
+        active_jobs = store.list_active()
+        pending = store.pending_outbox(limit=500)
+        lines.append("prediction_service_up 1")
+        lines.append("# HELP prediction_active_jobs_count Number of currently active training jobs")
+        lines.append("# TYPE prediction_active_jobs_count gauge")
+        lines.append(f"prediction_active_jobs_count {len(active_jobs)}")
+        lines.append("# HELP prediction_pending_outbox_count Number of pending outbox events awaiting dispatch")
+        lines.append("# TYPE prediction_pending_outbox_count gauge")
+        lines.append(f"prediction_pending_outbox_count {len(pending)}")
+    except Exception:
+        lines.append("prediction_service_up 0")
+
+    # Modelo activo
+    lines.append("# HELP prediction_active_model_available Indicates if an active approved model is loaded")
+    lines.append("# TYPE prediction_active_model_available gauge")
+    try:
+        registry = _model_registry(os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"))
+        registry.active()
+        lines.append("prediction_active_model_available 1")
+    except Exception:
+        lines.append("prediction_active_model_available 0")
+
+    return PlainTextResponse("\n".join(lines) + "\n", media_type="text/plain; version=0.0.4; charset=utf-8")
+
+
 # ---------------------------------------------------------------------------
 # Prediction from one explicitly activated, integrity-checked bundle
 # ---------------------------------------------------------------------------
 
-@app.post("/predict")
+@app.post(
+    "/predict",
+    deprecated=True,
+    summary="Legacy prediction endpoint (DEPRECATED)",
+    description="Endpoint deprecado sin verificación de contexto DW seguro. Use POST /v1/predictions en su lugar.",
+    responses={503: {"model": ProblemResponse, "description": "Servicio no disponible o sin modelo activo"}},
+)
 def predict_legacy(data: dict) -> dict:
     """Legacy route: refuse fake inference until a trusted DW adapter exists."""
     registry = _model_registry(os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"))
@@ -192,7 +319,21 @@ def predict_legacy(data: dict) -> dict:
     })
 
 
-@app.post("/v1/predictions", response_model=PredictionResponse)
+@app.post(
+    "/v1/predictions",
+    response_model=PredictionResponse,
+    summary="Inferencia puntual de riesgo académico",
+    description="Calcula la predicción para un estudiante usando features auditables de punto en tiempo del DW.",
+    responses={
+        400: COMMON_ERROR_RESPONSES[400],
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        404: COMMON_ERROR_RESPONSES[404],
+        422: COMMON_ERROR_RESPONSES[422],
+        500: COMMON_ERROR_RESPONSES[500],
+        503: COMMON_ERROR_RESPONSES[503],
+    },
+)
 def predict_v1(
     body: PredictionRequest,
     authorization: str | None = Header(default=None, alias="Authorization"),
@@ -257,7 +398,16 @@ def _publication_error(exc: InferenceFailure, request_id: str) -> JSONResponse:
     )
 
 
-@app.get("/v1/academic-options")
+@app.get(
+    "/v1/academic-options",
+    summary="Listar opciones académicas autorizadas",
+    description="Devuelve programas y cortes procesados visibles según los roles y facultades del token.",
+    responses={
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        503: COMMON_ERROR_RESPONSES[503],
+    },
+)
 def get_prediction_academic_options(
     authorization: str | None = Header(default=None, alias="Authorization"),
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
@@ -276,7 +426,19 @@ def get_prediction_academic_options(
         return _make_problem(503, "Academic options unavailable", "PREDICTION_OPTIONS_UNAVAILABLE", request_id)
 
 
-@app.post("/v1/prediction-batches", status_code=202)
+@app.post(
+    "/v1/prediction-batches",
+    status_code=202,
+    summary="Encolar scoring poblacional",
+    description="Autoriza un programa/corte y envía la tarea de puntuación por lotes de forma asíncrona.",
+    responses={
+        400: COMMON_ERROR_RESPONSES[400],
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        409: COMMON_ERROR_RESPONSES[409],
+        503: COMMON_ERROR_RESPONSES[503],
+    },
+)
 def submit_prediction_batch(
     body: PredictionBatchRequest,
     idempotency_key: str = Header(alias="Idempotency-Key", min_length=16, max_length=128),
@@ -300,7 +462,17 @@ def submit_prediction_batch(
         return _make_problem(503, "Publication unavailable", "PREDICTION_PUBLICATION_UNAVAILABLE", request_id)
 
 
-@app.get("/v1/prediction-publications")
+@app.get(
+    "/v1/prediction-publications",
+    summary="Consultar publicación poblacional vigente",
+    description="Devuelve únicamente el último lote completado y publicado tras autorización académica del servidor.",
+    responses={
+        400: COMMON_ERROR_RESPONSES[400],
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        503: COMMON_ERROR_RESPONSES[503],
+    },
+)
 def get_current_prediction_publication(
     program_ref: str = Query(min_length=1, max_length=64),
     cut_id: str = Query(min_length=1, max_length=128),
@@ -323,7 +495,17 @@ def get_current_prediction_publication(
         return _make_problem(503, "Publication unavailable", "PREDICTION_PUBLICATION_UNAVAILABLE", request_id)
 
 
-@app.get("/v1/prediction-batches/{batch_id}")
+@app.get(
+    "/v1/prediction-batches/{batch_id}",
+    summary="Consultar estado de un lote de predicción",
+    description="Devuelve el estado y los resultados (si está publicado) de un lote específico.",
+    responses={
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        404: COMMON_ERROR_RESPONSES[404],
+        503: COMMON_ERROR_RESPONSES[503],
+    },
+)
 def get_prediction_batch(
     batch_id: str,
     limit: int = Query(default=100, ge=1, le=1000),
@@ -365,7 +547,19 @@ def _make_problem(
     )
 
 
-@app.post("/v1/training-jobs", status_code=202, response_model=TrainingJobResponse)
+@app.post(
+    "/v1/training-jobs",
+    status_code=202,
+    response_model=TrainingJobResponse,
+    summary="Solicitar entrenamiento asíncrono",
+    description="Requiere permiso de operador ML. Encola el trabajo y nunca entrena dentro de la petición.",
+    responses={
+        400: COMMON_ERROR_RESPONSES[400],
+        409: COMMON_ERROR_RESPONSES[409],
+        429: {"model": ProblemResponse, "description": "Capacidad de workers agotada"},
+        500: COMMON_ERROR_RESPONSES[500],
+    },
+)
 def submit_training_job(
     body: TrainingJobRequest,
     idempotency_key: str = Header(alias="Idempotency-Key", min_length=16, max_length=128),
@@ -451,7 +645,16 @@ def submit_training_job(
 # Training Jobs — GET /v1/training-jobs/{jobId}
 # ---------------------------------------------------------------------------
 
-@app.get("/v1/training-jobs/{job_id}", response_model=TrainingJobResponse)
+@app.get(
+    "/v1/training-jobs/{job_id}",
+    response_model=TrainingJobResponse,
+    summary="Consultar estado de trabajo de entrenamiento",
+    description="Consulta el estado, métricas y candidato del modelo si el trabajo finalizó con éxito.",
+    responses={
+        404: COMMON_ERROR_RESPONSES[404],
+        500: COMMON_ERROR_RESPONSES[500],
+    },
+)
 def get_training_job(
     job_id: str,
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),

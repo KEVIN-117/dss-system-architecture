@@ -218,6 +218,61 @@ class TrainingApiTests(unittest.TestCase):
         finally:
             del app.state.prediction_service
 
+    def test_readiness_probe_returns_detailed_health(self) -> None:
+        response = self.client.get("/v1/health/ready")
+        self.assertEqual(response.status_code, 200)
+        data = response.json()
+        self.assertIn("status", data)
+        self.assertEqual(data["service"], "prediction-service")
+        self.assertTrue(data["database"]["connected"])
+        self.assertIn("outbox", data)
+        self.assertIn("active_model", data)
+
+    def test_metrics_endpoint_returns_prometheus_format(self) -> None:
+        response = self.client.get("/metrics")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/plain", response.headers["content-type"])
+        body = response.text
+        self.assertIn("prediction_service_up", body)
+        self.assertIn("prediction_active_jobs_count", body)
+        self.assertIn("prediction_pending_outbox_count", body)
+        self.assertIn("prediction_active_model_available", body)
+
+    def test_openapi_schema_documents_problem_responses_and_deprecated_predict(self) -> None:
+        response = self.client.get("/openapi.json")
+        self.assertEqual(response.status_code, 200)
+        schema = response.json()
+        # Verificar endpoint legacy deprecado
+        predict_spec = schema["paths"]["/predict"]["post"]
+        self.assertTrue(predict_spec.get("deprecated", False))
+
+        # Verificar responses documentadas en endpoints v1
+        v1_predictions = schema["paths"]["/v1/predictions"]["post"]["responses"]
+        for code in ("401", "403", "422", "503"):
+            self.assertIn(code, v1_predictions)
+            self.assertIn("ProblemResponse", str(v1_predictions[code]))
+
+        v1_batches = schema["paths"]["/v1/prediction-batches"]["post"]["responses"]
+        self.assertIn("409", v1_batches)
+
+    def test_config_validate_runtime_in_production(self) -> None:
+        from config import Settings
+        import os
+
+        old_env = os.environ.get("PREDICTION_ENV")
+        try:
+            os.environ["PREDICTION_ENV"] = "production"
+            # Settings para producción sin vars requeridas debe fallar
+            prod_settings = Settings("production", "0.0.0.0", 8000, "info", False)
+            with self.assertRaises(RuntimeError) as ctx:
+                prod_settings.validate_runtime()
+            self.assertIn("Runtime configuration missing or invalid", str(ctx.exception))
+        finally:
+            if old_env is not None:
+                os.environ["PREDICTION_ENV"] = old_env
+            else:
+                os.environ.pop("PREDICTION_ENV", None)
+
 
 if __name__ == "__main__":
     unittest.main()

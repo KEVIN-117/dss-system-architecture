@@ -66,7 +66,8 @@ class KeycloakIdentityProvider:
         # http://auth-service:8000); Auth Service is mounted below /api/v1.
         auth_url = _required_env("AUTH_SERVICE_URL").rstrip("/") + "/api/v1/auth/me"
         try:
-            response = httpx.get(auth_url, headers={"Authorization": f"Bearer {access_token}"}, timeout=5.0)
+            http_timeout = httpx.Timeout(connect=3.0, read=5.0, write=5.0, pool=5.0)
+            response = httpx.get(auth_url, headers={"Authorization": f"Bearer {access_token}"}, timeout=http_timeout)
             response.raise_for_status()
             profile = response.json()
         except Exception as exc:

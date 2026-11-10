@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
+import json
+import logging
 import os
 from dataclasses import dataclass
+
+logger = logging.getLogger(__name__)
 
 
 _ALLOWED_ENVIRONMENTS = {"development", "test", "production"}
@@ -70,6 +74,55 @@ class Settings:
             raise ValueError("PREDICTION_RELOAD must be false in production.")
 
         return cls(environment, host, port, log_level, reload)
+
+    def validate_runtime(self) -> list[str]:
+        """Validate critical runtime environment variables.
+
+        In production, raises RuntimeError if required settings are missing.
+        In development/test, logs warnings and returns missing variable names.
+        """
+        missing: list[str] = []
+
+        # Database URL
+        db_url = os.getenv("PREDICTION_DATABASE_URL", "").strip()
+        if not db_url:
+            missing.append("PREDICTION_DATABASE_URL")
+
+        # DW Database URL
+        dw_url = os.getenv("PREDICTION_DW_DATABASE_URL", "").strip()
+        if not dw_url:
+            missing.append("PREDICTION_DW_DATABASE_URL")
+
+        # Keycloak settings
+        for key in ("KEYCLOAK_URL", "KEYCLOAK_REALM", "KEYCLOAK_AUDIENCE", "KEYCLOAK_ROLE_CLIENT_ID"):
+            if not os.getenv(key, "").strip():
+                missing.append(key)
+
+        # Auth service URL
+        auth_url = os.getenv("AUTH_SERVICE_URL", "").strip()
+        if not auth_url:
+            missing.append("AUTH_SERVICE_URL")
+
+        # Academic role policies
+        allowed_roles_raw = os.getenv("PREDICTION_ALLOWED_ROLES", "").strip()
+        if not allowed_roles_raw:
+            missing.append("PREDICTION_ALLOWED_ROLES")
+        else:
+            try:
+                roles = json.loads(allowed_roles_raw)
+                valid = {"DIRECTOR", "DECANO", "RECTOR"}
+                if not isinstance(roles, list) or not roles or any(r not in valid for r in roles):
+                    missing.append("PREDICTION_ALLOWED_ROLES (invalid role format)")
+            except Exception:
+                missing.append("PREDICTION_ALLOWED_ROLES (invalid JSON)")
+
+        if missing:
+            msg = f"Runtime configuration missing or invalid: {', '.join(missing)}"
+            if self.environment == "production":
+                raise RuntimeError(msg)
+            logger.warning("Development/Test non-blocking configuration notice: %s", msg)
+
+        return missing
 
 
 @dataclass(frozen=True)

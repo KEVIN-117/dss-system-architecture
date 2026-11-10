@@ -333,12 +333,12 @@ core.*
 
 .agents/
 **/.agents/
+.impeccable/
+**/.impeccable/
 
-# Local Codex conversation exports and design-tool state; never project source.
-/.impeccable/
-/chat_summary.md
-/scratch_chat.html
-/scratch_chat_content.json
-
-# Local document review working files; preserve locally, keep out of Git.
-/outputs/chapter3-review/
+# Chat summaries & local review scratch files
+chat_summary.md
+scratch_chat.html
+scratch_chat_content.json
+/outputs/
+**/outputs/
