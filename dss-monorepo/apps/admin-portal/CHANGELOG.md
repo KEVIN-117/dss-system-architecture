@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.3.0...admin-portal-v1.4.0) (2026-11-10)
+
+
+### Features
+
+* **prediction:** permitir carga de datasets preparados para entrenamiento ML ([#251](https://github.com/KEVIN-117/dss-system-architecture/issues/251)) ([0812d21](https://github.com/KEVIN-117/dss-system-architecture/commit/0812d210dad92261fcb087686d250d63525a8d1a))
+
 ## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.2.0...admin-portal-v1.3.0) (2026-11-10)
 
 
