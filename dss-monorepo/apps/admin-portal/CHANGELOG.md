@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.2.0...admin-portal-v1.3.0) (2026-11-10)
+
+
+### Features
+
+* **frontend:** conectar analítica académica del Director ([#159](https://github.com/KEVIN-117/dss-system-architecture/issues/159)) ([#242](https://github.com/KEVIN-117/dss-system-architecture/issues/242)) ([ea33bdf](https://github.com/KEVIN-117/dss-system-architecture/commit/ea33bdf357b69daa5c4d2378a1d7d7377514691c))
+
 ## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.1.0...admin-portal-v1.2.0) (2026-11-08)
 
 
