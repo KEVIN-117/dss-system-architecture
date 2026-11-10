@@ -63,11 +63,15 @@ celery_app.conf.update(
 
 def _resolve_dataset(dataset_ref: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Resolve and load manifest and rows from dataset_ref."""
+    normalized_ref = dataset_ref.removeprefix("custom:")
     dataset_root = os.getenv("PREDICTION_DATASET_ROOT")
     if dataset_root and not dataset_ref.startswith(("synthetic:", "fixture:")):
         root = Path(dataset_root).resolve()
-        ref_path = (root / dataset_ref).resolve()
-        if root not in ref_path.parents:
+        # Permitir resolución directa de carpetas o carpetas dentro de custom/
+        ref_path = (root / normalized_ref).resolve()
+        if not ref_path.is_dir() and (root / "custom" / normalized_ref).is_dir():
+            ref_path = (root / "custom" / normalized_ref).resolve()
+        if root not in ref_path.parents and ref_path != root:
             raise ValueError("Dataset reference escapes the configured snapshot root.")
     else:
         ref_path = Path(dataset_ref) if dataset_ref.startswith("synthetic:") else Path("__no_external_dataset__")

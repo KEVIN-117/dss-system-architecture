@@ -1,6 +1,7 @@
 const BFF_BASE_URL =
   process.env.NEXT_PUBLIC_BFF_URL?.trim().replace(/\/$/, '') ?? '';
 const TRAINING_JOBS_URL = `${BFF_BASE_URL}/api/prediction/v1/training-jobs`;
+const DATASETS_URL = `${BFF_BASE_URL}/api/prediction/v1/datasets`;
 
 export type MlAlgorithm = 'random_forest' | 'xgboost';
 export interface TrainingJobRequest {
@@ -16,6 +17,57 @@ export interface TrainingJob {
   created_at: string;
   model_candidate?: { model_id: string; version: string } | null;
   error?: { title?: string } | null;
+}
+
+export interface DatasetOption {
+  dataset_ref: string;
+  dataset_id: string;
+  label: string;
+  description?: string | null;
+  is_custom: boolean;
+  row_count: number;
+  target_field?: string | null;
+  event_code?: string | null;
+  created_at?: string | null;
+}
+
+export interface DatasetUploadResult {
+  message: string;
+  dataset_ref: string;
+  dataset_id: string;
+  row_count: number;
+  content_digest: string;
+  target_field: string;
+  event_code?: string | null;
+}
+
+export async function getAvailableDatasets(): Promise<DatasetOption[]> {
+  const response = await fetch(DATASETS_URL, {
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw await responseError(response);
+  return (await response.json()) as DatasetOption[];
+}
+
+export async function uploadCustomDataset(
+  file: File,
+): Promise<DatasetUploadResult> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${DATASETS_URL}/upload`, {
+    method: 'POST',
+    credentials: 'include',
+    cache: 'no-store',
+    headers: {
+      Accept: 'application/json',
+    },
+    body: formData,
+  });
+  if (!response.ok) throw await responseError(response);
+  return (await response.json()) as DatasetUploadResult;
 }
 
 export async function submitMlTrainingJob(
