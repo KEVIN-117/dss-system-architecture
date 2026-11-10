@@ -2,6 +2,7 @@ import './global.css';
 import { Providers } from './providers';
 import { PortalBoundary } from './components/portal-frame';
 import type { ReactNode } from 'react';
+import Script from 'next/script';
 
 export const metadata = {
   title: 'Portal de Rectoría | DSS UATF',
@@ -22,7 +23,17 @@ const authConfig = { bffBaseUrl: requiredAuthEnv('NEXT_PUBLIC_BFF_URL') };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="es" data-theme="rector" className="dark">
+    <html
+      lang="es"
+      data-theme="rector"
+      className="dark"
+      suppressHydrationWarning
+    >
+      <head>
+        <Script id="dss-theme-init" strategy="beforeInteractive">
+          {`try { document.documentElement.classList.toggle('dark', localStorage.getItem('dss-theme-mode') !== 'light'); } catch {}`}
+        </Script>
+      </head>
       <body>
         <Providers bffBaseUrl={authConfig.bffBaseUrl}>
           <PortalBoundary>{children}</PortalBoundary>

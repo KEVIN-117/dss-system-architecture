@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import Script from 'next/script';
 import { Providers } from './providers';
 import './globals.css';
 
@@ -17,7 +18,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="es" className="dark">
+    <html lang="es" className="dark" suppressHydrationWarning>
+      <head>
+        <Script id="dss-theme-init" strategy="beforeInteractive">
+          {`try { document.documentElement.classList.toggle('dark', localStorage.getItem('dss-theme-mode') !== 'light'); } catch {}`}
+        </Script>
+      </head>
       <body>
         <Providers bffBaseUrl={process.env.NEXT_PUBLIC_BFF_URL ?? ''}>
           {children}

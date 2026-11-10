@@ -14,7 +14,7 @@ beforeEach(() => {
   requests = []; kind = 'career'; vi.stubEnv('NEXT_PUBLIC_BFF_URL', 'http://localhost:3006');
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body)); requests.push(body);
-    if (body.query.includes('DirectorAnalyticsViewer')) return Response.json({ data: { viewer: { academicScope: { kind, careerIds: kind === 'career' ? ['AGR'] : [] } } } });
+    if (body.query.includes('DirectorAnalyticsViewer')) return Response.json({ data: { viewer: { academicScope: { kind, careerIds: kind === 'career' ? ['AGR'] : [], facultyIds: kind === 'faculty' ? ['FAC-1'] : [] } } } });
     if (body.query.includes('DirectorAnalyticsCubes')) return Response.json({ data: { olapCubes: [{ cubeId: 'dw/catalog/schema/Academic Performance', cubeName: 'Academic Performance' }] } });
     if (body.query.includes('DirectorAnalyticsSchema')) return Response.json({ data: { olapCubeSchema: schema } });
     return Response.json({ data: { analyticQuery: { data: [{ 'Academic Year': '2024', Career: 'Agronomía', 'Enrollment Attempts': 45 }, { 'Academic Year': '2023', Career: 'Medicina', 'Enrollment Attempts': 30 }] } } });
@@ -22,7 +22,7 @@ beforeEach(() => {
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 describe('academic reports', () => {
-  it.each([['career'], ['global']] as const)('loads only the selected cube for %s scope and filters its rows', async (scope) => {
+  it.each([['career'], ['faculty'], ['global']] as const)('loads only the selected cube for %s scope and filters its rows', async (scope) => {
     kind = scope; render(<AcademicReports section="performance" scope={scope} />);
     await screen.findByText('Agronomía');
     expect(screen.getByText('Medicina')).toBeTruthy();

@@ -11,6 +11,7 @@ import {
 } from '../atoms/input-group';
 import { Avatar, AvatarFallback, AvatarImage } from '../atoms/avatar';
 import { Badge } from '../atoms/badge';
+import { ThemeToggle } from '../atoms/theme-toggle';
 import {
   Popover,
   PopoverTrigger,
@@ -137,6 +138,7 @@ export function Header({
       )}
 
       <div className="flex min-w-0 items-center justify-end gap-2 md:order-3">
+        <ThemeToggle />
         {onNotificationsClick && (
           <Button
             type="button"

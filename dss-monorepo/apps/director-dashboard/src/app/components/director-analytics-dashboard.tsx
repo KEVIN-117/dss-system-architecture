@@ -1,6 +1,7 @@
 'use client';
 
 import { AcademicBarChart, TrendLineChart } from '@dss-monorepo/charts';
+import { AcademicSparkline } from '@dss-monorepo/academic-analytics';
 import {
   Button,
   Card,
@@ -164,6 +165,9 @@ export function DirectorAnalyticsDashboard() {
   const [selectedYear, setSelectedYear] = useState('');
   const [tableFilter, setTableFilter] = useState('');
   const [tablePage, setTablePage] = useState(0);
+  const [activeTrend, setActiveTrend] = useState<'attempts' | 'grade'>(
+    'attempts',
+  );
   const [analytics, setAnalytics] = useState<AnalyticsState>(EMPTY_ANALYTICS);
   const [initialLoading, setInitialLoading] = useState(true);
   const [queryLoading, setQueryLoading] = useState(false);
@@ -506,6 +510,7 @@ export function DirectorAnalyticsDashboard() {
           }
           value={formatInteger(analytics.enrollmentAttempts)}
           unit={paths?.enrollmentUnit ?? 'intentos de cursado'}
+          series={analytics.attemptsByPeriod}
           loading={initialLoading || queryLoading}
         />
         <MetricCard
@@ -517,6 +522,7 @@ export function DirectorAnalyticsDashboard() {
           }
           value={formatGrade(analytics.averageGrade)}
           unit={paths?.gradeUnit ?? 'escala institucional'}
+          series={analytics.gradeByPeriod}
           loading={initialLoading || queryLoading}
         />
         <MetricCard
@@ -551,46 +557,75 @@ export function DirectorAnalyticsDashboard() {
         </p>
       </div>
 
-      <section
-        aria-label="Evolución académica de la carrera"
-        className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"
-      >
+      <section aria-labelledby="director-trend-title" className="space-y-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1">
+            <h2 id="director-trend-title" className="text-xl font-semibold">
+              Evolución de la carrera
+            </h2>
+            <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+              Revisa los intentos de cursado o el promedio final en los periodos
+              disponibles.
+            </p>
+          </div>
+          <div
+            role="group"
+            aria-label="Indicador de evolución"
+            className="flex w-fit gap-1 rounded-lg bg-muted/60 p-1"
+          >
+            <Button
+              type="button"
+              variant={activeTrend === 'attempts' ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-pressed={activeTrend === 'attempts'}
+              onClick={() => setActiveTrend('attempts')}
+              className="min-h-9"
+            >
+              Intentos
+            </Button>
+            <Button
+              type="button"
+              variant={activeTrend === 'grade' ? 'secondary' : 'ghost'}
+              size="sm"
+              aria-pressed={activeTrend === 'grade'}
+              onClick={() => setActiveTrend('grade')}
+              className="min-h-9"
+            >
+              Promedio final
+            </Button>
+          </div>
+        </div>
         <Card className={`min-w-0 ${CARD_CLASS}`}>
-          <CardHeader className="px-6 pt-2">
-            <CardTitle>Intentos por periodo</CardTitle>
+          <CardHeader className="px-6 pt-5">
+            <CardTitle>
+              {activeTrend === 'attempts'
+                ? 'Intentos por periodo académico'
+                : 'Promedio final por periodo académico'}
+            </CardTitle>
             <CardDescription>
-              Suma de conteos de intento en los registros de cursado, agrupada
-              por gestión y periodo académico.
+              {activeTrend === 'attempts'
+                ? 'Suma de registros de cursado agrupados por gestión y periodo.'
+                : 'Promedio de las notas finales registradas en cada periodo.'}
             </CardDescription>
           </CardHeader>
-          <CardContent className="min-h-80 px-6 pb-4">
-            <AcademicBarChart
-              data={analytics.attemptsByPeriod}
-              title="Intentos de cursado por periodo"
-              ariaLabel={`Intentos de cursado por periodo académico en el contexto asignado. ${analytics.attemptsByPeriod.length} periodos.`}
-              loading={initialLoading || queryLoading}
-              emptyMessage="No hay intentos de cursado para esta gestión."
-              height={320}
-            />
-          </CardContent>
-        </Card>
-        <Card className={`min-w-0 ${CARD_CLASS}`}>
-          <CardHeader>
-            <CardTitle>Nota final promedio por periodo</CardTitle>
-            <CardDescription>
-              Promedio de nota final de los registros con calificación, sin
-              sumar calificaciones entre periodos.
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="min-h-80">
-            <TrendLineChart
-              data={analytics.gradeByPeriod}
-              title="Nota final promedio por periodo"
-              ariaLabel={`Nota final promedio por periodo académico en el contexto asignado. ${analytics.gradeByPeriod.length} periodos.`}
-              loading={initialLoading || queryLoading}
-              emptyMessage="El cubo no devolvió calificaciones para esta gestión."
-              height={320}
-            />
+          <CardContent className="min-h-80 px-6 pb-5">
+            {activeTrend === 'attempts' ? (
+              <AcademicBarChart
+                data={analytics.attemptsByPeriod}
+                ariaLabel={`Intentos de cursado por periodo académico en el contexto asignado. ${analytics.attemptsByPeriod.length} periodos.`}
+                loading={initialLoading || queryLoading}
+                emptyMessage="No hay intentos de cursado para esta selección."
+                height={300}
+              />
+            ) : (
+              <TrendLineChart
+                data={analytics.gradeByPeriod}
+                ariaLabel={`Nota final promedio por periodo académico en el contexto asignado. ${analytics.gradeByPeriod.length} periodos.`}
+                loading={initialLoading || queryLoading}
+                emptyMessage="El cubo no devolvió calificaciones para esta selección."
+                height={300}
+              />
+            )}
           </CardContent>
         </Card>
       </section>
@@ -712,20 +747,19 @@ function MetricCard({
   label,
   value,
   unit,
+  series = [],
   loading,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string;
   unit: string;
+  series?: { label: string; value: number }[];
   loading: boolean;
 }) {
   return (
     <Card className={CARD_CLASS}>
-      <CardContent className="flex items-center gap-4 px-6 py-3">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-          {icon}
-        </div>
+      <CardContent className="grid min-h-40 grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 px-5 py-5 sm:px-6">
         <div className="min-w-0">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
           {loading ? (
@@ -740,6 +774,21 @@ function MetricCard({
           )}
           <p className="mt-1 text-xs text-muted-foreground">{unit}</p>
         </div>
+        <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          {icon}
+        </div>
+        {series.length > 0 && !loading ? (
+          <div className="col-span-2 flex items-center justify-between gap-4 border-t border-border pt-3">
+            <span className="text-xs text-muted-foreground">
+              Tendencia · {series.length} periodos
+            </span>
+            <AcademicSparkline
+              label={label}
+              data={series}
+              className="h-8 w-28 shrink-0 text-[color:var(--role-accent,var(--primary))]"
+            />
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );

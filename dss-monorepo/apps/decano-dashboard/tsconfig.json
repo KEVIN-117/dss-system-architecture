@@ -71,6 +71,9 @@
       "path": "../../libs/charts"
     },
     {
+      "path": "../../libs/ui/academic-analytics"
+    },
+    {
       "path": "../../libs/auth"
     }
   ]
