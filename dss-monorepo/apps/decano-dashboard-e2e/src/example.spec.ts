@@ -19,8 +19,22 @@ test('shows access denied to an authenticated user without the dean role', async
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Acceso no autorizado' })).toBeVisible();
-  await expect(page.getByText('portal del decano')).toBeVisible();
+  await expect(page.getByText('portal Decanato')).toBeVisible();
   await expect(page.getByText('Decano Dashboard')).toHaveCount(0);
+});
+
+test('renders the faculty analytics workspace for an authorized dean', async ({ page }) => {
+  await mockSession(page, 'http://localhost:3002', ['DECANO']);
+  await page.goto('/');
+
+  const navigation = page.getByRole('navigation');
+  await expect(navigation.getByText('Rendimiento', { exact: true })).toBeVisible();
+  await expect(
+    navigation.getByRole('link', { name: 'Resultados por gestión' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Resumen de la facultad' }),
+  ).toBeVisible();
 });
 
 async function mockSession(page: import('@playwright/test').Page, origin: string, roles: string[]) {

@@ -1,4 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { parse } from 'yaml';
 
@@ -50,6 +51,7 @@ export type ApiOperation = {
   requestRequired: boolean;
   requestExample?: unknown;
   responses: ApiResponse[];
+  referenceSlug: string;
 };
 
 export type ApiService = {
@@ -60,6 +62,16 @@ export type ApiService = {
   operations: ApiOperation[];
 };
 
+export function apiOperationSlug(
+  operation: Pick<ApiOperation, 'method' | 'path'>,
+): string {
+  const suffix = createHash('sha1')
+    .update(`${operation.method}:${operation.path}`)
+    .digest('hex')
+    .slice(0, 8);
+  return `${operation.method.toLowerCase()}-${suffix}`;
+}
+
 function findRepositoryRoot(): string {
   const candidates = [
     path.resolve(process.cwd(), '..', '..', '..'),
@@ -67,7 +79,9 @@ function findRepositoryRoot(): string {
     process.cwd(),
   ];
 
-  const root = candidates.find((candidate) => existsSync(path.join(candidate, 'docs')));
+  const root = candidates.find((candidate) =>
+    existsSync(path.join(candidate, 'docs')),
+  );
 
   if (!root) {
     throw new Error('No se encontró el directorio docs del repositorio.');
@@ -76,7 +90,9 @@ function findRepositoryRoot(): string {
   return root;
 }
 
-function discoverOpenApiContracts(root: string): Array<{ id: string; sourcePath: string }> {
+function discoverOpenApiContracts(
+  root: string,
+): Array<{ id: string; sourcePath: string }> {
   const docsRoot = path.join(root, 'docs');
   const files: string[] = [];
   const visit = (directory: string) => {
@@ -89,12 +105,25 @@ function discoverOpenApiContracts(root: string): Array<{ id: string; sourcePath:
 
   visit(docsRoot);
 
-  return files.flatMap((absolutePath) => {
-    const document = parse(readFileSync(absolutePath, 'utf8'));
-    if (typeof document?.openapi !== 'string' || !document.paths) return [];
-    const sourcePath = path.relative(root, absolutePath).split(path.sep).join('/');
-    return [{ id: sourcePath.replace(/^docs\//, '').replace(/\.ya?ml$/i, '').replace(/[^a-z0-9]+/gi, '-'), sourcePath }];
-  }).sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
+  return files
+    .flatMap((absolutePath) => {
+      const document = parse(readFileSync(absolutePath, 'utf8'));
+      if (typeof document?.openapi !== 'string' || !document.paths) return [];
+      const sourcePath = path
+        .relative(root, absolutePath)
+        .split(path.sep)
+        .join('/');
+      return [
+        {
+          id: sourcePath
+            .replace(/^docs\//, '')
+            .replace(/\.ya?ml$/i, '')
+            .replace(/[^a-z0-9]+/gi, '-'),
+          sourcePath,
+        },
+      ];
+    })
+    .sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
 }
 
 function resolveSchemaRef(document: any, schema: any): any {
@@ -107,21 +136,38 @@ function resolveSchemaRef(document: any, schema: any): any {
 
 function schemaType(schema: any, document: any): string {
   const resolved = resolveSchemaRef(document, schema);
-  if (resolved?.type === 'array') return `array<${schemaType(resolved.items, document)}>`;
+  if (resolved?.type === 'array')
+    return `array<${schemaType(resolved.items, document)}>`;
   const composed = resolved?.oneOf ?? resolved?.anyOf;
-  if (composed?.length) return composed.map((item: any) => schemaType(item, document)).join(' | ');
+  if (composed?.length)
+    return composed.map((item: any) => schemaType(item, document)).join(' | ');
   if (resolved?.type) {
-    return Array.isArray(resolved.type) ? resolved.type.join(' | ') : resolved.type;
+    return Array.isArray(resolved.type)
+      ? resolved.type.join(' | ')
+      : resolved.type;
   }
   return resolved?.enum ? resolved.enum.join(' | ') : 'object';
 }
 
-function fieldsForSchema(document: any, schema: any, depth = 0): ApiSchemaField[] {
+function fieldsForSchema(
+  document: any,
+  schema: any,
+  depth = 0,
+): ApiSchemaField[] {
   if (depth > 5) return [];
   const resolved = resolveSchemaRef(document, schema);
-  const composedSchemas = (resolved?.allOf ?? []).map((part: any) => resolveSchemaRef(document, part));
-  const properties = Object.assign({}, ...composedSchemas.map((part: any) => part?.properties ?? {}), resolved?.properties ?? {});
-  const required = new Set<string>([...(resolved?.required ?? []), ...composedSchemas.flatMap((part: any) => part?.required ?? [])]);
+  const composedSchemas = (resolved?.allOf ?? []).map((part: any) =>
+    resolveSchemaRef(document, part),
+  );
+  const properties = Object.assign(
+    {},
+    ...composedSchemas.map((part: any) => part?.properties ?? {}),
+    resolved?.properties ?? {},
+  );
+  const required = new Set<string>([
+    ...(resolved?.required ?? []),
+    ...composedSchemas.flatMap((part: any) => part?.required ?? []),
+  ]);
 
   return Object.entries(properties).map(([name, field]: [string, any]) => {
     const property = resolveSchemaRef(document, field);
@@ -144,7 +190,9 @@ function declaredExample(document: any, media: any): unknown {
 }
 
 function joinPath(serverUrl: string | undefined, endpointPath: string): string {
-  const prefix = serverUrl?.startsWith('http') ? new URL(serverUrl).pathname : serverUrl;
+  const prefix = serverUrl?.startsWith('http')
+    ? new URL(serverUrl).pathname
+    : serverUrl;
   const combined = `${prefix ?? ''}/${endpointPath}`.replace(/\/{2,}/g, '/');
   return combined.startsWith('/') ? combined : `/${combined}`;
 }
@@ -154,43 +202,58 @@ function operationAuth(document: any, operation: any): string {
   if (requirements.length === 0) return 'Sin autenticación declarada';
 
   return requirements
-    .flatMap((requirement: Record<string, string[]>) => Object.keys(requirement))
+    .flatMap((requirement: Record<string, string[]>) =>
+      Object.keys(requirement),
+    )
     .map((name: string) => {
       const scheme = document.components?.securitySchemes?.[name];
-      if (scheme?.type === 'http' && scheme.scheme === 'bearer') return 'Bearer token';
+      if (scheme?.type === 'http' && scheme.scheme === 'bearer')
+        return 'Bearer token';
       if (scheme?.type === 'openIdConnect') return 'OpenID Connect';
       return name;
     })
     .join(', ');
 }
 
-function parseContract(id: string, sourcePath: string, root: string): ApiService {
+function parseContract(
+  id: string,
+  sourcePath: string,
+  root: string,
+): ApiService {
   const document = parse(readFileSync(path.join(root, sourcePath), 'utf8'));
   const serverUrl = document.servers?.[0]?.url;
   const operations: ApiOperation[] = [];
 
   for (const [route, pathItem] of Object.entries<any>(document.paths ?? {})) {
     for (const [method, operation] of Object.entries<any>(pathItem)) {
-      if (!['get', 'post', 'put', 'patch', 'delete', 'options', 'head'].includes(method)) continue;
+      if (
+        !['get', 'post', 'put', 'patch', 'delete', 'options', 'head'].includes(
+          method,
+        )
+      )
+        continue;
 
       const body = resolveSchemaRef(document, operation.requestBody);
       const content = body?.content ?? {};
       const requestContentType = Object.keys(content)[0];
       const requestSchema = content[requestContentType]?.schema;
-      const responses = Object.entries<any>(operation.responses ?? {}).map(([status, unresolvedResponse]) => {
-        const response = resolveSchemaRef(document, unresolvedResponse);
-        const responseContent = response.content ?? {};
-        const responseMedia = Object.values<any>(responseContent)[0];
-        return {
-          status,
-          description: response.description ?? 'Sin descripción en el contrato.',
-          contentTypes: Object.keys(responseContent),
-          schemaFields: fieldsForSchema(document, responseMedia?.schema),
-          example: declaredExample(document, responseMedia),
-        };
-      });
+      const responses = Object.entries<any>(operation.responses ?? {}).map(
+        ([status, unresolvedResponse]) => {
+          const response = resolveSchemaRef(document, unresolvedResponse);
+          const responseContent = response.content ?? {};
+          const responseMedia = Object.values<any>(responseContent)[0];
+          return {
+            status,
+            description:
+              response.description ?? 'Sin descripción en el contrato.',
+            contentTypes: Object.keys(responseContent),
+            schemaFields: fieldsForSchema(document, responseMedia?.schema),
+            example: declaredExample(document, responseMedia),
+          };
+        },
+      );
 
-      operations.push({
+      const parsedOperation = {
         id: `${id}:${method}:${route}`,
         serviceId: id,
         serviceName: document.info?.title ?? id,
@@ -198,12 +261,18 @@ function parseContract(id: string, sourcePath: string, root: string): ApiService
         sourcePath,
         method: method.toUpperCase(),
         path: joinPath(serverUrl, route),
-        summary: operation.summary ?? operation.operationId ?? `${method.toUpperCase()} ${route}`,
+        summary:
+          operation.summary ??
+          operation.operationId ??
+          `${method.toUpperCase()} ${route}`,
         description: operation.description,
         tags: operation.tags ?? [],
         auth: operationAuth(document, operation),
         permission: operation['x-required-permission'],
-        parameters: [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])]
+        parameters: [
+          ...(pathItem.parameters ?? []),
+          ...(operation.parameters ?? []),
+        ]
           .map((parameter: any) => resolveSchemaRef(document, parameter))
           .map((parameter: any) => ({
             name: parameter.name,
@@ -221,6 +290,10 @@ function parseContract(id: string, sourcePath: string, root: string): ApiService
         requestRequired: Boolean(body?.required),
         requestExample: declaredExample(document, content[requestContentType]),
         responses,
+      };
+      operations.push({
+        ...parsedOperation,
+        referenceSlug: apiOperationSlug(parsedOperation),
       });
     }
   }
@@ -236,5 +309,7 @@ function parseContract(id: string, sourcePath: string, root: string): ApiService
 
 export function getApiCatalog(): ApiService[] {
   const root = findRepositoryRoot();
-  return discoverOpenApiContracts(root).map(({ id, sourcePath }) => parseContract(id, sourcePath, root));
+  return discoverOpenApiContracts(root).map(({ id, sourcePath }) =>
+    parseContract(id, sourcePath, root),
+  );
 }
