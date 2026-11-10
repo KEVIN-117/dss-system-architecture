@@ -210,8 +210,13 @@ describe('RectorAnalyticsDashboard', () => {
     expect(await screen.findByText('1.280')).toBeTruthy();
     expect(screen.getByText('72,5')).toBeTruthy();
     expect(
+      screen.getByRole('list', {
+        name: /facultades ordenadas por intentos de cursado/i,
+      }),
+    ).toBeTruthy();
+    expect(
       screen.getByRole('img', {
-        name: /intentos de inscripción por facultad/i,
+        name: /ingeniería: 100% del volumen de la facultad con más intentos/i,
       }),
     ).toBeTruthy();
     expect(

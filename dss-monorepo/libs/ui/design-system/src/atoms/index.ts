@@ -1,5 +1,6 @@
 export * from './button';
 export * from './badge';
+export * from './breadcrumb';
 export * from './checkbox';
 export * from './divider';
 export * from './dropdown';
@@ -22,6 +23,7 @@ export * from './sheet';
 export * from './skeleton';
 export * from './switch';
 export * from './textarea';
+export * from './theme-toggle';
 export {
   Tooltip as TooltipRoot,
   TooltipContent,

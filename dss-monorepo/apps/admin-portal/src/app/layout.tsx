@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import Script from 'next/script';
 import './global.css';
 import { Providers } from './providers';
 
@@ -21,7 +22,17 @@ const authConfig = { bffBaseUrl: requiredAuthEnv('NEXT_PUBLIC_BFF_URL') };
 
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" data-theme="admin" className="dark">
+    <html
+      lang="en"
+      data-theme="admin"
+      className="dark"
+      suppressHydrationWarning
+    >
+      <head>
+        <Script id="dss-theme-init" strategy="beforeInteractive">
+          {`try { document.documentElement.classList.toggle('dark', localStorage.getItem('dss-theme-mode') !== 'light'); } catch {}`}
+        </Script>
+      </head>
       <body>
         <Providers bffBaseUrl={authConfig.bffBaseUrl}>{children}</Providers>
       </body>

@@ -1,39 +1,5 @@
-import { AccessDenied, Button } from '@dss-monorepo/design-system';
-import { ProtectedRoute } from '@dss-monorepo/auth';
-import { RoleGuard } from '@dss-monorepo/rbac';
+import { AcademicOverviewDashboard } from '@dss-monorepo/academic-analytics';
 
 export default function Index() {
-  return (
-    <ProtectedRoute unauthenticatedFallback={<LoginRequired />}>
-      <RoleGuard rolesAllowed={['DECANO']} fallback={<AccessDeniedForPortal />}>
-        <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
-          <h1 className="text-2xl font-bold">Decano Dashboard</h1>
-          <div className="flex gap-2">
-            <Button variant="default">Evaluar Docentes</Button>
-            <Button variant="outline">Carga Horaria</Button>
-            <Button variant="destructive">Cerrar Semestre</Button>
-          </div>
-        </main>
-      </RoleGuard>
-    </ProtectedRoute>
-  );
-}
-
-function LoginRequired() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8">
-      <h1 className="text-2xl font-bold">Sesión requerida</h1>
-      <p>Inicia sesión para acceder al portal del decano.</p>
-      <a className="text-primary underline" href="/login">Iniciar sesión</a>
-    </main>
-  );
-}
-
-function AccessDeniedForPortal() {
-  return (
-    <AccessDenied
-      portalName="del decano"
-      logoutHref={`${process.env.NEXT_PUBLIC_BFF_URL}/api/auth/logout`}
-    />
-  );
+  return <AcademicOverviewDashboard scope="faculty" />;
 }

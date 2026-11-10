@@ -6,9 +6,11 @@
   "tags": ["type:app", "scope:shared"],
   "targets": {
     "build": {
+      "command": "next build --webpack",
       "dependsOn": ["^build"],
       "parallelism": false,
       "options": {
+        "cwd": "apps/docs-portal",
         "env": {
           "NODE_ENV": "production"
         }

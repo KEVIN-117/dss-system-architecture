@@ -254,9 +254,10 @@ describe('DirectorAnalyticsDashboard', () => {
         name: /intentos de cursado por periodo académico/i,
       }),
     ).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Promedio final' }));
     expect(
-      screen.getByRole('img', {
-        name: /nota final promedio por periodo académico/i,
+      await screen.findByRole('img', {
+        name: /nota final promedio por periodo académico en el contexto asignado/i,
       }),
     ).toBeTruthy();
 

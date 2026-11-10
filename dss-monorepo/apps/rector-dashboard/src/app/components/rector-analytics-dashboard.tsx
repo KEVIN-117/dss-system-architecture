@@ -10,7 +10,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@dss-monorepo/design-system';
-import { RiskDonutChart, TrendLineChart } from '@dss-monorepo/charts';
+import { TrendLineChart } from '@dss-monorepo/charts';
+import { AcademicSparkline } from '@dss-monorepo/academic-analytics';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   BookOpenCheck,
@@ -39,6 +40,7 @@ interface CubeSummary {
 interface AnalyticsState {
   enrollment: number | null;
   averageGrade: number | null;
+  gradeSeries: ChartPoint[];
   facultySeries: ChartPoint[];
   periodSeries: ChartPoint[];
   facultyCount: number;
@@ -48,6 +50,7 @@ interface AnalyticsState {
 const EMPTY_ANALYTICS: AnalyticsState = {
   enrollment: null,
   averageGrade: null,
+  gradeSeries: [],
   facultySeries: [],
   periodSeries: [],
   facultyCount: 0,
@@ -256,7 +259,10 @@ export function RectorAnalyticsDashboard() {
             {
               input: {
                 ...baseInput,
-                measures: [{ name: paths.enrollmentAttempts }],
+                measures: [
+                  { name: paths.enrollmentAttempts },
+                  { name: paths.averageFinalGrade },
+                ],
                 rows: [{ ...paths.academicYear }, { ...paths.academicPeriod }],
               },
             },
@@ -281,6 +287,15 @@ export function RectorAnalyticsDashboard() {
             ),
           )
         : [];
+      const gradeSeries = period
+        ? sortAcademicPeriods(
+            readDimensionSeriesByLevels(
+              period.analyticQuery.data,
+              [paths.academicYear.level, paths.academicPeriod.level],
+              paths.averageFinalGrade,
+            ),
+          )
+        : [];
       const enrollment = readMetric(overviewRows, paths.enrollmentAttempts);
       const averageGrade = readMetric(overviewRows, paths.averageFinalGrade);
       const hasAnyValues =
@@ -296,6 +311,7 @@ export function RectorAnalyticsDashboard() {
       setAnalytics({
         enrollment,
         averageGrade,
+        gradeSeries,
         facultySeries: facultySeries.slice(0, 12),
         facultyCount: faculty.analyticQuery.totalRows ?? facultySeries.length,
         periodSeries,
@@ -443,6 +459,7 @@ export function RectorAnalyticsDashboard() {
           }
           formattedValue={formatInteger(analytics.enrollment)}
           unit={paths?.enrollmentUnit ?? 'intentos'}
+          series={analytics.periodSeries}
           loading={initialLoading || queryLoading}
         />
         <MetricCard
@@ -454,6 +471,7 @@ export function RectorAnalyticsDashboard() {
           }
           formattedValue={formatGrade(analytics.averageGrade)}
           unit={paths?.gradeUnit ?? 'escala de calificación institucional'}
+          series={analytics.gradeSeries}
           loading={initialLoading || queryLoading}
         />
         <MetricCard
@@ -496,34 +514,67 @@ export function RectorAnalyticsDashboard() {
 
       <section
         aria-label="Visualizaciones institucionales"
-        className="grid gap-5 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]"
+        className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(21rem,1fr)]"
       >
-        <Card className={`min-w-0 xl:order-2 ${CARD_CLASS}`}>
-          <CardHeader className="px-6 pt-2">
+        <Card className={`min-w-0 ${CARD_CLASS}`}>
+          <CardHeader className="px-6 pt-5">
             <CardTitle>Intentos por facultad</CardTitle>
             <CardDescription>
-              Suma de intentos de inscripción agrupada por facultad para la
-              cobertura seleccionada.
+              Facultades con mayor volumen en la cobertura seleccionada.
             </CardDescription>
           </CardHeader>
-          <CardContent className="min-h-80 px-6 pb-4">
+          <CardContent className="space-y-4 px-6 pb-6">
             {initialLoading ? (
               <ChartSkeleton />
+            ) : analytics.facultySeries.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                No hay actividad de inscripción para esta gestión.
+              </p>
             ) : (
-              <RiskDonutChart
-                data={analytics.facultySeries}
-                title="Distribución de intentos por facultad"
-                ariaLabel={`Intentos de inscripción por facultad, ${analytics.facultySeries.length} facultades. ${analytics.cutLabel}.`}
-                loading={queryLoading}
-                emptyMessage="No hay actividad de inscripción para esta gestión."
-                height={320}
-              />
+              <ol
+                aria-label="Facultades ordenadas por intentos de cursado"
+                className="space-y-4"
+              >
+                {analytics.facultySeries.slice(0, 7).map((faculty, index) => {
+                  const maximum = analytics.facultySeries[0]?.value ?? 0;
+                  const share =
+                    maximum > 0 ? (faculty.value / maximum) * 100 : 0;
+                  return (
+                    <li
+                      key={`${faculty.label}-${index}`}
+                      className="space-y-1.5"
+                    >
+                      <div className="flex min-w-0 items-baseline justify-between gap-3 text-sm">
+                        <span
+                          className="min-w-0 truncate text-foreground"
+                          title={faculty.label}
+                        >
+                          {faculty.label}
+                        </span>
+                        <span className="shrink-0 font-medium tabular-nums text-foreground">
+                          {formatInteger(faculty.value)}
+                        </span>
+                      </div>
+                      <div
+                        className="h-2 overflow-hidden rounded-full bg-muted"
+                        role="img"
+                        aria-label={`${faculty.label}: ${Math.round(share)}% del volumen de la facultad con más intentos`}
+                      >
+                        <div
+                          className="h-full rounded-full bg-[var(--role-accent,var(--primary))]"
+                          style={{ width: `${share}%` }}
+                        />
+                      </div>
+                    </li>
+                  );
+                })}
+              </ol>
             )}
           </CardContent>
         </Card>
 
         <Card className={`min-w-0 ${CARD_CLASS}`}>
-          <CardHeader className="px-6 pt-2">
+          <CardHeader className="px-6 pt-5">
             <CardTitle>Tendencia por periodo académico</CardTitle>
             <CardDescription>
               {selectedMember
@@ -673,20 +724,19 @@ function MetricCard({
   label,
   formattedValue,
   unit,
+  series = [],
   loading,
 }: {
   icon: React.ReactNode;
   label: string;
   formattedValue: string;
   unit: string;
+  series?: ChartPoint[];
   loading: boolean;
 }) {
   return (
     <Card className={CARD_CLASS}>
-      <CardContent className="flex items-center gap-4 px-6 py-3">
-        <div className="flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary">
-          {icon}
-        </div>
+      <CardContent className="grid min-h-40 grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 px-5 py-5 sm:px-6">
         <div className="min-w-0">
           <p className="text-sm font-medium text-muted-foreground">{label}</p>
           {loading ? (
@@ -701,6 +751,21 @@ function MetricCard({
           )}
           <p className="mt-1 text-xs text-muted-foreground">{unit}</p>
         </div>
+        <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          {icon}
+        </div>
+        {series.length > 0 && !loading ? (
+          <div className="col-span-2 flex items-center justify-between gap-4 border-t border-border pt-3">
+            <span className="text-xs text-muted-foreground">
+              Tendencia · {series.length} periodos
+            </span>
+            <AcademicSparkline
+              label={label}
+              data={series}
+              className="h-8 w-28 shrink-0 text-[color:var(--role-accent,var(--primary))]"
+            />
+          </div>
+        ) : null}
       </CardContent>
     </Card>
   );
