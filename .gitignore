@@ -333,3 +333,12 @@ core.*
 
 .agents/
 **/.agents/
+.impeccable/
+**/.impeccable/
+
+# Chat summaries & local review scratch files
+chat_summary.md
+scratch_chat.html
+scratch_chat_content.json
+/outputs/
+**/outputs/
