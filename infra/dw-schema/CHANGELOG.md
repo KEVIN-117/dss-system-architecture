@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.6.0...dw-migrator-v1.7.0) (2026-11-10)
+
+
+### Features
+
+* **dw-control:** add local compose service and db provisioning ([c4e60f3](https://github.com/KEVIN-117/dss-system-architecture/commit/c4e60f3c6bee2b40e09b5c0d549ee32aa45fb475))
+
 ## [1.6.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.5.0...dw-migrator-v1.6.0) (2026-11-10)
 
 
