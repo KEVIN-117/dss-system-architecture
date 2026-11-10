@@ -33,9 +33,8 @@ const JSONScalar = new GraphQLScalarType({
   parseLiteral: (node) => parseJsonLiteral(node),
 });
 
-// Saiku masks every measure in cells with fewer than k rows when this count
-// measure is present. Keep it in the server-to-server query and strip it from
-// the public GraphQL response unless the caller explicitly asked for it.
+// Every published academic cube must expose this internal measure so Saiku can
+// apply its k-anonymity policy. It must never be queryable or visible to clients.
 const PRIVACY_COUNT_MEASURE = 'Attempt Count';
 
 export const analyticsTypeDefs = `#graphql
@@ -144,7 +143,8 @@ export function createAnalyticsResolvers() {
         requireAnalyticsRead(context.authentication.roles);
         validateCubeId(args.cubeId);
         await requireVisibleCube(context.authentication, args.cubeId);
-        return olapCall(() => getServerOlapCubeSchema(serverConfig(context.authentication), args.cubeId));
+        const schema = await olapCall(() => getServerOlapCubeSchema(serverConfig(context.authentication), args.cubeId));
+        return hidePrivacyMeasure(schema);
       },
       olapCubeMembers: async (
         _: unknown,
@@ -181,9 +181,12 @@ export function createAnalyticsResolvers() {
       ) => {
         // Resolve the analytics role/scope from trusted Auth Service data first.
         // Prediction Service repeats the scope check against the selected program/cut.
-        deriveAcademicScope(context.authentication.roles, context.authentication.user.academicContexts ?? []);
+        const scope = deriveAcademicScope(context.authentication.roles, context.authentication.user.academicContexts ?? []);
         if (!args.programRef.trim() || !args.cutId.trim()) {
           throw new GraphQLError('Program and academic cut are required', { extensions: { code: 'BAD_USER_INPUT' } });
+        }
+        if (scope.kind === 'career' && !scope.contexts.some((item) => item.careerId === args.programRef)) {
+          throw authorizationError('Prediction publication is outside the assigned academic career', 'FORBIDDEN');
         }
         let baseUrl: string;
         try { baseUrl = getPredictionServiceUrl(); }
@@ -219,12 +222,10 @@ export function createAnalyticsResolvers() {
         const scopeFilter = buildScopeFilter(scope);
         rejectClientScopeOverrides(args.input, scopeFilter);
 
-        const exposesPrivacyCount = args.input.measures.some(
-          (measure) => normalizeMeasureName(measure.name) === normalizeMeasureName(PRIVACY_COUNT_MEASURE),
-        );
-        const measures = exposesPrivacyCount
-          ? args.input.measures
-          : [...args.input.measures, { name: PRIVACY_COUNT_MEASURE }];
+        if (args.input.measures.some(isPrivacyCountMeasure)) {
+          throw authorizationError('The requested measure is reserved for server-side privacy enforcement', 'FORBIDDEN');
+        }
+        const measures = [...args.input.measures, { name: PRIVACY_COUNT_MEASURE }];
         const request: OlapQueryRequest = {
           cube: args.input.cubeId,
           measures,
@@ -251,7 +252,7 @@ export function createAnalyticsResolvers() {
         return {
           status: result.status ?? 'SUCCESS',
           queryId: result.queryId,
-          data: exposesPrivacyCount ? result.data ?? [] : stripPrivacyCount(result.data ?? []),
+          data: stripPrivacyCount(result.data ?? []),
           metadata: result.metadata ?? null,
           totalRows: result.totalRows ?? result.data?.length ?? 0,
           runtimeMs: result.runtimeMs ?? null,
@@ -279,6 +280,33 @@ function normalizeMeasureName(name: string): string {
   return name.trim().toLocaleLowerCase();
 }
 
+function isPrivacyCountMeasure(measure: { name: string }): boolean {
+  return normalizeMeasureName(measure.name) === normalizeMeasureName(PRIVACY_COUNT_MEASURE);
+}
+
+function hidePrivacyMeasure(schema: unknown): unknown {
+  if (!isRecord(schema)) return schema;
+  if (Array.isArray(schema.measures)) {
+    return {
+      ...schema,
+      measures: schema.measures.filter((measure) => {
+        const name = isRecord(measure) && typeof measure.name === 'string' ? measure.name : '';
+        return normalizeMeasureName(name) !== normalizeMeasureName(PRIVACY_COUNT_MEASURE);
+      }),
+    };
+  }
+  if (!isRecord(schema.measures)) return schema;
+  return {
+    ...schema,
+    measures: Object.fromEntries(
+      Object.entries(schema.measures).filter(([key, value]) => {
+        const name = isRecord(value) && typeof value.name === 'string' ? value.name : key;
+        return normalizeMeasureName(name) !== normalizeMeasureName(PRIVACY_COUNT_MEASURE);
+      }),
+    ),
+  };
+}
+
 function stripPrivacyCount(rows: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
   return rows.map((row) => Object.fromEntries(
     Object.entries(row).filter(([key]) => normalizeMeasureName(key) !== normalizeMeasureName(PRIVACY_COUNT_MEASURE)),
@@ -298,13 +326,18 @@ export interface AnalyticQueryInput {
 export function deriveAcademicScope(roles: readonly DSSRole[], contexts: readonly AcademicContext[]): AcademicScope {
   const permissions = resolvePermissions(roles);
   if (!permissions.has('analytics:read')) throw authorizationError('Analytics access is not permitted', 'FORBIDDEN');
-  if (roles.includes('RECTOR')) return { kind: 'global', contexts: [] };
+  if (roles.includes('RECTOR')) {
+    if (!permissions.has('analytics:global')) throw authorizationError('Global analytics access is not permitted', 'FORBIDDEN');
+    return { kind: 'global', contexts: [] };
+  }
   if (roles.includes('DECANO')) {
+    if (!permissions.has('analytics:faculty')) throw authorizationError('Faculty analytics access is not permitted', 'FORBIDDEN');
     const scoped = contexts.filter((item) => item.facultyId !== null && item.careerId === null);
     if (!scoped.length) throw authorizationError('Academic faculty context is required', 'ACADEMIC_CONTEXT_REQUIRED');
     return { kind: 'faculty', contexts: scoped };
   }
   if (roles.includes('DIRECTOR')) {
+    if (!permissions.has('analytics:career')) throw authorizationError('Career analytics access is not permitted', 'FORBIDDEN');
     const scoped = contexts.filter((item) => item.facultyId !== null && item.careerId !== null);
     if (!scoped.length) throw authorizationError('Academic career context is required', 'ACADEMIC_CONTEXT_REQUIRED');
     return { kind: 'career', contexts: scoped };
@@ -412,7 +445,13 @@ async function olapCall<T>(operation: () => Promise<T>): Promise<T> {
   catch (error) {
     if (error instanceof OlapServerClientError) {
       const code = error.status === 504 ? 'OLAP_TIMEOUT' : error.code;
-      throw new GraphQLError(error.message, { extensions: { code, http: { status: error.status } } });
+      throw new GraphQLError(error.message, {
+        extensions: {
+          code,
+          http: { status: error.status },
+          ...(error.field ? { field: error.field } : {}),
+        },
+      });
     }
     throw new GraphQLError('OLAP service is unavailable', { extensions: { code: 'OLAP_UNAVAILABLE' } });
   }
@@ -458,7 +497,9 @@ function queryResultError(result: { status?: string; error?: string; field?: str
       code: normalized.code,
       http: { status: normalized.httpStatus },
       ...(validName(result.field) ? { field: result.field } : {}),
-      ...(Array.isArray(result.available) && result.available.every(validName) ? { available: result.available } : {}),
+      ...(Array.isArray(result.available) && result.available.every(validName)
+        ? { available: result.available.filter((name) => !isPrivacyCountMeasure({ name })) }
+        : {}),
     },
   });
 }

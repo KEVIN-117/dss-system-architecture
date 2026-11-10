@@ -1,5 +1,19 @@
 # Changelog
 
+## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/rector-dashboard-v1.2.0...rector-dashboard-v1.3.0) (2026-11-10)
+
+
+### Features
+
+* **frontend:** conectar analítica académica del Director ([#159](https://github.com/KEVIN-117/dss-system-architecture/issues/159)) ([#242](https://github.com/KEVIN-117/dss-system-architecture/issues/242)) ([ea33bdf](https://github.com/KEVIN-117/dss-system-architecture/commit/ea33bdf357b69daa5c4d2378a1d7d7377514691c))
+
+## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/rector-dashboard-v1.1.0...rector-dashboard-v1.2.0) (2026-11-08)
+
+
+### Features
+
+* **frontend:** conectar Rector Dashboard con analítica institucional ([#238](https://github.com/KEVIN-117/dss-system-architecture/issues/238)) ([cdc8e08](https://github.com/KEVIN-117/dss-system-architecture/commit/cdc8e08c675ea40583e3284be0f4d171e5269aad))
+
 ## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/rector-dashboard-v1.0.0...rector-dashboard-v1.1.0) (2026-11-03)
 
 

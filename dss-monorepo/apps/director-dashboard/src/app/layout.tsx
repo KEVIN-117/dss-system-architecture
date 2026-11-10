@@ -1,17 +1,18 @@
 import './global.css';
 import { Providers } from './providers';
+import { PortalBoundary } from './components/portal-frame';
 import type { ReactNode } from 'react';
 
 export const metadata = {
-  title: 'Welcome to Director DSS Dashboard',
-  description: 'Director DSS Dashboard',
+  title: 'Rendimiento de carrera | DSS',
+  description: 'Indicadores académicos del contexto asignado al Director.',
 };
 
 function requiredAuthEnv(name: string): string {
   const value = process.env[name];
   if (!value) {
     throw new Error(
-      `Admin portal is missing ${name} authentication configuration`,
+      `Director dashboard is missing ${name} authentication configuration`,
     );
   }
   return value;
@@ -19,16 +20,12 @@ function requiredAuthEnv(name: string): string {
 
 const authConfig = { bffBaseUrl: requiredAuthEnv('NEXT_PUBLIC_BFF_URL') };
 
-export default function RootLayout({
-  children,
-}: {
-  children: ReactNode;
-}) {
+export default function RootLayout({ children }: { children: ReactNode }) {
   return (
-    <html lang="en" data-theme="director" className="dark">
+    <html lang="es" data-theme="director" className="dark">
       <body>
         <Providers bffBaseUrl={authConfig.bffBaseUrl}>
-          {children}
+          <PortalBoundary>{children}</PortalBoundary>
         </Providers>
       </body>
     </html>

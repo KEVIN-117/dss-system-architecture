@@ -14,7 +14,7 @@ import {
   Badge,
   Button,
   DashboardGrid,
-  Skeleton,
+  Loader,
   Tile,
 } from '@dss-monorepo/design-system';
 import { SavedTileQuery } from './saved-tile-query';
@@ -72,9 +72,7 @@ export function AppViewer({ path }: { path: string }) {
   }, [app]);
 
   if (loading)
-    return (
-      <Skeleton className="h-[36rem] rounded-xl" aria-label="Cargando app" />
-    );
+    return <Loader text="Cargando app…" fullScreen={false} className="rounded-xl" />;
   if (error || !app || !appConfig) {
     return (
       <section

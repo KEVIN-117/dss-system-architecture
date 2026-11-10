@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Input,
+  Loader,
   Select,
   Sheet,
   SheetContent,
@@ -451,7 +452,7 @@ export function AdminUsersPage() {
                     className="h-24 text-center font-sans text-muted-foreground"
                     role="status"
                   >
-                    Cargando usuarios…
+                    <Loader text="Cargando usuarios…" fullScreen={false} className="min-h-24" />
                   </TableCell>
                 </TableRow>
               )}
@@ -544,9 +545,7 @@ export function AdminUsersPage() {
                     </p>
                   </div>
                   {catalogLoading && (
-                    <p role="status" className="text-sm text-muted-foreground">
-                      Cargando facultades y carreras…
-                    </p>
+                    <Loader text="Cargando facultades y carreras…" fullScreen={false} className="min-h-32" />
                   )}
                   {catalogError && (
                     <div

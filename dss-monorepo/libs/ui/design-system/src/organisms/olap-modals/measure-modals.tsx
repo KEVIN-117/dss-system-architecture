@@ -5,6 +5,7 @@ import { Badge } from '../../atoms/badge';
 import { Button } from '../../atoms/button';
 import { Checkbox } from '../../atoms/checkbox';
 import { Input } from '../../atoms/input';
+import { Loader } from '../../atoms/loader';
 import { OlapModal } from './olap-modal';
 
 export interface OlapMeasure {
@@ -226,7 +227,7 @@ export function SelectionsModal({
           <Button type="button" size="sm" variant={activeState.type === 'EXCLUSION' ? 'secondary' : 'outline'} onClick={() => updateActive((current) => ({ ...current, type: 'EXCLUSION' }))}>Excluir</Button>
         </div>
         <Input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar miembros…" aria-label="Buscar miembros" />
-        {loadingLevel === activeLevel ? <p className="text-sm text-muted-foreground" role="status">Cargando miembros…</p> : null}
+        {loadingLevel === activeLevel ? <Loader text="Cargando miembros…" fullScreen={false} /> : null}
         {loadError ? <p className="text-sm text-destructive" role="alert">{loadError}</p> : null}
         <ul className="max-h-[45vh] divide-y divide-border overflow-auto rounded-md border border-border">
           {visibleMembers.map((member) => (

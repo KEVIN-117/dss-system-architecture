@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { AppWindow, ArrowUpRight, RefreshCw } from 'lucide-react';
 import { listSavedApps, type AppSummary } from '@dss-monorepo/olap-data-access';
-import { Badge, Button, Skeleton } from '@dss-monorepo/design-system';
+import { Badge, Button, Loader } from '@dss-monorepo/design-system';
 
 export function AppCatalog() {
   const [apps, setApps] = useState<AppSummary[]>([]);
@@ -71,14 +71,7 @@ export function AppCatalog() {
       </header>
 
       {loading ? (
-        <div
-          className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
-          aria-label="Cargando apps"
-        >
-          {[0, 1, 2].map((item) => (
-            <Skeleton key={item} className="h-32 rounded-xl" />
-          ))}
-        </div>
+        <Loader text="Cargando apps…" fullScreen={false} className="rounded-xl" />
       ) : error ? (
         <div
           role="alert"

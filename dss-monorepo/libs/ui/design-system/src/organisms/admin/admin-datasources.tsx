@@ -15,8 +15,8 @@ import { Badge } from '../../atoms/badge';
 import { Button } from '../../atoms/button';
 import { Input } from '../../atoms/input';
 import { Label } from '../../atoms/label';
+import { Loader } from '../../atoms/loader';
 import { Select } from '../../atoms/select';
-import { Skeleton } from '../../atoms/skeleton';
 import {
   Dialog,
   DialogContent,
@@ -298,11 +298,7 @@ export function AdminDatasources({
         </div>
 
         {loading ? (
-          <div className="space-y-3 p-4" aria-label="Cargando conexiones">
-            {Array.from({ length: 3 }, (_, index) => (
-              <Skeleton key={index} className="h-14 w-full" />
-            ))}
-          </div>
+          <Loader text="Cargando conexiones…" fullScreen={false} className="rounded-lg" />
         ) : filteredDatasources.length > 0 ? (
           <div className="overflow-x-auto">
             <Table>

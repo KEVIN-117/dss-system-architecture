@@ -19,7 +19,7 @@ test('shows access denied to an authenticated user without the director role', a
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Acceso no autorizado' })).toBeVisible();
-  await expect(page.getByText('portal del director')).toBeVisible();
+  await expect(page.getByText('portal Dirección de carrera')).toBeVisible();
   await expect(page.getByText('Director Dashboard')).toHaveCount(0);
 });
 
