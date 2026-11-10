@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.5.0...dw-migrator-v1.6.0) (2026-11-10)
+
+
+### Features
+
+* **frontend:** conectar analítica académica del Director ([#159](https://github.com/KEVIN-117/dss-system-architecture/issues/159)) ([#242](https://github.com/KEVIN-117/dss-system-architecture/issues/242)) ([ea33bdf](https://github.com/KEVIN-117/dss-system-architecture/commit/ea33bdf357b69daa5c4d2378a1d7d7377514691c))
+
 ## [1.5.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.4.0...dw-migrator-v1.5.0) (2026-11-03)
 
 
