@@ -27,9 +27,14 @@ test('renders the faculty analytics workspace for an authorized dean', async ({ 
   await mockSession(page, 'http://localhost:3002', ['DECANO']);
   await page.goto('/');
 
-  await expect(page.getByRole('navigation').getByText('Analítica académica')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Rendimiento' })).toBeVisible();
-  await expect(page.getByRole('heading', { name: 'Rendimiento y regularidad académica' })).toBeVisible();
+  const navigation = page.getByRole('navigation');
+  await expect(navigation.getByText('Rendimiento', { exact: true })).toBeVisible();
+  await expect(
+    navigation.getByRole('link', { name: 'Resultados por gestión' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('heading', { name: 'Resumen de la facultad' }),
+  ).toBeVisible();
 });
 
 async function mockSession(page: import('@playwright/test').Page, origin: string, roles: string[]) {
