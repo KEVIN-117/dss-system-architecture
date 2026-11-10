@@ -20,26 +20,34 @@ import {
   Cpu,
   RefreshCw,
   ShieldCheck,
+  Upload,
 } from 'lucide-react';
 
 import {
+  getAvailableDatasets,
   getMlTrainingJob,
   isMlAlgorithm,
   submitMlTrainingJob,
+  uploadCustomDataset,
+  type DatasetOption,
   type MlAlgorithm,
   type TrainingJob,
 } from '../data-access/ml-operations';
 
 const STORAGE_KEY = 'dss.admin.ml-operation-job-ids.v1';
 const FIXTURE_DATASET = 'fixture:pred003_synthetic-v1';
-const TRAINING_DATASETS = [
+const DEFAULT_DATASETS: DatasetOption[] = [
   {
-    ref: FIXTURE_DATASET,
+    dataset_ref: FIXTURE_DATASET,
+    dataset_id: 'pred003-synthetic',
     label: 'Fixture sintético PRED-003 (retención)',
     description:
       'Dataset sintético incluido en el servicio para validar preparación y entrenamiento; no representa datos institucionales.',
+    is_custom: false,
+    row_count: 40,
+    target_field: 'target_class',
   },
-] as const;
+];
 const TERMINAL_STATES = new Set(['SUCCEEDED', 'FAILED', 'CANCELLED']);
 
 function readSavedJobIds(): string[] {
@@ -90,6 +98,8 @@ function dateLabel(value: string): string {
 export function AdminMlOperationsPage() {
   const [algorithm, setAlgorithm] =
     React.useState<MlAlgorithm>('random_forest');
+  const [availableDatasets, setAvailableDatasets] =
+    React.useState<DatasetOption[]>(DEFAULT_DATASETS);
   const [datasetRef, setDatasetRef] = React.useState(FIXTURE_DATASET);
   const [configurationRef, setConfigurationRef] = React.useState('');
   const [jobs, setJobs] = React.useState<TrainingJob[]>([]);
@@ -99,9 +109,28 @@ export function AdminMlOperationsPage() {
   const [submitting, setSubmitting] = React.useState(false);
   const [confirmOpen, setConfirmOpen] = React.useState(false);
   const [confirmed, setConfirmed] = React.useState(false);
-  const selectedDataset = TRAINING_DATASETS.find(
-    (dataset) => dataset.ref === datasetRef,
+
+  // Upload modal state
+  const [uploadOpen, setUploadOpen] = React.useState(false);
+  const [uploadFile, setUploadFile] = React.useState<File | null>(null);
+  const [uploading, setUploading] = React.useState(false);
+  const [uploadError, setUploadError] = React.useState<string | null>(null);
+  const [uploadSuccess, setUploadSuccess] = React.useState<string | null>(null);
+
+  const selectedDataset = availableDatasets.find(
+    (dataset) => dataset.dataset_ref === datasetRef,
   );
+
+  const refreshDatasets = React.useCallback(async () => {
+    try {
+      const list = await getAvailableDatasets();
+      if (Array.isArray(list) && list.length > 0) {
+        setAvailableDatasets(list);
+      }
+    } catch {
+      // Usar fallback de DEFAULT_DATASETS si falla la llamada
+    }
+  }, []);
 
   const refreshJobs = React.useCallback(async () => {
     const ids = readSavedJobIds();
@@ -138,13 +167,37 @@ export function AdminMlOperationsPage() {
   }, []);
 
   React.useEffect(() => {
+    void refreshDatasets();
     void refreshJobs();
     const timer = window.setInterval(() => {
       if (jobs.some((job) => !TERMINAL_STATES.has(job.status)))
         void refreshJobs();
     }, 4000);
     return () => window.clearInterval(timer);
-  }, [jobs, refreshJobs]);
+  }, [jobs, refreshJobs, refreshDatasets]);
+
+  async function handleDatasetUpload(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!uploadFile || uploading) return;
+    setUploading(true);
+    setUploadError(null);
+    setUploadSuccess(null);
+    try {
+      const result = await uploadCustomDataset(uploadFile);
+      setUploadSuccess(
+        `Dataset subido y validado exitosamente (${result.row_count} filas). ID: ${result.dataset_ref}`,
+      );
+      await refreshDatasets();
+      setDatasetRef(result.dataset_ref);
+      setUploadFile(null);
+    } catch (cause) {
+      setUploadError(
+        cause instanceof Error ? cause.message : 'Error al subir el dataset.',
+      );
+    } finally {
+      setUploading(false);
+    }
+  }
 
   function openConfirmation(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -255,7 +308,20 @@ export function AdminMlOperationsPage() {
               </select>
             </label>
             <label className="space-y-2 text-sm font-medium">
-              Dataset de entrenamiento
+              <div className="flex items-center justify-between">
+                <span>Dataset de entrenamiento</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUploadOpen(true);
+                    setUploadError(null);
+                    setUploadSuccess(null);
+                  }}
+                  className="inline-flex items-center gap-1 text-xs text-primary underline hover:text-primary/80"
+                >
+                  <Upload aria-hidden="true" className="size-3.5" /> Subir dataset
+                </button>
+              </div>
               <select
                 required
                 aria-label="Dataset de entrenamiento"
@@ -264,9 +330,9 @@ export function AdminMlOperationsPage() {
                 aria-describedby="dataset-ref-help"
                 className="h-10 w-full rounded-md border border-input bg-background px-3"
               >
-                {TRAINING_DATASETS.map((dataset) => (
-                  <option key={dataset.ref} value={dataset.ref}>
-                    {dataset.label}
+                {availableDatasets.map((dataset) => (
+                  <option key={dataset.dataset_ref} value={dataset.dataset_ref}>
+                    {dataset.label} ({dataset.row_count} filas)
                   </option>
                 ))}
               </select>
@@ -274,9 +340,8 @@ export function AdminMlOperationsPage() {
                 id="dataset-ref-help"
                 className="block text-xs font-normal text-muted-foreground"
               >
-                {selectedDataset?.description} Los datasets institucionales se
-                habilitarán cuando se implemente el catálogo y almacenamiento
-                en bucket; aquí aún no se aceptan cargas de archivos.
+                {selectedDataset?.description ||
+                  `Dataset de ${selectedDataset?.row_count} filas preparado bajo el contrato PRED-002.`}
               </span>
             </label>
             <label className="space-y-2 text-sm font-medium sm:col-span-2">
@@ -538,6 +603,93 @@ export function AdminMlOperationsPage() {
               {submitting ? 'Enviando job…' : 'Iniciar entrenamiento'}
             </Button>
           </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modal para subir dataset preparado */}
+      <Dialog
+        open={uploadOpen}
+        onOpenChange={(open) => {
+          if (!uploading) {
+            setUploadOpen(open);
+            setUploadError(null);
+            setUploadSuccess(null);
+            setUploadFile(null);
+          }
+        }}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Subir dataset preparado (.zip)</DialogTitle>
+            <DialogDescription>
+              El archivo comprimido debe incluir <code>manifest.json</code> y{' '}
+              <code>rows.jsonl</code> preparados según el contrato PRED-002.
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleDatasetUpload} className="space-y-4">
+            <div className="rounded-lg border-2 border-dashed border-border p-6 text-center">
+              <Upload className="mx-auto size-8 text-muted-foreground" />
+              <label className="mt-2 block cursor-pointer text-sm font-medium text-primary hover:underline">
+                <span>Seleccionar archivo ZIP</span>
+                <input
+                  type="file"
+                  accept=".zip"
+                  required
+                  disabled={uploading}
+                  onChange={(e) => {
+                    if (e.target.files && e.target.files[0]) {
+                      setUploadFile(e.target.files[0]);
+                      setUploadError(null);
+                      setUploadSuccess(null);
+                    }
+                  }}
+                  className="sr-only"
+                />
+              </label>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {uploadFile ? (
+                  <span className="font-semibold text-foreground">
+                    {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
+                  </span>
+                ) : (
+                  'Archivo .zip con manifest.json y rows.jsonl'
+                )}
+              </p>
+            </div>
+
+            {uploadError && (
+              <p
+                role="alert"
+                className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+              >
+                {uploadError}
+              </p>
+            )}
+
+            {uploadSuccess && (
+              <p
+                role="status"
+                className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-600 dark:text-emerald-400"
+              >
+                {uploadSuccess}
+              </p>
+            )}
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={uploading}
+                onClick={() => setUploadOpen(false)}
+              >
+                Cerrar
+              </Button>
+              <Button type="submit" disabled={!uploadFile || uploading}>
+                {uploading ? 'Validando y subiendo…' : 'Subir y validar dataset'}
+              </Button>
+            </DialogFooter>
+          </form>
         </DialogContent>
       </Dialog>
     </section>

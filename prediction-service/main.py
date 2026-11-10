@@ -12,11 +12,15 @@ from pathlib import Path
 from typing import Any
 from uuid import UUID, uuid4
 
-from fastapi import FastAPI, Header, HTTPException, Query
+from io import BytesIO
+import json
+import zipfile
+from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from config import settings
+from dataset_contract import DatasetValidationReport, validate_prepared_dataset
 from training.job_store import IdempotencyConflict, JobStore
 from training.model_registry import InvalidModelArtifact, ModelRegistry, NoActiveModel
 from inference import InferenceFailure, PredictionService
@@ -179,6 +183,33 @@ class DetailedHealthResponse(BaseModel):
     database: dict[str, Any]
     outbox: dict[str, Any]
     timestamp: str
+
+
+class DatasetSummary(BaseModel):
+    """Resumen de metadatos de un dataset de entrenamiento disponible."""
+
+    dataset_ref: str
+    dataset_id: str
+    label: str
+    description: str | None = None
+    is_custom: bool = False
+    row_count: int
+    target_field: str | None = None
+    event_code: str | None = None
+    created_at: str | None = None
+    content_digest: str | None = None
+
+
+class DatasetUploadResponse(BaseModel):
+    """Respuesta tras subir y validar exitosamente un dataset."""
+
+    message: str
+    dataset_ref: str
+    dataset_id: str
+    row_count: int
+    content_digest: str
+    target_field: str
+    event_code: str | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -707,6 +738,177 @@ def get_training_job(
         submitted_by=record.submitted_by,
         model_candidate=model_candidate,
         error=record.error,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Datasets Management — Upload & List
+# ---------------------------------------------------------------------------
+
+@app.get(
+    "/v1/datasets",
+    response_model=list[DatasetSummary],
+    summary="Listar datasets de entrenamiento disponibles",
+    description="Devuelve la lista de fixtures del sistema y datasets personalizados previamente subidos y validados.",
+)
+def list_training_datasets() -> list[DatasetSummary]:
+    results: list[DatasetSummary] = []
+
+    # 1. Fixture incorporado PRED-003
+    base_fixtures = Path(__file__).parent / "tests" / "fixtures"
+    pred003_manifest = base_fixtures / "pred003_synthetic" / "manifest.json"
+    if pred003_manifest.exists():
+        try:
+            m = json.loads(pred003_manifest.read_text(encoding="utf-8"))
+            results.append(
+                DatasetSummary(
+                    dataset_ref="fixture:pred003_synthetic-v1",
+                    dataset_id=str(m.get("dataset_id", "pred003-synthetic")),
+                    label="Fixture sintético PRED-003 (retención)",
+                    description="Dataset sintético de prueba incorporado en el servicio.",
+                    is_custom=False,
+                    row_count=int(m.get("row_count", 0)),
+                    target_field=m.get("target_field"),
+                    event_code=(m.get("target_definition") or {}).get("event_code"),
+                    created_at=m.get("created_at"),
+                    content_digest=m.get("content_digest"),
+                )
+            )
+        except Exception as exc:
+            logger.warning("No se pudo leer el manifest de pred003_synthetic: %s", exc)
+
+    # 2. Datasets personalizados en PREDICTION_DATASET_ROOT
+    dataset_root_env = os.getenv("PREDICTION_DATASET_ROOT")
+    if dataset_root_env:
+        custom_root = Path(dataset_root_env).resolve() / "custom"
+        if custom_root.is_dir():
+            for item in sorted(custom_root.iterdir()):
+                manifest_path = item / "manifest.json"
+                if item.is_dir() and manifest_path.exists():
+                    try:
+                        m = json.loads(manifest_path.read_text(encoding="utf-8"))
+                        results.append(
+                            DatasetSummary(
+                                dataset_ref=f"custom:{item.name}",
+                                dataset_id=str(m.get("dataset_id", item.name)),
+                                label=f"Dataset personalizado: {item.name}",
+                                description=m.get("warning") or "Dataset preparado externamente y validado.",
+                                is_custom=True,
+                                row_count=int(m.get("row_count", 0)),
+                                target_field=m.get("target_field"),
+                                event_code=(m.get("target_definition") or {}).get("event_code"),
+                                created_at=m.get("created_at"),
+                                content_digest=m.get("content_digest"),
+                            )
+                        )
+                    except Exception as exc:
+                        logger.warning("No se pudo leer manifest en %s: %s", item, exc)
+
+    return results
+
+
+@app.post(
+    "/v1/datasets/upload",
+    status_code=201,
+    response_model=DatasetUploadResponse,
+    summary="Subir y validar un dataset preparado",
+    description="Recibe un archivo .zip con manifest.json y rows.jsonl. Lo valida exhaustivamente contra el contrato de datos antes de registrarlo.",
+    responses={
+        400: COMMON_ERROR_RESPONSES[400],
+        422: COMMON_ERROR_RESPONSES[422],
+        500: COMMON_ERROR_RESPONSES[500],
+    },
+)
+async def upload_training_dataset(
+    file: UploadFile = File(...),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+
+    filename = file.filename or ""
+    if not (filename.endswith(".zip") or filename.endswith(".jsonl")):
+        return _make_problem(
+            400, "Formato de archivo inválido", "INVALID_FILE_TYPE", request_id,
+            detail="Debe proporcionar un archivo comprimido .zip que contenga 'manifest.json' y 'rows.jsonl'."
+        )
+
+    try:
+        content_bytes = await file.read()
+    except Exception as exc:
+        return _make_problem(500, "Error de lectura", "FILE_READ_ERROR", request_id, detail=str(exc))
+
+    manifest_data: dict[str, Any] | None = None
+    rows_data: list[dict[str, Any]] = []
+
+    if filename.endswith(".zip"):
+        try:
+            with zipfile.ZipFile(BytesIO(content_bytes)) as z:
+                # Prevenir zip slip
+                for zip_info in z.infolist():
+                    if ".." in zip_info.filename or zip_info.filename.startswith("/"):
+                        return _make_problem(400, "Archivo malicioso", "INVALID_ZIP_ARCHIVE", request_id,
+                                             detail="El archivo zip contiene rutas inválidas.")
+
+                file_names = set(z.namelist())
+                # Buscar manifest.json y rows.jsonl incluso si están dentro de un subdirectorio raíz único
+                manifest_entry = next((name for name in z.namelist() if Path(name).name == "manifest.json"), None)
+                rows_entry = next((name for name in z.namelist() if Path(name).name == "rows.jsonl"), None)
+
+                if not manifest_entry or not rows_entry:
+                    return _make_problem(
+                        400, "Estructura de dataset incompleta", "MISSING_DATASET_FILES", request_id,
+                        detail="El zip debe incluir 'manifest.json' y 'rows.jsonl'."
+                    )
+
+                manifest_raw = z.read(manifest_entry).decode("utf-8")
+                manifest_data = json.loads(manifest_raw)
+
+                rows_raw = z.read(rows_entry).decode("utf-8")
+                rows_data = [
+                    json.loads(line)
+                    for line in rows_raw.splitlines()
+                    if line.strip()
+                ]
+        except zipfile.BadZipFile:
+            return _make_problem(400, "Archivo zip corrupto", "BAD_ZIP_FILE", request_id)
+        except Exception as exc:
+            return _make_problem(400, "Error al descomprimir dataset", "ZIP_PROCESSING_ERROR", request_id, detail=str(exc))
+
+    if not manifest_data or not rows_data:
+        return _make_problem(400, "Dataset vacío", "EMPTY_DATASET", request_id)
+
+    # Validar rigurosamente el contrato de datos
+    report: DatasetValidationReport = validate_prepared_dataset(manifest_data, rows_data)
+    if not report.ready_for_preparation:
+        issues_summary = [f"[{i.code}] {i.path}: {i.message}" for i in report.issues]
+        return _make_problem(
+            422,
+            "Dataset no cumple contrato de datos",
+            "DATASET_CONTRACT_VIOLATION",
+            request_id,
+            detail=f"Estado del reporte: {report.status}. Errores: {'; '.join(issues_summary[:5])}"
+        )
+
+    # Determinar ruta de almacenamiento
+    dataset_id = str(manifest_data.get("dataset_id") or uuid4())
+    dataset_root_env = os.getenv("PREDICTION_DATASET_ROOT", "/app/snapshots")
+    target_dir = Path(dataset_root_env).resolve() / "custom" / dataset_id
+    target_dir.mkdir(parents=True, exist_ok=True)
+
+    # Guardar archivos
+    (target_dir / "manifest.json").write_text(json.dumps(manifest_data, indent=2, sort_keys=True, ensure_ascii=False), encoding="utf-8")
+    with (target_dir / "rows.jsonl").open("w", encoding="utf-8") as f:
+        for r in rows_data:
+            f.write(json.dumps(r, separators=(",", ":"), ensure_ascii=False) + "\n")
+
+    return DatasetUploadResponse(
+        message="Dataset preparado subido y validado exitosamente",
+        dataset_ref=f"custom:{dataset_id}",
+        dataset_id=dataset_id,
+        row_count=len(rows_data),
+        content_digest=str(manifest_data.get("content_digest", "")),
+        target_field=str(manifest_data.get("target_field", "")),
+        event_code=(manifest_data.get("target_definition") or {}).get("event_code"),
     )
 
 

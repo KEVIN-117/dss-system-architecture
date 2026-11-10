@@ -54,12 +54,16 @@ async function handle(
     segments.length === 2 && segments[0] === 'v1' && segments[1] === 'prediction-publications';
   const isAcademicOptions =
     segments.length === 2 && segments[0] === 'v1' && segments[1] === 'academic-options';
+  const isDatasetCollection =
+    segments.length === 2 && segments[0] === 'v1' && segments[1] === 'datasets';
+  const isDatasetUpload =
+    segments.length === 3 && segments[0] === 'v1' && segments[1] === 'datasets' && segments[2] === 'upload';
 
   if (
     !(
       (request.method === 'POST' && (isPrediction || isTrainingCollection)) ||
-      (request.method === 'POST' && isBatchCollection) ||
-      (request.method === 'GET' && (isTrainingItem || isBatchItem || isPublicationQuery || isAcademicOptions))
+      (request.method === 'POST' && (isBatchCollection || isDatasetUpload)) ||
+      (request.method === 'GET' && (isTrainingItem || isBatchItem || isPublicationQuery || isAcademicOptions || isDatasetCollection))
     )
   ) {
     return withCors(
@@ -74,7 +78,7 @@ async function handle(
   // Model training changes the candidate registry and consumes worker capacity.
   // Keep it behind the technical administrator role; academic roles only read
   // predictions and publications through the separate routes.
-  if (isTrainingCollection || isTrainingItem) {
+  if (isTrainingCollection || isTrainingItem || isDatasetCollection || isDatasetUpload) {
     const forbidden = requireRoles(authentication.value, ['SUPERADMIN']);
     if (forbidden) return withCors(request, forbidden);
   }
@@ -104,7 +108,7 @@ async function handle(
     requestId: request.headers.get('x-request-id') ?? undefined,
   };
 
-  if (isBatchCollection || isBatchItem || isPublicationQuery || isAcademicOptions) {
+  if (isBatchCollection || isBatchItem || isPublicationQuery || isAcademicOptions || isDatasetCollection || isDatasetUpload) {
     try {
       const upstream = new URL(`${segments.join('/')}`, `${serviceUrl.replace(/\/+$/, '')}/`);
       if (isPublicationQuery) upstream.search = new URL(request.url).search;
@@ -114,10 +118,16 @@ async function handle(
       });
       const idempotencyKey = request.headers.get('idempotency-key');
       if (idempotencyKey) headers.set('Idempotency-Key', idempotencyKey);
-      let body: string | undefined;
+      let body: BodyInit | undefined;
       if (request.method === 'POST') {
-        body = await request.text();
-        headers.set('Content-Type', 'application/json');
+        if (isDatasetUpload) {
+          body = await request.blob();
+          const contentType = request.headers.get('content-type');
+          if (contentType) headers.set('Content-Type', contentType);
+        } else {
+          body = await request.text();
+          headers.set('Content-Type', 'application/json');
+        }
       }
       const response = await fetch(upstream, { method: request.method, headers, body, signal: request.signal, cache: 'no-store' });
       return withCors(request, new Response(response.body, {
@@ -128,7 +138,7 @@ async function handle(
         },
       }));
     } catch (error) {
-      console.error('[bff-ml] Prediction publication request failed', error);
+      console.error('[bff-ml] Prediction request failed', error);
       return withCors(request, NextResponse.json({ error: 'Prediction Service is unavailable' }, { status: 502 }));
     }
   }
