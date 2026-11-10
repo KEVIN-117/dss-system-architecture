@@ -7,7 +7,7 @@ import {
   listSavedDashboards,
   type SavedDashboardSummary,
 } from '@dss-monorepo/olap-data-access';
-import { Badge, Button, Skeleton } from '@dss-monorepo/design-system';
+import { Badge, Button, Loader } from '@dss-monorepo/design-system';
 
 export function DashboardCatalog() {
   const [dashboards, setDashboards] = useState<SavedDashboardSummary[]>([]);
@@ -73,14 +73,7 @@ export function DashboardCatalog() {
       </header>
 
       {loading ? (
-        <div
-          className="grid gap-3 md:grid-cols-2 xl:grid-cols-3"
-          aria-label="Cargando dashboards"
-        >
-          {[0, 1, 2].map((item) => (
-            <Skeleton key={item} className="h-32 rounded-xl" />
-          ))}
-        </div>
+        <Loader text="Cargando dashboards…" fullScreen={false} className="rounded-xl" />
       ) : error ? (
         <div
           role="alert"

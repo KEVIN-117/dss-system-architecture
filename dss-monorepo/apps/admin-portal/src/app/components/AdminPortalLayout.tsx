@@ -15,6 +15,7 @@ import { ProtectedRoute, useAuth } from '@dss-monorepo/auth';
 import {
   AccessDenied,
   DashboardTemplate,
+  Loader,
   type NavigationGroup,
   type NavigationItem,
 } from '@dss-monorepo/design-system';
@@ -128,28 +129,29 @@ export function AdminPortalLayout({
       }
       onDisconnect={logout}
     >
-      {children}
+      <ProtectedRoute
+        loadingFallback={<Loader text="Verificando sesión…" fullScreen={false} className="min-h-[60vh]" />}
+        unauthenticatedFallback={<LoginRequired />}
+      >
+        {access === 'authenticated' ? (
+          children
+        ) : (
+          <RoleGuard
+            rolesAllowed={['SUPERADMIN']}
+            fallback={
+              <AccessDenied
+                portalName="de administración"
+                logoutHref={`${process.env.NEXT_PUBLIC_BFF_URL}/api/auth/logout`}
+              />
+            }
+          >
+            {children}
+          </RoleGuard>
+        )}
+      </ProtectedRoute>
     </DashboardTemplate>
   );
-  return (
-    <ProtectedRoute unauthenticatedFallback={<LoginRequired />}>
-      {access === 'authenticated' ? (
-        portal
-      ) : (
-        <RoleGuard
-          rolesAllowed={['SUPERADMIN']}
-          fallback={
-            <AccessDenied
-              portalName="de administración"
-              logoutHref={`${process.env.NEXT_PUBLIC_BFF_URL}/api/auth/logout`}
-            />
-          }
-        >
-          {portal}
-        </RoleGuard>
-      )}
-    </ProtectedRoute>
-  );
+  return portal;
 }
 
 function LoginRequired() {

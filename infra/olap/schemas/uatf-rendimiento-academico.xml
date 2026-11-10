@@ -10,7 +10,12 @@
 -->
 <Schema name="UATF_DW" metamodelVersion="4.0">
   <PhysicalSchema>
-    <Table name="fact_cursado" />
+    <Table name="vw_fact_cursado_olap" />
+    <Table name="vw_fact_admision_olap" />
+    <Table name="vw_fact_retencion_olap" />
+    <Table name="dim_estudiante">
+      <Key><Column name="estudiante_sk" /></Key>
+    </Table>
     <Table name="dim_programa">
       <Key>
         <Column name="programa_sk" />
@@ -21,15 +26,48 @@
         <Column name="periodo_academico_sk" />
       </Key>
     </Table>
-    <Link source="dim_programa" target="fact_cursado">
+    <Table name="dim_materia">
+      <Key><Column name="materia_sk" /></Key>
+    </Table>
+    <Table name="dim_admision">
+      <Key><Column name="admision_sk" /></Key>
+    </Table>
+    <Link source="dim_programa" target="vw_fact_cursado_olap">
       <ForeignKey>
         <Column name="programa_sk" />
       </ForeignKey>
     </Link>
-    <Link source="dim_periodo_academico" target="fact_cursado">
+    <Link source="dim_periodo_academico" target="vw_fact_cursado_olap">
       <ForeignKey>
         <Column name="periodo_academico_sk" />
       </ForeignKey>
+    </Link>
+    <Link source="dim_estudiante" target="vw_fact_cursado_olap">
+      <ForeignKey><Column name="estudiante_sk" /></ForeignKey>
+    </Link>
+    <Link source="dim_materia" target="vw_fact_cursado_olap">
+      <ForeignKey><Column name="materia_sk" /></ForeignKey>
+    </Link>
+    <Link source="dim_programa" target="vw_fact_admision_olap">
+      <ForeignKey><Column name="programa_sk" /></ForeignKey>
+    </Link>
+    <Link source="dim_periodo_academico" target="vw_fact_admision_olap">
+      <ForeignKey><Column name="periodo_academico_sk" /></ForeignKey>
+    </Link>
+    <Link source="dim_estudiante" target="vw_fact_admision_olap">
+      <ForeignKey><Column name="estudiante_sk" /></ForeignKey>
+    </Link>
+    <Link source="dim_admision" target="vw_fact_admision_olap">
+      <ForeignKey><Column name="admision_sk" /></ForeignKey>
+    </Link>
+    <Link source="dim_programa" target="vw_fact_retencion_olap">
+      <ForeignKey><Column name="programa_sk" /></ForeignKey>
+    </Link>
+    <Link source="dim_periodo_academico" target="vw_fact_retencion_olap">
+      <ForeignKey><Column name="periodo_academico_sk" /></ForeignKey>
+    </Link>
+    <Link source="dim_estudiante" target="vw_fact_retencion_olap">
+      <ForeignKey><Column name="estudiante_sk" /></ForeignKey>
     </Link>
   </PhysicalSchema>
 
@@ -71,6 +109,17 @@
     </Hierarchies>
   </Dimension>
 
+  <!-- Campus codes come from the governed UATF sede catalog (C = central; 2-8 = regional branches). -->
+  <Dimension name="Academic Campus" table="dim_programa" key="Program SK">
+    <Attributes>
+      <Attribute name="Program SK" keyColumn="programa_sk" hasHierarchy="false" />
+      <Attribute name="Campus Code" keyColumn="sede" nameColumn="sede" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Academic Campus"><Level attribute="Campus Code" /></Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
   <Dimension name="Academic Period" table="dim_periodo_academico" key="Period SK">
     <Attributes>
       <Attribute name="Period SK" keyColumn="periodo_academico_sk" hasHierarchy="false" />
@@ -85,27 +134,148 @@
     </Hierarchies>
   </Dimension>
 
+  <!-- Only aggregate-safe profile attributes are published; student identifiers stay out of Mondrian. -->
+  <Dimension name="Applicant Profile" table="dim_estudiante" key="Student SK">
+    <Attributes>
+      <Attribute name="Student SK" keyColumn="estudiante_sk" hasHierarchy="false" />
+      <Attribute name="Gender" keyColumn="id_sexo" nameColumn="id_sexo" />
+      <Attribute name="School Type" keyColumn="tipo_colegio" nameColumn="tipo_colegio" />
+      <Attribute name="School" keyColumn="id_colegio" nameColumn="colegio" />
+      <Attribute name="Educational Location" keyColumn="cod_localidad" nameColumn="localidad" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="By Gender"><Level attribute="Gender" /></Hierarchy>
+      <Hierarchy name="By School Type"><Level attribute="School Type" /></Hierarchy>
+      <Hierarchy name="By School"><Level attribute="School" /></Hierarchy>
+      <Hierarchy name="By Educational Location"><Level attribute="Educational Location" /></Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
+  <Dimension name="Admission Mode" table="dim_admision" key="Admission SK">
+    <Attributes>
+      <Attribute name="Admission SK" keyColumn="admision_sk" hasHierarchy="false" />
+      <Attribute name="Admission Code" keyColumn="id_acceso" nameColumn="id_acceso" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Admission Mode"><Level attribute="Admission Code" /></Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
+  <Dimension name="Academic Subject" table="dim_materia" key="Subject SK">
+    <Attributes>
+      <Attribute name="Subject SK" keyColumn="materia_sk" hasHierarchy="false" />
+      <Attribute name="Subject" keyColumn="id_materia" nameColumn="materia" />
+      <Attribute name="Course Cycle" keyColumn="ciclo" nameColumn="ciclo" />
+      <Attribute name="Course Code" keyColumn="sigla" nameColumn="sigla" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Academic Subject">
+        <Level attribute="Course Cycle" />
+        <Level attribute="Subject" />
+      </Hierarchy>
+      <Hierarchy name="By Course Code"><Level attribute="Course Code" /></Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
   <Cube name="Academic Performance" defaultMeasure="Enrollment Attempts">
     <Dimensions>
       <Dimension source="Academic Program" />
       <Dimension source="Academic Faculty Scope" />
       <Dimension source="Academic Career Scope" />
+      <Dimension source="Academic Campus" />
       <Dimension source="Academic Period" />
+      <Dimension source="Applicant Profile" />
+      <Dimension source="Academic Subject" />
     </Dimensions>
     <MeasureGroups>
-      <MeasureGroup name="Coursework" table="fact_cursado">
+      <MeasureGroup name="Coursework" table="vw_fact_cursado_olap">
         <Measures>
           <Measure name="Enrollment Attempts" column="conteo_intento" aggregator="sum" formatString="#,##0" />
           <!-- Used internally by the BFF to apply Saiku's k-anonymity mask to every aggregate. -->
-          <Measure name="Attempt Count" column="fact_cursado_id" aggregator="count" formatString="#,##0" />
+          <Measure name="Attempt Count" column="estudiante_sk" aggregator="distinct-count" formatString="#,##0" />
           <Measure name="Average Final Grade" column="nota_final" aggregator="avg" formatString="#,##0.00" />
-          <Measure name="Graded Attempts" column="nota_final" aggregator="count" formatString="#,##0" />
+          <Measure name="Graded Attempts" column="conteo_calificado" aggregator="sum" formatString="#,##0" />
+          <Measure name="Passed Attempts" column="conteo_aprobado" aggregator="sum" formatString="#,##0" />
+          <Measure name="Failed Attempts" column="conteo_reprobado" aggregator="sum" formatString="#,##0" />
+          <Measure name="Repeated Attempts" column="conteo_repeticion" aggregator="sum" formatString="#,##0" />
+          <Measure name="Abandoned Attempts" column="conteo_abandono" aggregator="sum" formatString="#,##0" />
         </Measures>
         <DimensionLinks>
           <ForeignKeyLink dimension="Academic Program" foreignKeyColumn="programa_sk" />
           <ForeignKeyLink dimension="Academic Faculty Scope" foreignKeyColumn="programa_sk" />
           <ForeignKeyLink dimension="Academic Career Scope" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Campus" foreignKeyColumn="programa_sk" />
           <ForeignKeyLink dimension="Academic Period" foreignKeyColumn="periodo_academico_sk" />
+          <ForeignKeyLink dimension="Applicant Profile" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Academic Subject" foreignKeyColumn="materia_sk" />
+        </DimensionLinks>
+      </MeasureGroup>
+    </MeasureGroups>
+  </Cube>
+
+  <Cube name="Academic Admission" defaultMeasure="Applicants">
+    <Dimensions>
+      <Dimension source="Academic Program" />
+      <Dimension source="Academic Faculty Scope" />
+      <Dimension source="Academic Career Scope" />
+      <Dimension source="Academic Campus" />
+      <Dimension source="Academic Period" />
+      <Dimension source="Applicant Profile" />
+      <Dimension source="Admission Mode" />
+    </Dimensions>
+    <MeasureGroups>
+      <MeasureGroup name="Admissions" table="vw_fact_admision_olap">
+        <Measures>
+          <Measure name="Applicants" column="applicant_person_sk" aggregator="distinct-count" formatString="#,##0" />
+          <Measure name="Admitted Applicants" column="admitted_person_sk" aggregator="distinct-count" formatString="#,##0" />
+          <Measure name="Known Admission Outcomes" column="known_outcome_person_sk" aggregator="distinct-count" formatString="#,##0" />
+          <Measure name="Applications" column="conteo_postulacion" aggregator="sum" formatString="#,##0" />
+          <Measure name="Average Admission Score" column="puntaje_examen" aggregator="avg" formatString="#,##0.00" />
+          <Measure name="Attempt Count" column="applicant_person_sk" aggregator="distinct-count" formatString="#,##0" />
+        </Measures>
+        <DimensionLinks>
+          <ForeignKeyLink dimension="Academic Program" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Faculty Scope" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Career Scope" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Campus" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Period" foreignKeyColumn="periodo_academico_sk" />
+          <ForeignKeyLink dimension="Applicant Profile" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Admission Mode" foreignKeyColumn="admision_sk" />
+        </DimensionLinks>
+      </MeasureGroup>
+    </MeasureGroups>
+  </Cube>
+
+  <Cube name="Academic Retention" defaultMeasure="Student Snapshots">
+    <Dimensions>
+      <Dimension source="Academic Program" />
+      <Dimension source="Academic Faculty Scope" />
+      <Dimension source="Academic Career Scope" />
+      <Dimension source="Academic Campus" />
+      <Dimension source="Academic Period" />
+      <Dimension source="Applicant Profile" />
+    </Dimensions>
+    <MeasureGroups>
+      <MeasureGroup name="Retention" table="vw_fact_retencion_olap">
+        <Measures>
+          <Measure name="Student Snapshots" column="conteo_snapshot" aggregator="sum" formatString="#,##0" />
+          <Measure name="Evaluable Retention Outcomes" column="conteo_evaluable" aggregator="sum" formatString="#,##0" />
+          <Measure name="Retained Students" column="conteo_retenido" aggregator="sum" formatString="#,##0" />
+          <Measure name="Observed Dropouts" column="conteo_desercion" aggregator="sum" formatString="#,##0" />
+          <Measure name="Average Courses Taken" column="materias_cursadas" aggregator="avg" formatString="#,##0.00" />
+          <Measure name="Average Courses Passed" column="materias_aprobadas" aggregator="avg" formatString="#,##0.00" />
+          <Measure name="Average Courses Failed" column="materias_reprobadas" aggregator="avg" formatString="#,##0.00" />
+          <Measure name="Average Failed Course Backlog" column="materias_arrastradas" aggregator="avg" formatString="#,##0.00" />
+          <Measure name="Average Cumulative Score" column="ppa_acumulado" aggregator="avg" formatString="#,##0.00" />
+          <Measure name="Attempt Count" column="estudiante_sk" aggregator="distinct-count" formatString="#,##0" />
+        </Measures>
+        <DimensionLinks>
+          <ForeignKeyLink dimension="Academic Program" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Faculty Scope" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Career Scope" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Campus" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Academic Period" foreignKeyColumn="periodo_academico_sk" />
+          <ForeignKeyLink dimension="Applicant Profile" foreignKeyColumn="estudiante_sk" />
         </DimensionLinks>
       </MeasureGroup>
     </MeasureGroups>

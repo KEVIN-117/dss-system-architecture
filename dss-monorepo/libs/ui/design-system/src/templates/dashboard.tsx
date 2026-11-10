@@ -35,6 +35,8 @@ export interface DashboardTemplateProps
   extends React.HTMLAttributes<HTMLDivElement> {
   children: React.ReactNode;
   sidebarTitle?: string;
+  sidebarSubtitle?: string;
+  sidebarLogo?: React.ReactNode;
   navItems?: NavigationItem[];
   navGroups?: NavigationGroup[];
   surfaceMaterial?: 'solid' | 'frosted';
@@ -42,11 +44,14 @@ export interface DashboardTemplateProps
   onMenuClick?: () => void;
   onSearch?: (query: string) => void;
   onDisconnect?: () => void;
+  onNavigate?: (href: string) => void;
 }
 
 export function DashboardTemplate({
   children,
   sidebarTitle = 'DSS MAINFRAME',
+  sidebarSubtitle,
+  sidebarLogo,
   navItems = [],
   navGroups,
   surfaceMaterial = 'solid',
@@ -54,6 +59,7 @@ export function DashboardTemplate({
   onMenuClick,
   onSearch,
   onDisconnect,
+  onNavigate,
   className,
   ...props
 }: DashboardTemplateProps) {
@@ -65,11 +71,14 @@ export function DashboardTemplate({
           navItems={navItems}
           navGroups={navGroups}
           sidebarTitle={sidebarTitle}
+          sidebarSubtitle={sidebarSubtitle}
+          sidebarLogo={sidebarLogo}
           surfaceMaterial={surfaceMaterial}
           user={user}
           onMenuClick={onMenuClick}
           onSearch={onSearch}
           onDisconnect={onDisconnect}
+          onNavigate={onNavigate}
           {...props}
         >
           {children}
@@ -82,6 +91,8 @@ export function DashboardTemplate({
 function DashboardTemplateFrame({
   children,
   sidebarTitle,
+  sidebarSubtitle,
+  sidebarLogo,
   navItems,
   navGroups,
   surfaceMaterial,
@@ -89,6 +100,7 @@ function DashboardTemplateFrame({
   onMenuClick,
   onSearch,
   onDisconnect,
+  onNavigate,
   className,
   ...props
 }: DashboardTemplateProps) {
@@ -132,14 +144,14 @@ function DashboardTemplateFrame({
               aria-hidden="true"
               className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-sidebar-border bg-sidebar-accent text-sidebar-primary group-data-[collapsible=icon]:size-9"
             >
-              <Landmark className="size-5" strokeWidth={1.8} />
+              {sidebarLogo ?? <Landmark className="size-5" strokeWidth={1.8} />}
             </span>
             <div className="min-w-0 group-data-[collapsible=icon]:hidden">
               <p className="truncate text-sm font-semibold tracking-tight text-sidebar-foreground">
                 {sidebarTitle}
               </p>
               <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                Plataforma institucional
+                {sidebarSubtitle ?? 'Plataforma institucional'}
               </p>
             </div>
           </div>
@@ -202,6 +214,19 @@ function DashboardTemplateFrame({
                           >
                             <a
                               href={item.href}
+                              onClick={(event) => {
+                                if (
+                                  onNavigate &&
+                                  event.button === 0 &&
+                                  !event.metaKey &&
+                                  !event.ctrlKey &&
+                                  !event.shiftKey &&
+                                  !event.altKey
+                                ) {
+                                  event.preventDefault();
+                                  onNavigate(item.href);
+                                }
+                              }}
                               aria-current={item.isActive ? 'page' : undefined}
                             >
                               {item.isActive && (
@@ -243,12 +268,15 @@ function DashboardTemplateFrame({
       <main className="flex min-h-svh min-w-0 flex-1 flex-col overflow-x-hidden">
         <Header
           appName={sidebarTitle}
+          contextLabel={sidebarSubtitle}
+          logo={sidebarLogo}
           user={user}
           onMenuClick={() => {
             onMenuClick?.();
             toggleSidebar();
           }}
           onSearch={onSearch}
+          showSearch={Boolean(onSearch)}
           onDisconnect={onDisconnect}
           data-dashboard-material={surfaceMaterial}
           className="sticky top-0 z-30 border-b border-border"

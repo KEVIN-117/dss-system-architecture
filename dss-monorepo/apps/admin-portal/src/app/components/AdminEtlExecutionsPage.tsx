@@ -5,6 +5,7 @@ import {
   Badge,
   Button,
   Input,
+  Loader,
   Sheet,
   SheetContent,
   SheetDescription,
@@ -357,7 +358,7 @@ export function AdminEtlExecutionsPage() {
                     colSpan={7}
                     className="py-10 text-center text-muted-foreground"
                   >
-                    Cargando ejecuciones…
+                    <Loader text="Cargando ejecuciones…" fullScreen={false} className="min-h-24" />
                   </TableCell>
                 </TableRow>
               )}
@@ -483,9 +484,7 @@ export function AdminEtlExecutionsPage() {
             </SheetDescription>
           </SheetHeader>
           {detailLoading && (
-            <p role="status" className="p-6 text-sm text-muted-foreground">
-              Cargando detalle…
-            </p>
+            <Loader text="Cargando detalle…" fullScreen={false} className="m-6" />
           )}
           {detailError && (
             <p

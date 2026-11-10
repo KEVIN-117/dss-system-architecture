@@ -1,9 +1,10 @@
 'use client';
 
 import * as React from 'react';
-import { Database, LoaderCircle } from 'lucide-react';
+import { Database } from 'lucide-react';
 import type { SaikuConnection, SaikuCube } from '@dss-monorepo/olap-models';
 import { Label } from '../../atoms/label';
+import { Loader } from '../../atoms/loader';
 import { Select } from '../../atoms/select';
 
 export interface CubePickerProps {
@@ -108,13 +109,7 @@ export function CubePicker({
         ))}
       </Select>
       {loading ? (
-        <p
-          className="mt-2 flex items-center gap-2 text-xs text-muted-foreground"
-          role="status"
-        >
-          <LoaderCircle aria-hidden="true" className="size-3.5 animate-spin" />
-          Cargando conexiones y cubos…
-        </p>
+        <Loader text="Cargando conexiones y cubos…" fullScreen={false} className="mt-2 min-h-32 rounded-lg" />
       ) : error ? (
         <p id={errorId} className="mt-2 text-xs text-destructive" role="alert">
           {error}

@@ -86,6 +86,9 @@
     },
     {
       "path": "./libs/connectors/dw-control-connector"
+    },
+    {
+      "path": "./libs/ui/academic-analytics"
     }
   ]
 }

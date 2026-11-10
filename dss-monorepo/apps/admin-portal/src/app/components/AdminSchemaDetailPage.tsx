@@ -4,6 +4,7 @@ import * as React from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Button,
+  Loader,
   OlapSchemaViewer,
   type OlapSchemaViewModel,
 } from '@dss-monorepo/design-system';
@@ -37,16 +38,7 @@ export function AdminSchemaDetailPage({ schemaId }: { schemaId: string }) {
   }, [loadSchema]);
 
   if (loading) {
-    return (
-      <section
-        className="space-y-4"
-        aria-busy="true"
-        aria-label="Loading schema"
-      >
-        <div className="h-8 w-64 animate-pulse rounded bg-muted" />
-        <div className="h-[620px] animate-pulse rounded-xl border border-border bg-muted/50" />
-      </section>
-    );
+    return <Loader text="Cargando esquema OLAP…" fullScreen={false} className="rounded-xl" />;
   }
 
   if (error || !schema || xml === null) {

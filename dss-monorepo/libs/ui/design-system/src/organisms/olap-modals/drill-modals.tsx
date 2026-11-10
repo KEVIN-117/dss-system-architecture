@@ -4,6 +4,7 @@ import * as React from 'react';
 import { Button } from '../../atoms/button';
 import { Checkbox } from '../../atoms/checkbox';
 import { Input } from '../../atoms/input';
+import { Loader } from '../../atoms/loader';
 import { Select } from '../../atoms/select';
 import { OlapModal } from './olap-modal';
 import { OlapModalActions, OlapModalField } from './modal-parts';
@@ -253,9 +254,7 @@ export function DrillthroughResultModal({
       footer={<Button onClick={onClose}>Cerrar</Button>}
     >
       {!result ? (
-        <p className="text-sm text-muted-foreground" role="status">
-          {loadingLabel}
-        </p>
+        <Loader text={loadingLabel} fullScreen={false} />
       ) : result.error ? (
         <p
           className="rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"

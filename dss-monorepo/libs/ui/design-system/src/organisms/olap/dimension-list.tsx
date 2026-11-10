@@ -5,6 +5,7 @@ import { Layers3, Plus, Search, TableProperties } from 'lucide-react';
 import type { SaikuDimension, SaikuMeasure } from '@dss-monorepo/olap-models';
 import { Button } from '../../atoms/button';
 import { Input } from '../../atoms/input';
+import { Loader } from '../../atoms/loader';
 import { OLAP_AXIS_LABELS, type OlapQueryItem } from './types';
 
 export interface DimensionListProps {
@@ -121,15 +122,7 @@ export function DimensionList({
       </header>
 
       {loading ? (
-        <div
-          className="mt-4 space-y-3"
-          role="status"
-          aria-label="Cargando metadatos"
-        >
-          <div className="h-10 animate-pulse rounded-md bg-muted" />
-          <div className="h-10 animate-pulse rounded-md bg-muted" />
-          <span className="sr-only">Cargando dimensiones y medidas…</span>
-        </div>
+        <Loader text="Cargando dimensiones y medidas…" fullScreen={false} className="mt-4 rounded-lg" />
       ) : error ? (
         <p
           className="mt-4 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"

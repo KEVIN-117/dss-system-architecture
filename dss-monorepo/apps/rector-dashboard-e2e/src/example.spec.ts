@@ -19,7 +19,7 @@ test('shows access denied to an authenticated user without the rector role', asy
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Acceso no autorizado' })).toBeVisible();
-  await expect(page.getByText('portal del rector')).toBeVisible();
+  await expect(page.getByText('portal Rectoría')).toBeVisible();
   await expect(page.getByText('Rector Dashboard')).toHaveCount(0);
 });
 

@@ -1,7 +1,8 @@
 'use client';
 
-import { AlertCircle, LoaderCircle, Table2 } from 'lucide-react';
+import { AlertCircle, Table2 } from 'lucide-react';
 import type { CellEntry, QueryResult } from '@dss-monorepo/olap-models';
+import { Loader } from '../../atoms/loader';
 
 export interface CellsetTableProps {
   result?: QueryResult | null;
@@ -27,18 +28,7 @@ export function CellsetTable({
 
   if (loading) {
     return (
-      <div
-        className={`flex min-h-40 items-center justify-center rounded-lg border border-border bg-background ${className ?? ''}`}
-        role="status"
-      >
-        <LoaderCircle
-          aria-hidden="true"
-          className="mr-2 size-4 animate-spin text-primary"
-        />
-        <span className="text-sm text-muted-foreground">
-          Ejecutando consulta…
-        </span>
-      </div>
+      <Loader text="Ejecutando consulta…" fullScreen={false} className={`rounded-lg border border-border ${className ?? ''}`} />
     );
   }
 

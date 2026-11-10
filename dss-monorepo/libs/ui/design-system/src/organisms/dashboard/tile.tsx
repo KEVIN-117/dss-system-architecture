@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Badge } from '../../atoms/badge';
 import { Button } from '../../atoms/button';
-import { Skeleton } from '../../atoms/skeleton';
+import { Loader } from '../../atoms/loader';
 import { cn } from 'cn';
 import {
   DashboardEditContext,
@@ -158,10 +158,7 @@ export function Tile({
       </header>
       <div className="min-h-0 flex-1 p-4" aria-busy={loading}>
         {loading ? (
-          <div className="space-y-3" aria-label={`Cargando ${title}`}>
-            <Skeleton className="h-5 w-2/5" />
-            <Skeleton className="h-24 w-full" />
-          </div>
+          <Loader text={`Cargando ${title}…`} fullScreen={false} />
         ) : error ? (
           <div
             role="alert"

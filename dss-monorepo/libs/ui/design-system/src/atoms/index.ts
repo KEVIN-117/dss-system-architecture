@@ -6,6 +6,7 @@ export * from './dropdown';
 export * from './input';
 export * from './kbd';
 export * from './label';
+export * from './loader';
 export {
   Popover as PopoverRoot,
   PopoverAnchor,
