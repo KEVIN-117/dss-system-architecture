@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   Activity,
@@ -30,7 +30,10 @@ export function AdminPortalLayout({
 }) {
   const { user, logout } = useAuth();
   const pathname = usePathname() ?? '';
-  const isSuperAdmin = user?.roles.includes('SUPERADMIN') ?? false;
+  const [navigationReady, setNavigationReady] = useState(false);
+  useEffect(() => setNavigationReady(true), []);
+  const isSuperAdmin =
+    navigationReady && (user?.roles.includes('SUPERADMIN') ?? false);
   const navigationItem = (
     title: string,
     href: string,

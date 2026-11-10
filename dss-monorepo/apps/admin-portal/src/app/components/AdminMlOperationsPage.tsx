@@ -18,9 +18,12 @@ import {
   CircleHelp,
   Clock3,
   Cpu,
+  FileArchive,
+  FileCheck2,
   RefreshCw,
   ShieldCheck,
   Upload,
+  X,
 } from 'lucide-react';
 
 import {
@@ -95,6 +98,18 @@ function dateLabel(value: string): string {
   }).format(date);
 }
 
+function fileSizeLabel(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  const units = ['KB', 'MB', 'GB'];
+  let value = bytes / 1024;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${new Intl.NumberFormat('es-BO', { maximumFractionDigits: 1 }).format(value)} ${units[unit]}`;
+}
+
 export function AdminMlOperationsPage() {
   const [algorithm, setAlgorithm] =
     React.useState<MlAlgorithm>('random_forest');
@@ -116,6 +131,8 @@ export function AdminMlOperationsPage() {
   const [uploading, setUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = React.useState<string | null>(null);
+  const [uploadDropActive, setUploadDropActive] = React.useState(false);
+  const uploadInputRef = React.useRef<HTMLInputElement>(null);
 
   const selectedDataset = availableDatasets.find(
     (dataset) => dataset.dataset_ref === datasetRef,
@@ -169,12 +186,29 @@ export function AdminMlOperationsPage() {
   React.useEffect(() => {
     void refreshDatasets();
     void refreshJobs();
-    const timer = window.setInterval(() => {
-      if (jobs.some((job) => !TERMINAL_STATES.has(job.status)))
-        void refreshJobs();
-    }, 4000);
+  }, [refreshDatasets, refreshJobs]);
+
+  const hasActiveJobs = jobs.some((job) => !TERMINAL_STATES.has(job.status));
+
+  React.useEffect(() => {
+    if (!hasActiveJobs) return;
+    const timer = window.setInterval(() => void refreshJobs(), 4000);
     return () => window.clearInterval(timer);
-  }, [jobs, refreshJobs, refreshDatasets]);
+  }, [hasActiveJobs, refreshJobs]);
+
+  function selectUploadFile(file?: File) {
+    if (!file) return;
+    if (!file.name.toLowerCase().endsWith('.zip')) {
+      setUploadFile(null);
+      setUploadError('Selecciona un archivo .zip con el dataset preparado.');
+      setUploadSuccess(null);
+      if (uploadInputRef.current) uploadInputRef.current.value = '';
+      return;
+    }
+    setUploadFile(file);
+    setUploadError(null);
+    setUploadSuccess(null);
+  }
 
   async function handleDatasetUpload(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -618,45 +652,110 @@ export function AdminMlOperationsPage() {
           }
         }}
       >
-        <DialogContent className="sm:max-w-lg">
+        <DialogContent className="sm:max-w-xl">
           <DialogHeader>
-            <DialogTitle>Subir dataset preparado (.zip)</DialogTitle>
-            <DialogDescription>
-              El archivo comprimido debe incluir <code>manifest.json</code> y{' '}
-              <code>rows.jsonl</code> preparados según el contrato PRED-002.
-            </DialogDescription>
+            <div className="flex items-start gap-4">
+              <span className="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                <FileArchive aria-hidden="true" className="size-5" />
+              </span>
+              <div className="space-y-1">
+                <DialogTitle>Agregar dataset de entrenamiento</DialogTitle>
+                <DialogDescription>
+                  Selecciona el paquete ZIP preparado para el contrato PRED-002.
+                  El servicio validará su estructura antes de registrarlo.
+                </DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
 
-          <form onSubmit={handleDatasetUpload} className="space-y-4">
-            <div className="rounded-lg border-2 border-dashed border-border p-6 text-center">
-              <Upload className="mx-auto size-8 text-muted-foreground" />
-              <label className="mt-2 block cursor-pointer text-sm font-medium text-primary hover:underline">
-                <span>Seleccionar archivo ZIP</span>
+          <form onSubmit={handleDatasetUpload} className="space-y-5">
+            <div
+              onDragEnter={(event) => {
+                event.preventDefault();
+                if (!uploading) setUploadDropActive(true);
+              }}
+              onDragOver={(event) => event.preventDefault()}
+              onDragLeave={(event) => {
+                if (
+                  !(event.relatedTarget instanceof Node) ||
+                  !event.currentTarget.contains(event.relatedTarget)
+                )
+                  setUploadDropActive(false);
+              }}
+              onDrop={(event) => {
+                event.preventDefault();
+                setUploadDropActive(false);
+                if (!uploading) selectUploadFile(event.dataTransfer.files[0]);
+              }}
+              className={`rounded-xl border-2 border-dashed p-6 text-center transition-colors sm:p-8 ${
+                uploadDropActive
+                  ? 'border-primary bg-primary/10'
+                  : 'border-border bg-muted/20 hover:border-primary/60 hover:bg-muted/40'
+              }`}
+            >
+              <span className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
+                <Upload aria-hidden="true" className="size-5" />
+              </span>
+              <p className="mt-4 font-medium text-foreground">
+                Arrastra el archivo ZIP aquí
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">o</p>
+              <label className="mt-3 inline-flex min-h-10 cursor-pointer items-center justify-center rounded-md border border-border bg-background px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted focus-within:ring-2 focus-within:ring-ring focus-within:ring-offset-2">
+                Examinar archivos
                 <input
+                  ref={uploadInputRef}
                   type="file"
                   accept=".zip"
-                  required
                   disabled={uploading}
                   onChange={(e) => {
-                    if (e.target.files && e.target.files[0]) {
-                      setUploadFile(e.target.files[0]);
-                      setUploadError(null);
-                      setUploadSuccess(null);
-                    }
+                    selectUploadFile(e.target.files?.[0]);
                   }}
                   className="sr-only"
                 />
               </label>
-              <p className="mt-1 text-xs text-muted-foreground">
-                {uploadFile ? (
-                  <span className="font-semibold text-foreground">
-                    {uploadFile.name} ({(uploadFile.size / 1024).toFixed(1)} KB)
-                  </span>
-                ) : (
-                  'Archivo .zip con manifest.json y rows.jsonl'
-                )}
+              <p className="mt-3 text-xs text-muted-foreground">
+                Solo archivos .zip. Debe incluir{' '}
+                <code className="rounded bg-muted px-1 py-0.5 text-foreground">
+                  manifest.json
+                </code>{' '}
+                y{' '}
+                <code className="rounded bg-muted px-1 py-0.5 text-foreground">
+                  rows.jsonl
+                </code>.
               </p>
             </div>
+
+            {uploadFile && (
+              <div className="flex min-w-0 items-center gap-3 rounded-lg border border-border bg-card p-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                  <FileCheck2 aria-hidden="true" className="size-5" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p
+                    className="truncate text-sm font-medium"
+                    title={uploadFile.name}
+                  >
+                    {uploadFile.name}
+                  </p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Archivo ZIP · {fileSizeLabel(uploadFile.size)}
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  aria-label="Quitar dataset seleccionado"
+                  disabled={uploading}
+                  onClick={() => {
+                    setUploadFile(null);
+                    if (uploadInputRef.current) uploadInputRef.current.value = '';
+                  }}
+                >
+                  <X aria-hidden="true" className="size-4" />
+                </Button>
+              </div>
+            )}
 
             {uploadError && (
               <p

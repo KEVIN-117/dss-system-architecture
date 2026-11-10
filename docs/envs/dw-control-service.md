@@ -43,6 +43,27 @@ paths and methods remain denied.
 
 ## Runtime and operations
 
+### Compose local
+
+The root `docker-compose.yml` builds this service from `dw-control-service/Dockerfile`, waits for
+PostgreSQL, the DW migrations, and Keycloak, then publishes the API on `http://localhost:8090`.
+Set `DW_CONTROL_DB_PASSWORD` in the ignored root `.env`. The local-only
+`dw-control-db-provision` one-shot service creates or reconciles the restricted
+`dw_control_runtime` login after migrations and grants it membership in `dw_control_service`.
+The API connects to PostgreSQL through the internal `postgres-dw:5432` address; `DW_CONTROL_PORT`
+controls the host port. Start or rebuild the service and its dependencies with:
+
+```powershell
+docker compose up -d --build dw-control-service
+docker compose ps dw-control-service
+Invoke-RestMethod http://localhost:8090/actuator/health/readiness
+```
+
+To inspect startup errors, use `docker compose logs --tail=100 dw-control-service`. The API login
+is separate from the database owner. The local provisioner is only for the root development
+Compose; production and UATF environments must have a DBA provision the runtime login through the
+approved secret-management process as described below.
+
 Build the image from the repository root:
 
 ```sh

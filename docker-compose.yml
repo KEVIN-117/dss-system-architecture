@@ -65,6 +65,61 @@ services:
     networks:
       - dss-net
 
+  # Local Compose only: reconcile the restricted runtime login after role migrations.
+  dw-control-db-provision:
+    image: postgres:15-alpine
+    depends_on:
+      dw-migrator:
+        condition: service_completed_successfully
+    environment:
+      PGHOST: postgres-dw
+      PGPORT: "5432"
+      PGDATABASE: ${POSTGRES_DW_NAME}
+      PGUSER: ${POSTGRES_DW_USER}
+      PGPASSWORD: ${POSTGRES_DW_PASSWORD}
+      DW_CONTROL_DB_PASSWORD: ${DW_CONTROL_DB_PASSWORD:?DW_CONTROL_DB_PASSWORD must be set in the root .env}
+    volumes:
+      - ./infra/dw-schema/scripts/provision-local-dw-control-runtime.sql:/scripts/provision-local-dw-control-runtime.sql:ro
+    entrypoint: ["/bin/sh", "-c"]
+    command: ["psql -v ON_ERROR_STOP=1 -f /scripts/provision-local-dw-control-runtime.sql"]
+    restart: "no"
+    networks:
+      - dss-net
+
+  dw-control-service:
+    image: ${DOCKERHUB_USERNAME:-local}/dss-dw-control-service:${DW_CONTROL_IMAGE_TAG:-local}
+    build:
+      context: ./dw-control-service
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    depends_on:
+      postgres-dw:
+        condition: service_healthy
+      dw-migrator:
+        condition: service_completed_successfully
+      dw-control-db-provision:
+        condition: service_completed_successfully
+      keycloak:
+        condition: service_healthy
+    environment:
+      DW_CONTROL_PROFILE: ${DW_CONTROL_PROFILE:-dev}
+      DW_CONTROL_PORT: "8090"
+      DW_CONTROL_OPENAPI_ENABLED: ${DW_CONTROL_OPENAPI_ENABLED:-true}
+      # Inside the Compose network, localhost points to this container. Always use the DW service DNS.
+      DW_CONTROL_DB_URL: jdbc:postgresql://postgres-dw:5432/${POSTGRES_DW_NAME}
+      DW_CONTROL_DB_USERNAME: ${DW_CONTROL_DB_USERNAME:-dw_control_runtime}
+      DW_CONTROL_DB_PASSWORD: ${DW_CONTROL_DB_PASSWORD:?DW_CONTROL_DB_PASSWORD must be set in the root .env}
+      DW_CONTROL_DB_POOL_SIZE: ${DW_CONTROL_DB_POOL_SIZE:-8}
+      DW_CONTROL_DB_CONNECTION_TIMEOUT_MS: ${DW_CONTROL_DB_CONNECTION_TIMEOUT_MS:-5000}
+      KEYCLOAK_ISSUER_URI: ${AUTH_KEYCLOAK_ISSUER_URI:-http://localhost:8080/realms/uatf-dss-realm}
+      KEYCLOAK_JWK_SET_URI: ${AUTH_KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs}
+      KEYCLOAK_DW_CONTROL_AUDIENCE: ${KEYCLOAK_DW_CONTROL_AUDIENCE:-dw-control-service}
+      KEYCLOAK_DW_CONTROL_CLIENT_ID: ${KEYCLOAK_DW_CONTROL_CLIENT_ID:-dw-control-service}
+    ports:
+      - "127.0.0.1:${DW_CONTROL_PORT:-8090}:8090"
+    networks:
+      - dss-net
+
   keycloak:
     image: ${DOCKERHUB_USERNAME:-local}/dss-keycloak:${KEYCLOAK_VERSION:-local}
     build:
