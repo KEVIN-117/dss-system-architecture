@@ -47,6 +47,17 @@ export interface DashboardTemplateProps
   onNavigate?: (href: string) => void;
 }
 
+function toNavigationIdSegment(value: string): string {
+  return (
+    value
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '') || 'group'
+  );
+}
+
 export function DashboardTemplate({
   children,
   sidebarTitle = 'DSS MAINFRAME',
@@ -108,7 +119,7 @@ function DashboardTemplateFrame({
   const [collapsedGroups, setCollapsedGroups] = React.useState<Set<string>>(
     () => new Set(),
   );
-  const groupIdPrefix = React.useId().replaceAll(':', '');
+  const groupIdPrefix = toNavigationIdSegment(sidebarTitle ?? 'dashboard');
   const groups = navGroups?.length
     ? navGroups
     : navItems?.length
@@ -160,7 +171,7 @@ function DashboardTemplateFrame({
           <nav aria-label="Navegación principal">
             {groups.map((group, index) => {
               const isExpanded = !collapsedGroups.has(group.title);
-              const contentId = `${groupIdPrefix}-navigation-group-${index}`;
+              const contentId = `${groupIdPrefix}-navigation-group-${index}-${toNavigationIdSegment(group.title)}`;
               return (
                 <SidebarGroup
                   key={group.title}
