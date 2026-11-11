@@ -1,6 +1,9 @@
 import {
+  cancelQuery,
+  drillthrough,
   executeQuery,
   getApp,
+  getQueryMdx,
   listApps,
   loadDashboard,
   newQuery,
@@ -14,15 +17,17 @@ import type {
   SaikuApp,
 } from '@dss-monorepo/olap-connector';
 import type {
+  QueryResult,
   SaikuConnection,
   SaikuCube,
   SaikuDimension,
   SaikuMeasure,
+  ThinQuery,
 } from '@dss-monorepo/olap-models';
 
 // Keep application code on the data-access layer instead of depending on the
 // low-level OLAP connector directly.
-export { executeQuery, newQuery };
+export { cancelQuery, drillthrough, executeQuery, getQueryMdx, newQuery };
 
 export type {
   AppPage,
@@ -186,3 +191,66 @@ export async function executeSavedTileQuery(
   }
   return result;
 }
+
+function generateUuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/** Execute a raw MDX statement against a specific cube and return the Cellset QueryResult. */
+export async function executeMdxQuery(
+  cube: SaikuCube,
+  mdx: string,
+): Promise<QueryResult> {
+  const query: ThinQuery = {
+    name: generateUuid(),
+    cube,
+    queryType: 'OLAP',
+    type: 'MDX',
+    mdx,
+  };
+  return executeQuery(query);
+}
+
+/** Request preview SQL from Saiku's Calcite engine for the provided ThinQuery. */
+export async function previewSqlQuery(
+  query: ThinQuery,
+): Promise<{ sql: string }> {
+  const response = await olapFetch('/rest/saiku/api/query/preview-sql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(query),
+  });
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '');
+    throw new Error(
+      `No se pudo obtener la vista previa SQL (${response.status}): ${errorBody.slice(0, 200)}`,
+    );
+  }
+  return (await response.json()) as { sql: string };
+}
+
+export interface SimpleMemberElement {
+  name: string;
+  uniqueName: string;
+  caption: string;
+}
+
+/** Fetch member list for a given level to enable member-level selection filters. */
+export async function getLevelMembers(
+  username: string,
+  cube: SaikuCube,
+  dimension: string,
+  hierarchy: string,
+  level: string,
+): Promise<SimpleMemberElement[]> {
+  const base = `/rest/saiku/${encodeURIComponent(username)}/discover/${encodeURIComponent(cube.connection)}/${encodeURIComponent(cube.catalog)}/${encodeURIComponent(cube.schema)}/${encodeURIComponent(cube.name)}/dimensions/${encodeURIComponent(dimension)}/hierarchies/${encodeURIComponent(hierarchy)}/levels/${encodeURIComponent(level)}`;
+  return getJson<SimpleMemberElement[]>(base);
+}
+

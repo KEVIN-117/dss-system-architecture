@@ -1,6 +1,6 @@
 'use client';
 
-import { AlertCircle, Table2 } from 'lucide-react';
+import { AlertCircle, ExternalLink, Table2 } from 'lucide-react';
 import type { CellEntry, QueryResult } from '@dss-monorepo/olap-models';
 import { Loader } from '../../atoms/loader';
 
@@ -11,9 +11,15 @@ export interface CellsetTableProps {
   emptyMessage?: string;
   maxHeight?: number | string;
   className?: string;
+  onDrillthrough?: (
+    cell: CellEntry,
+    position?: string,
+    coordinates?: { row: number; col: number },
+  ) => void;
+  selectedCell?: { row: number; col: number } | null;
 }
 
-/** Accessible, token-styled table for an OLAP cellset, including status and empty states. */
+/** Accessible, token-styled table for an OLAP cellset, including status, drillthrough and empty states. */
 export function CellsetTable({
   result,
   loading = false,
@@ -21,6 +27,8 @@ export function CellsetTable({
   emptyMessage = 'La consulta no devolvió celdas.',
   maxHeight = 560,
   className,
+  onDrillthrough,
+  selectedCell,
 }: CellsetTableProps) {
   const displayError = error ?? result?.error;
   const rows = result?.cellset ?? [];
@@ -86,7 +94,13 @@ export function CellsetTable({
               className="border-b border-border last:border-b-0"
             >
               {row.map((cell, columnIndex) =>
-                renderCell(cell, rowIndex, columnIndex),
+                renderCell(
+                  cell,
+                  rowIndex,
+                  columnIndex,
+                  onDrillthrough,
+                  selectedCell?.row === rowIndex && selectedCell?.col === columnIndex,
+                ),
               )}
             </tr>
           ))}
@@ -96,7 +110,17 @@ export function CellsetTable({
   );
 }
 
-function renderCell(cell: CellEntry, rowIndex: number, columnIndex: number) {
+function renderCell(
+  cell: CellEntry,
+  rowIndex: number,
+  columnIndex: number,
+  onDrillthrough?: (
+    cell: CellEntry,
+    position?: string,
+    coordinates?: { row: number; col: number },
+  ) => void,
+  isSelected = false,
+) {
   const key = `cell-${rowIndex}-${columnIndex}`;
   const content = cell.value || (cell.type === 'EMPTY' ? '—' : '');
   const baseClass =
@@ -131,6 +155,51 @@ function renderCell(cell: CellEntry, rowIndex: number, columnIndex: number) {
       </td>
     );
   }
+
+  // DATA_CELL with drillthrough support
+  const isDataCell =
+    cell.type === 'DATA_CELL' ||
+    (cell.type !== 'EMPTY' && content !== '—' && !isNaN(Number(content.replace(/[^0-9.-]/g, ''))));
+  const canDrill = Boolean(onDrillthrough && isDataCell && content !== '—');
+
+  if (canDrill) {
+    return (
+      <td
+        key={key}
+        className={`${baseClass} group/cell relative cursor-pointer text-foreground tabular-nums transition-colors hover:bg-primary/10 hover:text-primary ${
+          isSelected ? 'bg-primary/15 ring-1 ring-inset ring-primary' : ''
+        }`}
+        title={`Ver detalle transaccional (Drillthrough): ${content}`}
+        tabIndex={0}
+        role="button"
+        aria-label={`Detalle de celda con valor ${content}`}
+        onClick={() =>
+          onDrillthrough!(cell, cell.properties?.position, {
+            row: rowIndex,
+            col: columnIndex,
+          })
+        }
+        onKeyDown={(event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault();
+            onDrillthrough!(cell, cell.properties?.position, {
+              row: rowIndex,
+              col: columnIndex,
+            });
+          }
+        }}
+      >
+        <div className="flex items-center justify-between gap-1.5">
+          <span>{content}</span>
+          <ExternalLink
+            aria-hidden="true"
+            className="size-3 shrink-0 opacity-0 transition-opacity group-hover/cell:opacity-100 text-primary"
+          />
+        </div>
+      </td>
+    );
+  }
+
   return (
     <td key={key} className={`${baseClass} text-foreground tabular-nums`}>
       {content}

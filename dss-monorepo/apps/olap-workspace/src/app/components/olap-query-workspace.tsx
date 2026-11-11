@@ -1,26 +1,52 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertCircle, Play, Table2 } from 'lucide-react';
+import {
+  AlertCircle,
+  ArrowUpDown,
+  Code2,
+  Download,
+  ExternalLink,
+  Play,
+  RotateCcw,
+  Sparkles,
+  Table2,
+} from 'lucide-react';
 import { useAuth } from '@dss-monorepo/auth';
 import {
-  DimensionList,
-  CubePicker,
-  QueryCanvas,
-  CellsetTable,
   Button,
+  CellsetTable,
+  CubePicker,
+  DimensionList,
+  DrillthroughResultModal,
+  FilterModal,
+  LimitModal,
+  MDXModal,
+  MemberSelectionModal,
+  OrderModal,
+  QueryCanvas,
   Select,
+  type DrillthroughResult,
+  type MemberOption,
+  type OlapMeasureOption,
+  type OlapQueryAxes,
+  type OlapQueryItem,
+  type SortFunction,
 } from '@dss-monorepo/design-system';
 import {
+  drillthrough,
   executeQuery,
-  listOlapConnections,
   getCubeMetadata,
+  getLevelMembers,
+  getQueryMdx,
+  listOlapConnections,
   newQuery,
 } from '@dss-monorepo/olap-data-access';
 import {
   parseCellset,
   toNumber,
   type AxisLocation,
+  type CellEntry,
   type QueryResult,
   type SaikuConnection,
   type SaikuCube,
@@ -28,7 +54,6 @@ import {
   type SaikuMeasure,
   type ThinQuery,
 } from '@dss-monorepo/olap-models';
-import type { OlapQueryAxes, OlapQueryItem } from '@dss-monorepo/design-system';
 import { CHART_TYPES, SaikuChart } from '@dss-monorepo/charts';
 
 export function OlapQueryWorkspace() {
@@ -47,6 +72,36 @@ export function OlapQueryWorkspace() {
   const [error, setError] = useState<string | null>(null);
   const [resultView, setResultView] = useState<'table' | 'chart'>('table');
   const [chartType, setChartType] = useState('bar');
+  const [nonEmpty, setNonEmpty] = useState(true);
+
+  // MDX Modal state
+  const [mdxModalOpen, setMdxModalOpen] = useState(false);
+  const [activeMdx, setActiveMdx] = useState('');
+
+  // Drillthrough state
+  const [drillOpen, setDrillOpen] = useState(false);
+  const [drillLoading, setDrillLoading] = useState(false);
+  const [drillResult, setDrillResult] = useState<DrillthroughResult | null>(null);
+
+  // Order modal state
+  const [orderModalAxis, setOrderModalAxis] = useState<AxisLocation | null>(null);
+
+  // Limit modal state
+  const [limitModalAxis, setLimitModalAxis] = useState<AxisLocation | null>(null);
+
+  // Filter modal state
+  const [filterModalAxis, setFilterModalAxis] = useState<AxisLocation | null>(null);
+
+  // Member selection modal state
+  const [memberModalOpen, setMemberModalOpen] = useState(false);
+  const [memberModalConfig, setMemberModalConfig] = useState<{
+    dimensionUniqueName: string;
+    hierarchyUniqueName: string;
+    levelUniqueName?: string;
+    caption: string;
+  } | null>(null);
+  const [levelMembers, setLevelMembers] = useState<MemberOption[]>([]);
+  const [membersLoading, setMembersLoading] = useState(false);
 
   useEffect(() => {
     if (!user?.username) return;
@@ -82,7 +137,12 @@ export function OlapQueryWorkspace() {
     let active = true;
     setLoadingMetadata(true);
     setError(null);
-    setQuery(newQuery(cube));
+    const initialQ = newQuery(cube);
+    if (initialQ.queryModel) {
+      initialQ.queryModel.axes.COLUMNS.nonEmpty = nonEmpty;
+      initialQ.queryModel.axes.ROWS.nonEmpty = nonEmpty;
+    }
+    setQuery(initialQ);
     setResult(null);
     void getCubeMetadata(user.username, cube)
       .then((value) => {
@@ -102,9 +162,10 @@ export function OlapQueryWorkspace() {
     return () => {
       active = false;
     };
-  }, [cube, user?.username]);
+  }, [cube, user?.username, nonEmpty]);
 
   const axes = useMemo(() => queryToAxes(query), [query]);
+
   const addItem = useCallback(
     (item: OlapQueryItem, axis: 'COLUMNS' | 'ROWS') => {
       if (!query?.queryModel || !cube) return;
@@ -198,6 +259,39 @@ export function OlapQueryWorkspace() {
     [query],
   );
 
+  const clearAxis = useCallback(
+    (axis: AxisLocation) => {
+      if (!query?.queryModel) return;
+      const next = structuredClone(query);
+      next.queryModel!.axes[axis].hierarchies = [];
+      if (axis === 'COLUMNS') next.queryModel!.details.measures = [];
+      setQuery(next);
+    },
+    [query],
+  );
+
+  const swapAxes = useCallback(() => {
+    if (!query?.queryModel) return;
+    const next = structuredClone(query);
+    const colHierarchies = next.queryModel.axes.COLUMNS.hierarchies;
+    const rowHierarchies = next.queryModel.axes.ROWS.hierarchies;
+    next.queryModel.axes.COLUMNS.hierarchies = rowHierarchies;
+    next.queryModel.axes.ROWS.hierarchies = colHierarchies;
+    setQuery(next);
+  }, [query]);
+
+  const toggleNonEmpty = useCallback(
+    (value: boolean) => {
+      setNonEmpty(value);
+      if (!query?.queryModel) return;
+      const next = structuredClone(query);
+      next.queryModel.axes.COLUMNS.nonEmpty = value;
+      next.queryModel.axes.ROWS.nonEmpty = value;
+      setQuery(next);
+    },
+    [query],
+  );
+
   const runQuery = async () => {
     if (!query) return;
     setRunning(true);
@@ -219,13 +313,172 @@ export function OlapQueryWorkspace() {
     }
   };
 
+  // Drillthrough execution
+  const handleDrillthrough = async (
+    cell: CellEntry,
+    position?: string,
+  ) => {
+    const targetQueryName = result?.query?.name || query?.name;
+    if (!targetQueryName) return;
+    setDrillLoading(true);
+    setDrillOpen(true);
+    try {
+      const pos = position || cell.properties?.position;
+      const drillResponse = await drillthrough(targetQueryName, {
+        position: pos,
+        maxRows: 500,
+      });
+      if (drillResponse.error) throw new Error(drillResponse.error);
+
+      const cellRows = drillResponse.cellset ?? [];
+      if (cellRows.length === 0) {
+        setDrillResult({ columns: [], rows: [] });
+      } else {
+        const columns = cellRows[0].map((c) => c.value || 'Columna');
+        const rows = cellRows.slice(1).map((r) => r.map((c) => c.value));
+        setDrillResult({
+          columns,
+          rows,
+          runtimeMs: drillResponse.runtime,
+        });
+      }
+    } catch (err) {
+      setDrillResult({
+        columns: [],
+        rows: [],
+        error: err instanceof Error ? err.message : 'Error en consulta drillthrough',
+      });
+    } finally {
+      setDrillLoading(false);
+    }
+  };
+
+  // MDX Modal handler
+  const handleOpenMdxModal = async () => {
+    if (!query) return;
+    try {
+      const mdx = await getQueryMdx(query.name);
+      setActiveMdx(mdx || query.mdx || '/* MDX no disponible */');
+      setMdxModalOpen(true);
+    } catch {
+      setActiveMdx(query.mdx || '/* Error al obtener MDX */');
+      setMdxModalOpen(true);
+    }
+  };
+
+  // Member selection modal handler
+  const handleOpenMemberFilter = async (
+    dimensionUniqueName: string,
+    hierarchyUniqueName: string,
+    levelUniqueName?: string,
+    caption?: string,
+  ) => {
+    if (!cube || !user?.username) return;
+    setMemberModalConfig({
+      dimensionUniqueName,
+      hierarchyUniqueName,
+      levelUniqueName,
+      caption: caption || hierarchyUniqueName,
+    });
+    setMemberModalOpen(true);
+    setMembersLoading(true);
+    try {
+      const dim = metadata.dimensions.find((d) => d.uniqueName === dimensionUniqueName);
+      const hier = dim?.hierarchies.find((h) => h.uniqueName === hierarchyUniqueName);
+      const lvl = levelUniqueName
+        ? hier?.levels?.find((l) => l.uniqueName === levelUniqueName)
+        : hier?.levels?.[0];
+
+      if (dim && hier && lvl) {
+        const fetched = await getLevelMembers(
+          user.username,
+          cube,
+          dim.name,
+          hier.name,
+          lvl.name,
+        );
+        setLevelMembers(
+          fetched.map((f) => ({
+            name: f.name,
+            uniqueName: f.uniqueName,
+            caption: f.caption || f.name,
+          })),
+        );
+      } else {
+        setLevelMembers([]);
+      }
+    } catch {
+      setLevelMembers([]);
+    } finally {
+      setMembersLoading(false);
+    }
+  };
+
+  const handleApplyMemberSelection = (
+    selected: string[],
+    selectionType: 'INCLUSION' | 'EXCLUSION',
+  ) => {
+    if (!query?.queryModel || !memberModalConfig) return;
+    const next = structuredClone(query);
+    const model = next.queryModel;
+    const { hierarchyUniqueName, levelUniqueName } = memberModalConfig;
+
+    // Find in any axis (ROWS, COLUMNS, FILTER)
+    for (const ax of Object.values(model.axes)) {
+      const h = ax.hierarchies.find((candidate) => candidate.name === hierarchyUniqueName);
+      if (h) {
+        const lvlKey = levelUniqueName || Object.keys(h.levels)[0];
+        if (lvlKey && h.levels[lvlKey]) {
+          h.levels[lvlKey].selection = {
+            type: selectionType,
+            members: selected.map((uniqueName) => ({ uniqueName })),
+          };
+        }
+      }
+    }
+    setQuery(next);
+    setMemberModalOpen(false);
+  };
+
+  // CSV export
+  const handleExportCsv = () => {
+    if (!result?.cellset || result.cellset.length === 0) return;
+    const lines = result.cellset.map((row) =>
+      row
+        .map((cell) => {
+          const val = (cell.value ?? '').replace(/"/g, '""');
+          return `"${val}"`;
+        })
+        .join(','),
+    );
+    const csvContent = `\uFEFF${lines.join('\r\n')}`;
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `saiku-analisis-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const projection = useMemo(
     () => (result ? projectCellset(result) : null),
     [result],
   );
 
+  const measureOptions: OlapMeasureOption[] = useMemo(
+    () =>
+      metadata.measures.map((m) => ({
+        name: m.name,
+        uniqueName: m.uniqueName,
+        caption: m.caption || m.name,
+      })),
+    [metadata.measures],
+  );
+
   return (
     <main className="space-y-6" aria-labelledby="olap-workspace-heading">
+      {/* Header */}
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
@@ -233,25 +486,40 @@ export function OlapQueryWorkspace() {
           </p>
           <h1
             id="olap-workspace-heading"
-            className="mt-1 text-2xl font-semibold"
+            className="mt-1 text-2xl font-semibold text-foreground tracking-tight"
           >
             Explorador OLAP
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Construye consultas sobre tus cubos, organiza dimensiones y ejecuta
-            análisis directamente en Saiku.
+            Diseña consultas multidimensionales, filtra miembros, analiza celdas con drillthrough y visualiza gráficos dinámicos.
           </p>
         </div>
-        <Button
-          onClick={() => void runQuery()}
-          disabled={!query || !metadata.dimensions.length || running}
-        >
-          <Play aria-hidden="true" className="size-4" />
-          {running ? 'Ejecutando…' : 'Ejecutar consulta'}
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {query && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleOpenMdxModal}
+              title="Ver la consulta MDX generada"
+              className="h-9 gap-1.5 text-xs"
+            >
+              <Code2 className="size-4" aria-hidden="true" />
+              <span>Ver MDX</span>
+            </Button>
+          )}
+          <Button
+            onClick={() => void runQuery()}
+            disabled={!query || !metadata.dimensions.length || running}
+            className="h-9 gap-2 text-xs font-medium"
+          >
+            <Play aria-hidden="true" className="size-4 fill-current" />
+            {running ? 'Ejecutando…' : 'Ejecutar consulta'}
+          </Button>
+        </div>
       </header>
 
-      <section className="rounded-xl border border-border bg-card p-4">
+      {/* Cube Selector */}
+      <section className="rounded-xl border border-border bg-card p-4 shadow-xs">
         <CubePicker
           connections={connections}
           onCubeChange={setCube}
@@ -271,86 +539,217 @@ export function OlapQueryWorkspace() {
         </p>
       )}
 
-      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(17rem,0.9fr)_minmax(0,1.6fr)]">
-        <section className="min-w-0 rounded-xl border border-border bg-card p-4">
+      {/* Main Studio layout */}
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(18rem,0.9fr)_minmax(0,1.6fr)]">
+        {/* Left: Dimensions and Measures */}
+        <section className="min-w-0 rounded-xl border border-border bg-card p-4 shadow-xs">
           <DimensionList
             dimensions={metadata.dimensions}
             measures={metadata.measures}
             loading={loadingMetadata}
             error={undefined}
             onAddItem={addItem}
+            onOpenMemberFilter={handleOpenMemberFilter}
           />
         </section>
+
+        {/* Right: Query Canvas and Results */}
         <section className="min-w-0 space-y-5">
           {query && (
-            <div className="rounded-xl border border-border bg-card p-4">
+            <div className="rounded-xl border border-border bg-card p-4 shadow-xs">
               <QueryCanvas
                 axes={axes}
                 onRemoveItem={removeItem}
                 onMoveItem={moveItem}
+                onClearAxis={clearAxis}
+                onSwapAxes={swapAxes}
+                nonEmpty={nonEmpty}
+                onToggleNonEmpty={toggleNonEmpty}
+                onOpenOrderModal={(axis) => setOrderModalAxis(axis)}
+                onOpenLimitModal={(axis) => setLimitModalAxis(axis)}
+                onOpenFilterModal={(axis) => setFilterModalAxis(axis)}
               />
             </div>
           )}
-          <div className="min-h-80 rounded-xl border border-border bg-card p-4">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+
+          {/* Results Container */}
+          <div className="min-h-80 rounded-xl border border-border bg-card p-4 shadow-xs">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3 border-b border-border/60 pb-3">
               <div>
-                <h2 className="font-semibold">Resultados</h2>
+                <h2 className="font-semibold text-foreground text-base">Resultados</h2>
                 <p className="text-xs text-muted-foreground">
                   {result
                     ? `${result.height ?? result.cellset.length} filas · ${result.runtime ?? 0} ms`
-                    : 'Ejecuta la consulta para ver los datos.'}
+                    : 'Ejecuta la consulta para inspeccionar los datos.'}
                 </p>
               </div>
+
               {result && (
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <Button
                     variant={resultView === 'table' ? 'secondary' : 'outline'}
                     size="sm"
                     onClick={() => setResultView('table')}
+                    className="h-8 gap-1.5 text-xs"
                   >
-                    <Table2 aria-hidden="true" className="size-4" />
-                    Tabla
+                    <Table2 aria-hidden="true" className="size-3.5" />
+                    <span>Tabla</span>
                   </Button>
                   <Button
                     variant={resultView === 'chart' ? 'secondary' : 'outline'}
                     size="sm"
                     onClick={() => setResultView('chart')}
+                    className="h-8 gap-1.5 text-xs"
                   >
-                    Gráfico
+                    <Sparkles aria-hidden="true" className="size-3.5" />
+                    <span>Gráfico</span>
                   </Button>
+
                   {resultView === 'chart' && (
                     <Select
                       aria-label="Tipo de gráfico"
                       value={chartType}
                       onChange={(event) => setChartType(event.target.value)}
-                      className="w-36"
+                      className="h-8 w-44 py-0 pl-2 text-xs"
                     >
-                      {CHART_TYPES.filter((type) => type.id !== 'map').map(
-                        (type) => (
-                          <option key={type.id} value={type.id}>
-                            {type.label}
-                          </option>
-                        ),
-                      )}
+                      {['Bars', 'Lines', 'Proportional', 'Matrix', 'Points', 'Geo'].map((grp) => (
+                        <optgroup key={grp} label={grp}>
+                          {CHART_TYPES.filter((t) => t.group === grp).map((type) => (
+                            <option key={type.id} value={type.id}>
+                              {type.label}
+                            </option>
+                          ))}
+                        </optgroup>
+                      ))}
                     </Select>
                   )}
+
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleExportCsv}
+                    className="h-8 gap-1.5 text-xs"
+                    title="Exportar a CSV"
+                  >
+                    <Download className="size-3.5" aria-hidden="true" />
+                    <span>CSV</span>
+                  </Button>
                 </div>
               )}
             </div>
+
             {resultView === 'chart' && projection ? (
               <SaikuChart
-                chartType={
-                  chartType as Parameters<typeof SaikuChart>[0]['chartType']
-                }
+                chartType={chartType as Parameters<typeof SaikuChart>[0]['chartType']}
                 projection={projection}
-                height={420}
+                height={460}
               />
             ) : (
-              <CellsetTable result={result} loading={running} />
+              <CellsetTable
+                result={result}
+                loading={running}
+                onDrillthrough={handleDrillthrough}
+              />
             )}
           </div>
         </section>
       </div>
+
+      {/* Drillthrough result dialog */}
+      <DrillthroughResultModal
+        open={drillOpen}
+        onClose={() => setDrillOpen(false)}
+        result={drillResult}
+        loadingLabel={drillLoading ? 'Consultando registros transaccionales…' : undefined}
+      />
+
+      {/* MDX Query View Modal */}
+      <MDXModal
+        open={mdxModalOpen}
+        onCancel={() => setMdxModalOpen(false)}
+        mdx={activeMdx}
+        onRun={(newMdx) => {
+          setMdxModalOpen(false);
+          if (query) {
+            const next = structuredClone(query);
+            next.type = 'MDX';
+            next.mdx = newMdx;
+            setQuery(next);
+            void executeQuery(next).then(setResult);
+          }
+        }}
+      />
+
+      {/* Order Modal */}
+      {orderModalAxis && query?.queryModel && (
+        <OrderModal
+          open={Boolean(orderModalAxis)}
+          axis={orderModalAxis}
+          measures={measureOptions}
+          initialMeasure={query.queryModel.axes[orderModalAxis].sortEvaluationLiteral || ''}
+          initialSort={(query.queryModel.axes[orderModalAxis].sortOrder as SortFunction) || 'ASC'}
+          onCancel={() => setOrderModalAxis(null)}
+          onSave={(expression, sort) => {
+            const next = structuredClone(query);
+            next.queryModel.axes[orderModalAxis].sortOrder = sort;
+            next.queryModel.axes[orderModalAxis].sortEvaluationLiteral = expression;
+            setQuery(next);
+            setOrderModalAxis(null);
+            void executeQuery(next).then(setResult);
+          }}
+        />
+      )}
+
+      {/* Limit Modal */}
+      {limitModalAxis && query?.queryModel && (
+        <LimitModal
+          open={Boolean(limitModalAxis)}
+          axis={limitModalAxis}
+          initialCount={10}
+          onCancel={() => setLimitModalAxis(null)}
+          onSave={(countOrExpr) => {
+            const next = structuredClone(query);
+            next.queryModel.axes[limitModalAxis].filters = [
+              { filterType: 'TopCount', count: parseInt(countOrExpr, 10) || 10 },
+            ];
+            setQuery(next);
+            setLimitModalAxis(null);
+            void executeQuery(next).then(setResult);
+          }}
+        />
+      )}
+
+      {/* Filter Modal */}
+      {filterModalAxis && query?.queryModel && (
+        <FilterModal
+          open={Boolean(filterModalAxis)}
+          axis={filterModalAxis}
+          expression={query.queryModel.axes[filterModalAxis].mdx || ''}
+          onCancel={() => setFilterModalAxis(null)}
+          onSave={(expr) => {
+            const next = structuredClone(query);
+            next.queryModel.axes[filterModalAxis].mdx = expr;
+            setQuery(next);
+            setFilterModalAxis(null);
+            void executeQuery(next).then(setResult);
+          }}
+        />
+      )}
+
+      {/* Member Selection Modal */}
+      {memberModalConfig && (
+        <MemberSelectionModal
+          open={memberModalOpen}
+          onCancel={() => setMemberModalOpen(false)}
+          dimensionCaption={memberModalConfig.caption}
+          hierarchyCaption={memberModalConfig.hierarchyUniqueName}
+          levelCaption={memberModalConfig.levelUniqueName}
+          members={levelMembers}
+          loading={membersLoading}
+          onApply={handleApplyMemberSelection}
+        />
+      )}
     </main>
   );
 }

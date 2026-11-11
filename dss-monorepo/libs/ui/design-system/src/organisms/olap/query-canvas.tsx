@@ -1,10 +1,16 @@
 'use client';
 
 import {
+  ArrowDownAZ,
   ArrowRightLeft,
+  ArrowUpDown,
+  Check,
+  EyeOff,
   Filter,
   LayoutList,
+  ListFilter,
   Rows3,
+  SlidersHorizontal,
   Trash2,
   X,
 } from 'lucide-react';
@@ -28,6 +34,12 @@ export interface QueryCanvasProps {
     to: AxisLocation,
   ) => void;
   onClearAxis?: (axis: AxisLocation) => void;
+  onSwapAxes?: () => void;
+  nonEmpty?: boolean;
+  onToggleNonEmpty?: (nonEmpty: boolean) => void;
+  onOpenOrderModal?: (axis: AxisLocation) => void;
+  onOpenLimitModal?: (axis: AxisLocation) => void;
+  onOpenFilterModal?: (axis: AxisLocation) => void;
   className?: string;
 }
 
@@ -38,17 +50,23 @@ const axisIcons = {
   PAGES: ArrowRightLeft,
 } satisfies Record<AxisLocation, typeof Filter>;
 
-/** Four OLAP query axes with accessible controls for moving and removing fields. */
+/** Four OLAP query axes with accessible controls for swapping, sorting, filtering, and organizing fields. */
 export function QueryCanvas({
   axes,
   onRemoveItem,
   onMoveItem,
   onClearAxis,
+  onSwapAxes,
+  nonEmpty = false,
+  onToggleNonEmpty,
+  onOpenOrderModal,
+  onOpenLimitModal,
+  onOpenFilterModal,
   className,
 }: QueryCanvasProps) {
   return (
     <section className={className} aria-labelledby="olap-query-canvas-heading">
-      <header className="mb-3 flex items-start justify-between gap-3">
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2
             id="olap-query-canvas-heading"
@@ -56,25 +74,58 @@ export function QueryCanvas({
           >
             Diseño de consulta
           </h2>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             Organiza los campos en cada eje OLAP.
           </p>
         </div>
-        <span
-          className="rounded-md bg-muted px-2 py-1 text-xs tabular-nums text-muted-foreground"
-          aria-label={`${OLAP_AXIS_ORDER.reduce((total, axis) => total + axes[axis].length, 0)} campos en la consulta`}
-        >
-          {OLAP_AXIS_ORDER.reduce(
-            (total, axis) => total + axes[axis].length,
-            0,
-          )}{' '}
-          campos
-        </span>
+        <div className="flex flex-wrap items-center gap-2">
+          {onSwapAxes && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={onSwapAxes}
+              title="Invertir filas y columnas"
+              className="h-8 gap-1.5 text-xs"
+            >
+              <ArrowUpDown aria-hidden="true" className="size-3.5" />
+              <span>Invertir ejes</span>
+            </Button>
+          )}
+
+          {onToggleNonEmpty && (
+            <Button
+              type="button"
+              variant={nonEmpty ? 'secondary' : 'outline'}
+              size="sm"
+              onClick={() => onToggleNonEmpty(!nonEmpty)}
+              title="Ocultar filas y columnas sin valores"
+              className="h-8 gap-1.5 text-xs"
+            >
+              <EyeOff aria-hidden="true" className="size-3.5" />
+              <span>Ocultar vacíos</span>
+              {nonEmpty && <Check aria-hidden="true" className="size-3 text-primary" />}
+            </Button>
+          )}
+
+          <span
+            className="rounded-md bg-muted px-2 py-1 text-xs tabular-nums text-muted-foreground"
+            aria-label={`${OLAP_AXIS_ORDER.reduce((total, axis) => total + axes[axis].length, 0)} campos en la consulta`}
+          >
+            {OLAP_AXIS_ORDER.reduce(
+              (total, axis) => total + axes[axis].length,
+              0,
+            )}{' '}
+            campos
+          </span>
+        </div>
       </header>
       <div className="grid gap-3 sm:grid-cols-2">
         {OLAP_AXIS_ORDER.map((axis) => {
           const Icon = axisIcons[axis];
           const items = axes[axis];
+          const isRowOrCol = axis === 'ROWS' || axis === 'COLUMNS';
+
           return (
             <section
               key={axis}
@@ -102,17 +153,59 @@ export function QueryCanvas({
                     </p>
                   </div>
                 </div>
-                {items.length > 0 && onClearAxis && (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-xs"
-                    aria-label={`Vaciar eje ${OLAP_AXIS_LABELS[axis].toLocaleLowerCase()}`}
-                    onClick={() => onClearAxis(axis)}
-                  >
-                    <Trash2 aria-hidden="true" />
-                  </Button>
-                )}
+                <div className="flex items-center gap-1">
+                  {isRowOrCol && onOpenOrderModal && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={`Ordenar eje ${OLAP_AXIS_LABELS[axis].toLocaleLowerCase()}`}
+                      title="Ordenar eje"
+                      onClick={() => onOpenOrderModal(axis)}
+                    >
+                      <ArrowDownAZ aria-hidden="true" className="size-3.5" />
+                    </Button>
+                  )}
+
+                  {isRowOrCol && onOpenLimitModal && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={`Limitar eje ${OLAP_AXIS_LABELS[axis].toLocaleLowerCase()}`}
+                      title="Limitar cantidad (Top/Bottom)"
+                      onClick={() => onOpenLimitModal(axis)}
+                    >
+                      <ListFilter aria-hidden="true" className="size-3.5" />
+                    </Button>
+                  )}
+
+                  {onOpenFilterModal && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={`Filtro avanzado para ${OLAP_AXIS_LABELS[axis].toLocaleLowerCase()}`}
+                      title="Filtro de expresión MDX"
+                      onClick={() => onOpenFilterModal(axis)}
+                    >
+                      <SlidersHorizontal aria-hidden="true" className="size-3.5" />
+                    </Button>
+                  )}
+
+                  {items.length > 0 && onClearAxis && (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-xs"
+                      aria-label={`Vaciar eje ${OLAP_AXIS_LABELS[axis].toLocaleLowerCase()}`}
+                      title="Vaciar eje"
+                      onClick={() => onClearAxis(axis)}
+                    >
+                      <Trash2 aria-hidden="true" className="size-3.5" />
+                    </Button>
+                  )}
+                </div>
               </header>
               {items.length === 0 ? (
                 <p className="px-3 py-4 text-xs text-muted-foreground">

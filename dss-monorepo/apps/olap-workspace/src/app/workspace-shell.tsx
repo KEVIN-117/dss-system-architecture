@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { AppWindow, Database, LayoutDashboard, Search } from 'lucide-react';
+import { AppWindow, Code2, Database, LayoutDashboard, Search } from 'lucide-react';
 import { ProtectedRoute, useAuth } from '@dss-monorepo/auth';
 import { Button, DashboardTemplate } from '@dss-monorepo/design-system';
 
@@ -27,6 +27,11 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
             title: 'Análisis OLAP',
             href: '/analysis',
             icon: <Search aria-hidden="true" className="size-4" />,
+          },
+          {
+            title: 'MDX Workbench',
+            href: '/workbench',
+            icon: <Code2 aria-hidden="true" className="size-4" />,
           },
           {
             title: 'Apps',
