@@ -165,8 +165,6 @@ async function proxy(
         }
         throw error;
       }
-    } else if (isQueryExecution) {
-      proxiedBody = await request.arrayBuffer();
     }
   }
 

@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Check, Filter, ListFilter, RotateCcw, Search, X } from 'lucide-react';
+import { ListFilter, RotateCcw, Search } from 'lucide-react';
 import { Button } from '../../atoms/button';
 import { Checkbox } from '../../atoms/checkbox';
 import { Input } from '../../atoms/input';
@@ -129,8 +129,13 @@ export function MemberSelectionModal({
             <Radio
               id="mode-inclusion"
               name="selection-mode"
-              checked={type === 'INCLUSION'}
-              onChange={() => setType('INCLUSION')}
+              group={type}
+              value="INCLUSION"
+              onGroupChange={(value) => {
+                if (value === 'INCLUSION' || value === 'EXCLUSION') {
+                  setType(value);
+                }
+              }}
               label="Incluir seleccionados"
             />
           </div>
@@ -138,8 +143,13 @@ export function MemberSelectionModal({
             <Radio
               id="mode-exclusion"
               name="selection-mode"
-              checked={type === 'EXCLUSION'}
-              onChange={() => setType('EXCLUSION')}
+              group={type}
+              value="EXCLUSION"
+              onGroupChange={(value) => {
+                if (value === 'INCLUSION' || value === 'EXCLUSION') {
+                  setType(value);
+                }
+              }}
               label="Excluir seleccionados"
             />
           </div>

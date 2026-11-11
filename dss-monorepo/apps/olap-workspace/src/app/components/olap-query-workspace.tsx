@@ -453,7 +453,10 @@ export function OlapQueryWorkspace() {
 
   const swapAxes = useCallback(() => {
     if (!query?.queryModel) return;
-    const next = structuredClone(query);
+    const next = {
+      ...structuredClone(query),
+      queryModel: structuredClone(query.queryModel),
+    };
     const colHierarchies = next.queryModel.axes.COLUMNS.hierarchies;
     const rowHierarchies = next.queryModel.axes.ROWS.hierarchies;
     next.queryModel.axes.COLUMNS.hierarchies = rowHierarchies;
@@ -465,7 +468,10 @@ export function OlapQueryWorkspace() {
     (value: boolean) => {
       setNonEmpty(value);
       if (!query?.queryModel) return;
-      const next = structuredClone(query);
+      const next = {
+        ...structuredClone(query),
+        queryModel: structuredClone(query.queryModel),
+      };
       next.queryModel.axes.COLUMNS.nonEmpty = value;
       next.queryModel.axes.ROWS.nonEmpty = value;
       setQuery(next);
@@ -601,8 +607,8 @@ export function OlapQueryWorkspace() {
     selectionType: 'INCLUSION' | 'EXCLUSION',
   ) => {
     if (!query?.queryModel || !memberModalConfig) return;
-    const next = structuredClone(query);
-    const model = next.queryModel;
+    const model = structuredClone(query.queryModel);
+    const next = { ...structuredClone(query), queryModel: model };
     const { hierarchyUniqueName, levelUniqueName } = memberModalConfig;
 
     // Find in any axis (ROWS, COLUMNS, FILTER)
@@ -1009,10 +1015,14 @@ export function OlapQueryWorkspace() {
           }
           onCancel={() => setOrderModalAxis(null)}
           onSave={(expression, sort) => {
-            const next = structuredClone(query);
-            next.queryModel.axes[orderModalAxis].sortOrder = sort;
-            next.queryModel.axes[orderModalAxis].sortEvaluationLiteral =
-              expression;
+            if (!query.queryModel) return;
+            const model = structuredClone(query.queryModel);
+            const next = {
+              ...structuredClone(query),
+              queryModel: model,
+            };
+            model.axes[orderModalAxis].sortOrder = sort;
+            model.axes[orderModalAxis].sortEvaluationLiteral = expression;
             setQuery(next);
             setOrderModalAxis(null);
             void executeQuery(next).then(setResult);
@@ -1028,8 +1038,13 @@ export function OlapQueryWorkspace() {
           initialCount={10}
           onCancel={() => setLimitModalAxis(null)}
           onSave={(countOrExpr) => {
-            const next = structuredClone(query);
-            next.queryModel.axes[limitModalAxis].filters = [
+            if (!query.queryModel) return;
+            const model = structuredClone(query.queryModel);
+            const next = {
+              ...structuredClone(query),
+              queryModel: model,
+            };
+            model.axes[limitModalAxis].filters = [
               {
                 filterType: 'TopCount',
                 count: parseInt(countOrExpr, 10) || 10,
@@ -1050,8 +1065,13 @@ export function OlapQueryWorkspace() {
           expression={query.queryModel.axes[filterModalAxis].mdx || ''}
           onCancel={() => setFilterModalAxis(null)}
           onSave={(expr) => {
-            const next = structuredClone(query);
-            next.queryModel.axes[filterModalAxis].mdx = expr;
+            if (!query.queryModel) return;
+            const model = structuredClone(query.queryModel);
+            const next = {
+              ...structuredClone(query),
+              queryModel: model,
+            };
+            model.axes[filterModalAxis].mdx = expr;
             setQuery(next);
             setFilterModalAxis(null);
             void executeQuery(next).then(setResult);

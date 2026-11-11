@@ -1,13 +1,13 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
-import { use } from 'echarts/core';
+import { use as registerEchartsModules } from 'echarts/core';
 import { SVGRenderer } from 'echarts/renderers';
 import type { EChartsOption } from 'echarts';
 import { init } from '../core/engine';
 import { buildChartOption } from './build';
 import { cellRadiusPct, gridCells } from './small-multiples';
 
-use([SVGRenderer]);
+registerEchartsModules([SVGRenderer]);
 
 describe('Saiku chart rendering', () => {
   it('renders a bar chart with the zoom slider for a large result', () => {

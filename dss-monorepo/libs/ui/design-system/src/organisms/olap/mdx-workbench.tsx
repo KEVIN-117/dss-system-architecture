@@ -7,18 +7,14 @@ import {
   Code2,
   Copy,
   Database,
-  Download,
   History,
   Play,
-  RotateCcw,
   Sparkles,
   Table2,
-  Trash2,
 } from 'lucide-react';
 import type { QueryResult, SaikuConnection, SaikuCube } from '@dss-monorepo/olap-models';
 import { Button } from '../../atoms/button';
 import { Select } from '../../atoms/select';
-import { Loader } from '../../atoms/loader';
 import { CellsetTable } from './cellset-table';
 import { MonacoExpressionEditor } from '../olap-modals/monaco-expression-editor';
 import { DrillthroughResultModal, type DrillthroughResult } from '../olap-modals/drill-modals';
