@@ -39,19 +39,22 @@
   "exclude": ["node_modules", "dist", ".next"],
   "references": [
     {
+      "path": "../../libs/rbac"
+    },
+    {
+      "path": "../../libs/shared/olap-models"
+    },
+    {
       "path": "../../libs/shared/olap-data-access"
     },
     {
       "path": "../../libs/connectors/olap-connector"
     },
     {
-      "path": "../../libs/shared/olap-models"
+      "path": "../../libs/ui/design-system"
     },
     {
       "path": "../../libs/charts"
-    },
-    {
-      "path": "../../libs/ui/design-system"
     },
     {
       "path": "../../libs/auth"

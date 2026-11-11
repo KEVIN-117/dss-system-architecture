@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { use as registerEChartsModules } from 'echarts/core';
-import { DataZoomInsideComponent } from 'echarts/components';
 
 import { BaseChart } from './base-chart';
 import type { ChartOption, CommonChartProps } from '../core/types';
@@ -21,11 +19,6 @@ import {
   type ChartGeometry,
   type ChartProjection,
 } from '../saiku/build';
-
-// Saiku's cartesian builders emit dataZoom.inside. Register it here so the
-// shared ECharts instance can render those options even when the base engine
-// has not imported the optional data-zoom component.
-registerEChartsModules([DataZoomInsideComponent]);
 
 export interface SaikuChartProps extends CommonChartProps {
   chartType: ChartType;
@@ -81,7 +74,7 @@ export function SaikuChart({
   );
 
   const option = useMemo(
-    () => (tokens: ChartThemeTokens, width: number) => {
+    () => (tokens: ChartThemeTokens, width: number, height: number) => {
       // BaseChart keeps the chart mounted while a loading state is active and
       // still evaluates its option factory. Do not emit the map series until
       // the asynchronous GeoJSON registration has completed.
@@ -91,6 +84,7 @@ export function SaikuChart({
       const built = buildChartOption(projection, chartType, chartOptions, saikuTokens, {
         ...geometry,
         chartWidth: geometry?.chartWidth ?? width,
+        aspect: geometry?.aspect ?? width / height,
       });
 
       // A single-measure proportional chart already has a chart title. Saiku's

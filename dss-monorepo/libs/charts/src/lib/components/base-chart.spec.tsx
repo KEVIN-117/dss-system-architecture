@@ -169,6 +169,13 @@ describe('BaseChart lifecycle', () => {
     resize();
     flush();
     expect(charts).toHaveLength(1);
+    expect(charts[0].resize).not.toHaveBeenCalled();
+    width = 450;
+    resize();
+    flush();
+    expect(charts[0].resize).toHaveBeenCalledTimes(1);
+    changeTheme();
+    flush();
     expect(charts[0].resize).toHaveBeenCalledTimes(1);
   });
 

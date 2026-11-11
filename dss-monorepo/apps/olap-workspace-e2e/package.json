@@ -1,0 +1,14 @@
+{
+  "name": "@dss-monorepo/olap-workspace-e2e",
+  "version": "0.0.1",
+  "private": true,
+  "nx": {
+    "implicitDependencies": [
+      "@dss-monorepo/olap-workspace"
+    ],
+    "tags": [
+      "type:e2e",
+      "scope:olap"
+    ]
+  }
+}

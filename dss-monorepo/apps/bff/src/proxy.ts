@@ -12,11 +12,17 @@ export function proxy(request: NextRequest): NextResponse {
   const corsHeaders = resolveCorsHeaders(origin);
 
   if (origin && !corsHeaders) {
-    return NextResponse.json({ error: 'Origin is not allowed' }, { status: 403 });
+    return NextResponse.json(
+      { error: 'Origin is not allowed' },
+      { status: 403 },
+    );
   }
 
   if (request.method === 'OPTIONS') {
-    return new NextResponse(null, { status: 204, headers: corsHeaders ?? undefined });
+    return new NextResponse(null, {
+      status: 204,
+      headers: corsHeaders ?? undefined,
+    });
   }
 
   if (
@@ -35,10 +41,12 @@ export function proxy(request: NextRequest): NextResponse {
 
 /** OAuth redirects start before a BFF session exists. Keep this allowlist narrow. */
 function isPublicAuthenticationRoute(request: NextRequest): boolean {
-  return request.method === 'GET' && (
-    request.nextUrl.pathname === '/api/health' ||
-    request.nextUrl.pathname === '/api/auth/login' ||
-    request.nextUrl.pathname === '/api/auth/callback'
+  return (
+    request.method === 'GET' &&
+    (request.nextUrl.pathname === '/api/health' ||
+      request.nextUrl.pathname === '/api/auth/login' ||
+      request.nextUrl.pathname === '/api/auth/callback' ||
+      request.nextUrl.pathname === '/api/auth/logout')
   );
 }
 
@@ -52,9 +60,11 @@ function hasBearerHeader(header: string | null): boolean {
 
 function hasSessionCookie(cookieHeader: string | null): boolean {
   const cookieName = getBffSessionCookieName();
-  return cookieHeader
-    ?.split(';')
-    .some((part) => part.trim().startsWith(`${cookieName}=`)) ?? false;
+  return (
+    cookieHeader
+      ?.split(';')
+      .some((part) => part.trim().startsWith(`${cookieName}=`)) ?? false
+  );
 }
 
 function resolveCorsHeaders(origin: string | null): Headers | null {
@@ -68,7 +78,8 @@ function resolveCorsHeaders(origin: string | null): Headers | null {
 
   return new Headers({
     'Access-Control-Allow-Origin': origin,
-    'Access-Control-Allow-Headers': 'Authorization, Content-Type, Idempotency-Key',
+    'Access-Control-Allow-Headers':
+      'Authorization, Content-Type, Idempotency-Key',
     'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
     'Access-Control-Allow-Credentials': 'true',
     Vary: 'Origin',

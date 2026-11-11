@@ -34,6 +34,8 @@ export function BaseChart(props: BaseChartProps) {
     let chart: EChartsType | undefined;
     let frame: number | undefined;
     let active = true;
+    let lastWidth = 0;
+    let lastHeight = 0;
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
     const click = (event: ChartClickEvent) => {
       const current = latest.current;
@@ -60,14 +62,19 @@ export function BaseChart(props: BaseChartProps) {
       if (!chart) {
         chart = init(element, undefined, { renderer: 'canvas' });
         chart.on('click', click);
+        lastWidth = element.clientWidth;
+        lastHeight = element.clientHeight;
+      } else if (element.clientWidth !== lastWidth || element.clientHeight !== lastHeight) {
+        lastWidth = element.clientWidth;
+        lastHeight = element.clientHeight;
+        chart.resize();
       }
-      chart.resize();
       // Never send invalid data to ECharts, including while showing loading.
       const option =
         current.invalid || current.empty
           ? {}
           : typeof current.option === 'function'
-            ? current.option(theme, element.clientWidth)
+            ? current.option(theme, element.clientWidth, element.clientHeight)
             : current.option;
       chart.setOption(
         {

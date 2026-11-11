@@ -12,18 +12,12 @@ import {
 } from '@dss-monorepo/olap-connector/server';
 import { resolvePermissions } from '@dss-monorepo/rbac-server';
 import type { AcademicContext, DSSRole } from '@dss-monorepo/auth-models';
-
-export interface AcademicScope {
-  kind: 'global' | 'faculty' | 'career';
-  contexts: AcademicContext[];
-}
-
-interface ScopeFilterBinding {
-  dimension: string;
-  hierarchy: string;
-  level: string;
-  memberTemplate: string;
-}
+import {
+  AcademicScopePolicyError,
+  buildAcademicScopeFilter,
+  deriveAcademicScope,
+  type AcademicScope,
+} from '../_lib/academic-scope';
 
 const JSONScalar = new GraphQLScalarType({
   name: 'JSON',
@@ -121,7 +115,7 @@ export function createAnalyticsResolvers() {
     Query: {
       viewer: (_: unknown, __: unknown, context: { authentication: AuthenticatedRequest }) => {
         const { user, roles } = context.authentication;
-        const scope = deriveAcademicScope(roles, user.academicContexts ?? []);
+        const scope = deriveScopeForGraphQL(roles, user.academicContexts ?? []);
         return {
           id: user.id,
           username: user.username,
@@ -181,7 +175,7 @@ export function createAnalyticsResolvers() {
       ) => {
         // Resolve the analytics role/scope from trusted Auth Service data first.
         // Prediction Service repeats the scope check against the selected program/cut.
-        const scope = deriveAcademicScope(context.authentication.roles, context.authentication.user.academicContexts ?? []);
+        const scope = deriveScopeForGraphQL(context.authentication.roles, context.authentication.user.academicContexts ?? []);
         if (!args.programRef.trim() || !args.cutId.trim()) {
           throw new GraphQLError('Program and academic cut are required', { extensions: { code: 'BAD_USER_INPUT' } });
         }
@@ -215,11 +209,11 @@ export function createAnalyticsResolvers() {
       },
       analyticQuery: async (_: unknown, args: { input: AnalyticQueryInput }, context: { authentication: AuthenticatedRequest }) => {
         const { authentication } = context;
-        const scope = deriveAcademicScope(authentication.roles, authentication.user.academicContexts ?? []);
+        const scope = deriveScopeForGraphQL(authentication.roles, authentication.user.academicContexts ?? []);
         validateAnalyticInput(args.input);
         const config = serverConfig(authentication);
         await requireVisibleCube(authentication, args.input.cubeId);
-        const scopeFilter = buildScopeFilter(scope);
+        const scopeFilter = buildScopeFilterForGraphQL(scope);
         rejectClientScopeOverrides(args.input, scopeFilter);
 
         if (args.input.measures.some(isPrivacyCountMeasure)) {
@@ -323,30 +317,38 @@ export interface AnalyticQueryInput {
   limit?: number | null;
 }
 
-export function deriveAcademicScope(roles: readonly DSSRole[], contexts: readonly AcademicContext[]): AcademicScope {
-  const permissions = resolvePermissions(roles);
-  if (!permissions.has('analytics:read')) throw authorizationError('Analytics access is not permitted', 'FORBIDDEN');
-  if (roles.includes('RECTOR')) {
-    if (!permissions.has('analytics:global')) throw authorizationError('Global analytics access is not permitted', 'FORBIDDEN');
-    return { kind: 'global', contexts: [] };
-  }
-  if (roles.includes('DECANO')) {
-    if (!permissions.has('analytics:faculty')) throw authorizationError('Faculty analytics access is not permitted', 'FORBIDDEN');
-    const scoped = contexts.filter((item) => item.facultyId !== null && item.careerId === null);
-    if (!scoped.length) throw authorizationError('Academic faculty context is required', 'ACADEMIC_CONTEXT_REQUIRED');
-    return { kind: 'faculty', contexts: scoped };
-  }
-  if (roles.includes('DIRECTOR')) {
-    if (!permissions.has('analytics:career')) throw authorizationError('Career analytics access is not permitted', 'FORBIDDEN');
-    const scoped = contexts.filter((item) => item.facultyId !== null && item.careerId !== null);
-    if (!scoped.length) throw authorizationError('Academic career context is required', 'ACADEMIC_CONTEXT_REQUIRED');
-    return { kind: 'career', contexts: scoped };
-  }
-  throw authorizationError('Analytics access is not permitted', 'FORBIDDEN');
-}
-
 function requireAnalyticsRead(roles: readonly DSSRole[]): void {
   if (!resolvePermissions(roles).has('analytics:read')) throw authorizationError('Analytics access is not permitted', 'FORBIDDEN');
+}
+
+function deriveScopeForGraphQL(roles: readonly DSSRole[], contexts: readonly AcademicContext[]): AcademicScope {
+  try {
+    return deriveAcademicScope(roles, contexts);
+  } catch (error) {
+    if (error instanceof AcademicScopePolicyError) {
+      throw authorizationError(error.message, error.code);
+    }
+    throw error;
+  }
+}
+
+function buildScopeFilterForGraphQL(scope: AcademicScope): NonNullable<OlapQueryRequest['filters']>[number] | null {
+  try {
+    const filter = buildAcademicScopeFilter(scope);
+    if (!filter) return null;
+    return {
+      dimension: filter.dimension,
+      hierarchy: filter.hierarchy,
+      level: filter.level,
+      op: 'in',
+      members: filter.members,
+    };
+  } catch (error) {
+    if (error instanceof AcademicScopePolicyError) {
+      throw authorizationError(error.message, error.code);
+    }
+    throw error;
+  }
 }
 
 function serverConfig(authentication: AuthenticatedRequest): OlapServerConfig {
@@ -364,34 +366,7 @@ async function requireVisibleCube(authentication: AuthenticatedRequest, cubeId: 
   }
 }
 
-function buildScopeFilter(scope: AcademicScope): NonNullable<OlapQueryRequest['filters']>[number] | null {
-  if (scope.kind === 'global') return null;
-  const binding = readScopeBinding(scope.kind);
-  const ids = scope.kind === 'faculty'
-    ? scope.contexts.flatMap((item) => item.facultyId === null ? [] : [String(item.facultyId)])
-    : scope.contexts.flatMap((item) => item.careerId === null ? [] : [item.careerId]);
-  if (scope.kind === 'career' && ids.some((id) => !/^[A-Za-z0-9]{3}$/.test(id))) {
-    throw authorizationError('Academic career context is invalid', 'ACADEMIC_CONTEXT_INVALID');
-  }
-  const members = [...new Set(ids)].map((id) => binding.memberTemplate.replaceAll('{id}', id));
-  if (!members.length) throw authorizationError('No academic scope is available', 'ACADEMIC_CONTEXT_REQUIRED');
-  return { dimension: binding.dimension, hierarchy: binding.hierarchy, level: binding.level, op: 'in', members };
-}
-
-function readScopeBinding(kind: 'faculty' | 'career'): ScopeFilterBinding {
-  let value: unknown;
-  try { value = JSON.parse(process.env.OLAP_ACADEMIC_SCOPE_FILTERS ?? 'null') as unknown; }
-  catch { throw authorizationError('Academic analytics scope is not configured', 'SCOPE_CONFIGURATION_ERROR'); }
-  const candidate = isRecord(value) ? value[kind] : undefined;
-  if (!isRecord(candidate) || !['dimension', 'hierarchy', 'level', 'memberTemplate'].every((key) => typeof candidate[key] === 'string' && candidate[key].trim())) {
-    throw authorizationError('Academic analytics scope is not configured', 'SCOPE_CONFIGURATION_ERROR');
-  }
-  const binding = candidate as unknown as ScopeFilterBinding;
-  if (!binding.memberTemplate.includes('{id}')) throw authorizationError('Academic analytics scope is invalid', 'SCOPE_CONFIGURATION_ERROR');
-  return binding;
-}
-
-function rejectClientScopeOverrides(input: AnalyticQueryInput, binding: ReturnType<typeof buildScopeFilter>): void {
+function rejectClientScopeOverrides(input: AnalyticQueryInput, binding: ReturnType<typeof buildScopeFilterForGraphQL>): void {
   if (!binding) return;
   const hierarchy = binding.hierarchy?.toLocaleLowerCase();
   const dimension = binding.dimension.toLocaleLowerCase();

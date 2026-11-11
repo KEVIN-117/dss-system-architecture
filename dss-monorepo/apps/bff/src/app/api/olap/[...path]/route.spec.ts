@@ -62,6 +62,18 @@ describe('OLAP BFF proxy route', () => {
       { params: Promise.resolve({ path: ['admin', 'secrets'] }) },
     );
     expect(invalidPath.status).toBe(400);
+
+    const traversalPath = await POST(
+      new Request('http://bff/api/olap/rest/saiku/../admin/schema', {
+        method: 'POST',
+      }),
+      {
+        params: Promise.resolve({
+          path: ['rest', 'saiku', '..', 'admin', 'schema'],
+        }),
+      },
+    );
+    expect(traversalPath.status).toBe(400);
   });
 
   it('forwards the verified bearer token to the configured OLAP service', async () => {
@@ -93,6 +105,35 @@ describe('OLAP BFF proxy route', () => {
     );
     expect(upstreamOptions.signal).toBeInstanceOf(AbortSignal);
     expect(upstreamOptions.redirect).toBe('manual');
+  });
+
+  it('preserves a trailing slash on Saiku endpoint paths', async () => {
+    authenticateRequest.mockResolvedValue(authentication);
+    vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080');
+    const fetchMock = vi.fn().mockResolvedValue(Response.json([]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const path = [
+      'rest',
+      'saiku',
+      'rector',
+      'discover',
+      'uatf-dw',
+      'UATF_DW',
+      'UATF_DW',
+      'Academic Admission',
+      'measures',
+    ];
+    await GET(
+      new Request(
+        'http://bff/api/olap/rest/saiku/rector/discover/uatf-dw/UATF_DW/UATF_DW/Academic%20Admission/measures/',
+      ),
+      { params: Promise.resolve({ path }) },
+    );
+
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      'http://olap-service:8080/rest/saiku/rector/discover/uatf-dw/UATF_DW/UATF_DW/Academic%20Admission/measures/',
+    );
   });
 
   it('returns 504 when the OLAP upstream exceeds the proxy timeout', async () => {

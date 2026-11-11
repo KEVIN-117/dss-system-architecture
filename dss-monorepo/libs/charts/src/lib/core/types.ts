@@ -5,7 +5,7 @@ import type { ChartThemeTokens, ChartThemeOverrides } from './theme';
 /** Unmodified ECharts event. No ECharts dependency is needed in a consumer. */
 export type ChartClickEvent = ECElementEvent;
 export type ChartOption = EChartsOption;
-export type ChartOptionFactory = (theme: ChartThemeTokens, width: number) => ChartOption;
+export type ChartOptionFactory = (theme: ChartThemeTokens, width: number, height: number) => ChartOption;
 
 export interface CommonChartProps {
   title?: string;

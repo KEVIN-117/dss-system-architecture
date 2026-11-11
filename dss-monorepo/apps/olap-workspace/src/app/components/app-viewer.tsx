@@ -6,6 +6,7 @@ import { AlertCircle, ArrowLeft, RefreshCw } from 'lucide-react';
 import {
   getSavedApp,
   type AppPage,
+  type DashboardFilter,
   type DashboardTile,
   type SaikuApp,
 } from '@dss-monorepo/olap-data-access';
@@ -72,7 +73,9 @@ export function AppViewer({ path }: { path: string }) {
   }, [app]);
 
   if (loading)
-    return <Loader text="Cargando app…" fullScreen={false} className="rounded-xl" />;
+    return (
+      <Loader text="Cargando app…" fullScreen={false} className="rounded-xl" />
+    );
   if (error || !app || !appConfig) {
     return (
       <section
@@ -133,7 +136,7 @@ export function AppViewer({ path }: { path: string }) {
 }
 
 function AppPagePreview({ page }: { page: AppPage }) {
-  const tiles = getTiles(page.grid);
+  const { tiles, filters } = getGridContent(page.grid);
   return (
     <div className="space-y-4">
       {page.heading && (
@@ -183,7 +186,7 @@ function AppPagePreview({ page }: { page: AppPage }) {
                   </p>
                 ) : tile.query &&
                   ['chart', 'table', 'kpi', 'custom'].includes(tile.type) ? (
-                  <SavedTileQuery tile={tile} />
+                  <SavedTileQuery tile={tile} filters={filters} />
                 ) : undefined}
               </Tile>
             ),
@@ -201,15 +204,41 @@ function AppPagePreview({ page }: { page: AppPage }) {
   );
 }
 
-function getTiles(grid: unknown): DashboardTile[] {
-  if (
-    !grid ||
-    typeof grid !== 'object' ||
-    !('tiles' in grid) ||
-    !Array.isArray(grid.tiles)
-  )
-    return [];
-  return grid.tiles.filter(isDashboardTile);
+function getGridContent(grid: unknown): {
+  tiles: DashboardTile[];
+  filters: DashboardFilter[];
+} {
+  if (!grid || typeof grid !== 'object' || !('tiles' in grid))
+    return { tiles: [], filters: [] };
+  const value = grid as {
+    tiles?: unknown;
+    filters?: unknown;
+    filterPanel?: { filters?: unknown };
+  };
+  const filters = [
+    ...(Array.isArray(value.filters) ? value.filters : []),
+    ...(Array.isArray(value.filterPanel?.filters)
+      ? value.filterPanel.filters
+      : []),
+  ].filter(isDashboardFilter);
+  return {
+    tiles: Array.isArray(value.tiles)
+      ? value.tiles.filter(isDashboardTile)
+      : [],
+    filters,
+  };
+}
+
+function isDashboardFilter(value: unknown): value is DashboardFilter {
+  if (!value || typeof value !== 'object') return false;
+  const filter = value as Partial<DashboardFilter>;
+  return (
+    typeof filter.dimension === 'string' &&
+    typeof filter.hierarchy === 'string' &&
+    typeof filter.level === 'string' &&
+    Array.isArray(filter.members) &&
+    filter.members.every((member) => typeof member === 'string')
+  );
 }
 
 function isDashboardTile(value: unknown): value is DashboardTile {
