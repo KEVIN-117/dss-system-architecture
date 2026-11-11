@@ -20,7 +20,7 @@ concurrency:
 jobs:
   affected:
     name: Affected lint, tests, build, and E2E
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'nx-cloud-protected' || 'nx-cloud-unprotected' }}
     defaults:
@@ -65,7 +65,7 @@ jobs:
       - uses: nrwl/nx-set-shas@v5
 
       - run: bun install --frozen-lockfile
-      - run: bun playwright install --with-deps
+      - run: bun run playwright install --with-deps
       - name: Require Nx Cloud read-only token for same-repository PRs
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         env:
