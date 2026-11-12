@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ from celery import Celery
 from celery.signals import worker_ready
 from kombu import Exchange, Queue
 
-from config import WorkerSettings
+from config import WorkerSettings, custom_dataset_roots
 from training.job_store import JobStatus, JobStore
 
 logger = logging.getLogger(__name__)
@@ -61,16 +62,30 @@ celery_app.conf.update(
 )
 
 
+_CUSTOM_DATASET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+
+
+def _resolve_custom_dataset(name: str) -> Path:
+    """Find an uploaded/provisioned dataset by opaque name in the trusted roots."""
+    if not _CUSTOM_DATASET_NAME.fullmatch(name):
+        raise ValueError("Custom dataset references must be opaque identifiers.")
+    for root in custom_dataset_roots():
+        candidate = (root / name).resolve()
+        if root not in candidate.parents:
+            raise ValueError("Dataset reference escapes the configured dataset root.")
+        if candidate.is_dir():
+            return candidate
+    raise FileNotFoundError(f"Unknown dataset reference: custom:{name}")
+
+
 def _resolve_dataset(dataset_ref: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Resolve and load manifest and rows from dataset_ref."""
-    normalized_ref = dataset_ref.removeprefix("custom:")
     dataset_root = os.getenv("PREDICTION_DATASET_ROOT")
-    if dataset_root and not dataset_ref.startswith(("synthetic:", "fixture:")):
+    if dataset_ref.startswith("custom:"):
+        ref_path = _resolve_custom_dataset(dataset_ref.removeprefix("custom:"))
+    elif dataset_root and not dataset_ref.startswith(("synthetic:", "fixture:")):
         root = Path(dataset_root).resolve()
-        # Permitir resolución directa de carpetas o carpetas dentro de custom/
-        ref_path = (root / normalized_ref).resolve()
-        if not ref_path.is_dir() and (root / "custom" / normalized_ref).is_dir():
-            ref_path = (root / "custom" / normalized_ref).resolve()
+        ref_path = (root / dataset_ref).resolve()
         if root not in ref_path.parents and ref_path != root:
             raise ValueError("Dataset reference escapes the configured snapshot root.")
     else:

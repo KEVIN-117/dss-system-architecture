@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import platform
 import tempfile
@@ -145,6 +146,11 @@ class ModelRegistry:
                 or [field.get("name") for field in schema_fields] != features
                 or any(field.get("logical_type") not in {"string", "integer", "number", "boolean", "date", "datetime", "category"} or not isinstance(field.get("nullable"), bool) for field in schema_fields)):
             raise InvalidModelArtifact("Typed input schema fields do not match the ordered feature list.")
+        if "decision_threshold" in manifest:
+            threshold = manifest["decision_threshold"]
+            if (isinstance(threshold, bool) or not isinstance(threshold, (int, float))
+                    or not math.isfinite(threshold) or not 0 <= threshold <= 1):
+                raise InvalidModelArtifact("Model decision threshold must be a finite probability between 0 and 1.")
         files = manifest.get("artifact_files")
         required_files = {
             "model.joblib", "pipeline.joblib", "metrics.json", "evaluation_report.json",
@@ -168,6 +174,10 @@ class ModelRegistry:
             feature_names = json.loads((folder / "feature_names.json").read_text(encoding="utf-8"))
             if feature_names != schema["feature_names"] or schema.get("required") != feature_names:
                 raise InvalidModelArtifact("Manifest input schema does not match the bundled feature list.")
+            if "decision_threshold" in manifest:
+                metrics = json.loads((folder / "metrics.json").read_text(encoding="utf-8"))
+                if isinstance(metrics, dict) and "decision_threshold" in metrics and metrics["decision_threshold"] != manifest["decision_threshold"]:
+                    raise InvalidModelArtifact("Serving decision threshold differs from the evaluated threshold.")
             probability = manifest.get("probability_definition", {})
             if probability.get("positive_class") != classes["positive_class"] or probability.get("class_order") != [classes["negative_class"], classes["positive_class"]]:
                 raise InvalidModelArtifact("Probability semantics or class ordering conflict with the manifest.")

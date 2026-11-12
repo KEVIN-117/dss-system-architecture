@@ -329,7 +329,7 @@ services:
       PREDICTION_ALLOWED_ROLES: ${PREDICTION_ALLOWED_ROLES:-}
       PREDICTION_BATCH_SUBMITTER_ROLES: ${PREDICTION_BATCH_SUBMITTER_ROLES:-[]}
       PREDICTION_IDEMPOTENCY_SCOPE: ${PREDICTION_IDEMPOTENCY_SCOPE:-development}
-      PREDICTION_DEV_SUBJECT: ${PREDICTION_DEV_SUBJECT:-development-operator}
+      PREDICTION_TRAINING_ROLES: '${PREDICTION_TRAINING_ROLES:-["SUPERADMIN"]}'
       PREDICTION_OUTBOX_POLL_SECONDS: ${PREDICTION_OUTBOX_POLL_SECONDS:-5}
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
@@ -338,8 +338,11 @@ services:
       RABBITMQ_VHOST: ${PREDICTION_RABBITMQ_VHOST:-${RABBITMQ_VHOST:-/}}
       WORKER_ARTIFACTS_DIR: /app/artifacts
       PREDICTION_DATASET_ROOT: ${PREDICTION_DATASET_ROOT:-/app/snapshots}
+      PREDICTION_CUSTOM_DATASET_ROOT: /app/custom-datasets
     volumes:
       - prediction_artifacts:/app/artifacts
+      # Uploaded datasets: written by the API, read-only for the worker.
+      - prediction_custom_datasets:/app/custom-datasets
     depends_on:
       postgres-dw:
         condition: service_healthy
@@ -372,8 +375,10 @@ services:
       WORKER_ARTIFACTS_DIR: /app/artifacts
       PREDICTION_DATASET_ROOT: ${PREDICTION_DATASET_ROOT:-/app/snapshots}
       PREDICTION_CONFIG_ROOT: /app/configurations
+      PREDICTION_CUSTOM_DATASET_ROOT: /app/custom-datasets
     volumes:
       - prediction_artifacts:/app/artifacts
+      - prediction_custom_datasets:/app/custom-datasets:ro
       - ${PREDICTION_SNAPSHOT_DIR:-./infra/prediction-snapshots}:/app/snapshots:ro
       - ${PREDICTION_CONFIG_DIR:-./infra/prediction-configurations}:/app/configurations:ro
     cpus: ${WORKER_CPU_LIMIT:-2}
@@ -429,3 +434,4 @@ volumes:
   postgres_data:
   olap_home_empty:
   prediction_artifacts:
+  prediction_custom_datasets:

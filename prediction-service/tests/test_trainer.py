@@ -47,6 +47,9 @@ class TrainerTests(unittest.TestCase):
         self.assertEqual(result.manifest["algorithm"], "random_forest")
         self.assertEqual(result.manifest["lifecycle_state"], "CANDIDATE")
         self.assertEqual(result.manifest["contract_version"], "1.0")
+        # Serving uses exactly the threshold that produced the reported metrics.
+        self.assertEqual(result.manifest["decision_threshold"], result.metrics["decision_threshold"])
+        self.assertTrue(0.0 <= result.manifest["decision_threshold"] <= 1.0)
 
         # Check metrics completeness
         metrics = result.metrics

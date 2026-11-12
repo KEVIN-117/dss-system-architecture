@@ -13,17 +13,24 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from io import BytesIO
+import hashlib
 import json
+import shutil
 import zipfile
 from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from config import settings
+from config import (
+    custom_dataset_roots,
+    dataset_max_uncompressed_bytes,
+    dataset_upload_max_bytes,
+    settings,
+)
 from dataset_contract import DatasetValidationReport, validate_prepared_dataset
 from training.job_store import IdempotencyConflict, JobStore
 from training.model_registry import InvalidModelArtifact, ModelRegistry, NoActiveModel
-from inference import InferenceFailure, PredictionService
+from inference import InferenceFailure, PredictionService, Principal
 from inference_adapters import ConfiguredAcademicPolicy, DwPredictionDataProvider, KeycloakIdentityProvider
 
 logger = logging.getLogger(__name__)
@@ -578,6 +585,39 @@ def _make_problem(
     )
 
 
+def _failure_response(exc: InferenceFailure, request_id: str, title: str) -> JSONResponse:
+    return JSONResponse(
+        status_code=exc.status_code,
+        media_type="application/problem+json",
+        content={"type": "about:blank", "title": title, "status": exc.status_code,
+                 "detail": exc.detail, "code": exc.code, "request_id": request_id},
+    )
+
+
+def _ml_operator_roles() -> set[str]:
+    """Roles allowed to train models and manage datasets (fails closed)."""
+    raw = os.getenv("PREDICTION_TRAINING_ROLES", '["SUPERADMIN"]').strip()
+    try:
+        roles = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise InferenceFailure("AUTHORIZATION_UNAVAILABLE", 503, "ML operator role policy is invalid.") from exc
+    if not isinstance(roles, list) or not roles or any(not isinstance(role, str) or not role.strip() for role in roles):
+        raise InferenceFailure("AUTHORIZATION_UNAVAILABLE", 503, "ML operator role policy must list at least one role.")
+    return {role.strip() for role in roles}
+
+
+def _authenticate_ml_operator(authorization: str | None) -> Principal:
+    """Verify the bearer JWT in this service; the BFF check is not the only gate."""
+    if not authorization or not authorization.startswith("Bearer ") or not authorization[7:].strip():
+        raise InferenceFailure("INVALID_TOKEN", 401, "A bearer access token is required.")
+    allowed_roles = _ml_operator_roles()
+    identity = getattr(app.state, "identity_provider", None) or KeycloakIdentityProvider()
+    principal = identity.authenticate(authorization[7:].strip())
+    if not principal.roles & allowed_roles:
+        raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The account cannot operate model training or datasets.")
+    return principal
+
+
 @app.post(
     "/v1/training-jobs",
     status_code=202,
@@ -586,14 +626,18 @@ def _make_problem(
     description="Requiere permiso de operador ML. Encola el trabajo y nunca entrena dentro de la petición.",
     responses={
         400: COMMON_ERROR_RESPONSES[400],
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
         409: COMMON_ERROR_RESPONSES[409],
         429: {"model": ProblemResponse, "description": "Capacidad de workers agotada"},
         500: COMMON_ERROR_RESPONSES[500],
+        503: COMMON_ERROR_RESPONSES[503],
     },
 )
 def submit_training_job(
     body: TrainingJobRequest,
     idempotency_key: str = Header(alias="Idempotency-Key", min_length=16, max_length=128),
+    authorization: str | None = Header(default=None, alias="Authorization"),
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
 ) -> Any:
     """Solicita un entrenamiento asíncrono.
@@ -604,10 +648,15 @@ def submit_training_job(
     from training.job_store import JobStatus, TrainingJobRecord
 
     request_id = x_request_id or str(uuid4())
+    try:
+        principal = _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Training job request rejected")
     store = JobStore()
 
-    # Idempotency check
-    scope = os.getenv("PREDICTION_IDEMPOTENCY_SCOPE", "development")
+    # Idempotency keys are scoped per authenticated operator so one caller
+    # cannot replay or observe another operator's submission.
+    scope = f"{os.getenv('PREDICTION_IDEMPOTENCY_SCOPE', 'development')}:{principal.subject}"
     existing = store.find_by_idempotency_key(idempotency_key, scope)
     if existing is not None:
         digest = store.request_digest(body.dataset_ref, body.algorithm, {"configuration_ref": body.configuration_ref})
@@ -646,7 +695,7 @@ def submit_training_job(
         created_at=now,
         started_at=None,
         finished_at=None,
-        submitted_by=os.getenv("PREDICTION_DEV_SUBJECT", "development-operator"),
+        submitted_by=principal.subject,
         model_candidate=None,
         error=None,
         idempotency_key=idempotency_key,
@@ -682,16 +731,24 @@ def submit_training_job(
     summary="Consultar estado de trabajo de entrenamiento",
     description="Consulta el estado, métricas y candidato del modelo si el trabajo finalizó con éxito.",
     responses={
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
         404: COMMON_ERROR_RESPONSES[404],
         500: COMMON_ERROR_RESPONSES[500],
+        503: COMMON_ERROR_RESPONSES[503],
     },
 )
 def get_training_job(
     job_id: str,
+    authorization: str | None = Header(default=None, alias="Authorization"),
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
 ) -> Any:
     """Consulta el estado de un trabajo dentro del ámbito autorizado."""
     request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Training job request rejected")
     try:
         UUID(job_id)
     except ValueError:
@@ -749,9 +806,23 @@ def get_training_job(
     "/v1/datasets",
     response_model=list[DatasetSummary],
     summary="Listar datasets de entrenamiento disponibles",
-    description="Devuelve la lista de fixtures del sistema y datasets personalizados previamente subidos y validados.",
+    description="Requiere rol de operador ML. Devuelve los fixtures del sistema y los datasets subidos y validados.",
+    responses={
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        503: COMMON_ERROR_RESPONSES[503],
+    },
 )
-def list_training_datasets() -> list[DatasetSummary]:
+def list_training_datasets(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Dataset request rejected")
+
     results: list[DatasetSummary] = []
 
     # 1. Fixture incorporado PRED-003
@@ -777,34 +848,133 @@ def list_training_datasets() -> list[DatasetSummary]:
         except Exception as exc:
             logger.warning("No se pudo leer el manifest de pred003_synthetic: %s", exc)
 
-    # 2. Datasets personalizados en PREDICTION_DATASET_ROOT
-    dataset_root_env = os.getenv("PREDICTION_DATASET_ROOT")
-    if dataset_root_env:
-        custom_root = Path(dataset_root_env).resolve() / "custom"
-        if custom_root.is_dir():
-            for item in sorted(custom_root.iterdir()):
-                manifest_path = item / "manifest.json"
-                if item.is_dir() and manifest_path.exists():
-                    try:
-                        m = json.loads(manifest_path.read_text(encoding="utf-8"))
-                        results.append(
-                            DatasetSummary(
-                                dataset_ref=f"custom:{item.name}",
-                                dataset_id=str(m.get("dataset_id", item.name)),
-                                label=f"Dataset personalizado: {item.name}",
-                                description=m.get("warning") or "Dataset preparado externamente y validado.",
-                                is_custom=True,
-                                row_count=int(m.get("row_count", 0)),
-                                target_field=m.get("target_field"),
-                                event_code=(m.get("target_definition") or {}).get("event_code"),
-                                created_at=m.get("created_at"),
-                                content_digest=m.get("content_digest"),
-                            )
-                        )
-                    except Exception as exc:
-                        logger.warning("No se pudo leer manifest en %s: %s", item, exc)
+    # 2. Datasets personalizados (almacén compartido y snapshots de operador).
+    seen: set[str] = set()
+    for custom_root in custom_dataset_roots():
+        if not custom_root.is_dir():
+            continue
+        for item in sorted(custom_root.iterdir()):
+            manifest_path = item / "manifest.json"
+            if item.name in seen or item.name.startswith(".") or not item.is_dir() or not manifest_path.exists():
+                continue
+            try:
+                m = json.loads(manifest_path.read_text(encoding="utf-8"))
+                results.append(
+                    DatasetSummary(
+                        dataset_ref=f"custom:{item.name}",
+                        dataset_id=str(m.get("dataset_id", item.name)),
+                        label=f"Dataset personalizado: {item.name}",
+                        description=m.get("warning") or "Dataset preparado externamente y validado.",
+                        is_custom=True,
+                        row_count=int(m.get("row_count", 0)),
+                        target_field=m.get("target_field"),
+                        event_code=(m.get("target_definition") or {}).get("event_code"),
+                        created_at=m.get("created_at"),
+                        content_digest=m.get("content_digest"),
+                    )
+                )
+                seen.add(item.name)
+            except Exception as exc:
+                logger.warning("No se pudo leer manifest en %s: %s", item, exc)
 
     return results
+
+
+class _UploadRejected(Exception):
+    def __init__(self, status: int, title: str, code: str, detail: str | None = None):
+        super().__init__(detail or title)
+        self.status = status
+        self.title = title
+        self.code = code
+        self.detail = detail
+
+
+async def _read_upload_bounded(file: UploadFile, limit: int) -> bytes:
+    """Read at most ``limit`` bytes; never buffer an oversized request body."""
+    buffer = bytearray()
+    while chunk := await file.read(1024 * 1024):
+        buffer.extend(chunk)
+        if len(buffer) > limit:
+            raise _UploadRejected(413, "Archivo demasiado grande", "PAYLOAD_TOO_LARGE",
+                                  f"El archivo supera el límite de {limit} bytes.")
+    return bytes(buffer)
+
+
+def _read_dataset_archive(content: bytes, max_uncompressed: int) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    """Extract exactly one manifest.json and one rows.jsonl with bounded decompression."""
+    try:
+        archive = zipfile.ZipFile(BytesIO(content))
+    except zipfile.BadZipFile as exc:
+        raise _UploadRejected(400, "Archivo zip corrupto", "BAD_ZIP_FILE") from exc
+    with archive:
+        entries = [info for info in archive.infolist() if not info.is_dir()]
+        if len(entries) > 16:
+            raise _UploadRejected(400, "Archivo zip inválido", "INVALID_ZIP_ARCHIVE",
+                                  "El zip contiene demasiados archivos.")
+        manifests = [info for info in entries if Path(info.filename).name == "manifest.json"]
+        rows = [info for info in entries if Path(info.filename).name == "rows.jsonl"]
+        if not manifests or not rows:
+            raise _UploadRejected(400, "Estructura de dataset incompleta", "MISSING_DATASET_FILES",
+                                  "El zip debe incluir 'manifest.json' y 'rows.jsonl'.")
+        if len(manifests) > 1 or len(rows) > 1:
+            raise _UploadRejected(400, "Estructura de dataset ambigua", "AMBIGUOUS_DATASET_FILES",
+                                  "El zip debe incluir un único 'manifest.json' y un único 'rows.jsonl'.")
+        if manifests[0].file_size + rows[0].file_size > max_uncompressed:
+            raise _UploadRejected(413, "Dataset demasiado grande", "PAYLOAD_TOO_LARGE",
+                                  f"El contenido descomprimido supera {max_uncompressed} bytes.")
+        try:
+            # Headers can lie about sizes: cap the actual decompressed read too.
+            with archive.open(manifests[0]) as stream:
+                manifest_bytes = stream.read(max_uncompressed + 1)
+            rows_bytes = b""
+            if len(manifest_bytes) <= max_uncompressed:
+                with archive.open(rows[0]) as stream:
+                    rows_bytes = stream.read(max_uncompressed - len(manifest_bytes) + 1)
+            if len(manifest_bytes) + len(rows_bytes) > max_uncompressed:
+                raise _UploadRejected(413, "Dataset demasiado grande", "PAYLOAD_TOO_LARGE",
+                                      f"El contenido descomprimido supera {max_uncompressed} bytes.")
+            manifest = json.loads(manifest_bytes.decode("utf-8"))
+            parsed_rows = [json.loads(line) for line in rows_bytes.decode("utf-8").splitlines() if line.strip()]
+        except _UploadRejected:
+            raise
+        except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+            raise _UploadRejected(400, "Contenido de dataset inválido", "INVALID_DATASET_ENCODING",
+                                  "manifest.json y rows.jsonl deben ser JSON válido en UTF-8.") from exc
+        except (zipfile.BadZipFile, RuntimeError, NotImplementedError, OSError) as exc:
+            raise _UploadRejected(400, "Error al descomprimir dataset", "ZIP_PROCESSING_ERROR") from exc
+    if not isinstance(manifest, dict) or not parsed_rows:
+        raise _UploadRejected(400, "Dataset vacío", "EMPTY_DATASET")
+    return manifest, parsed_rows
+
+
+def _store_dataset(root: Path, dataset_id: str, manifest: dict[str, Any], rows: list[dict[str, Any]],
+                   provenance: dict[str, Any]) -> None:
+    """Write into a staging directory and publish it once; never overwrite a dataset."""
+    root.mkdir(parents=True, exist_ok=True)
+    target = root / dataset_id
+    if target.exists():
+        raise _UploadRejected(409, "Dataset ya registrado", "DATASET_ALREADY_EXISTS",
+                              "Los datasets son inmutables; publique la nueva versión con otro dataset_id.")
+    staging = root / f".{dataset_id}.tmp-{uuid4().hex}"
+    staging.mkdir()
+    try:
+        (staging / "manifest.json").write_text(
+            json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False), encoding="utf-8")
+        with (staging / "rows.jsonl").open("w", encoding="utf-8") as handle:
+            for row in rows:
+                handle.write(json.dumps(row, separators=(",", ":"), ensure_ascii=False) + "\n")
+        (staging / "upload.json").write_text(json.dumps(provenance, indent=2, sort_keys=True), encoding="utf-8")
+        try:
+            # rename (not replace) fails if a concurrent upload published first.
+            os.rename(staging, target)
+        except OSError as exc:
+            if target.exists():
+                raise _UploadRejected(409, "Dataset ya registrado", "DATASET_ALREADY_EXISTS",
+                                      "Los datasets son inmutables; publique la nueva versión con otro dataset_id.") from exc
+            raise
+    finally:
+        if staging.exists():
+            shutil.rmtree(staging, ignore_errors=True)
 
 
 @app.post(
@@ -812,94 +982,70 @@ def list_training_datasets() -> list[DatasetSummary]:
     status_code=201,
     response_model=DatasetUploadResponse,
     summary="Subir y validar un dataset preparado",
-    description="Recibe un archivo .zip con manifest.json y rows.jsonl. Lo valida exhaustivamente contra el contrato de datos antes de registrarlo.",
+    description=(
+        "Requiere rol de operador ML. Recibe un .zip con un único manifest.json y rows.jsonl, "
+        "lo valida contra el contrato de datos y lo registra de forma inmutable."
+    ),
     responses={
         400: COMMON_ERROR_RESPONSES[400],
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        409: {"model": ProblemResponse, "description": "El dataset_id ya está registrado"},
+        413: {"model": ProblemResponse, "description": "Archivo o contenido descomprimido demasiado grande"},
         422: COMMON_ERROR_RESPONSES[422],
-        500: COMMON_ERROR_RESPONSES[500],
+        503: COMMON_ERROR_RESPONSES[503],
     },
 )
 async def upload_training_dataset(
     file: UploadFile = File(...),
+    authorization: str | None = Header(default=None, alias="Authorization"),
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
 ) -> Any:
     request_id = x_request_id or str(uuid4())
-
-    filename = file.filename or ""
-    if not (filename.endswith(".zip") or filename.endswith(".jsonl")):
-        return _make_problem(
-            400, "Formato de archivo inválido", "INVALID_FILE_TYPE", request_id,
-            detail="Debe proporcionar un archivo comprimido .zip que contenga 'manifest.json' y 'rows.jsonl'."
-        )
+    try:
+        # Token verification makes blocking HTTP calls; keep it off the event loop.
+        principal = await asyncio.to_thread(_authenticate_ml_operator, authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Dataset request rejected")
 
     try:
-        content_bytes = await file.read()
-    except Exception as exc:
-        return _make_problem(500, "Error de lectura", "FILE_READ_ERROR", request_id, detail=str(exc))
+        if not (file.filename or "").lower().endswith(".zip"):
+            raise _UploadRejected(
+                400, "Formato de archivo inválido", "INVALID_FILE_TYPE",
+                "Debe proporcionar un archivo .zip que contenga 'manifest.json' y 'rows.jsonl'.",
+            )
+        roots = custom_dataset_roots()
+        if not roots:
+            raise _UploadRejected(503, "Almacén de datasets no configurado", "DATASET_STORAGE_UNAVAILABLE")
 
-    manifest_data: dict[str, Any] | None = None
-    rows_data: list[dict[str, Any]] = []
+        content = await _read_upload_bounded(file, dataset_upload_max_bytes())
+        manifest_data, rows_data = _read_dataset_archive(content, dataset_max_uncompressed_bytes())
 
-    if filename.endswith(".zip"):
+        report: DatasetValidationReport = validate_prepared_dataset(manifest_data, rows_data)
+        if not report.ready_for_preparation:
+            issues_summary = [f"[{i.code}] {i.path}: {i.message}" for i in report.issues]
+            raise _UploadRejected(
+                422, "Dataset no cumple contrato de datos", "DATASET_CONTRACT_VIOLATION",
+                f"Estado del reporte: {report.status}. Errores: {'; '.join(issues_summary[:5])}",
+            )
+        # The contract requires a UUID; normalizing it also rules out path segments.
+        dataset_id = str(UUID(str(manifest_data["dataset_id"])))
+        if any((root / dataset_id).exists() for root in roots):
+            raise _UploadRejected(409, "Dataset ya registrado", "DATASET_ALREADY_EXISTS",
+                                  "Los datasets son inmutables; publique la nueva versión con otro dataset_id.")
+        provenance = {
+            "uploaded_by": principal.subject,
+            "uploaded_at": datetime.now(timezone.utc).isoformat(),
+            "upload_sha256": hashlib.sha256(content).hexdigest(),
+            "request_id": request_id,
+        }
         try:
-            with zipfile.ZipFile(BytesIO(content_bytes)) as z:
-                # Prevenir zip slip
-                for zip_info in z.infolist():
-                    if ".." in zip_info.filename or zip_info.filename.startswith("/"):
-                        return _make_problem(400, "Archivo malicioso", "INVALID_ZIP_ARCHIVE", request_id,
-                                             detail="El archivo zip contiene rutas inválidas.")
-
-                file_names = set(z.namelist())
-                # Buscar manifest.json y rows.jsonl incluso si están dentro de un subdirectorio raíz único
-                manifest_entry = next((name for name in z.namelist() if Path(name).name == "manifest.json"), None)
-                rows_entry = next((name for name in z.namelist() if Path(name).name == "rows.jsonl"), None)
-
-                if not manifest_entry or not rows_entry:
-                    return _make_problem(
-                        400, "Estructura de dataset incompleta", "MISSING_DATASET_FILES", request_id,
-                        detail="El zip debe incluir 'manifest.json' y 'rows.jsonl'."
-                    )
-
-                manifest_raw = z.read(manifest_entry).decode("utf-8")
-                manifest_data = json.loads(manifest_raw)
-
-                rows_raw = z.read(rows_entry).decode("utf-8")
-                rows_data = [
-                    json.loads(line)
-                    for line in rows_raw.splitlines()
-                    if line.strip()
-                ]
-        except zipfile.BadZipFile:
-            return _make_problem(400, "Archivo zip corrupto", "BAD_ZIP_FILE", request_id)
-        except Exception as exc:
-            return _make_problem(400, "Error al descomprimir dataset", "ZIP_PROCESSING_ERROR", request_id, detail=str(exc))
-
-    if not manifest_data or not rows_data:
-        return _make_problem(400, "Dataset vacío", "EMPTY_DATASET", request_id)
-
-    # Validar rigurosamente el contrato de datos
-    report: DatasetValidationReport = validate_prepared_dataset(manifest_data, rows_data)
-    if not report.ready_for_preparation:
-        issues_summary = [f"[{i.code}] {i.path}: {i.message}" for i in report.issues]
-        return _make_problem(
-            422,
-            "Dataset no cumple contrato de datos",
-            "DATASET_CONTRACT_VIOLATION",
-            request_id,
-            detail=f"Estado del reporte: {report.status}. Errores: {'; '.join(issues_summary[:5])}"
-        )
-
-    # Determinar ruta de almacenamiento
-    dataset_id = str(manifest_data.get("dataset_id") or uuid4())
-    dataset_root_env = os.getenv("PREDICTION_DATASET_ROOT", "/app/snapshots")
-    target_dir = Path(dataset_root_env).resolve() / "custom" / dataset_id
-    target_dir.mkdir(parents=True, exist_ok=True)
-
-    # Guardar archivos
-    (target_dir / "manifest.json").write_text(json.dumps(manifest_data, indent=2, sort_keys=True, ensure_ascii=False), encoding="utf-8")
-    with (target_dir / "rows.jsonl").open("w", encoding="utf-8") as f:
-        for r in rows_data:
-            f.write(json.dumps(r, separators=(",", ":"), ensure_ascii=False) + "\n")
+            await asyncio.to_thread(_store_dataset, roots[0], dataset_id, manifest_data, rows_data, provenance)
+        except OSError as exc:
+            logger.exception("Dataset storage failed request_id=%s", request_id)
+            raise _UploadRejected(503, "Almacén de datasets no disponible", "DATASET_STORAGE_UNAVAILABLE") from exc
+    except _UploadRejected as rejected:
+        return _make_problem(rejected.status, rejected.title, rejected.code, request_id, detail=rejected.detail)
 
     return DatasetUploadResponse(
         message="Dataset preparado subido y validado exitosamente",

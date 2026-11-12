@@ -43,7 +43,11 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `PREDICTION_RELOAD` | `false` | Recarga automática para desarrollo (rechazada en producción). |
 | `PREDICTION_DATABASE_URL` | PostgreSQL Compose local | Base compartida para estado de trabajos y outbox transaccional. |
 | `PREDICTION_IDEMPOTENCY_SCOPE` | `development` | Ámbito que delimita las claves de idempotencia. |
-| `PREDICTION_DATASET_ROOT` | `/app/snapshots` | Raíz de solo lectura para snapshots preparados. |
+| `PREDICTION_DATASET_ROOT` | `/app/snapshots` | Raíz de solo lectura para snapshots preparados por operadores (`custom/` se usa como respaldo de solo lectura). |
+| `PREDICTION_CUSTOM_DATASET_ROOT` | `/app/custom-datasets` | Almacén compartido de datasets subidos: lectura-escritura en la API, solo lectura en el worker (volumen `prediction_custom_datasets`). |
+| `PREDICTION_DATASET_UPLOAD_MAX_BYTES` | `52428800` | Tamaño máximo del `.zip` subido; se rechaza con `413` sin cargarlo completo en memoria. |
+| `PREDICTION_DATASET_MAX_UNCOMPRESSED_BYTES` | `209715200` | Tamaño máximo descomprimido de `manifest.json` + `rows.jsonl` (protección contra zip bombs). |
+| `PREDICTION_TRAINING_ROLES` | `["SUPERADMIN"]` | Lista JSON de roles del token que pueden entrenar y gestionar datasets. Inválida o vacía bloquea esos endpoints con `503`. |
 | `PREDICTION_CONFIG_ROOT` | `/app/configurations` (worker) | Catálogo de configuraciones versionadas; Compose lo monta en solo lectura. |
 | `PREDICTION_OUTBOX_POLL_SECONDS` | `5` | Intervalo de recuperación de mensajes pendientes en outbox. |
 | `PREDICTION_DW_DATABASE_URL` | *(sin configurar)* | Conexión de solo lectura al DW para resolver cortes y features. Sin DSN, la inferencia falla cerrada. |
@@ -88,14 +92,19 @@ El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.
 - `GET /v1/prediction-batches/{batch_id}`: consulta estado e historial; devuelve filas únicamente tras `PUBLISHED` y si el solicitante conserva ámbito para el programa/corte.
 - `GET /v1/prediction-publications?program_ref=…&cut_id=…`: obtiene la publicación completa vigente; devuelve `publication: null` si aún no existe. Los lotes históricos se consultan por `batch_id`.
 - `GET /v1/academic-options`: devuelve programas activos y cierres procesados visibles para el usuario autenticado; filtra las opciones por rol y ámbito académico.
-- `POST /v1/training-jobs`: Solicita un trabajo asíncrono de entrenamiento para `random_forest` o `xgboost`. Requiere header `Idempotency-Key`. Retorna `202 Accepted` con `job_id` y estado `QUEUED`.
+- `POST /v1/training-jobs`: Solicita un trabajo asíncrono de entrenamiento para `random_forest` o `xgboost`. Requiere header `Idempotency-Key`. Retorna `202 Accepted` con `job_id` y estado `QUEUED`. La clave de idempotencia queda acotada al `sub` del operador y `submitted_by` registra ese `sub` verificado.
 - `GET /v1/training-jobs/{jobId}`: Consulta el estado, progreso, candidato generado o detalle de error según el estándar RFC 7807 Problem Details.
+- `GET /v1/datasets`: lista fixtures y datasets subidos o provisionados.
+- `POST /v1/datasets/upload`: recibe un `.zip` con un único `manifest.json` y un único `rows.jsonl`, aplica límites de tamaño, valida el contrato y registra el dataset de forma **inmutable** (`409` si el `dataset_id` ya existe). Guarda `upload.json` con el `sub` del operador, la fecha y el SHA-256 del archivo. El worker lo resuelve como `custom:<dataset_id>`.
+
+Los cuatro endpoints de entrenamiento y datasets validan el JWT de Keycloak dentro del propio servicio (no dependen solo del BFF) y exigen un rol de `PREDICTION_TRAINING_ROLES`: `401` sin token válido, `403` sin rol de operador ML.
 
 ## Pipeline de Preparación y Modelado
 
 - **Partición temporal y agrupamiento:** `temporal_student_grouped_split` reserva un bloque global de periodos futuros para test, excluye el historial de estudiantes del test del train y comprueba que no haya solapamiento.
 - **Imputación y preprocesamiento:** Imputación por mediana ajustada **exclusivamente con datos de entrenamiento**.
 - **Balanceo SMOTE:** `apply_smote_if_warranted` evalúa el ratio de desbalance y aplica `SMOTE` o `SMOTENC` **únicamente sobre el fold de entrenamiento**. Test y validación permanecen con su distribución observada real.
+- **Umbral de servicio:** el `decision_threshold` elegido en validación se guarda en el manifest, forma parte del `artifact_digest` y debe coincidir con el de `metrics.json`. La inferencia clasifica con `event_probability >= decision_threshold`; los bundles anteriores sin umbral conservan `model.predict()`.
 - **Selección de hiperparámetros y umbral:** `StratifiedGroupKFold` agrupa por estudiante dentro del train temporal. Cada fold ajusta su propio preprocesador y sampler. El candidato se selecciona por recall medio y F1; para evidencia sintética el umbral descriptivo se deriva de validación por recall y F1. Para datasets institucionales no se abre el test sin una `decision_policy` aprobada con referencia y costes de FN/FP; con ella, modelo y umbral se seleccionan exclusivamente usando validación.
 - **Métricas y comparación:** El reporte incluye precision, recall, F1 y soporte por clase, matriz de confusión etiquetada, promedios, exactitud complementaria y causas de métricas indefinidas. `evaluation.comparison` compara los artefactos RF/XGBoost si prueban la misma partición, dataset, objetivo y política; selecciona solo con validación y declara empate sin forzar un ganador. La decisión institucional permanece `EVIDENCIA_INSUFICIENTE` sin evidencia autorizada y criterios DSA.
 - **Trazabilidad de artefactos:** Cada intento genera en `/artifacts/{job_id}-attempt-{n}/`:
@@ -148,7 +157,9 @@ Con `.env` de desarrollo configurado, iniciar solo las dependencias y servicios 
 
 ```powershell
 docker compose up --build -d postgres-dw dw-migrator rabbitmq prediction-service prediction-worker
-docker compose run --rm --no-deps prediction-worker python /app/tests/integration/stack_smoke.py
+docker compose run --rm --no-deps -e PREDICTION_TEST_OPERATOR_TOKEN prediction-worker python /app/tests/integration/stack_smoke.py
 ```
+
+`PREDICTION_TEST_OPERATOR_TOKEN` debe contener un access token con un rol de `PREDICTION_TRAINING_ROLES`; la API rechaza los envíos de entrenamiento sin él.
 
 La prueba crea trabajos sintéticos y comprueba la ruta API → PostgreSQL/outbox → RabbitMQ → worker, el reintento del outbox, la recuperación de una lease vencida y el digest del artefacto. No usa datos institucionales.
