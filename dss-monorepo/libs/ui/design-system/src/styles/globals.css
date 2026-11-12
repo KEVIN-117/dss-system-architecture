@@ -17,6 +17,9 @@
   --color-sidebar-primary: var(--sidebar-primary);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar: var(--sidebar);
+  --color-chart-8: var(--chart-8);
+  --color-chart-7: var(--chart-7);
+  --color-chart-6: var(--chart-6);
   --color-chart-5: var(--chart-5);
   --color-chart-4: var(--chart-4);
   --color-chart-3: var(--chart-3);
@@ -113,11 +116,20 @@
   --border: #cbd9eb;
   --input: #cbd9eb;
   --ring: var(--dss-cyan-500);
+  /* Categorical chart palette. The ORDER is the colour-blind-safety
+     mechanism: adjacent slots stay distinguishable under protan/deutan
+     simulation (OKLab ΔE ≥ 8) and normal vision (ΔE ≥ 15) on #ffffff and
+     #f5f9ff. Slots 3, 4 and 5 sit below 3:1 on light surfaces, so charts
+     using them need direct labels, textures or a table view. Re-validate
+     before reordering, recolouring or adding slots; never cycle them. */
   --chart-1: var(--dss-blue-500);
-  --chart-2: var(--dss-cyan-500);
-  --chart-3: var(--dss-navy-800);
-  --chart-4: var(--dss-gold-400);
-  --chart-5: var(--dss-red-500);
+  --chart-2: #eb6834;
+  --chart-3: #1baf7a;
+  --chart-4: #eda100;
+  --chart-5: #e87ba4;
+  --chart-6: #008300;
+  --chart-7: #6250d6;
+  --chart-8: #e34948;
   --sidebar: #eef4fb;
   --sidebar-foreground: #0b1a38;
   --sidebar-primary: var(--dss-blue-700);
@@ -130,6 +142,15 @@
 
 .dark {
   --background: var(--dss-navy-950);
+  /* Dark steps of the same eight hues, validated on #060b14 and #0b1a38. */
+  --chart-1: #3987e5;
+  --chart-2: #d95926;
+  --chart-3: #199e70;
+  --chart-4: #c98500;
+  --chart-5: #d55181;
+  --chart-6: #008300;
+  --chart-7: #9085e9;
+  --chart-8: #e66767;
   --foreground: #f3f7ff;
   --card: var(--dss-navy-900);
   --card-foreground: #f3f7ff;

@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import {
+  buildHeatmapOption,
   buildBarOption,
   buildDonutOption,
   buildLineOption,
@@ -8,7 +9,12 @@ import {
   buildRegressionScatterOption,
   ChartDataPoint,
 } from './builders';
-import { DEFAULT_DARK_THEME } from './theme';
+import {
+  DEFAULT_DARK_THEME,
+  DEFAULT_LIGHT_THEME,
+  DARK_SEQUENTIAL_COLORS,
+  LIGHT_SEQUENTIAL_COLORS,
+} from './theme';
 
 describe('Pure ECharts Builders', () => {
   const sampleData: ChartDataPoint[] = [
@@ -123,5 +129,26 @@ describe('Donut semantics and proportions', () => {
     expect(option.series).toMatchObject([{stillShowZeroSum:false}]);
     expect(option.legend).toMatchObject({orient:'horizontal',bottom:0});
     expect(option.aria?.label?.description).not.toContain('NaN');
+  });
+});
+
+describe('Heatmap magnitude encoding', () => {
+  const data = {
+    xAxisLabels: ['A', 'B'],
+    yAxisLabels: ['Y'],
+    data: [[0, 0, 0], [1, 0, 100]] as Array<[number, number, number]>,
+  };
+  it('uses a one-hue sequential ramp instead of a traffic light', () => {
+    const light = buildHeatmapOption(data, undefined, DEFAULT_LIGHT_THEME);
+    const dark = buildHeatmapOption(data, undefined, DEFAULT_DARK_THEME);
+    expect(light.visualMap).toMatchObject({ inRange: { color: LIGHT_SEQUENTIAL_COLORS } });
+    expect(dark.visualMap).toMatchObject({ inRange: { color: DARK_SEQUENTIAL_COLORS } });
+  });
+  it('picks a readable label ink for each cell', () => {
+    const option = buildHeatmapOption(data, undefined, DEFAULT_LIGHT_THEME);
+    expect(option.series).toMatchObject([{ data: [
+      { value: [0, 0, 0], label: { color: '#0b0b0b' } },
+      { value: [1, 0, 100], label: { color: '#ffffff' } },
+    ] }]);
   });
 });

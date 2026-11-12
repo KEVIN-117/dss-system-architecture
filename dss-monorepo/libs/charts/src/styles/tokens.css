@@ -80,14 +80,18 @@
 
   /* Categorical chart palette (ECharts). Kept as-is — consumed as full
      colours via `var(--chart-N)`, not through the hsl() token chain. */
-  --chart-1: #b0182a; /* saiku red — re-anchored to the new brand */
-  --chart-2: #0ea5e9;
-  --chart-3: #10b981;
-  --chart-4: #f59e0b;
-  --chart-5: #a855f7;
-  --chart-6: #ec4899;
-  --chart-7: #14b8a6;
-  --chart-8: #6366f1;
+  /* Categorical palette — ORDER is the colour-blind-safety mechanism
+     (adjacent CVD ΔE ≥ 9.2, normal-vision ΔE ≥ 19.6, both modes). Keep in
+     sync with LIGHT/DARK_CHART_COLORS in src/lib/core/theme.ts and re-run
+     the palette validation before changing, reordering or adding a slot. */
+  --chart-1: #b0182a; /* saiku red (brand) */
+  --chart-2: #2a78d6;
+  --chart-3: #1baf7a;
+  --chart-4: #eb6834;
+  --chart-5: #6250d6;
+  --chart-6: #eda100;
+  --chart-7: #e87ba4;
+  --chart-8: #008300;
 
   color-scheme: light;
 
@@ -542,13 +546,13 @@
   --bg-overlay: hsl(0 0% 0% / 0.6);
 
   --chart-1: #ef5a6b;
-  --chart-2: #38bdf8;
-  --chart-3: #34d399;
-  --chart-4: #fbbf24;
-  --chart-5: #c084fc;
-  --chart-6: #f472b6;
-  --chart-7: #2dd4bf;
-  --chart-8: #818cf8;
+  --chart-2: #3987e5;
+  --chart-3: #199e70;
+  --chart-4: #d95926;
+  --chart-5: #9085e9;
+  --chart-6: #c98500;
+  --chart-7: #d55181;
+  --chart-8: #008300;
 }
 
 /* ==========================================================================
@@ -577,11 +581,7 @@
   --input: 265 25% 25%;
   --ring: 250 100% 70%;
 
-  --chart-1: 250 100% 70%;
-  --chart-2: 280 100% 70%;
-  --chart-3: 150 100% 60%;
-  --chart-4: 330 100% 65%;
-  --chart-5: 190 100% 60%;
+  /* --chart-* stay on the validated dark palette above. */
 }
 
 /* Rector (Hot Pink) */
@@ -591,7 +591,6 @@
   --primary: 330 100% 65%;
   --primary-foreground: 330 100% 15%;
   --ring: 330 100% 65%;
-  --chart-1: 330 100% 65%;
 }
 
 /* Decano (Matrix Green) */
@@ -601,7 +600,6 @@
   --primary: 150 100% 60%;
   --primary-foreground: 150 100% 15%;
   --ring: 150 100% 60%;
-  --chart-1: 150 100% 60%;
 }
 
 /* Director (Cyber Violet) */
@@ -611,7 +609,6 @@
   --primary: 280 100% 70%;
   --primary-foreground: 280 100% 15%;
   --ring: 280 100% 70%;
-  --chart-1: 280 100% 70%;
 }
 
 /* Admin (Electric Cyan) */
@@ -621,5 +618,4 @@
   --primary: 190 100% 60%;
   --primary-foreground: 190 100% 15%;
   --ring: 190 100% 60%;
-  --chart-1: 190 100% 60%;
 }

@@ -30,6 +30,7 @@ let changeTheme: () => void;
 let motionChange: () => void;
 let width: number;
 let reducedMotion: boolean;
+let forcedColors: boolean;
 let disconnectResize: ReturnType<typeof vi.fn>;
 let disconnectMutation: ReturnType<typeof vi.fn>;
 let removeMotion: ReturnType<typeof vi.fn>;
@@ -96,15 +97,19 @@ beforeEach(() => {
       disconnect = disconnectMutation;
     },
   );
-  vi.stubGlobal('matchMedia', () => ({
-    get matches() {
-      return reducedMotion;
-    },
-    addEventListener: (_: string, callback: () => void) => {
-      motionChange = callback;
-    },
-    removeEventListener: removeMotion,
-  }));
+  forcedColors = false;
+  vi.stubGlobal('matchMedia', (query: string) => {
+    const motionQuery = query.includes('reduced-motion');
+    return {
+      get matches() {
+        return motionQuery ? reducedMotion : forcedColors;
+      },
+      addEventListener: (_: string, callback: () => void) => {
+        if (motionQuery) motionChange = callback;
+      },
+      removeEventListener: motionQuery ? removeMotion : vi.fn(),
+    };
+  });
 });
 afterEach(() => {
   cleanup();
@@ -270,5 +275,46 @@ describe('Required chart states', () => {
       'Sin datos disponibles',
     );
     expect(charts).toHaveLength(0);
+  });
+});
+
+describe('BaseChart accessibility', () => {
+  const lastAria = () =>
+    (charts[0].setOption.mock.lastCall?.[0] as { aria: Record<string, any> }).aria;
+
+  it('prepends the accessible name to the data summary instead of replacing it', () => {
+    render(
+      <BaseChart
+        ariaLabel="Rendimiento por facultad."
+        option={{ aria: { label: { description: 'A: 8. B: 9.' } } }}
+      />,
+    );
+    flush();
+    expect(lastAria().label.description).toBe('Rendimiento por facultad. A: 8. B: 9.');
+  });
+
+  it('keeps the data summary when no accessible name is given', () => {
+    render(<BaseChart option={{ aria: { label: { description: 'A: 8.' } } }} />);
+    flush();
+    expect(lastAria().label.description).toBe('A: 8.');
+  });
+
+  it('adds directional textures on request and under forced colours', () => {
+    const view = render(<BaseChart option={{}} />);
+    flush();
+    expect(lastAria().decal).toBeUndefined();
+    view.rerender(<BaseChart option={{}} textures />);
+    flush();
+    const decals = lastAria().decal.decals as Array<{ rotation: number }>;
+    expect(lastAria().decal.show).toBe(true);
+    expect(decals).toHaveLength(8);
+    expect(decals[0].rotation).toBeCloseTo(Math.PI / 4);
+    expect(decals[1].rotation).toBeCloseTo(-Math.PI / 4);
+    cleanup();
+    charts = [];
+    forcedColors = true;
+    render(<BaseChart option={{}} />);
+    flush();
+    expect(lastAria().decal.show).toBe(true);
   });
 });

@@ -1,6 +1,13 @@
 import { describe, it, expect, afterEach } from 'vitest';
 import { colorWithAlpha, normalizeChartColor } from './colors';
-import { resolveChartTheme, DEFAULT_DARK_THEME } from './theme';
+import {
+  resolveChartTheme,
+  DEFAULT_DARK_THEME,
+  DEFAULT_LIGHT_THEME,
+  DARK_SEQUENTIAL_COLORS,
+  LIGHT_SEQUENTIAL_COLORS,
+  isDarkColor,
+} from './theme';
 
 afterEach(() => { document.body.innerHTML = ''; });
 
@@ -23,6 +30,44 @@ describe('Theme resolution', () => {
     const theme = resolveChartTheme(DEFAULT_DARK_THEME, document.body, { chartColors: [] });
     expect(theme.chartColors).toEqual(DEFAULT_DARK_THEME.chartColors);
     expect(normalizeChartColor('not-a-color', '#000000')).toBe('#000000');
+  });
+});
+
+describe('Mode-aware fallbacks', () => {
+  it('fills undefined slots from the light palette on a light background', () => {
+    const element = document.createElement('div');
+    element.style.setProperty('--background', '#ffffff');
+    document.body.append(element);
+    const theme = resolveChartTheme(undefined, element);
+    expect(theme.chartColors).toEqual(DEFAULT_LIGHT_THEME.chartColors);
+    expect(theme.sequentialColors).toEqual(LIGHT_SEQUENTIAL_COLORS);
+  });
+
+  it('fills undefined slots from the dark palette on a dark background', () => {
+    const element = document.createElement('div');
+    element.style.setProperty('--background', '#060b14');
+    document.body.append(element);
+    const theme = resolveChartTheme(undefined, element);
+    expect(theme.chartColors).toEqual(DEFAULT_DARK_THEME.chartColors);
+    expect(theme.sequentialColors).toEqual(DARK_SEQUENTIAL_COLORS);
+  });
+
+  it('never borrows a categorical slot for a missing risk status', () => {
+    const element = document.createElement('div');
+    element.style.setProperty('--background', '#ffffff');
+    element.style.setProperty('--chart-2', '#2a78d6');
+    document.body.append(element);
+    const theme = resolveChartTheme(undefined, element);
+    expect(theme.riskColors.none).toBe(DEFAULT_LIGHT_THEME.riskColors.none);
+  });
+
+  it.each([
+    ['#ffffff', false],
+    ['#f5f9ff', false],
+    ['#060b14', true],
+    ['rgba(22, 25, 33, 1)', true],
+  ])('classifies %s as dark=%s', (color, dark) => {
+    expect(isDarkColor(color)).toBe(dark);
   });
 });
 

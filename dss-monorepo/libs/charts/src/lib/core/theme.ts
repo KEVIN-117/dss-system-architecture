@@ -38,6 +38,12 @@ export interface ChartThemeTokens {
   destructive: string;
   /** Semantic risk level colors */
   riskColors: { high: string; medium: string; none: string };
+  /**
+   * One-hue magnitude ramp, ordered low → high value. Light mode runs
+   * light → dark; dark mode flips the anchor so low values recede into the
+   * dark surface. Optional for compatibility with existing token objects.
+   */
+  sequentialColors?: string[];
   /** Apply alpha to any resolved color string */
   alpha: (color: string, opacity: number) => string;
 }
@@ -61,28 +67,49 @@ export type ChartThemeOverrides = Partial<Omit<ChartThemeTokens, 'riskColors'>> 
 // Static fallbacks — values copied from tokens.css
 // ---------------------------------------------------------------------------
 
-/** Light-mode chart series colors (tokens.css :root --chart-1..8) */
+/**
+ * Light-mode categorical palette (tokens.css :root --chart-1..8).
+ *
+ * The slot ORDER is the colour-blind-safety mechanism: it was chosen by
+ * enumerating orderings and keeping only those whose adjacent pairs stay
+ * distinguishable under protan/deutan simulation (OKLab ΔE ≥ 9.2) and under
+ * normal vision (ΔE ≥ 19.6) on both the light (#fdfcfb) and dark (#161921)
+ * surfaces. The first three slots also pass all-pairs (scatter, maps).
+ * Do not reorder, cycle or insert hues without re-running the validation.
+ * Aqua, yellow and magenta sit below 3:1 on the light surface, so charts
+ * that rely on them must also offer direct labels, textures or a table.
+ */
 export const LIGHT_CHART_COLORS: string[] = [
-  '#b0182a', // --chart-1  saiku red
-  '#0ea5e9', // --chart-2  sky
-  '#10b981', // --chart-3  emerald
-  '#f59e0b', // --chart-4  amber
-  '#a855f7', // --chart-5  purple
-  '#ec4899', // --chart-6  pink
-  '#14b8a6', // --chart-7  teal
-  '#6366f1', // --chart-8  indigo
+  '#b0182a', // --chart-1  saiku red (brand)
+  '#2a78d6', // --chart-2  blue
+  '#1baf7a', // --chart-3  aqua
+  '#eb6834', // --chart-4  orange
+  '#6250d6', // --chart-5  violet
+  '#eda100', // --chart-6  yellow
+  '#e87ba4', // --chart-7  magenta
+  '#008300', // --chart-8  green
 ];
 
-/** Dark-mode chart series colors (tokens.css [data-theme='dark'] --chart-1..8) */
+/** Dark-mode steps of the same eight hues, validated against #161921. */
 export const DARK_CHART_COLORS: string[] = [
-  '#ef5a6b', // --chart-1
-  '#38bdf8', // --chart-2
-  '#34d399', // --chart-3
-  '#fbbf24', // --chart-4
-  '#c084fc', // --chart-5
-  '#f472b6', // --chart-6
-  '#2dd4bf', // --chart-7
-  '#818cf8', // --chart-8
+  '#ef5a6b', // --chart-1  saiku red (brand)
+  '#3987e5', // --chart-2  blue
+  '#199e70', // --chart-3  aqua
+  '#d95926', // --chart-4  orange
+  '#9085e9', // --chart-5  violet
+  '#c98500', // --chart-6  yellow
+  '#d55181', // --chart-7  magenta
+  '#008300', // --chart-8  green
+];
+
+/** Single-hue blue magnitude ramp (low → high) for light surfaces. */
+export const LIGHT_SEQUENTIAL_COLORS: string[] = [
+  '#cde2fb', '#9ec5f4', '#6da7ec', '#3987e5', '#256abf', '#184f95', '#0d366b',
+];
+
+/** Same ramp with the anchor flipped for dark surfaces (low → high). */
+export const DARK_SEQUENTIAL_COLORS: string[] = [
+  '#0d366b', '#184f95', '#256abf', '#3987e5', '#6da7ec', '#9ec5f4', '#cde2fb',
 ];
 
 /**
@@ -117,6 +144,7 @@ export const DEFAULT_LIGHT_THEME: ChartThemeTokens = {
     medium: hslToHex(32, 90, 44), // --warning-500
     none: hslToHex(158, 64, 38), // --success-500
   },
+  sequentialColors: LIGHT_SEQUENTIAL_COLORS,
   alpha: hexWithAlpha,
 };
 
@@ -133,6 +161,7 @@ export const DEFAULT_DARK_THEME: ChartThemeTokens = {
     medium: hslToHex(32, 80, 76), // --warning-200
     none: hslToHex(158, 55, 76), // --success-200
   },
+  sequentialColors: DARK_SEQUENTIAL_COLORS,
   alpha: hexWithAlpha,
 };
 
@@ -145,10 +174,13 @@ export const DEFAULT_DARK_THEME: ChartThemeTokens = {
  * resolved ChartThemeTokens. Call this client-side after the DOM has
  * the design-system stylesheet loaded.
  *
- * Falls back to DEFAULT_DARK_THEME when no document is available.
+ * When no fallback is passed, the light or dark defaults are chosen from the
+ * luminance of the resolved `--background`, so variables a stylesheet leaves
+ * undefined never mix dark-mode colours into a light page (or vice versa).
+ * Without a document (SSR, workers) it falls back to DEFAULT_DARK_THEME.
  */
 export function resolveChartTheme(
-  fallback: ChartThemeTokens = DEFAULT_DARK_THEME,
+  fallback?: ChartThemeTokens,
   element?: HTMLElement,
   overrides?: ChartThemeOverrides,
 ): ChartThemeTokens {
@@ -160,6 +192,13 @@ export function resolveChartTheme(
     if (/^-?[\d.]+\s+[\d.]+%\s+[\d.]+%/.test(raw)) raw = 'hsl(' + raw + ')';
     return normalizeChartColor(raw, fb);
   };
+  if (!fallback) {
+    const background = cs
+      ? get('--background', get('--bg', ''))
+      : '';
+    fallback = background && isDarkColor(background) ? DEFAULT_DARK_THEME
+      : background ? DEFAULT_LIGHT_THEME : DEFAULT_DARK_THEME;
+  }
   const chartColors = fallback.chartColors.map((color, i) => get('--chart-' + (i + 1), color));
   const cssTheme: ChartThemeTokens = {
     primary: get('--primary', fallback.primary ?? chartColors[0]),
@@ -171,9 +210,12 @@ export function resolveChartTheme(
     destructive: get('--destructive', get('--danger', fallback.destructive)),
     riskColors: {
       high: get('--destructive', get('--danger', fallback.riskColors.high)),
-      medium: get('--warning', get('--chart-4', fallback.riskColors.medium)),
-      none: get('--success', get('--chart-2', fallback.riskColors.none)),
+      // Risk is a status, never a series colour: fall back to the status
+      // defaults rather than borrowing a categorical slot.
+      medium: get('--warning', fallback.riskColors.medium),
+      none: get('--success', fallback.riskColors.none),
     },
+    sequentialColors: fallback.sequentialColors ?? (fallback === DEFAULT_LIGHT_THEME ? LIGHT_SEQUENTIAL_COLORS : DARK_SEQUENTIAL_COLORS),
     alpha: colorWithAlpha,
   };
   const merged = { ...cssTheme, ...overrides,
@@ -194,7 +236,51 @@ export function resolveChartTheme(
       medium: normalizeChartColor(merged.riskColors.medium, cssTheme.riskColors.medium),
       none: normalizeChartColor(merged.riskColors.none, cssTheme.riskColors.none),
     },
+    sequentialColors: (merged.sequentialColors?.length ? merged.sequentialColors : cssTheme.sequentialColors ?? [])
+      .map((color, i) => normalizeChartColor(color, cssTheme.sequentialColors?.[i] ?? color)),
   };
+}
+
+/** WCAG relative luminance of a resolved hex/rgb(a) colour, or undefined. */
+export function relativeLuminance(color: string): number | undefined {
+  const normalized = normalizeChartColor(color, '');
+  let channels: number[] | undefined;
+  if (normalized.startsWith('#')) {
+    let hex = normalized.slice(1);
+    if (hex.length <= 4) hex = [...hex].map((c) => c + c).join('');
+    channels = [0, 2, 4].map((offset) => parseInt(hex.slice(offset, offset + 2), 16));
+  } else {
+    channels = normalized.match(/[\d.]+/g)?.slice(0, 3).map(Number);
+  }
+  if (!channels || channels.length < 3 || channels.some((c) => !Number.isFinite(c))) return undefined;
+  const [r, g, b] = channels.map((c) => {
+    const v = c / 255;
+    return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+/** True when a resolved hex/rgb(a) colour has WCAG relative luminance < 0.2. */
+export function isDarkColor(color: string): boolean {
+  const luminance = relativeLuminance(color);
+  return luminance !== undefined && luminance < 0.2;
+}
+
+const LIGHT_INK = '#ffffff';
+const DARK_INK = '#0b0b0b';
+
+/**
+ * Text colour for a label drawn INSIDE a filled mark: whichever of white or
+ * near-black ink has the higher WCAG contrast against that fill. Series
+ * colours never become text colours; this only picks the ink.
+ */
+export function labelInkFor(fill: string): string {
+  const luminance = relativeLuminance(fill);
+  if (luminance === undefined) return DARK_INK;
+  const dark = relativeLuminance(DARK_INK) ?? 0;
+  const onWhite = 1.05 / (luminance + 0.05);
+  const onDark = (luminance + 0.05) / (dark + 0.05);
+  return onWhite >= onDark ? LIGHT_INK : DARK_INK;
 }
 
 // ---------------------------------------------------------------------------
