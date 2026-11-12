@@ -173,6 +173,10 @@
         "@types/mdx": "^2.0.0",
       },
     },
+    "apps/docs-portal-e2e": {
+      "name": "@dss-monorepo/docs-portal-e2e",
+      "version": "0.0.1",
+    },
     "apps/landing": {
       "name": "@dss-monorepo/landing",
       "version": "0.0.1",
@@ -730,6 +734,8 @@
     "@dss-monorepo/director-dashboard-e2e": ["@dss-monorepo/director-dashboard-e2e@workspace:apps/director-dashboard-e2e"],
 
     "@dss-monorepo/docs-portal": ["@dss-monorepo/docs-portal@workspace:apps/docs-portal"],
+
+    "@dss-monorepo/docs-portal-e2e": ["@dss-monorepo/docs-portal-e2e@workspace:apps/docs-portal-e2e"],
 
     "@dss-monorepo/dw-control-connector": ["@dss-monorepo/dw-control-connector@workspace:libs/connectors/dw-control-connector"],
 
