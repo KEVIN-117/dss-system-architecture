@@ -606,6 +606,34 @@ def _ml_operator_roles() -> set[str]:
     return {role.strip() for role in roles}
 
 
+def _positive_int_env(name: str, default: int, minimum: int = 1) -> int:
+    raw = os.getenv(name)
+    if raw is None or not raw.strip():
+        return default
+    try:
+        value = int(raw.strip())
+    except ValueError as exc:
+        raise ValueError(f"{name} must be an integer >= {minimum}.") from exc
+    if value < minimum:
+        raise ValueError(f"{name} must be an integer >= {minimum}.")
+    return value
+
+
+def _training_job_response(record: Any) -> TrainingJobResponse:
+    model_candidate = None
+    if record.model_candidate:
+        model_candidate = ModelReference(
+            model_id=record.model_candidate.get("model_id", ""),
+            version=record.model_candidate.get("version", ""),
+        )
+    return TrainingJobResponse(
+        job_id=record.job_id, dataset_ref=record.dataset_ref, algorithm=record.algorithm,
+        status=record.status.value, created_at=record.created_at, started_at=record.started_at,
+        finished_at=record.finished_at, submitted_by=record.submitted_by,
+        model_candidate=model_candidate, error=record.error,
+    )
+
+
 def _authenticate_ml_operator(authorization: str | None) -> Principal:
     """Verify the bearer JWT in this service; the BFF check is not the only gate."""
     if not authorization or not authorization.startswith("Bearer ") or not authorization[7:].strip():
@@ -675,13 +703,19 @@ def submit_training_job(
             submitted_by=existing.submitted_by,
         )
 
-    # Check capacity
+    # Backpressure: bound running + queued work so a stalled worker cannot
+    # accumulate an unbounded backlog of training jobs.
+    try:
+        max_concurrent = _positive_int_env("WORKER_MAX_CONCURRENT_JOBS", 1)
+        max_queued = _positive_int_env("PREDICTION_MAX_QUEUED_JOBS", 4, minimum=0)
+    except ValueError as exc:
+        return _make_problem(503, "Job capacity misconfigured", "CONFIGURATION_ERROR", request_id, detail=str(exc))
     active_jobs = store.list_active()
-    max_concurrent = int(os.getenv("WORKER_MAX_CONCURRENT_JOBS", "1"))
-    if len([j for j in active_jobs if j.status == JobStatus.RUNNING]) >= max_concurrent:
+    capacity = max_concurrent + max_queued
+    if len(active_jobs) >= capacity:
         return _make_problem(
             429, "Job capacity exhausted", "JOB_CAPACITY", request_id,
-            detail=f"Maximum {max_concurrent} concurrent jobs allowed.",
+            detail=f"At most {max_concurrent} running and {max_queued} queued training jobs are allowed.",
         )
 
     # Create the job record
@@ -777,25 +811,48 @@ def get_training_job(
             },
         )
 
-    model_candidate = None
-    if record.model_candidate:
-        model_candidate = ModelReference(
-            model_id=record.model_candidate.get("model_id", ""),
-            version=record.model_candidate.get("version", ""),
-        )
+    return _training_job_response(record)
 
-    return TrainingJobResponse(
-        job_id=record.job_id,
-        dataset_ref=record.dataset_ref,
-        algorithm=record.algorithm,
-        status=record.status.value,
-        created_at=record.created_at,
-        started_at=record.started_at,
-        finished_at=record.finished_at,
-        submitted_by=record.submitted_by,
-        model_candidate=model_candidate,
-        error=record.error,
-    )
+
+@app.post(
+    "/v1/training-jobs/{job_id}/cancel",
+    response_model=TrainingJobResponse,
+    summary="Cancelar un trabajo de entrenamiento en cola",
+    description=(
+        "Requiere rol de operador ML. Solo cancela trabajos QUEUED; un trabajo en ejecución "
+        "no se interrumpe y responde 409."
+    ),
+    responses={
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        404: COMMON_ERROR_RESPONSES[404],
+        409: {"model": ProblemResponse, "description": "El trabajo ya no está en cola"},
+        503: COMMON_ERROR_RESPONSES[503],
+    },
+)
+def cancel_training_job(
+    job_id: str,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Training job request rejected")
+    try:
+        UUID(job_id)
+    except ValueError:
+        return _make_problem(404, "Training job not found", "RESOURCE_NOT_FOUND", request_id)
+    store = JobStore()
+    if store.cancel(job_id):
+        logger.info("Training job %s cancelled request_id=%s", job_id, request_id)
+        return _training_job_response(store.get(job_id))
+    record = store.get(job_id)
+    if record is None:
+        return _make_problem(404, "Training job not found", "RESOURCE_NOT_FOUND", request_id)
+    return _make_problem(409, "Training job cannot be cancelled", "JOB_NOT_CANCELLABLE", request_id,
+                         detail=f"Only QUEUED jobs can be cancelled; current status is {record.status.value}.")
 
 
 # ---------------------------------------------------------------------------

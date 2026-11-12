@@ -2,7 +2,7 @@
 
 Servicio HTTP basado en FastAPI y worker de entrenamiento aislado basado en Celery con RabbitMQ, diseñado conforme al ADR-PRED-001 (CRISP-DM, RNF-09).
 
-## Arquitectura de dos contenedores
+## Arquitectura de contenedores
 
 El servicio está desacoplado en dos imágenes Docker independientes para garantizar el aislamiento de recursos y evitar la degradación de inferencias durante el entrenamiento intensivo:
 
@@ -50,6 +50,7 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `PREDICTION_TRAINING_ROLES` | `["SUPERADMIN"]` | Lista JSON de roles del token que pueden entrenar y gestionar datasets. Inválida o vacía bloquea esos endpoints con `503`. |
 | `PREDICTION_CONFIG_ROOT` | `/app/configurations` (worker) | Catálogo de configuraciones versionadas; Compose lo monta en solo lectura. |
 | `PREDICTION_OUTBOX_POLL_SECONDS` | `5` | Intervalo de recuperación de mensajes pendientes en outbox. |
+| `PREDICTION_MAX_QUEUED_JOBS` | `4` | Jobs de entrenamiento en cola admitidos además de `WORKER_MAX_CONCURRENT_JOBS` en ejecución; al superarse responde `429 JOB_CAPACITY`. |
 | `PREDICTION_DW_DATABASE_URL` | *(sin configurar)* | Conexión de solo lectura al DW para resolver cortes y features. Sin DSN, la inferencia falla cerrada. |
 | `KEYCLOAK_URL` | *(sin configurar)* | URL base del issuer Keycloak. |
 | `KEYCLOAK_REALM` | *(sin configurar)* | Realm usado para validar firma e issuer del bearer token. |
@@ -78,8 +79,13 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `WORKER_ARTIFACTS_DIR` | `/app/artifacts` | Ruta del volumen para persistencia de artefactos. |
 | `PREDICTION_DW_DATABASE_URL` | *(sin configurar)* | Conexión de solo lectura al DW requerida también por el worker para resolver la población y sus features. |
 | `WORKER_RANDOM_SEED` | `42` | Semilla por defecto para reproducibilidad. |
+| `WORKER_MAX_JOB_ATTEMPTS` | `3` | Claims máximos por job o lote. Cuando el último intento muere (lease vencida), se marca `FAILED` con `ATTEMPTS_EXHAUSTED` en vez de reintentarse indefinidamente. |
 
 Las migraciones `0026` y `0027` crean el registro, el outbox y el grupo SQL `dw_prediction_runtime`, con acceso únicamente a esas tablas. Para entornos fuera de desarrollo, provisionar logins independientes para API/worker y asignarles ese grupo; no usar `dw_ml_writer` para el API. El API inserta job y outbox en una transacción; si falla el broker, el sondeo periódico vuelve a publicar el outbox con backoff exponencial. La entrega es al menos una vez: Celery usa `job_id` como identificador estable y el worker reclama el registro con una lease atómica. PostgreSQL es la fuente de estado y resultados, por eso Celery no usa backend RPC ni colas temporales de control/mingle. Si el worker cae, el reintento espera a que expire la lease y escribe en un directorio de artefactos por intento.
+
+Cada claim incrementa `attempt`, que actúa como token de fencing: el resultado final (`SUCCEEDED`, `FAILED` o `PUBLISHED`) solo se escribe si la fila sigue `RUNNING` con ese mismo intento. Un worker cuya lease venció y fue reemplazado no puede sobrescribir al intento nuevo; su artefacto queda como candidato huérfano. La migración `0036` añade `attempt` a `ml_workspace.prediction_batch`.
+
+En Compose, `prediction-worker` consume solo `prediction.train_model` y `prediction-publisher` solo `prediction.publish_population` (con artefactos en solo lectura), para que un entrenamiento largo no bloquee el scoring poblacional. La imagen del worker sin `command` sigue consumiendo ambas colas.
 
 El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.json` dentro del catálogo de solo lectura y registra la referencia y el digest de su contenido. El directorio local está en `infra/prediction-configurations/`; sus JSON no se versionan. Una política institucional requiere aprobación y costes DSA válidos; los valores no se envían directamente en una petición.
 
@@ -94,6 +100,7 @@ El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.
 - `GET /v1/academic-options`: devuelve programas activos y cierres procesados visibles para el usuario autenticado; filtra las opciones por rol y ámbito académico.
 - `POST /v1/training-jobs`: Solicita un trabajo asíncrono de entrenamiento para `random_forest` o `xgboost`. Requiere header `Idempotency-Key`. Retorna `202 Accepted` con `job_id` y estado `QUEUED`. La clave de idempotencia queda acotada al `sub` del operador y `submitted_by` registra ese `sub` verificado.
 - `GET /v1/training-jobs/{jobId}`: Consulta el estado, progreso, candidato generado o detalle de error según el estándar RFC 7807 Problem Details.
+- `POST /v1/training-jobs/{jobId}/cancel`: cancela un job `QUEUED` (`200`). Un job que ya está en ejecución o terminado responde `409 JOB_NOT_CANCELLABLE`; no se interrumpe un entrenamiento en curso.
 - `GET /v1/datasets`: lista fixtures y datasets subidos o provisionados.
 - `POST /v1/datasets/upload`: recibe un `.zip` con un único `manifest.json` y un único `rows.jsonl`, aplica límites de tamaño, valida el contrato y registra el dataset de forma **inmutable** (`409` si el `dataset_id` ya existe). Guarda `upload.json` con el `sub` del operador, la fecha y el SHA-256 del archivo. El worker lo resuelve como `custom:<dataset_id>`.
 

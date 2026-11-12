@@ -117,6 +117,16 @@ class Settings:
             except Exception:
                 missing.append("PREDICTION_ALLOWED_ROLES (invalid JSON)")
 
+        submitter_roles_raw = os.getenv("PREDICTION_BATCH_SUBMITTER_ROLES")
+        if submitter_roles_raw is not None:
+            try:
+                submitter_roles = json.loads(submitter_roles_raw)
+                # An empty list is valid: it explicitly disables population submission.
+                if not isinstance(submitter_roles, list) or any(r not in {"DIRECTOR", "DECANO", "RECTOR"} for r in submitter_roles):
+                    missing.append("PREDICTION_BATCH_SUBMITTER_ROLES (invalid role format)")
+            except Exception:
+                missing.append("PREDICTION_BATCH_SUBMITTER_ROLES (invalid JSON)")
+
         training_roles_raw = os.getenv("PREDICTION_TRAINING_ROLES")
         if training_roles_raw is not None:
             try:
@@ -147,6 +157,7 @@ class WorkerSettings:
     memory_limit_mb: int
     artifacts_dir: str
     random_seed: int
+    max_job_attempts: int
 
     @classmethod
     def from_environment(cls) -> "WorkerSettings":
@@ -170,6 +181,7 @@ class WorkerSettings:
             memory_limit_mb=_read_int("WORKER_MEMORY_LIMIT_MB", 2048),
             artifacts_dir=os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"),
             random_seed=_read_int("WORKER_RANDOM_SEED", 42, minimum=0),
+            max_job_attempts=_read_int("WORKER_MAX_JOB_ATTEMPTS", 3),
         )
 
 

@@ -7,6 +7,7 @@ import json
 import os
 import sqlite3
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -36,6 +37,10 @@ class TrainingJobRecord:
     dependency_versions: dict[str, str]
     request_digest: str = ""
     attempt: int = 0
+
+
+def _utc_now() -> str:
+    return datetime.now(timezone.utc).isoformat()
 
 
 class IdempotencyConflict(ValueError):
@@ -136,7 +141,13 @@ class JobStore:
             row=c.execute("SELECT * FROM "+("jobs" if self._sqlite else "ml_workspace.training_job")+" WHERE idempotency_scope="+("?" if self._sqlite else "%s")+" AND idempotency_key="+("?" if self._sqlite else "%s"),(scope,key)).fetchone()
         return self._record(row) if row else None
 
-    def update_status(self,job_id,status,**kw):
+    def update_status(self, job_id, status, expected_attempt: int | None = None, **kw) -> bool:
+        """Update a job; with ``expected_attempt`` the write is fenced.
+
+        A fenced update only applies while the row is still RUNNING under that
+        claim, so a worker whose lease expired cannot overwrite a newer attempt.
+        Returns whether a row was updated.
+        """
         allowed={"started_at","finished_at","model_candidate","error","dependency_versions","attempt","lease_until"}
         vals={k:v for k,v in kw.items() if k in allowed}; vals["status"]=status.value
         if status in {JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED}:
@@ -146,16 +157,48 @@ class JobStore:
         for k,v in vals.items():
             if k in {"model_candidate","error","dependency_versions"}: v=json.dumps(v) if v is not None else None
             cols.append(f"{k}={ph}"); args.append(v)
+        where = f"job_id={ph}"
         args.append(job_id)
-        with self._connect() as c: c.execute(f"UPDATE {table} SET {','.join(cols)} WHERE job_id={ph}",args)
+        if expected_attempt is not None:
+            where += f" AND attempt={ph} AND status='RUNNING'"
+            args.append(expected_attempt)
+        with self._connect() as c:
+            return c.execute(f"UPDATE {table} SET {','.join(cols)} WHERE {where}",args).rowcount == 1
 
-    def claim(self,job_id,lease_seconds=3600):
+    def claim_attempt(self, job_id, lease_seconds=3600, max_attempts: int | None = None) -> int | None:
+        """Atomically claim a QUEUED (or expired RUNNING) job; return its attempt number.
+
+        Returns ``None`` when the job is not claimable, including when it has
+        already used ``max_attempts`` claims.
+        """
+        limit = "" if max_attempts is None else (" AND attempt < ?" if self._sqlite else " AND attempt < %s")
         with self._connect() as c:
             if self._sqlite:
-                cur=c.execute("UPDATE jobs SET status='RUNNING',attempt=attempt+1,started_at=datetime('now'),lease_until=datetime('now',?) WHERE job_id=? AND (status='QUEUED' OR (status='RUNNING' AND lease_until < datetime('now'))) ",(f'+{lease_seconds} seconds',job_id))
+                args = [f'+{lease_seconds} seconds', job_id] + ([] if max_attempts is None else [max_attempts])
+                row=c.execute("UPDATE jobs SET status='RUNNING',attempt=attempt+1,started_at=datetime('now'),finished_at=NULL,error=NULL,lease_until=datetime('now',?) WHERE job_id=? AND (status='QUEUED' OR (status='RUNNING' AND lease_until < datetime('now')))"+limit+" RETURNING attempt",args).fetchone()
             else:
-                cur=c.execute("UPDATE ml_workspace.training_job SET status='RUNNING',attempt=attempt+1,started_at=clock_timestamp(),finished_at=NULL,error=NULL,lease_until=clock_timestamp()+(%s * interval '1 second') WHERE job_id=%s AND (status='QUEUED' OR (status='RUNNING' AND lease_until < clock_timestamp()))",(lease_seconds,job_id))
-            return cur.rowcount==1
+                args = [lease_seconds, job_id] + ([] if max_attempts is None else [max_attempts])
+                row=c.execute("UPDATE ml_workspace.training_job SET status='RUNNING',attempt=attempt+1,started_at=clock_timestamp(),finished_at=NULL,error=NULL,lease_until=clock_timestamp()+(%s * interval '1 second') WHERE job_id=%s AND (status='QUEUED' OR (status='RUNNING' AND lease_until < clock_timestamp()))"+limit+" RETURNING attempt",args).fetchone()
+            return int(row["attempt"]) if row else None
+
+    def claim(self,job_id,lease_seconds=3600,max_attempts: int | None = None) -> bool:
+        return self.claim_attempt(job_id, lease_seconds, max_attempts) is not None
+
+    def fail_exhausted(self, job_id, max_attempts: int, error: dict[str, Any]) -> bool:
+        """Fail a job whose last allowed attempt died without finishing (expired lease)."""
+        if self._sqlite:
+            sql = "UPDATE jobs SET status='FAILED',finished_at=?,error=?,lease_until=NULL WHERE job_id=? AND status='RUNNING' AND attempt >= ? AND lease_until < datetime('now')"
+        else:
+            sql = "UPDATE ml_workspace.training_job SET status='FAILED',finished_at=%s,error=%s,lease_until=NULL WHERE job_id=%s AND status='RUNNING' AND attempt >= %s AND lease_until < clock_timestamp()"
+        with self._connect() as c:
+            return c.execute(sql, (_utc_now(), json.dumps(error), job_id, max_attempts)).rowcount == 1
+
+    def cancel(self, job_id) -> bool:
+        """Cancel a job that no worker has claimed yet; running jobs are not interrupted."""
+        table = "jobs" if self._sqlite else "ml_workspace.training_job"; ph = "?" if self._sqlite else "%s"
+        with self._connect() as c:
+            return c.execute(f"UPDATE {table} SET status='CANCELLED',finished_at={ph},lease_until=NULL WHERE job_id={ph} AND status='QUEUED'",
+                             (_utc_now(), job_id)).rowcount == 1
 
     def pending_outbox(self,limit=100):
         with self._connect() as c:
