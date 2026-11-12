@@ -6,6 +6,10 @@ El Compose raíz utiliza `KC_BOOTSTRAP_ADMIN_USERNAME` y `KC_BOOTSTRAP_ADMIN_PAS
 
 `KEYCLOAK_BFF_CLIENT_SECRET` es secreto del cliente confidencial BFF. Se exige al interpolar Compose, se utiliza también al importar la configuración del realm y debe coincidir con el secreto provisionado en Keycloak. No es el secreto de sesión del BFF.
 
+`KEYCLOAK_OLAP_CLIENT_SECRET` es el secreto del cliente confidencial `olap-service`. Ese cliente ya no es público ni admite login interactivo (standard flow desactivado): solo emite tokens `client_credentials` para su cuenta de servicio `service-account-olap-service`, que tiene el rol `uatf-auth-service: CONTEXT_READER` para leer el alcance académico. Se exige al interpolar Compose y se usa al importar el realm.
+
+**Realms ya importados:** `--import-realm` no sobrescribe un realm existente. En un entorno que ya tiene `uatf-dss-realm`, aplicar a mano (consola o `kcadm`): volver confidencial `olap-service` con service account y el secreto anterior, desactivar standard flow, crear el rol de cliente `CONTEXT_READER` en `uatf-auth-service` y asignarlo a `service-account-olap-service`.
+
 ## Provider de eventos
 
 El provider usa `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` y `RABBITMQ_VHOST`. Compose inyecta las credenciales desde `RABBITMQ_DEFAULT_USER/PASS`; dentro de Docker usa `rabbitmq:5672` y vhost `/`. La publicación no usa una URL HTTP al auth-service: RabbitMQ desacopla temporalmente la disponibilidad de ambos servicios.

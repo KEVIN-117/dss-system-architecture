@@ -44,6 +44,7 @@ jobs:
       KEYCLOAK_ROLE_CLIENT_ID: uatf-auth-service
       KEYCLOAK_BFF_CLIENT_ID: dss-bff
       KEYCLOAK_BFF_CLIENT_SECRET: ci-client-secret-not-used-in-production
+      KEYCLOAK_OLAP_CLIENT_SECRET: ci-client-secret-not-used-in-production
       KEYCLOAK_BFF_REDIRECT_URI: http://localhost:3006/api/auth/callback
       KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI: http://localhost:3000/login
       AUTH_SERVICE_URL: http://localhost:8000

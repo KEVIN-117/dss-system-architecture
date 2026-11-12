@@ -12,6 +12,8 @@ import uatf.dss.authservice.application.port.out.AcademicContextRepository;
 import uatf.dss.authservice.application.port.out.ExampleUserRepository;
 import uatf.dss.authservice.application.port.out.UserRepository;
 import uatf.dss.authservice.application.service.GetAuthUserProfileService;
+import uatf.dss.authservice.application.service.GetUserAcademicScopeService;
+import uatf.dss.authservice.application.port.in.GetUserAcademicScopeUseCase;
 import uatf.dss.authservice.application.service.ListAcademicCatalogService;
 import uatf.dss.authservice.application.service.AdminUserDirectoryService;
 import uatf.dss.authservice.application.service.RegisterExampleUserService;
@@ -34,6 +36,11 @@ public class ApplicationConfig {
     @Bean
     public GetAuthUserProfileUseCase userProfileUseCase(UserRepository userRepository, AcademicContextRepository contextRepository){
         return new GetAuthUserProfileService(userRepository, contextRepository);
+    }
+
+    @Bean
+    public GetUserAcademicScopeUseCase userAcademicScopeUseCase(UserRepository userRepository, AcademicContextRepository contextRepository) {
+        return new GetUserAcademicScopeService(userRepository, contextRepository);
     }
 
     @Bean

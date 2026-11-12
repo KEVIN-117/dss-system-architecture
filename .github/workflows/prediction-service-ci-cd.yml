@@ -64,6 +64,7 @@ jobs:
       - name: Validate Compose configuration
         env:
           KEYCLOAK_BFF_CLIENT_SECRET: ci-validation-only
+          KEYCLOAK_OLAP_CLIENT_SECRET: ci-validation-only
           DW_CONTROL_DB_PASSWORD: ci-validation-only
         run: docker compose --env-file .env.example config --quiet
 
