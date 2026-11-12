@@ -18,7 +18,8 @@ vi.mock('@dss-monorepo/olap-connector/server', () => ({
 }));
 
 import { OlapServerClientError } from '@dss-monorepo/olap-connector/server';
-import { createAnalyticsResolvers, deriveAcademicScope } from './analytics';
+import { createAnalyticsResolvers } from './analytics';
+import { deriveAcademicScope } from '../_lib/academic-scope';
 
 const cube = {
   connectionName: 'academic', catalog: 'UATF', schema: 'UATF', cubeName: 'Students',

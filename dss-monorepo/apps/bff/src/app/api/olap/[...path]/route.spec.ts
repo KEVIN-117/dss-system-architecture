@@ -16,7 +16,19 @@ const authentication = {
   authenticated: true as const,
   value: {
     token: 'verified-access-token',
-    user: { id: 'user-1', roles: ['DIRECTOR'] },
+    user: {
+      id: 'user-1',
+      username: 'director',
+      academicContexts: [
+        {
+          id: 'aaaabbbb-1111-4111-8111-000000000001',
+          userId: 'user-1',
+          facultyId: 12,
+          careerId: '025',
+        },
+      ],
+      roles: ['DIRECTOR'],
+    },
     roles: ['DIRECTOR'],
   },
 };
@@ -62,10 +74,22 @@ describe('OLAP BFF proxy route', () => {
       { params: Promise.resolve({ path: ['admin', 'secrets'] }) },
     );
     expect(invalidPath.status).toBe(400);
+
+    const traversalPath = await POST(
+      new Request('http://bff/api/olap/rest/saiku/../admin/schema', {
+        method: 'POST',
+      }),
+      {
+        params: Promise.resolve({
+          path: ['rest', 'saiku', '..', 'admin', 'schema'],
+        }),
+      },
+    );
+    expect(traversalPath.status).toBe(400);
   });
 
   it('forwards the verified bearer token to the configured OLAP service', async () => {
-    authenticateRequest.mockResolvedValue(authentication);
+    authenticateRequest.mockResolvedValue(adminAuthentication);
     vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080/');
     const upstream = Response.json({ data: { ping: 'pong' } });
     const fetchMock = vi.fn().mockResolvedValue(upstream);
@@ -89,15 +113,44 @@ describe('OLAP BFF proxy route', () => {
     const upstreamOptions = fetchMock.mock.calls[0][1] as RequestInit;
     expect(upstreamOptions.method).toBe('POST');
     expect(new Headers(upstreamOptions.headers).get('authorization')).toBe(
-      'Bearer verified-access-token',
+      'Bearer verified-admin-token',
     );
     expect(upstreamOptions.signal).toBeInstanceOf(AbortSignal);
     expect(upstreamOptions.redirect).toBe('manual');
   });
 
+  it('preserves a trailing slash on Saiku endpoint paths', async () => {
+    authenticateRequest.mockResolvedValue(authentication);
+    vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080');
+    const fetchMock = vi.fn().mockResolvedValue(Response.json([]));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const path = [
+      'rest',
+      'saiku',
+      'director',
+      'discover',
+      'uatf-dw',
+      'UATF_DW',
+      'UATF_DW',
+      'Academic Admission',
+      'metadata',
+    ];
+    await GET(
+      new Request(
+        'http://bff/api/olap/rest/saiku/director/discover/uatf-dw/UATF_DW/UATF_DW/Academic%20Admission/metadata/',
+      ),
+      { params: Promise.resolve({ path }) },
+    );
+
+    expect(String(fetchMock.mock.calls[0][0])).toBe(
+      'http://olap-service:8080/rest/saiku/director/discover/uatf-dw/UATF_DW/UATF_DW/Academic%20Admission/metadata/',
+    );
+  });
+
   it('returns 504 when the OLAP upstream exceeds the proxy timeout', async () => {
     vi.useFakeTimers();
-    authenticateRequest.mockResolvedValue(authentication);
+    authenticateRequest.mockResolvedValue(adminAuthentication);
     vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080');
     vi.stubGlobal(
       'fetch',
@@ -182,22 +235,63 @@ describe('OLAP BFF proxy route', () => {
 
   it('keeps ordinary OLAP paths available to authenticated non-admin roles', async () => {
     authenticateRequest.mockResolvedValue(authentication);
+    vi.stubEnv('OLAP_ACADEMIC_SCOPE_FILTERS', JSON.stringify({
+      career: {
+        dimension: 'Academic Career Scope',
+        hierarchy: 'Career Scope',
+        level: 'Career',
+        memberTemplate: '[Academic Career Scope].[Career Scope].[Career].&[{id}]',
+      },
+    }));
     vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080');
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(Response.json({ ok: true })),
-    );
+    const fetchMock = vi.fn().mockResolvedValue(Response.json({ ok: true }));
+    vi.stubGlobal('fetch', fetchMock);
+    const query = {
+      type: 'QUERYMODEL',
+      queryModel: {
+        axes: {
+          FILTER: { hierarchies: [] },
+          COLUMNS: { hierarchies: [] },
+          ROWS: { hierarchies: [] },
+          PAGES: { hierarchies: [] },
+        },
+        details: { measures: [] },
+      },
+    };
 
-    const response = await GET(
-      new Request('http://bff/api/olap/rest/saiku/query/execute'),
+    const response = await POST(
+      new Request('http://bff/api/olap/rest/saiku/api/query/execute', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(query),
+      }),
       {
         params: Promise.resolve({
-          path: ['rest', 'saiku', 'query', 'execute'],
+          path: ['rest', 'saiku', 'api', 'query', 'execute'],
         }),
       },
     );
 
     expect(response.status).toBe(200);
-    expect(requireRoles).not.toHaveBeenCalled();
+    expect(requireRoles).toHaveBeenCalledWith(authentication.value, [
+      'RECTOR',
+      'DECANO',
+      'DIRECTOR',
+    ]);
+    const upstreamOptions = fetchMock.mock.calls[0][1] as RequestInit;
+    expect(JSON.parse(String(upstreamOptions.body))).toMatchObject({
+      queryModel: {
+        axes: {
+          FILTER: {
+            hierarchies: [
+              {
+                name: '[Academic Career Scope].[Career Scope]',
+                dimension: 'Academic Career Scope',
+              },
+            ],
+          },
+        },
+      },
+    });
   });
 });

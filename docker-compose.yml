@@ -144,6 +144,7 @@ services:
       KC_BOOTSTRAP_ADMIN_USERNAME: ${KC_BOOTSTRAP_ADMIN_USERNAME}
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KC_BOOTSTRAP_ADMIN_PASSWORD}
       KEYCLOAK_BFF_CLIENT_SECRET: ${KEYCLOAK_BFF_CLIENT_SECRET:?KEYCLOAK_BFF_CLIENT_SECRET must be set}
+      KEYCLOAK_OLAP_CLIENT_SECRET: ${KEYCLOAK_OLAP_CLIENT_SECRET:?KEYCLOAK_OLAP_CLIENT_SECRET must be set}
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
       RABBITMQ_USERNAME: ${RABBITMQ_DEFAULT_USER}
@@ -387,38 +388,38 @@ services:
     networks:
       - dss-net
 
-  etl-service:
-    build: ./etl-service
-    networks:
-      - dss-net
+  # etl-service:
+  #   build: ./etl-service
+  #   networks:
+  #     - dss-net
 
   # ==========================================
   # GATEWAY, BFF Y FRONTEND
   # ==========================================
-  graphql-bff:
-    build: ./gateway/graphql-bff
-    depends_on:
-      - auth-service
-      - olap-service
-      - prediction-service
-      - etl-service
-    networks:
-      - dss-net
+  # graphql-bff:
+  #   build: ./gateway/graphql-bff
+  #   depends_on:
+  #     - auth-service
+  #     - olap-service
+  #     - prediction-service
+  #     - etl-service
+  #   networks:
+  #     - dss-net
 
-  gateway:
-    build: ./gateway/traefik
-    ports:
-      - "80:80"
-      - "443:443"
-    networks:
-      - dss-net
+  # gateway:
+  #   build: ./gateway/traefik
+  #   ports:
+  #     - "80:80"
+  #     - "443:443"
+  #   networks:
+  #     - dss-net
 
-  frontend:
-    build: ./frontend/nextjs-spa
-    ports:
-      - "3000:3000"
-    networks:
-      - dss-net
+  # frontend:
+  #   build: ./frontend/nextjs-spa
+  #   ports:
+  #     - "3000:3000"
+  #   networks:
+  #     - dss-net
 
 networks:
   dss-net:

@@ -1,0 +1,36 @@
+export const metadata = { title: 'Ingresar al sistema', audience: ['directivos', 'administradores'], classification: 'public' }
+
+## Antes de empezar
+
+Para usar el DSS necesitas una cuenta institucional habilitada con uno de estos roles: Rector, Decano, Director de carrera o Administrador (SUPERADMIN). Decanos y directores también necesitan un **contexto académico** asignado: la facultad o la carrera cuyos datos pueden consultar. Si tu cuenta no tiene rol o contexto, pide a la administración del sistema que lo revise.
+
+## Iniciar sesión
+
+1. Abre la página principal del DSS y elige <Ui>Ingresar</Ui>.
+2. Selecciona <Ui>Iniciar sesión</Ui>. Se abrirá la pantalla de acceso institucional (Keycloak).
+3. Escribe tu usuario y contraseña institucionales. El DSS nunca te pedirá la contraseña en sus propios portales.
+4. Al terminar, el sistema te lleva automáticamente al portal que corresponde a tu rol.
+
+| Rol | Portal al que llegas | Guía |
+| --- | --- | --- |
+| Rector | Tablero de Rectorado | [Tablero de Rectorado](/docs/guia-rectorado) |
+| Decano | Tablero de Decanato | [Tablero de Decanato](/docs/guia-decanato) |
+| Director de carrera | Tablero de Dirección de carrera | [Tablero de Dirección de carrera](/docs/guia-direccion-de-carrera) |
+| Administrador | Portal de administración | [Portal de administración](/docs/guia-portal-administracion) |
+
+Si tu cuenta tiene más de un rol, el sistema abre el portal del rol de mayor nivel. Desde los tableros puedes abrir también el [OLAP Workspace](/docs/guia-olap-workspace) para hacer consultas propias.
+
+## Mensajes frecuentes
+
+- **«Sesión requerida»**: tu sesión no existe o venció. Vuelve a iniciar sesión.
+- **«La sesión expiró. Inicia sesión nuevamente.»**: la sesión caducó mientras usabas el tablero. Inicia sesión y repite la consulta.
+- **«La cuenta no tiene permiso para consultar esta analítica.»**: tu rol no habilita esa pantalla. Confirma con la administración qué rol tienes asignado.
+- **«Tu cuenta no tiene una carrera académica asignada»** o **«Auth Service no tiene un contexto académico asignado a esta cuenta.»**: falta tu facultad o carrera. La administración debe asignarla desde el portal de administración.
+
+## Cerrar sesión
+
+Usa la opción de cerrar sesión del portal. El sistema elimina la sesión del navegador y, cuando es posible, también cierra la sesión institucional. En equipos compartidos, cierra siempre la sesión y el navegador al terminar.
+
+<Callout title="Protege tu cuenta">
+  Nunca compartas tu contraseña, códigos de acceso ni capturas de pantalla que muestren datos de estudiantes. Para reportar un problema, describe la pantalla, la hora y el mensaje visible.
+</Callout>

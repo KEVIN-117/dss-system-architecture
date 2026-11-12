@@ -85,6 +85,7 @@ jobs:
           # a disposable placeholder; CI does not start services or connect to
           # any database.
           KEYCLOAK_BFF_CLIENT_SECRET: ci-placeholder
+          KEYCLOAK_OLAP_CLIENT_SECRET: ci-placeholder
           DW_CONTROL_DB_PASSWORD: ci-placeholder
         run: |
           docker compose --env-file .env.example config --quiet

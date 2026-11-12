@@ -1,0 +1,332 @@
+openapi: 3.1.0
+info:
+  title: OLAP Service API (subconjunto DSS)
+  version: 1.0.0-draft
+  description: >-
+    Subconjunto de la API REST de Saiku/Mondrian que consumen los portales DSS a
+    través del BFF (`/api/olap/rest/saiku/*`). Redactado desde
+    `OlapDiscoverResource`, `Query2Resource` y `AdminResource`. No es la
+    especificación completa de Saiku: las rutas de IA, repositorio, apps,
+    dashboards y GraphQL siguen documentadas en `olap-service/docs/`. Los cuerpos
+    `ThinQuery`, `SaikuConnection` y `QueryResult` son modelos de Saiku y aquí se
+    describen solo a nivel de propiedades estables.
+servers:
+  - url: /
+security:
+  - bearerAuth: []
+tags:
+  - name: Descubrimiento
+  - name: Consultas
+  - name: Administración de datasources
+  - name: Administración de esquemas
+paths:
+  /rest/saiku/{username}/discover:
+    get:
+      tags: [Descubrimiento]
+      operationId: discoverConnections
+      summary: Lista conexiones, catálogos, esquemas y cubos visibles
+      x-required-permission: RECTOR, DECANO, DIRECTOR o SUPERADMIN
+      description: >-
+        Árbol de conexiones OLAP visibles para el usuario. Vía BFF, los roles
+        académicos solo pueden consultar su propio `username`.
+      parameters:
+        - $ref: '#/components/parameters/Username'
+      responses:
+        '200':
+          description: Conexiones con sus catálogos, esquemas y cubos.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/SaikuConnection' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /rest/saiku/{username}/discover/{connection}/{catalog}/{schema}/{cube}/metadata:
+    get:
+      tags: [Descubrimiento]
+      operationId: getCubeMetadata
+      summary: Obtiene dimensiones y medidas de un cubo
+      x-required-permission: RECTOR, DECANO, DIRECTOR o SUPERADMIN
+      parameters:
+        - $ref: '#/components/parameters/Username'
+        - { name: connection, in: path, required: true, schema: { type: string } }
+        - { name: catalog, in: path, required: true, schema: { type: string } }
+        - { name: schema, in: path, required: true, schema: { type: string } }
+        - { name: cube, in: path, required: true, description: Nombre del cubo, codificado en URL., schema: { type: string } }
+      responses:
+        '200':
+          description: Metadatos del cubo.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CubeMetadata' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Cubo inexistente o no visible. }
+  /rest/saiku/api/query/execute:
+    post:
+      tags: [Consultas]
+      operationId: executeQuery
+      summary: Ejecuta una consulta OLAP (ThinQuery o MDX)
+      x-required-permission: RECTOR, DECANO, DIRECTOR o SUPERADMIN
+      description: >-
+        Ejecuta una consulta y devuelve el cellset. Para DECANO y DIRECTOR el BFF
+        agrega el filtro de ámbito académico (facultad o carrera) antes de
+        reenviar la consulta; una consulta que intente salir de ese ámbito se
+        rechaza con 403.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ThinQuery' }
+      responses:
+        '200':
+          description: Resultado de la consulta.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/QueryResult' }
+        '400': { description: Consulta JSON inválida o medidas/filtros no reconocidos. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { description: Política de ámbito académico no configurada en el BFF. }
+        '504': { description: OLAP no respondió dentro de 30 segundos (BFF). }
+  /rest/saiku/admin/datasources:
+    get:
+      tags: [Administración de datasources]
+      operationId: listDatasources
+      summary: Lista los datasources configurados
+      x-required-permission: SUPERADMIN
+      responses:
+        '200':
+          description: Datasources registrados.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Datasource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Administración de datasources]
+      operationId: createDatasource
+      summary: Registra un datasource
+      x-required-permission: SUPERADMIN
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Datasource' }
+      responses:
+        '200':
+          description: Datasource creado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Datasource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { description: El datasource no pudo registrarse. }
+  /rest/saiku/admin/datasources/{id}:
+    put:
+      tags: [Administración de datasources]
+      operationId: updateDatasource
+      summary: Actualiza un datasource
+      x-required-permission: SUPERADMIN
+      parameters:
+        - $ref: '#/components/parameters/DatasourceId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/Datasource' }
+      responses:
+        '200':
+          description: Datasource actualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/Datasource' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Administración de datasources]
+      operationId: deleteDatasource
+      summary: Elimina un datasource
+      x-required-permission: SUPERADMIN
+      parameters:
+        - $ref: '#/components/parameters/DatasourceId'
+      responses:
+        '200': { description: Datasource eliminado. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /rest/saiku/admin/datasources/{id}/refresh:
+    get:
+      tags: [Administración de datasources]
+      operationId: refreshDatasource
+      summary: Refresca la conexión y la caché de un datasource
+      x-required-permission: SUPERADMIN
+      parameters:
+        - $ref: '#/components/parameters/DatasourceId'
+      responses:
+        '200': { description: Conexión refrescada. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /rest/saiku/admin/schema:
+    get:
+      tags: [Administración de esquemas]
+      operationId: listSchemas
+      summary: Lista los esquemas Mondrian guardados
+      x-required-permission: SUPERADMIN
+      responses:
+        '200':
+          description: Esquemas disponibles.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id: { type: string }
+                    name: { type: string }
+                    path: { type: string }
+                    type: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /rest/saiku/admin/schema/{id}:
+    get:
+      tags: [Administración de esquemas]
+      operationId: getSchema
+      summary: Descarga el XML de un esquema
+      x-required-permission: SUPERADMIN
+      parameters:
+        - $ref: '#/components/parameters/SchemaId'
+      responses:
+        '200':
+          description: Documento XML del esquema Mondrian.
+          content:
+            application/xml:
+              schema: { type: string }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Administración de esquemas]
+      operationId: uploadSchema
+      summary: Sube un esquema Mondrian
+      x-required-permission: SUPERADMIN
+      description: >-
+        Guarda el XML en el repositorio de OLAP. Guardar un esquema no crea tablas
+        en el Data Warehouse ni lo asocia automáticamente a un datasource activo.
+      parameters:
+        - $ref: '#/components/parameters/SchemaId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: { type: string, format: binary, description: Archivo XML del esquema. }
+                name: { type: string, description: Nombre visible del esquema. }
+      responses:
+        '200': { description: Esquema guardado. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    delete:
+      tags: [Administración de esquemas]
+      operationId: deleteSchema
+      summary: Elimina un esquema
+      x-required-permission: SUPERADMIN
+      parameters:
+        - $ref: '#/components/parameters/SchemaId'
+      responses:
+        '200': { description: Esquema eliminado. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Access token de Keycloak con audiencia `olap-service`.
+  parameters:
+    Username:
+      name: username
+      in: path
+      required: true
+      description: Usuario autenticado. Vía BFF debe coincidir con el usuario de la sesión.
+      schema: { type: string }
+    DatasourceId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+    SchemaId:
+      name: id
+      in: path
+      required: true
+      schema: { type: string }
+  responses:
+    Unauthorized:
+      description: Token ausente, inválido o sin la audiencia esperada.
+    Forbidden:
+      description: El rol no permite la operación o la consulta sale del ámbito académico.
+  schemas:
+    SaikuConnection:
+      type: object
+      description: Conexión OLAP con sus catálogos; cada catálogo contiene esquemas y cubos.
+      properties:
+        name: { type: string }
+        uniqueName: { type: string }
+        catalogs:
+          type: array
+          items: { type: object }
+    CubeMetadata:
+      type: object
+      description: Metadatos de un cubo Mondrian.
+      properties:
+        dimensions:
+          type: array
+          items: { type: object }
+        measures:
+          type: array
+          items: { type: object }
+    ThinQuery:
+      type: object
+      description: Consulta de Saiku. Si se envía `mdx` sin `type`, el servicio asume una consulta MDX.
+      properties:
+        name: { type: string }
+        type: { type: string, enum: [QUERYMODEL, MDX] }
+        cube: { type: object, description: Referencia al cubo (conexión, catálogo, esquema, nombre). }
+        queryModel: { type: object, description: Ejes, niveles, medidas y filtros. }
+        mdx: { type: string }
+        parameters: { type: object }
+        properties: { type: object }
+    QueryResult:
+      type: object
+      description: Cellset de Saiku.
+      properties:
+        cellset:
+          type: array
+          items:
+            type: array
+            items: { type: object }
+        runtime: { type: integer, description: Tiempo de ejecución en milisegundos. }
+        height: { type: integer }
+        width: { type: integer }
+        error: { type: [string, 'null'] }
+    Datasource:
+      type: object
+      description: Representación de `DataSourceMapper`. La contraseña nunca debe registrarse en logs ni capturas.
+      properties:
+        id: { type: string }
+        connectionname: { type: string }
+        connectiontype: { type: string, description: 'Por ejemplo `MONDRIAN`.' }
+        jdbcurl: { type: string }
+        driver: { type: string }
+        schema: { type: string, description: Ruta del esquema Mondrian en el repositorio. }
+        username: { type: string }
+        password: { type: string, writeOnly: true }
+        enabled: { type: string }
+        advanced: { type: string }
+        security_type: { type: string }
+        ossieYaml: { type: string }

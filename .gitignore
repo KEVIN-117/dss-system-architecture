@@ -248,6 +248,9 @@ yarn-error.log*
 **/.claude/worktrees/
 .claude/settings.local.json
 **/.claude/settings.local.json
+# Preview servers: absolute, per-machine paths
+.claude/launch.json
+**/.claude/launch.json
 .gemini/
 **/.gemini/
 .cursor/
@@ -315,8 +318,10 @@ temp/
 *.seed
 *.dmp
 *.stackdump
+# Core dumps are FILES named core; source folders named core/ stay tracked.
 core
 core.*
+!core/
 
 # ------------------------------------------
 # 10. Servicios Legacy / Temporales
@@ -342,3 +347,9 @@ scratch_chat.html
 scratch_chat_content.json
 /outputs/
 **/outputs/
+
+# ------------------------------------------
+# graphify: generated knowledge graph and caches.
+# Regenerate locally with `graphify update .`; it stores per-machine paths.
+# ------------------------------------------
+graphify-out/

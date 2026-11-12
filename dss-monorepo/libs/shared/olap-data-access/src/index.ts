@@ -1,34 +1,44 @@
 import {
+  cancelQuery,
+  drillthrough,
   executeQuery,
   getApp,
+  getQueryMdx,
   listApps,
   loadDashboard,
   newQuery,
   olapFetch,
+  serializeQueryToHash,
+  deserializeQueryFromHash,
   toRepoRelative,
 } from '@dss-monorepo/olap-connector';
 import type {
   AppSummary,
   Dashboard,
   DashboardTile,
+  DashboardFilter,
   SaikuApp,
 } from '@dss-monorepo/olap-connector';
 import type {
+  QueryResult,
   SaikuConnection,
   SaikuCube,
   SaikuDimension,
   SaikuMeasure,
+  ThinQuery,
 } from '@dss-monorepo/olap-models';
 
 // Keep application code on the data-access layer instead of depending on the
 // low-level OLAP connector directly.
-export { executeQuery, newQuery };
+export { cancelQuery, drillthrough, executeQuery, getQueryMdx, newQuery };
+export { serializeQueryToHash, deserializeQueryFromHash };
 
 export type {
   AppPage,
   AppSummary,
   Dashboard,
   DashboardTile,
+  DashboardFilter,
   SaikuApp,
 } from '@dss-monorepo/olap-connector';
 
@@ -120,11 +130,11 @@ export async function getCubeMetadata(
   cube: SaikuCube,
 ): Promise<CubeMetadata> {
   const base = `/rest/saiku/${encodeURIComponent(username)}/discover/${encodeURIComponent(cube.connection)}/${encodeURIComponent(cube.catalog)}/${encodeURIComponent(cube.schema)}/${encodeURIComponent(cube.name)}`;
-  const [dimensions, measures] = await Promise.all([
-    getJson<SaikuDimension[]>(`${base}/dimensions`),
-    getJson<SaikuMeasure[]>(`${base}/measures/`),
-  ]);
-  return { dimensions, measures };
+  const metadata = await getJson<CubeMetadata>(`${base}/metadata`);
+  return {
+    dimensions: metadata.dimensions,
+    measures: metadata.measures.filter((measure) => measure.visible !== false),
+  };
 }
 
 export interface AiQueryCell {
@@ -149,6 +159,7 @@ export interface AiQueryResponse {
 /** Execute a saved dashboard/app tile via the same AI query API used by Saiku. */
 export async function executeSavedTileQuery(
   query: DashboardTile['query'],
+  filters: readonly DashboardFilter[] = [],
 ): Promise<AiQueryResponse> {
   if (!query) throw new Error('Este bloque no tiene una consulta asociada.');
   const isReference = query.kind === 'reference';
@@ -156,8 +167,11 @@ export async function executeSavedTileQuery(
     ? '/rest/saiku/api/ai/query/saved'
     : '/rest/saiku/api/ai/query?format=records';
   const body = isReference
-    ? { path: toRepoRelative(query.path), filters: [] }
-    : query.body;
+    ? { path: toRepoRelative(query.path), filters: [...filters] }
+    : {
+        ...query.body,
+        filters: mergeFilters(query.body['filters'], filters),
+      };
   const response = await olapFetch(path, {
     method: 'POST',
     headers: {
@@ -185,4 +199,98 @@ export async function executeSavedTileQuery(
     );
   }
   return result;
+}
+
+function generateUuid(): string {
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === 'x' ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/** Execute a raw MDX statement against a specific cube and return the Cellset QueryResult. */
+export async function executeMdxQuery(
+  cube: SaikuCube,
+  mdx: string,
+): Promise<QueryResult> {
+  const query: ThinQuery = {
+    name: generateUuid(),
+    cube,
+    queryType: 'OLAP',
+    type: 'MDX',
+    mdx,
+  };
+  return executeQuery(query);
+}
+
+/** Request preview SQL from Saiku's Calcite engine for the provided ThinQuery. */
+export async function previewSqlQuery(
+  query: ThinQuery,
+): Promise<{ sql: string }> {
+  const response = await olapFetch('/rest/saiku/api/query/preview-sql', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify(query),
+  });
+  if (!response.ok) {
+    const errorBody = await response.text().catch(() => '');
+    throw new Error(
+      `No se pudo obtener la vista previa SQL (${response.status}): ${errorBody.slice(0, 200)}`,
+    );
+  }
+  return (await response.json()) as { sql: string };
+}
+
+export interface SimpleMemberElement {
+  name: string;
+  uniqueName: string;
+  caption: string;
+}
+
+/** Fetch member list for a given level to enable member-level selection filters. */
+export async function getLevelMembers(
+  username: string,
+  cube: SaikuCube,
+  dimension: string,
+  hierarchy: string,
+  level: string,
+): Promise<SimpleMemberElement[]> {
+  const base = `/rest/saiku/${encodeURIComponent(username)}/discover/${encodeURIComponent(cube.connection)}/${encodeURIComponent(cube.catalog)}/${encodeURIComponent(cube.schema)}/${encodeURIComponent(cube.name)}/dimensions/${encodeURIComponent(dimension)}/hierarchies/${encodeURIComponent(hierarchy)}/levels/${encodeURIComponent(level)}`;
+  return getJson<SimpleMemberElement[]>(base);
+}
+
+function mergeFilters(
+  existing: unknown,
+  applied: readonly DashboardFilter[],
+): DashboardFilter[] {
+  const filters = Array.isArray(existing)
+    ? existing.filter(isDashboardFilter)
+    : [];
+  const activeSelections = applied.filter(
+    (filter) => filter.members.length > 0 || Boolean(filter.captions?.length),
+  );
+  const byTarget = new Map<string, DashboardFilter>();
+  for (const filter of [...filters, ...activeSelections]) {
+    byTarget.set(
+      `${filter.dimension}\u0000${filter.hierarchy}\u0000${filter.level}`,
+      filter,
+    );
+  }
+  return [...byTarget.values()];
+}
+
+function isDashboardFilter(value: unknown): value is DashboardFilter {
+  if (!value || typeof value !== 'object') return false;
+  const filter = value as Partial<DashboardFilter>;
+  return (
+    typeof filter.dimension === 'string' &&
+    typeof filter.hierarchy === 'string' &&
+    typeof filter.level === 'string' &&
+    Array.isArray(filter.members) &&
+    filter.members.every((member) => typeof member === 'string')
+  );
 }

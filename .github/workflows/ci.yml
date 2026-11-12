@@ -20,7 +20,7 @@ concurrency:
 jobs:
   affected:
     name: Affected lint, tests, build, and E2E
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'nx-cloud-protected' || 'nx-cloud-unprotected' }}
     defaults:
@@ -44,6 +44,7 @@ jobs:
       KEYCLOAK_ROLE_CLIENT_ID: uatf-auth-service
       KEYCLOAK_BFF_CLIENT_ID: dss-bff
       KEYCLOAK_BFF_CLIENT_SECRET: ci-client-secret-not-used-in-production
+      KEYCLOAK_OLAP_CLIENT_SECRET: ci-client-secret-not-used-in-production
       KEYCLOAK_BFF_REDIRECT_URI: http://localhost:3006/api/auth/callback
       KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI: http://localhost:3000/login
       AUTH_SERVICE_URL: http://localhost:8000
@@ -65,7 +66,7 @@ jobs:
       - uses: nrwl/nx-set-shas@v5
 
       - run: bun install --frozen-lockfile
-      - run: bun playwright install --with-deps
+      - run: bun run playwright install --with-deps
       - name: Require Nx Cloud read-only token for same-repository PRs
         if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
         env:

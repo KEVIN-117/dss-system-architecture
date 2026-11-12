@@ -444,6 +444,15 @@
           "clientRole": true,
           "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
           "attributes": {}
+        },
+        {
+          "id": "b6b2ab9b-0340-4f0a-9c5d-5d46be746bbb",
+          "name": "CONTEXT_READER",
+          "description": "Lectura servicio-a-servicio del alcance académico (GET /internal/users/{id}/academic-contexts). Solo para cuentas de servicio; nunca asignar a usuarios humanos.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
+          "attributes": {}
         }
       ],
       "uatf-dss-spa": [],
@@ -672,6 +681,26 @@
       ],
       "notBefore": 0,
       "groups": []
+    },
+    {
+      "id": "2157622c-eeff-4132-93ea-3784c51c5c0d",
+      "username": "service-account-olap-service",
+      "emailVerified": false,
+      "enabled": true,
+      "totp": false,
+      "serviceAccountClientId": "olap-service",
+      "disableableCredentialTypes": [],
+      "requiredActions": [],
+      "realmRoles": [
+        "default-roles-uatf-dss-realm"
+      ],
+      "clientRoles": {
+        "uatf-auth-service": [
+          "CONTEXT_READER"
+        ]
+      },
+      "notBefore": 0,
+      "groups": []
     }
   ],
   "scopeMappings": [
@@ -851,7 +880,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "${KEYCLOAK_BFF_CLIENT_SECRET}",
+      "secret": "**********",
       "redirectUris": [],
       "webOrigins": [],
       "notBefore": 0,
@@ -900,7 +929,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "**********",
+      "secret": "${KEYCLOAK_BFF_CLIENT_SECRET}",
       "redirectUris": [
         "http://localhost:3006/api/auth/callback"
       ],
@@ -1045,11 +1074,11 @@
       "notBefore": 0,
       "bearerOnly": false,
       "consentRequired": false,
-      "standardFlowEnabled": true,
+      "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
       "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false,
-      "publicClient": true,
+      "serviceAccountsEnabled": true,
+      "publicClient": false,
       "frontchannelLogout": true,
       "protocol": "openid-connect",
       "attributes": {
@@ -1082,7 +1111,8 @@
         "organization",
         "offline_access",
         "microprofile-jwt"
-      ]
+      ],
+      "secret": "${KEYCLOAK_OLAP_CLIENT_SECRET}"
     },
     {
       "id": "49f25cf9-cf44-40dc-bc05-4a08d0a1a567",

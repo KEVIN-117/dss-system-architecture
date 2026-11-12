@@ -44,6 +44,7 @@ import {
 	resolvePalette
 } from './chart-theme';
 import { buildSparklineSvg } from './sparkline';
+import { labelInkFor } from '../core/theme';
 import { formatNumber, type NumberFormat } from './number-format';
 // #1084: threshold-driven per-point colours.
 import { colorForValue, conditionalFormatForMeasure } from './conditional-format';
@@ -97,6 +98,27 @@ function legendConfig(o: ChartOptions, tk: ThemeTokens): Record<string, unknown>
 		position.orient = 'vertical';
 	}
 	return position;
+}
+
+/** Height (px) one horizontal legend row needs below the plot, so a roomy
+ *  bottom legend never sits on top of the category-axis labels. */
+const BOTTOM_LEGEND_ROW = 28;
+
+/** Extra roomy grid.bottom for a bottom legend (0 when it is hidden, placed
+ *  elsewhere, or in compact tiles whose grids already budget for it). */
+function bottomLegendPad(o: ChartOptions, compact: boolean): number {
+	return !compact && o.showLegend && o.legendPosition === 'bottom' ? BOTTOM_LEGEND_ROW : 0;
+}
+
+/** A roomy bottom legend lifted above the zoom slider when both are drawn;
+ *  otherwise the legend unchanged. */
+function legendAboveSlider(
+	legend: Record<string, unknown>,
+	o: ChartOptions,
+	compact: boolean,
+	sliderShown: boolean
+): Record<string, unknown> {
+	return sliderShown && bottomLegendPad(o, compact) > 0 ? { ...legend, bottom: 32 } : legend;
 }
 
 /** Compact (dashboard-tile) legend: always a scroll legend (tiles are small,
@@ -877,7 +899,9 @@ export function buildChartOption(
 		// useful default for "Store Sales by Product Category".
 		const MAX_SMALL_MULTIPLES = 6;
 		const collapseToSingle = cols.length > MAX_SMALL_MULTIPLES;
-		const cells = gridCells(collapseToSingle ? 1 : cols.length);
+		// With a chart title, the per-measure cells are laid out in the band BELOW
+		// it; otherwise the first row's cell titles draw across the main title.
+		const cells = belowTitleBand(gridCells(collapseToSingle ? 1 : cols.length), !!title && !collapseToSingle);
 		// When collapsed, the single cell's title is just the chart title (set
 		// by titleConfig); skip the per-cell title so we don't draw two stacked
 		// labels.
@@ -956,11 +980,11 @@ export function buildChartOption(
 					top: cell.topPct + cell.heightPct * 0.18 + '%',
 					width: cell.widthPct + '%',
 					height: cell.heightPct * 0.82 + '%',
-					label: { color: '#fff' },
 					breadcrumb: { show: false },
-					data: (
-						collapsedData ?? rows.map((name, i) => ({ name, value: matrix[i][m] ?? 0 }))
-					).filter((d) => d.value > 0)
+					data: filledByEntity(
+						collapsedData ?? rows.map((name, i) => ({ name, value: matrix[i][m] ?? 0 })),
+						palette
+					)
 				}))
 			};
 		}
@@ -975,9 +999,10 @@ export function buildChartOption(
 				name: collapsedData ? 'Total' : cols[m],
 				center: [cell.centerXPct + '%', cell.centerYPct + '%'],
 				radius: [0, cellRadiusPct(cell, aspect) + '%'],
-				label: { show: showSliceLabels, color: '#fff' },
-				data: (collapsedData ?? rows.map((name, i) => ({ name, value: matrix[i][m] ?? 0 }))).filter(
-					(d) => d.value > 0
+				label: { show: showSliceLabels },
+				data: filledByEntity(
+					collapsedData ?? rows.map((name, i) => ({ name, value: matrix[i][m] ?? 0 })),
+					palette
 				)
 			}))
 		};
@@ -1208,6 +1233,10 @@ export function buildChartOption(
 										color: tk.fgMuted
 									}
 								: { show: false },
+							// Close points used to print their names on top of each other:
+							// nudge colliding labels apart, then drop any that still overlap
+							// (the tooltip keeps naming every point).
+							labelLayout: { moveOverlap: 'shiftY', hideOverlap: true },
 							symbolSize:
 								t === 'bubble'
 									? (val: unknown) => {
@@ -1247,7 +1276,7 @@ export function buildChartOption(
 			// roomy slider sits at the bottom, so reserve a little extra grid bottom.
 			grid: compact
 				? { top: compactGridTop(o), left: 48, right: 16, bottom: 56 }
-				: { left: 60, top: title ? 50 : 40, right: 40, bottom: 56 },
+				: { left: 60, top: title ? 50 : 40, right: 40, bottom: 56 + bottomLegendPad(o, compact) },
 			// scatter / bubble: never draw the visible slider (the points
 			// already show the full distribution and the slider added clutter
 			// per user feedback 2026-06-07). Inside-zoom stays for mouse-wheel.
@@ -1325,7 +1354,11 @@ export function buildChartOption(
 						top: title ? 50 : 30,
 						right: 40,
 						// #1598: + rotatedTickBottom so rotated tick labels don't clip.
-						bottom: 56 + catNameBottomPad(rows.length > 8) + rotatedTickBottom(rows.length > 8)
+						bottom:
+							56 +
+							catNameBottomPad(rows.length > 8) +
+							rotatedTickBottom(rows.length > 8) +
+							bottomLegendPad(o, compact)
 					},
 			// waterfall is a single ordered sequence — no useful "zoom window"
 			// semantics. Inside-zoom stays for power users, slider hidden.
@@ -1494,7 +1527,7 @@ export function buildChartOption(
 		...common,
 		title,
 		tooltip: cartesianTooltip,
-		legend,
+		legend: legendAboveSlider(legend, o, compact, rows.length >= ZOOM_SLIDER_MIN_CATEGORIES),
 		// Reserve room for the zoom slider only when it's actually drawn —
 		// otherwise the plot area gets squashed for an affordance that
 		// isn't present (saiku follow-up to #1080 + screenshot 2026-06-07).
@@ -1518,7 +1551,8 @@ export function buildChartOption(
 					bottom:
 						(rows.length >= ZOOM_SLIDER_MIN_CATEGORIES ? 76 : 40) +
 						catNameBottomPad(xRotated) +
-						rotatedTickBottom(xRotated)
+						rotatedTickBottom(xRotated) +
+						bottomLegendPad(o, compact)
 				},
 		// bar / line / area: x-axis is `rows`.
 		dataZoom: dataZoomConfig(compact, rows.length), // #1080: x-axis zoom + pan
@@ -1541,4 +1575,43 @@ export function buildChartOption(
 		// markLine-free. No-op when nothing is configured (legacy output unchanged).
 		series: attachMarks([...base, ...trend], markLine, markArea)
 	};
+}
+
+/* Treemap/sunburst cells: the colour is fixed by the row's position BEFORE
+ * empty rows are dropped, so an entity keeps its colour when others vanish
+ * (colour follows the entity, never its rank), and each label takes the ink
+ * that contrasts with its own fill instead of a blanket white. */
+function filledByEntity(
+	items: Array<{ name: string; value: number }>,
+	palette: string[]
+): Array<{ name: string; value: number; itemStyle?: { color: string }; label?: { color: string } }> {
+	return items
+		.map((item, index) => {
+			const color = palette.length ? palette[index % palette.length] : undefined;
+			return color
+				? { ...item, itemStyle: { color }, label: { color: labelInkFor(color) } }
+				: item;
+		})
+		.filter((d) => d.value > 0);
+}
+
+/** Share of the plot box (%) reserved for the chart title above small multiples. */
+const SMALL_MULTIPLE_TITLE_BAND = 10;
+
+/* Remaps small-multiple cells into the area under the chart title band, so
+ * the main title and the per-measure titles never overlap. Unchanged when
+ * there is no title or only one cell. */
+function belowTitleBand<T extends { topPct: number; heightPct: number; centerYPct: number }>(
+	cells: T[],
+	titled: boolean
+): T[] {
+	if (!titled || cells.length < 2) return cells;
+	const band = SMALL_MULTIPLE_TITLE_BAND;
+	const scale = (100 - band) / 100;
+	return cells.map((cell) => ({
+		...cell,
+		topPct: band + cell.topPct * scale,
+		heightPct: cell.heightPct * scale,
+		centerYPct: band + cell.centerYPct * scale
+	}));
 }

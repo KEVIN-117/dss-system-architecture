@@ -13,6 +13,7 @@ import {
   LayoutDashboard,
   ChartColumn,
   GraduationCap,
+  Database,
   UsersRound,
   BrainCircuit,
 } from 'lucide-react';
@@ -49,6 +50,9 @@ export function PortalFrame({ children }: { children: ReactNode }) {
       icon: <BrainCircuit aria-hidden="true" />,
     },
   ];
+  const olapWorkspaceUrl =
+    process.env.NEXT_PUBLIC_OLAP_WORKSPACE_URL?.trim() ||
+    'http://localhost:3007/analysis';
   const navGroups: NavigationGroup[] = [
     {
       title: 'Analítica académica',
@@ -56,6 +60,16 @@ export function PortalFrame({ children }: { children: ReactNode }) {
         ...item,
         isActive: pathname === item.href,
       })),
+    },
+    {
+      title: 'Exploración OLAP',
+      items: [
+        {
+          title: 'OLAP Workspace',
+          href: olapWorkspaceUrl,
+          icon: <Database aria-hidden="true" />,
+        },
+      ],
     },
   ];
   return (
@@ -108,13 +122,21 @@ export function PortalFrame({ children }: { children: ReactNode }) {
               : undefined
           }
           onDisconnect={logout}
-          onNavigate={router.push}
+          onNavigate={(href) => navigatePortal(href, router.push)}
         >
           {children}
         </DashboardTemplate>
       </RoleGuard>
     </ProtectedRoute>
   );
+}
+
+function navigatePortal(href: string, push: (path: string) => void): void {
+  if (typeof window !== 'undefined' && new URL(href, window.location.href).origin !== window.location.origin) {
+    window.location.assign(href);
+    return;
+  }
+  push(href);
 }
 
 export function PortalBoundary({ children }: { children: ReactNode }) {

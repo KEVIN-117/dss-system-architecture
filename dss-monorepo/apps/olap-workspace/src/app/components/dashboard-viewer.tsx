@@ -10,6 +10,7 @@ import {
 import Link from 'next/link';
 import {
   getSavedDashboard,
+  type DashboardFilter,
   type Dashboard,
   type DashboardTile,
 } from '@dss-monorepo/olap-data-access';
@@ -55,7 +56,13 @@ export function DashboardViewer({ dashboardPath }: { dashboardPath: string }) {
   }, [attempt, dashboardPath]);
 
   if (loading) {
-    return <Loader text="Cargando dashboard…" fullScreen={false} className="rounded-xl" />;
+    return (
+      <Loader
+        text="Cargando dashboard…"
+        fullScreen={false}
+        className="rounded-xl"
+      />
+    );
   }
 
   if (error || !dashboard) {
@@ -93,9 +100,13 @@ export function DashboardViewer({ dashboardPath }: { dashboardPath: string }) {
     );
   }
 
+  const activeFilters = [
+    ...(dashboard.filters ?? []),
+    ...(dashboard.filterPanel?.filters ?? []),
+  ];
   const gridTiles = dashboard.layout.tiles.map((tile) => ({
     id: tile.id,
-    content: <DashboardTilePreview tile={tile} />,
+    content: <DashboardTilePreview tile={tile} filters={activeFilters} />,
     defaultLayout: {
       id: tile.id,
       x: tile.x,
@@ -153,7 +164,13 @@ export function DashboardViewer({ dashboardPath }: { dashboardPath: string }) {
   );
 }
 
-function DashboardTilePreview({ tile }: { tile: DashboardTile }) {
+function DashboardTilePreview({
+  tile,
+  filters,
+}: {
+  tile: DashboardTile;
+  filters: readonly DashboardFilter[];
+}) {
   const isText = tile.type === 'text' && Boolean(tile.text?.trim());
   const hasQuery =
     Boolean(tile.query) &&
@@ -182,7 +199,7 @@ function DashboardTilePreview({ tile }: { tile: DashboardTile }) {
           {tile.text}
         </p>
       ) : hasQuery ? (
-        <SavedTileQuery tile={tile} />
+        <SavedTileQuery tile={tile} filters={filters} />
       ) : undefined}
     </Tile>
   );

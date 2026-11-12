@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 
 test('requires a session before rendering the dashboard', async ({ page }) => {
+  await mockUnauthenticatedSession(page);
   await page.goto('/');
 
   await expect(page.getByRole('heading', { name: 'Sesión requerida' })).toBeVisible();
@@ -8,6 +9,7 @@ test('requires a session before rendering the dashboard', async ({ page }) => {
 });
 
 test('exposes the BFF login entry point', async ({ page }) => {
+  await mockUnauthenticatedSession(page);
   await page.goto('/login');
 
   await expect(page.getByText('Sistema de Soporte a la Decisión')).toBeVisible();
@@ -45,4 +47,14 @@ async function mockSession(page: import('@playwright/test').Page, origin: string
       permissions: [],
     }),
   }));
+}
+
+async function mockUnauthenticatedSession(page: import('@playwright/test').Page) {
+  await page.route('**/api/auth/me', (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'unauthorized' }),
+    }),
+  );
 }

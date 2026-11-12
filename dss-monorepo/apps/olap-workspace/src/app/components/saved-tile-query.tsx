@@ -10,10 +10,21 @@ import {
 import { CellsetTable } from '@dss-monorepo/design-system';
 import { SaikuChart, isChartType } from '@dss-monorepo/charts';
 import type { ChartOptions } from '@dss-monorepo/charts';
-import type { DashboardTile } from '@dss-monorepo/olap-data-access';
+import type {
+  DashboardFilter,
+  DashboardTile,
+} from '@dss-monorepo/olap-data-access';
 import type { CellEntry, QueryResult } from '@dss-monorepo/olap-models';
 
-export function SavedTileQuery({ tile }: { tile: DashboardTile }) {
+const EMPTY_FILTERS: readonly DashboardFilter[] = [];
+
+export function SavedTileQuery({
+  tile,
+  filters = EMPTY_FILTERS,
+}: {
+  tile: DashboardTile;
+  filters?: readonly DashboardFilter[];
+}) {
   const [result, setResult] = useState<AiQueryResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -24,7 +35,7 @@ export function SavedTileQuery({ tile }: { tile: DashboardTile }) {
     let active = true;
     setLoading(true);
     setError(null);
-    void executeSavedTileQuery(query)
+    void executeSavedTileQuery(query, filters)
       .then((data) => {
         if (active) setResult(data);
       })
@@ -43,7 +54,7 @@ export function SavedTileQuery({ tile }: { tile: DashboardTile }) {
     return () => {
       active = false;
     };
-  }, [attempt, query]);
+  }, [attempt, filters, query]);
 
   const view = useMemo(() => (result ? projectResult(result) : null), [result]);
   if (loading) {

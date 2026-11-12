@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Layers3, Plus, Search, TableProperties } from 'lucide-react';
+import { Layers3, ListFilter, Plus, Search, TableProperties } from 'lucide-react';
 import type { SaikuDimension, SaikuMeasure } from '@dss-monorepo/olap-models';
 import { Button } from '../../atoms/button';
 import { Input } from '../../atoms/input';
@@ -12,6 +12,12 @@ export interface DimensionListProps {
   dimensions: readonly SaikuDimension[];
   measures?: readonly SaikuMeasure[];
   onAddItem: (item: OlapQueryItem, axis: 'COLUMNS' | 'ROWS') => void;
+  onOpenMemberFilter?: (
+    dimensionUniqueName: string,
+    hierarchyUniqueName: string,
+    levelUniqueName?: string,
+    caption?: string,
+  ) => void;
   loading?: boolean;
   error?: string;
   className?: string;
@@ -22,6 +28,7 @@ export function DimensionList({
   dimensions,
   measures = [],
   onAddItem,
+  onOpenMemberFilter,
   loading = false,
   error,
   className,
@@ -186,22 +193,43 @@ export function DimensionList({
                               <p className="min-w-0 truncate text-xs font-medium text-muted-foreground">
                                 {hierarchy.caption}
                               </p>
-                              <AddFieldButton
-                                label={hierarchy.caption}
-                                axis="ROWS"
-                                onClick={() =>
-                                  onAddItem(
-                                    {
-                                      id: hierarchy.uniqueName,
-                                      label: hierarchy.caption,
-                                      kind: 'hierarchy',
-                                      dimensionUniqueName: dimension.uniqueName,
-                                      hierarchyUniqueName: hierarchy.uniqueName,
-                                    },
-                                    'ROWS',
-                                  )
-                                }
-                              />
+                              <div className="flex items-center gap-0.5">
+                                {onOpenMemberFilter && (
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon-xs"
+                                    aria-label={`Filtrar miembros de ${hierarchy.caption}`}
+                                    title="Filtrar miembros específicos"
+                                    onClick={() =>
+                                      onOpenMemberFilter(
+                                        dimension.uniqueName,
+                                        hierarchy.uniqueName,
+                                        undefined,
+                                        hierarchy.caption,
+                                      )
+                                    }
+                                  >
+                                    <ListFilter aria-hidden="true" className="size-3 text-muted-foreground" />
+                                  </Button>
+                                )}
+                                <AddFieldButton
+                                  label={hierarchy.caption}
+                                  axis="ROWS"
+                                  onClick={() =>
+                                    onAddItem(
+                                      {
+                                        id: hierarchy.uniqueName,
+                                        label: hierarchy.caption,
+                                        kind: 'hierarchy',
+                                        dimensionUniqueName: dimension.uniqueName,
+                                        hierarchyUniqueName: hierarchy.uniqueName,
+                                      },
+                                      'ROWS',
+                                    )
+                                  }
+                                />
+                              </div>
                             </div>
                             {levels?.map((level) => (
                               <div
@@ -211,25 +239,46 @@ export function DimensionList({
                                 <span className="min-w-0 truncate text-xs text-foreground">
                                   {level.caption}
                                 </span>
-                                <AddFieldButton
-                                  label={level.caption}
-                                  axis="ROWS"
-                                  onClick={() =>
-                                    onAddItem(
-                                      {
-                                        id: level.uniqueName,
-                                        label: level.caption,
-                                        kind: 'level',
-                                        dimensionUniqueName:
+                                <div className="flex items-center gap-0.5">
+                                  {onOpenMemberFilter && (
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon-xs"
+                                      aria-label={`Filtrar miembros de nivel ${level.caption}`}
+                                      title="Filtrar miembros de este nivel"
+                                      onClick={() =>
+                                        onOpenMemberFilter(
                                           dimension.uniqueName,
-                                        hierarchyUniqueName:
                                           hierarchy.uniqueName,
-                                        levelUniqueName: level.uniqueName,
-                                      },
-                                      'ROWS',
-                                    )
-                                  }
-                                />
+                                          level.uniqueName,
+                                          level.caption,
+                                        )
+                                      }
+                                    >
+                                      <ListFilter aria-hidden="true" className="size-3 text-muted-foreground" />
+                                    </Button>
+                                  )}
+                                  <AddFieldButton
+                                    label={level.caption}
+                                    axis="ROWS"
+                                    onClick={() =>
+                                      onAddItem(
+                                        {
+                                          id: level.uniqueName,
+                                          label: level.caption,
+                                          kind: 'level',
+                                          dimensionUniqueName:
+                                            dimension.uniqueName,
+                                          hierarchyUniqueName:
+                                            hierarchy.uniqueName,
+                                          levelUniqueName: level.uniqueName,
+                                        },
+                                        'ROWS',
+                                      )
+                                    }
+                                  />
+                                </div>
                               </div>
                             ))}
                           </div>

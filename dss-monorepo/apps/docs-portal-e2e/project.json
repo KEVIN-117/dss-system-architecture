@@ -1,0 +1,9 @@
+{
+  "name": "@dss-monorepo/docs-portal-e2e",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/docs-portal-e2e/src",
+  "tags": ["type:e2e", "scope:shared"],
+  "implicitDependencies": ["@dss-monorepo/docs-portal"],
+  "targets": {}
+}

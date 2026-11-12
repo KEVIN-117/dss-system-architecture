@@ -1,5 +1,12 @@
 import type { EChartsOption } from 'echarts';
-import { ChartThemeTokens, DEFAULT_DARK_THEME } from './theme';
+import {
+  ChartThemeTokens,
+  DARK_SEQUENTIAL_COLORS,
+  DEFAULT_DARK_THEME,
+  isDarkColor,
+  labelInkFor,
+  LIGHT_SEQUENTIAL_COLORS,
+} from './theme';
 
 export interface ChartDataPoint {
   label: string;
@@ -106,7 +113,6 @@ export function buildDonutOption(
     // Accesibilidad: descripción textual para lectores de pantalla
     aria: {
       enabled: true,
-      decal: { show: false },
       label: {
         enabled: true,
         description: `${title ?? 'Gráfico de dona'}. ${data
@@ -465,7 +471,7 @@ export function buildScatterOption(
   title?: string,
   theme: ChartThemeTokens = DEFAULT_DARK_THEME,
 ): EChartsOption {
-  const primary = theme.chartColors[4];
+  const primary = theme.primary ?? theme.chartColors[0];
   return {
     backgroundColor: 'transparent',
     color: theme.chartColors,
@@ -513,10 +519,12 @@ export function buildScatterOption(
         type: 'scatter',
         symbolSize: (data: number[]) => data[2] || 10,
         data: data.map((d) => [d.x, d.y, d.size || 10, d.name]),
+        // Solid marks with a surface ring: translucent fills wash out on
+        // dark surfaces and turn overlaps into new, unlabelled colours.
         itemStyle: {
-          color: theme.alpha(primary, 0.7),
-          borderColor: primary,
-          borderWidth: 1,
+          color: primary,
+          borderColor: theme.background,
+          borderWidth: 1.5,
         },
         emphasis: {
           itemStyle: { shadowBlur: 10, shadowColor: primary },
@@ -591,9 +599,9 @@ export function buildClusteringScatterOption(
         symbolSize: 12,
         data: cluster.data.map((d) => [d.x, d.y, d.name]),
         itemStyle: {
-          color: theme.alpha(color, 0.6),
-          borderColor: color,
-          borderWidth: 1,
+          color,
+          borderColor: theme.background,
+          borderWidth: 1.5,
         },
         emphasis: { itemStyle: { shadowBlur: 10, shadowColor: color } },
       };
@@ -655,7 +663,11 @@ export function buildRegressionScatterOption(
         type: 'scatter',
         symbolSize: 8,
         data: data.points.map((d) => [d.x, d.y]),
-        itemStyle: { color: theme.alpha(primary, 0.5) },
+        itemStyle: {
+          color: primary,
+          borderColor: theme.background,
+          borderWidth: 1.5,
+        },
       },
       {
         name: 'Regresión',
@@ -744,6 +756,11 @@ export function buildHeatmapOption(
   title?: string,
   theme: ChartThemeTokens = DEFAULT_DARK_THEME,
 ): EChartsOption {
+  const ramp = theme.sequentialColors?.length
+    ? theme.sequentialColors
+    : isDarkColor(theme.background)
+      ? DARK_SEQUENTIAL_COLORS
+      : LIGHT_SEQUENTIAL_COLORS;
   return {
     backgroundColor: 'transparent',
     title: title
@@ -761,8 +778,9 @@ export function buildHeatmapOption(
     },
     grid: {
       left: '5%',
-      right: '5%',
-      bottom: '10%',
+      // The colour ramp sits in this right gutter, clear of the axis labels.
+      right: 88,
+      bottom: 16,
       top: title ? 60 : 20,
       containLabel: true,
     },
@@ -797,24 +815,38 @@ export function buildHeatmapOption(
     visualMap: {
       min: data.min ?? 0,
       max: data.max ?? 100,
-      calculable: true,
-      orient: 'horizontal',
-      left: 'center',
-      bottom: '0%',
-      textStyle: { color: theme.foreground },
-      inRange: {
-        color: [
-          theme.riskColors.none,
-          theme.riskColors.medium,
-          theme.riskColors.high,
-        ],
-      },
+      // Vertical ramp in the right gutter: a horizontal ramp under the plot
+      // collided with the category labels of the x-axis.
+      calculable: false,
+      orient: 'vertical',
+      right: 8,
+      top: 'middle',
+      itemWidth: 12,
+      itemHeight: 140,
+      // Without drag handles a continuous ramp shows no end labels on its own.
+      text: [String(data.max ?? 100), String(data.min ?? 0)],
+      textStyle: { color: theme.mutedForeground },
+      // Magnitude is a one-hue ramp, never a red/amber/green traffic light:
+      // that pair collapses under red-green colour blindness.
+      inRange: { color: ramp },
     },
     series: [
       {
         name: 'Valor',
         type: 'heatmap',
-        data: data.data,
+        // Each cell picks the label ink that contrasts with its own ramp step,
+        // so values stay readable on both the pale and the deep end.
+        data: data.data.map((cell) => {
+          const value = cell[2];
+          const min = data.min ?? 0;
+          const max = data.max ?? 100;
+          const t = max > min ? Math.max(0, Math.min(1, (value - min) / (max - min))) : 0;
+          const fill = ramp[Math.round(t * (ramp.length - 1))];
+          return {
+            value: cell,
+            label: { color: fill ? labelInkFor(fill) : theme.foreground },
+          };
+        }),
         label: {
           show: true,
           color: theme.foreground,
@@ -858,16 +890,29 @@ export function buildSunburstOption(
     series: {
       type: 'sunburst',
       data: data,
-      radius: [0, '100%'],
+      // Leave the title band free; a full-height ring drew across the title.
+      center: ['50%', title ? '54%' : '50%'],
+      radius: [0, title ? '82%' : '92%'],
       itemStyle: {
         borderRadius: 4,
         borderWidth: 3,
         borderColor: theme.background,
       },
       label: {
-        rotate: 'tangential',
+        rotate: 'radial',
         color: theme.foreground,
+        // A surface-coloured halo keeps the text legible on any fill.
+        textBorderColor: theme.background,
+        textBorderWidth: 2,
+        // Thin slices drop their label (the tooltip still names them) instead
+        // of piling unreadable text on top of each other.
+        minAngle: 22,
+        overflow: 'truncate',
+        width: 72,
       },
+      // Radial labels near the centre still meet each other: drop the ones
+      // that collide rather than stacking them.
+      labelLayout: { hideOverlap: true },
     },
   };
 }

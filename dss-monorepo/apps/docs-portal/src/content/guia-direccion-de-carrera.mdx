@@ -1,0 +1,40 @@
+export const metadata = { title: 'Tablero de Dirección de carrera', audience: ['directores'], classification: 'public-summary' }
+
+## Para qué sirve
+
+El tablero de Dirección de carrera muestra los indicadores **de la carrera asignada a tu cuenta**. El filtro de carrera se aplica automáticamente en el servidor; no puedes consultar otras carreras.
+
+<Callout title="Requisito">
+  Tu cuenta necesita una carrera asignada como contexto académico. Si aparece «Tu cuenta no tiene una carrera académica asignada», solicita a la administración que revise tu contexto.
+</Callout>
+
+## Recorrido del tablero
+
+| Sección | Qué muestra |
+| --- | --- |
+| <Ui>Resumen</Ui> | Indicadores de la carrera por periodo académico. |
+| <Ui>Rendimiento</Ui> | Resultados de cursado y regularidad por gestión. |
+| <Ui>Admisión</Ui> | Postulaciones y resultados de ingreso por gestión. |
+| <Ui>Permanencia</Ui> | Retención y deserción observada en periodos cerrados. |
+| <Ui>Exploración OLAP</Ui> | Abre el OLAP Workspace para consultas propias dentro de tu carrera. |
+
+### Resumen
+
+En la parte superior se indica el **contexto académico autorizado** (tu carrera). Debajo verás:
+
+- **Indicadores de carrera**: intentos de cursado y nota final promedio del histórico, y periodos con actividad.
+- **Intentos por periodo académico**: suma de registros de cursado agrupados por gestión y periodo.
+- **Promedio final por periodo académico**: promedio de las notas finales registradas en cada periodo.
+
+Usa el filtro de periodo (<Ui>Buscar periodo académico</Ui>) para enfocarte en un periodo o elige <Ui>Todas las gestiones</Ui>. <Ui>Actualizar datos</Ui> repite la consulta.
+
+### Reportes
+
+Los reportes de rendimiento, admisión y permanencia funcionan igual que en el [Tablero de Decanato](/docs/guia-decanato#reportes), pero limitados a tu carrera.
+
+## Si algo no carga
+
+- **«El cubo OLAP no reconoce la carrera asignada a tu cuenta.»**: el catálogo o los datos de esa carrera aún no están sincronizados en el Data Warehouse. Informa a la administración.
+- **«La carrera asignada no tiene indicadores para el periodo seleccionado.»**: elige otro periodo.
+- **«El servicio OLAP tardó demasiado en responder.»**: espera unos segundos y usa <Ui>Actualizar datos</Ui>.
+- **«OLAP rechazó esta consulta por permisos.»**: revisa con la administración tu rol y tu acceso al cubo.

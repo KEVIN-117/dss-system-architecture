@@ -45,6 +45,7 @@ jobs:
           NEXT_PUBLIC_RECTOR_DASHBOARD_URL: ${{ vars.NEXT_PUBLIC_RECTOR_DASHBOARD_URL }}
           NEXT_PUBLIC_DECANO_DASHBOARD_URL: ${{ vars.NEXT_PUBLIC_DECANO_DASHBOARD_URL }}
           NEXT_PUBLIC_DIRECTOR_DASHBOARD_URL: ${{ vars.NEXT_PUBLIC_DIRECTOR_DASHBOARD_URL }}
+          NEXT_PUBLIC_OLAP_WORKSPACE_URL: ${{ vars.NEXT_PUBLIC_OLAP_WORKSPACE_URL }}
         run: |
           require_url() {
             local name="$1"
@@ -71,6 +72,12 @@ jobs:
             *)
               echo "Unsupported DSS monorepo app: ${APP_NAME}" >&2
               exit 1
+              ;;
+          esac
+
+          case "$APP_NAME" in
+            director-dashboard|decano-dashboard|rector-dashboard)
+              require_url NEXT_PUBLIC_OLAP_WORKSPACE_URL "$NEXT_PUBLIC_OLAP_WORKSPACE_URL"
               ;;
           esac
 
@@ -109,6 +116,7 @@ jobs:
             NEXT_PUBLIC_RECTOR_DASHBOARD_URL=${{ vars.NEXT_PUBLIC_RECTOR_DASHBOARD_URL }}
             NEXT_PUBLIC_DECANO_DASHBOARD_URL=${{ vars.NEXT_PUBLIC_DECANO_DASHBOARD_URL }}
             NEXT_PUBLIC_DIRECTOR_DASHBOARD_URL=${{ vars.NEXT_PUBLIC_DIRECTOR_DASHBOARD_URL }}
+            NEXT_PUBLIC_OLAP_WORKSPACE_URL=${{ vars.NEXT_PUBLIC_OLAP_WORKSPACE_URL }}
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}

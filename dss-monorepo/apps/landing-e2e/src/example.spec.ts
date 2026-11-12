@@ -19,6 +19,7 @@ test('renders the public landing page', async ({ page }) => {
 test('presents the SSO login entry point without collecting credentials', async ({
   page,
 }) => {
+  await mockUnauthenticatedSession(page);
   await page.goto('/login');
 
   await expect(
@@ -88,6 +89,16 @@ async function mockBffSession(page: Page, body: Record<string, unknown>) {
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify(body),
+    }),
+  );
+}
+
+async function mockUnauthenticatedSession(page: Page) {
+  await page.route('**/api/auth/me', (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: 'unauthorized' }),
     }),
   );
 }

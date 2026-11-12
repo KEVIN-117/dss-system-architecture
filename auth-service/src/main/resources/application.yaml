@@ -62,3 +62,6 @@ jwt:
 app:
   security:
     jwt-audience: ${KEYCLOAK_AUDIENCE:${KEYCLOAK_RESOURCE_ID:uatf-auth-service}}
+    context-reader:
+      # Keycloak clients (token azp) allowed to call /internal/users/{id}/academic-contexts.
+      allowed-clients: ${AUTH_CONTEXT_READER_CLIENTS:olap-service}

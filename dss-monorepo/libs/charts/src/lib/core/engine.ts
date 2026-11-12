@@ -6,6 +6,7 @@ import {
 import {
   GridComponent, TooltipComponent, LegendComponent, TitleComponent,
   VisualMapComponent, RadarComponent, AriaComponent, ToolboxComponent, GeoComponent,
+  DataZoomInsideComponent, DataZoomSliderComponent,
 } from 'echarts/components';
 import { LabelLayout } from 'echarts/features';
 import { CanvasRenderer } from 'echarts/renderers';
@@ -14,6 +15,7 @@ registerModules([
   BarChart, LineChart, PieChart, ScatterChart, RadarChart, HeatmapChart,
   SunburstChart, SankeyChart, TreemapChart, MapChart, GridComponent, TooltipComponent, LegendComponent,
   TitleComponent, VisualMapComponent, RadarComponent, AriaComponent, ToolboxComponent, GeoComponent,
+  DataZoomInsideComponent, DataZoomSliderComponent,
   LabelLayout, CanvasRenderer,
 ]);
 

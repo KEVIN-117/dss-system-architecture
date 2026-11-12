@@ -1,0 +1,59 @@
+export const metadata = { title: 'Tablero de Rectorado', audience: ['rector'], classification: 'public-summary' }
+
+## Para qué sirve
+
+El tablero de Rectorado muestra indicadores académicos de **toda la universidad**, con datos del cubo académico publicado en el Data Warehouse. Permite comparar facultades, revisar la evolución por periodo y, cuando está habilitado, consultar y publicar predicciones por programa.
+
+## Recorrido del tablero
+
+El menú lateral tiene estas secciones:
+
+| Sección | Qué muestra |
+| --- | --- |
+| <Ui>Resumen</Ui> | Indicadores institucionales y visualizaciones generales. |
+| <Ui>Rendimiento</Ui> | Resultados de cursado y regularidad por gestión. |
+| <Ui>Admisión</Ui> | Postulaciones y resultados de ingreso por gestión. |
+| <Ui>Permanencia</Ui> | Retención y deserción observada en periodos cerrados. |
+| <Ui>Predicciones</Ui> | Publicaciones de predicción por programa y cierre académico. |
+| <Ui>Exploración OLAP</Ui> | Abre el OLAP Workspace para consultas propias. |
+
+### Resumen
+
+En la parte superior aparecen los **indicadores institucionales**: intentos de cursado acumulados, nota final promedio y periodos con actividad. Debajo encontrarás:
+
+- **Tendencia por periodo académico**: intentos agregados por gestión y periodo.
+- **Intentos por facultad**: facultades ordenadas por intentos de cursado. Usa <Ui>Buscar facultad</Ui> para ubicar una facultad en la lista.
+
+Con el filtro de gestión puedes elegir <Ui>Todas las gestiones</Ui> o una gestión concreta. Al elegir una gestión, la serie histórica se oculta para no mezclar periodos. <Ui>Actualizar datos</Ui> vuelve a consultar el cubo.
+
+### Reportes de rendimiento, admisión y permanencia
+
+Cada reporte muestra una síntesis por gestión y gráficos de evolución. Puedes cambiar el rango con <Ui>Últimas 5 gestiones</Ui>, <Ui>Últimas 10 gestiones</Ui> o <Ui>Histórico completo</Ui>, y usar <Ui>Buscar en la tabla</Ui> para filtrar filas.
+
+- **Rendimiento**: intentos de cursado, aprobados, reprobados, promedio final y tasas de aprobación, reprobación, repetición y abandono.
+- **Admisión**: postulantes identificados, solicitudes, admitidos y tasa de admisión, con desgloses por facultad, carrera, sede, género, tipo de colegio, colegio de origen y modalidad de ingreso.
+- **Permanencia**: estudiantes retenidos, deserciones observadas y tasa observada de deserción.
+
+<Callout title="Cómo leer las tasas">
+  Repetición y abandono se cuentan como **intentos de cursado**, no como estudiantes únicos. La deserción se calcula solo sobre periodos cerrados con datos evaluables; un periodo reciente puede no aparecer hasta su cierre.
+</Callout>
+
+## Predicciones
+
+La sección <Ui>Predicciones</Ui> trabaja con un programa y un cierre académico ya procesado.
+
+1. En <Ui>Filtros de publicación</Ui>, elige el programa y el cierre (cada cierre indica si es anual o semestral).
+2. Pulsa <Ui>Consultar</Ui> para ver la publicación vigente. Si no existe, verás «No hay una publicación completa para este programa y corte».
+3. Para calcular una nueva publicación, pulsa <Ui>Calcular y publicar</Ui>. El cálculo se encola y la publicación aparece cuando el lote termina por completo; si el cálculo falla, no se publica un lote parcial.
+4. En <Ui>Resultados del lote</Ui> verás estudiante, programa, resultado, probabilidad y fecha de generación. Usa <Ui>Anterior</Ui> y <Ui>Siguiente</Ui> para recorrer las páginas de 100 resultados.
+
+<Callout title="Uso responsable de las predicciones" tone="warning">
+  Una probabilidad no es una decisión sobre un estudiante. El uso institucional de estos resultados requiere un modelo aprobado y evidencia no sintética; consulta [Motor predictivo](/docs/prediccion) antes de usarlos.
+</Callout>
+
+## Si algo no carga
+
+- **«El cubo Academic Performance no está publicado para esta conexión.»**: el cubo no está disponible. Avisa a la administración del sistema.
+- **«El cubo está disponible, pero no tiene indicadores para los filtros seleccionados.»**: cambia la gestión o el rango.
+- **«No se pudo conectar con el BFF.»**: problema de red o servicio. Espera unos minutos y usa <Ui>Actualizar datos</Ui>.
+- **«La sesión expiró.»**: vuelve a [iniciar sesión](/docs/acceso-al-sistema).

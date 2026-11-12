@@ -18,6 +18,7 @@ import {
   LayoutDashboard,
   ListFilter,
   UsersRound,
+  Database,
 } from 'lucide-react';
 
 export function PortalFrame({ children }: { children: ReactNode }) {
@@ -81,6 +82,18 @@ export function PortalFrame({ children }: { children: ReactNode }) {
         },
       ],
     },
+    {
+      title: 'Exploración OLAP',
+      items: [
+        {
+          title: 'OLAP Workspace',
+          href:
+            process.env.NEXT_PUBLIC_OLAP_WORKSPACE_URL?.trim() ||
+            'http://localhost:3007/analysis',
+          icon: <Database aria-hidden="true" />,
+        },
+      ],
+    },
   ];
 
   return (
@@ -133,13 +146,21 @@ export function PortalFrame({ children }: { children: ReactNode }) {
               : undefined
           }
           onDisconnect={logout}
-          onNavigate={router.push}
+          onNavigate={(href) => navigatePortal(href, router.push)}
         >
           {children}
         </DashboardTemplate>
       </RoleGuard>
     </ProtectedRoute>
   );
+}
+
+function navigatePortal(href: string, push: (path: string) => void): void {
+  if (typeof window !== 'undefined' && new URL(href, window.location.href).origin !== window.location.origin) {
+    window.location.assign(href);
+    return;
+  }
+  push(href);
 }
 
 export function PortalBoundary({ children }: { children: ReactNode }) {

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import type { EChartsType } from 'echarts/core';
+import { buildChartDecals } from '../core/decals';
 import { init } from '../core/engine';
 import { resolveChartTheme } from '../core/theme';
 import type {
@@ -34,7 +35,10 @@ export function BaseChart(props: BaseChartProps) {
     let chart: EChartsType | undefined;
     let frame: number | undefined;
     let active = true;
+    let lastWidth = 0;
+    let lastHeight = 0;
     const motion = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const forcedColors = window.matchMedia('(forced-colors: active)');
     const click = (event: ChartClickEvent) => {
       const current = latest.current;
       if (
@@ -60,14 +64,19 @@ export function BaseChart(props: BaseChartProps) {
       if (!chart) {
         chart = init(element, undefined, { renderer: 'canvas' });
         chart.on('click', click);
+        lastWidth = element.clientWidth;
+        lastHeight = element.clientHeight;
+      } else if (element.clientWidth !== lastWidth || element.clientHeight !== lastHeight) {
+        lastWidth = element.clientWidth;
+        lastHeight = element.clientHeight;
+        chart.resize();
       }
-      chart.resize();
       // Never send invalid data to ECharts, including while showing loading.
       const option =
         current.invalid || current.empty
           ? {}
           : typeof current.option === 'function'
-            ? current.option(theme, element.clientWidth)
+            ? current.option(theme, element.clientWidth, element.clientHeight)
             : current.option;
       chart.setOption(
         {
@@ -86,10 +95,13 @@ export function BaseChart(props: BaseChartProps) {
           aria: {
             enabled: true,
             ...option.aria,
+            ...(current.textures || forcedColors.matches
+              ? { decal: { show: true, decals: buildChartDecals(theme) } }
+              : {}),
             label: {
               enabled: true,
               ...option.aria?.label,
-              ...(current.ariaLabel ? { description: current.ariaLabel } : {}),
+              ...describe(current.ariaLabel, option.aria?.label?.description),
             },
           },
         },
@@ -126,6 +138,7 @@ export function BaseChart(props: BaseChartProps) {
       });
     }
     motion.addEventListener('change', schedule);
+    forcedColors.addEventListener('change', schedule);
     schedule();
     return () => {
       active = false;
@@ -134,6 +147,7 @@ export function BaseChart(props: BaseChartProps) {
       resize.disconnect();
       mutations.disconnect();
       motion.removeEventListener('change', schedule);
+      forcedColors.removeEventListener('change', schedule);
       chart?.off('click', click);
       chart?.dispose();
       chart = undefined;
@@ -205,4 +219,17 @@ export function BaseChart(props: BaseChartProps) {
       )}
     </div>
   );
+}
+
+/**
+ * Joins the consumer's accessible name with the builder's data summary, so a
+ * caller-supplied label never hides the values from screen-reader users.
+ * Returns nothing when neither exists, letting ECharts generate its own.
+ */
+function describe(label?: string, summary?: string): { description?: string } {
+  const name = label?.trim().replace(/[.\s]+$/, '');
+  const data = summary?.trim();
+  if (!name) return data ? { description: data } : {};
+  if (!data || data.startsWith(name)) return { description: data || name };
+  return { description: `${name}. ${data}` };
 }

@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any -- OpenAPI YAML is untyped input; every access is guarded. */
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
@@ -32,6 +33,8 @@ export type ApiResponse = {
   example?: unknown;
 };
 
+export type AuthKind = 'bearer' | 'cookie' | 'none';
+
 export type ApiOperation = {
   id: string;
   serviceId: string;
@@ -44,6 +47,7 @@ export type ApiOperation = {
   description?: string;
   tags: string[];
   auth: string;
+  authKinds: AuthKind[];
   permission?: string;
   parameters: ApiParameter[];
   requestContentType?: string;
@@ -58,13 +62,12 @@ export type ApiService = {
   id: string;
   name: string;
   version: string;
+  description?: string;
   sourcePath: string;
   operations: ApiOperation[];
 };
 
-export function apiOperationSlug(
-  operation: Pick<ApiOperation, 'method' | 'path'>,
-): string {
+export function apiOperationSlug(operation: Pick<ApiOperation, 'method' | 'path'>): string {
   const suffix = createHash('sha1')
     .update(`${operation.method}:${operation.path}`)
     .digest('hex')
@@ -72,28 +75,27 @@ export function apiOperationSlug(
   return `${operation.method.toLowerCase()}-${suffix}`;
 }
 
-function findRepositoryRoot(): string {
+/**
+ * Contracts are read from the app-local snapshot (`openapi/`), produced by
+ * `scripts/sync-openapi.mjs` from `<repo>/docs`. The snapshot lives inside the
+ * app so it is available in the Docker context and in the standalone output
+ * (see `outputFileTracingIncludes` in next.config.mjs).
+ */
+function findSnapshotRoot(): string {
   const candidates = [
-    path.resolve(process.cwd(), '..', '..', '..'),
-    path.resolve(process.cwd(), '..'),
-    process.cwd(),
+    path.join(process.cwd(), 'openapi'),
+    path.join(process.cwd(), 'apps', 'docs-portal', 'openapi'),
   ];
-
-  const root = candidates.find((candidate) =>
-    existsSync(path.join(candidate, 'docs')),
-  );
-
+  const root = candidates.find((candidate) => existsSync(candidate));
   if (!root) {
-    throw new Error('No se encontró el directorio docs del repositorio.');
+    throw new Error(
+      'No se encontró openapi/. Ejecuta `bun nx run @dss-monorepo/docs-portal:sync-openapi`.',
+    );
   }
-
   return root;
 }
 
-function discoverOpenApiContracts(
-  root: string,
-): Array<{ id: string; sourcePath: string }> {
-  const docsRoot = path.join(root, 'docs');
+function discoverContracts(root: string): Array<{ id: string; file: string; sourcePath: string }> {
   const files: string[] = [];
   const visit = (directory: string) => {
     for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -102,26 +104,16 @@ function discoverOpenApiContracts(
       else if (/\.ya?ml$/i.test(entry.name)) files.push(absolutePath);
     }
   };
-
-  visit(docsRoot);
+  visit(root);
 
   return files
-    .flatMap((absolutePath) => {
-      const document = parse(readFileSync(absolutePath, 'utf8'));
-      if (typeof document?.openapi !== 'string' || !document.paths) return [];
-      const sourcePath = path
-        .relative(root, absolutePath)
-        .split(path.sep)
-        .join('/');
-      return [
-        {
-          id: sourcePath
-            .replace(/^docs\//, '')
-            .replace(/\.ya?ml$/i, '')
-            .replace(/[^a-z0-9]+/gi, '-'),
-          sourcePath,
-        },
-      ];
+    .map((file) => {
+      const relative = path.relative(root, file).split(path.sep).join('/');
+      return {
+        id: relative.replace(/\.ya?ml$/i, '').replace(/[^a-z0-9]+/gi, '-'),
+        file,
+        sourcePath: `docs/${relative}`,
+      };
     })
     .sort((left, right) => left.sourcePath.localeCompare(right.sourcePath));
 }
@@ -136,29 +128,21 @@ function resolveSchemaRef(document: any, schema: any): any {
 
 function schemaType(schema: any, document: any): string {
   const resolved = resolveSchemaRef(document, schema);
-  if (resolved?.type === 'array')
-    return `array<${schemaType(resolved.items, document)}>`;
+  if (resolved?.type === 'array') return `array<${schemaType(resolved.items, document)}>`;
   const composed = resolved?.oneOf ?? resolved?.anyOf;
-  if (composed?.length)
-    return composed.map((item: any) => schemaType(item, document)).join(' | ');
+  if (composed?.length) return composed.map((item: any) => schemaType(item, document)).join(' | ');
   if (resolved?.type) {
-    return Array.isArray(resolved.type)
-      ? resolved.type.join(' | ')
-      : resolved.type;
+    return Array.isArray(resolved.type) ? resolved.type.join(' | ') : resolved.type;
   }
   return resolved?.enum ? resolved.enum.join(' | ') : 'object';
 }
 
-function fieldsForSchema(
-  document: any,
-  schema: any,
-  depth = 0,
-): ApiSchemaField[] {
+function fieldsForSchema(document: any, schema: any, depth = 0): ApiSchemaField[] {
   if (depth > 5) return [];
   const resolved = resolveSchemaRef(document, schema);
-  const composedSchemas = (resolved?.allOf ?? []).map((part: any) =>
-    resolveSchemaRef(document, part),
-  );
+  // A top-level array (e.g. a list response) documents its item properties.
+  if (depth === 0 && resolved?.type === 'array') return fieldsForSchema(document, resolved.items, depth + 1);
+  const composedSchemas = (resolved?.allOf ?? []).map((part: any) => resolveSchemaRef(document, part));
   const properties = Object.assign(
     {},
     ...composedSchemas.map((part: any) => part?.properties ?? {}),
@@ -190,70 +174,61 @@ function declaredExample(document: any, media: any): unknown {
 }
 
 function joinPath(serverUrl: string | undefined, endpointPath: string): string {
-  const prefix = serverUrl?.startsWith('http')
-    ? new URL(serverUrl).pathname
-    : serverUrl;
+  const prefix = serverUrl?.startsWith('http') ? new URL(serverUrl).pathname : serverUrl;
   const combined = `${prefix ?? ''}/${endpointPath}`.replace(/\/{2,}/g, '/');
   return combined.startsWith('/') ? combined : `/${combined}`;
 }
 
-function operationAuth(document: any, operation: any): string {
-  const requirements = operation.security ?? document.security ?? [];
-  if (requirements.length === 0) return 'Sin autenticación declarada';
+function operationSecurity(document: any, operation: any): { label: string; kinds: AuthKind[] } {
+  const requirements: Array<Record<string, string[]>> = operation.security ?? document.security ?? [];
+  const names = requirements.flatMap((requirement) => Object.keys(requirement));
+  if (names.length === 0) return { label: 'Sin autenticación', kinds: ['none'] };
 
-  return requirements
-    .flatMap((requirement: Record<string, string[]>) =>
-      Object.keys(requirement),
-    )
-    .map((name: string) => {
-      const scheme = document.components?.securitySchemes?.[name];
-      if (scheme?.type === 'http' && scheme.scheme === 'bearer')
-        return 'Bearer token';
-      if (scheme?.type === 'openIdConnect') return 'OpenID Connect';
-      return name;
-    })
-    .join(', ');
+  const described = names.map((name) => {
+    const scheme = document.components?.securitySchemes?.[name];
+    if (scheme?.type === 'http' && scheme.scheme === 'bearer') {
+      return { label: 'Bearer token (JWT de Keycloak)', kind: 'bearer' as const };
+    }
+    if (scheme?.type === 'apiKey' && scheme.in === 'cookie') {
+      return { label: `Cookie de sesión \`${scheme.name}\``, kind: 'cookie' as const };
+    }
+    if (scheme?.type === 'openIdConnect') return { label: 'OpenID Connect', kind: 'bearer' as const };
+    return { label: name, kind: 'bearer' as const };
+  });
+  return {
+    label: described.map((item) => item.label).join(' o '),
+    kinds: [...new Set(described.map((item) => item.kind))],
+  };
 }
 
-function parseContract(
-  id: string,
-  sourcePath: string,
-  root: string,
-): ApiService {
-  const document = parse(readFileSync(path.join(root, sourcePath), 'utf8'));
+function parseContract(id: string, file: string, sourcePath: string): ApiService {
+  const document = parse(readFileSync(file, 'utf8'));
   const serverUrl = document.servers?.[0]?.url;
   const operations: ApiOperation[] = [];
 
   for (const [route, pathItem] of Object.entries<any>(document.paths ?? {})) {
     for (const [method, operation] of Object.entries<any>(pathItem)) {
-      if (
-        !['get', 'post', 'put', 'patch', 'delete', 'options', 'head'].includes(
-          method,
-        )
-      )
-        continue;
+      if (!['get', 'post', 'put', 'patch', 'delete', 'options', 'head'].includes(method)) continue;
 
       const body = resolveSchemaRef(document, operation.requestBody);
       const content = body?.content ?? {};
       const requestContentType = Object.keys(content)[0];
       const requestSchema = content[requestContentType]?.schema;
-      const responses = Object.entries<any>(operation.responses ?? {}).map(
-        ([status, unresolvedResponse]) => {
-          const response = resolveSchemaRef(document, unresolvedResponse);
-          const responseContent = response.content ?? {};
-          const responseMedia = Object.values<any>(responseContent)[0];
-          return {
-            status,
-            description:
-              response.description ?? 'Sin descripción en el contrato.',
-            contentTypes: Object.keys(responseContent),
-            schemaFields: fieldsForSchema(document, responseMedia?.schema),
-            example: declaredExample(document, responseMedia),
-          };
-        },
-      );
+      const responses = Object.entries<any>(operation.responses ?? {}).map(([status, unresolved]) => {
+        const response = resolveSchemaRef(document, unresolved) ?? {};
+        const responseContent = response.content ?? {};
+        const responseMedia = Object.values<any>(responseContent)[0];
+        return {
+          status,
+          description: response.description ?? 'Sin descripción en el contrato.',
+          contentTypes: Object.keys(responseContent),
+          schemaFields: fieldsForSchema(document, responseMedia?.schema),
+          example: declaredExample(document, responseMedia),
+        };
+      });
+      const security = operationSecurity(document, operation);
 
-      const parsedOperation = {
+      const parsed = {
         id: `${id}:${method}:${route}`,
         serviceId: id,
         serviceName: document.info?.title ?? id,
@@ -261,18 +236,13 @@ function parseContract(
         sourcePath,
         method: method.toUpperCase(),
         path: joinPath(serverUrl, route),
-        summary:
-          operation.summary ??
-          operation.operationId ??
-          `${method.toUpperCase()} ${route}`,
+        summary: operation.summary ?? operation.operationId ?? `${method.toUpperCase()} ${route}`,
         description: operation.description,
         tags: operation.tags ?? [],
-        auth: operationAuth(document, operation),
+        auth: security.label,
+        authKinds: security.kinds,
         permission: operation['x-required-permission'],
-        parameters: [
-          ...(pathItem.parameters ?? []),
-          ...(operation.parameters ?? []),
-        ]
+        parameters: [...(pathItem.parameters ?? []), ...(operation.parameters ?? [])]
           .map((parameter: any) => resolveSchemaRef(document, parameter))
           .map((parameter: any) => ({
             name: parameter.name,
@@ -291,10 +261,7 @@ function parseContract(
         requestExample: declaredExample(document, content[requestContentType]),
         responses,
       };
-      operations.push({
-        ...parsedOperation,
-        referenceSlug: apiOperationSlug(parsedOperation),
-      });
+      operations.push({ ...parsed, referenceSlug: apiOperationSlug(parsed) });
     }
   }
 
@@ -302,14 +269,23 @@ function parseContract(
     id,
     name: document.info?.title ?? id,
     version: document.info?.version ?? 'sin versión',
+    description: document.info?.description,
     sourcePath,
     operations,
   };
 }
 
+let cachedCatalog: ApiService[] | undefined;
+
 export function getApiCatalog(): ApiService[] {
-  const root = findRepositoryRoot();
-  return discoverOpenApiContracts(root).map(({ id, sourcePath }) =>
-    parseContract(id, sourcePath, root),
-  );
+  if (cachedCatalog && process.env.NODE_ENV === 'production') return cachedCatalog;
+  const root = findSnapshotRoot();
+  cachedCatalog = discoverContracts(root).map(({ id, file, sourcePath }) => parseContract(id, file, sourcePath));
+  return cachedCatalog;
+}
+
+export function findOperation(serviceId: string, slug: string) {
+  const service = getApiCatalog().find((item) => item.id === serviceId);
+  const operation = service?.operations.find((item) => item.referenceSlug === slug);
+  return service && operation ? { service, operation } : undefined;
 }

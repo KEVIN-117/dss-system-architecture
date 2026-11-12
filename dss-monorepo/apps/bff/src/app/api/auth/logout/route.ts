@@ -1,7 +1,10 @@
 import { createLogoutUrl } from '@dss-monorepo/auth-connector';
 import { NextResponse } from 'next/server';
 
-import { getBffAuthConfig, getBffSessionConfig } from '../../../../lib/bff-config';
+import {
+  getBffAuthConfig,
+  getBffSessionConfig,
+} from '../../../../lib/bff-config';
 import { unsealSessionTokens } from '../../_lib/session-cookie';
 
 export const runtime = 'nodejs';
@@ -11,7 +14,11 @@ export async function GET(request: Request): Promise<NextResponse> {
   const config = getBffAuthConfig();
   const session = await readSession(request.headers.get('cookie'));
   const redirect = session?.idToken
-    ? createLogoutUrl(config.oidc, session.idToken, config.oidc.postLogoutRedirectUri)
+    ? createLogoutUrl(
+        config.oidc,
+        session.idToken,
+        config.oidc.postLogoutRedirectUri,
+      )
     : new URL(config.oidc.postLogoutRedirectUri);
   const response = NextResponse.redirect(redirect, 303);
   const sessionConfig = getBffSessionConfig();
@@ -35,5 +42,10 @@ async function readSession(cookieHeader: string | null) {
     .map((part) => part.trim())
     .find((part) => part.startsWith(`${name}=`))
     ?.slice(name.length + 1);
-  return value ? unsealSessionTokens(decodeURIComponent(value)) : null;
+  if (!value) return null;
+  try {
+    return await unsealSessionTokens(decodeURIComponent(value));
+  } catch {
+    return null;
+  }
 }
