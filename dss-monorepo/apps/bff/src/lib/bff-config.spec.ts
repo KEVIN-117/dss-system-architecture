@@ -4,6 +4,7 @@ import {
   BffConfigurationError,
   getAllowedOrigins,
   getBffAuthConfig,
+  getBffSessionConfig,
   getDwControlServiceConfig,
   getPredictionServiceUrl,
 } from './bff-config';
@@ -98,7 +99,9 @@ describe('BFF server configuration', () => {
       session: {
         cookieName: 'dss_session',
         secret: 'a-development-only-secret-that-is-not-committed',
-        ttlSeconds: 300,
+        idleTimeoutSeconds: 1800,
+        maxLifetimeSeconds: 36_000,
+        refreshLeewaySeconds: 60,
         secure: false,
       },
     });
@@ -106,6 +109,26 @@ describe('BFF server configuration', () => {
       'http://localhost:3001',
       'https://admin.example.edu',
     ]);
+  });
+
+  it('validates the session idle and absolute lifetimes', () => {
+    expect(
+      getBffSessionConfig({
+        ...environment,
+        BFF_SESSION_IDLE_TIMEOUT_SECONDS: '900',
+        BFF_SESSION_MAX_LIFETIME_SECONDS: '7200',
+      }),
+    ).toMatchObject({ idleTimeoutSeconds: 900, maxLifetimeSeconds: 7200 });
+    expect(() =>
+      getBffSessionConfig({ ...environment, BFF_SESSION_IDLE_TIMEOUT_SECONDS: '60' }),
+    ).toThrow(BffConfigurationError);
+    expect(() =>
+      getBffSessionConfig({
+        ...environment,
+        BFF_SESSION_IDLE_TIMEOUT_SECONDS: '3600',
+        BFF_SESSION_MAX_LIFETIME_SECONDS: '1800',
+      }),
+    ).toThrow(BffConfigurationError);
   });
 
   it('fails closed when a required connector value is missing', () => {

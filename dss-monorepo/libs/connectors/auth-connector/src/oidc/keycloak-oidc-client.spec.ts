@@ -4,6 +4,8 @@ import {
   createAuthorizationUrl,
   createLogoutUrl,
   exchangeAuthorizationCode,
+  KeycloakOidcClientError,
+  refreshAccessToken,
 } from './keycloak-oidc-client.js';
 
 const config = {
@@ -76,5 +78,40 @@ describe('Keycloak OIDC client', () => {
     expect(url.searchParams.get('id_token_hint')).toBe('id-token');
     expect(url.searchParams.get('post_logout_redirect_uri')).toBe('https://admin.example.edu/login');
     expect(url.searchParams.get('client_id')).toBe('dss-bff');
+  });
+
+  it('renews tokens with the refresh_token grant using the confidential client', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+      access_token: 'new-access-token',
+      refresh_token: 'rotated-refresh-token',
+      expires_in: 300,
+      refresh_expires_in: 1800,
+    }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(refreshAccessToken(config, 'old-refresh-token')).resolves.toEqual({
+      accessToken: 'new-access-token',
+      idToken: undefined,
+      refreshToken: 'rotated-refresh-token',
+      expiresIn: 300,
+      refreshExpiresIn: 1800,
+    });
+    const body = (fetchMock.mock.calls[0] as [URL, RequestInit])[1].body as URLSearchParams;
+    expect(body.get('grant_type')).toBe('refresh_token');
+    expect(body.get('refresh_token')).toBe('old-refresh-token');
+    expect(body.get('client_secret')).toBe('confidential-client-secret');
+  });
+
+  it('distinguishes a rejected refresh token from a transient Keycloak failure', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ error: 'invalid_grant' }), { status: 400 }),
+    ));
+    await expect(refreshAccessToken(config, 'expired')).rejects.toMatchObject({ reason: 'rejected' });
+
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 503 })));
+    await expect(refreshAccessToken(config, 'valid')).rejects.toMatchObject({ reason: 'unavailable' });
+
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('network down')));
+    await expect(refreshAccessToken(config, 'valid')).rejects.toBeInstanceOf(KeycloakOidcClientError);
   });
 });

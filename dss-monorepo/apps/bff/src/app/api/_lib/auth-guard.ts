@@ -17,7 +17,7 @@ import {
   getBffAuthConfig,
   getBffSessionCookieName,
 } from '../../../lib/bff-config';
-import { unsealSession } from './session-cookie';
+import { readSessionCookie, unsealSession } from './session-cookie';
 
 export interface AuthenticatedRequest {
   user: AuthUser;
@@ -105,23 +105,13 @@ async function resolveRequestToken(request: Request): Promise<string | null> {
     return bearerToken;
   }
 
-  const cookieName = getBffSessionCookieName();
-  const sessionCookie = request.headers
-    .get('cookie')
-    ?.split(';')
-    .map((part) => part.trim())
-    .find((part) => part.startsWith(`${cookieName}=`))
-    ?.slice(cookieName.length + 1);
-
-  if (!sessionCookie) {
-    return null;
-  }
-
-  try {
-    return unsealSession(decodeURIComponent(sessionCookie));
-  } catch {
-    return null;
-  }
+  const sessionCookie = readSessionCookie(
+    request.headers.get('cookie'),
+    getBffSessionCookieName(),
+  );
+  // The proxy has already renewed the access token when needed and forwarded
+  // the refreshed cookie, so the route only validates what it receives.
+  return sessionCookie ? unsealSession(sessionCookie) : null;
 }
 
 /** Applies the shared DSS role hierarchy and fails closed without roles. */

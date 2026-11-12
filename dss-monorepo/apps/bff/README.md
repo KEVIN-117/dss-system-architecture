@@ -7,6 +7,7 @@ El BFF es el único punto de integración de los portales con Keycloak y `auth-s
 - `GET /api/auth/login`: crea una transacción cifrada con `state`, `nonce` y PKCE; después redirige a Keycloak. Acepta `returnTo` solo para orígenes de `BFF_ALLOWED_ORIGINS` y `action=register` cuando el realm permita registro.
 - `GET /api/auth/callback`: valida `state`, intercambia el código, valida ID token y access token, consulta el perfil activo y emite `dss_session`.
 - `GET /api/auth/me`: devuelve perfil, roles y permisos efectivos desde una sesión BFF válida.
+- `POST /api/auth/refresh`: heartbeat de actividad de los portales; extiende la ventana de inactividad y devuelve los vencimientos de la sesión.
 - `GET /api/auth/logout`: elimina la sesión BFF y redirige al logout OIDC si tiene un ID token disponible.
 - `PUT /api/admin/users/:userId/academic-contexts`: reemplaza los contextos académicos del usuario. Requiere `SUPERADMIN` en el BFF y conserva la validación `ROLE_SUPERADMIN` de `auth-service` como segunda barrera.
 - `/api/admin/dw/academic-closures*`: fachada autenticada de cierres académicos, historial y transiciones. Requiere el rol correspondiente (`DW_CLOSURE_READ` o `DW_CLOSURE_MANAGE`) del cliente `dw-control-service`; el BFF reenvía el JWT verificado y el servicio conserva el `sub` para auditoría.
@@ -15,7 +16,15 @@ El BFF es el único punto de integración de los portales con Keycloak y `auth-s
 - `/api/olap/rest/saiku/*`: proxy autenticado a `olap-service`, incluido su endpoint GraphQL real en `/api/olap/rest/saiku/api/graphql`. El BFF valida la sesión y reenvía el access token; las rutas `/rest/saiku/admin/*` requieren además el rol `SUPERADMIN`. Keycloak debe incluir la audiencia `olap-service` en los tokens solicitados por `dss-bff`.
 - `/api/prediction/v1/predictions`, `/api/prediction/v1/training-jobs*`, `/api/prediction/v1/prediction-batches*`, `/api/prediction/v1/prediction-publications` y `/api/prediction/v1/academic-options`: fachada autenticada para inferencia, entrenamiento, publicación y carga de programas/cierres autorizados. El BFF valida la sesión y reenvía el token a Prediction Service; el servicio vuelve a validar identidad, permiso y ámbito académico. El navegador no accede al worker ni al DW.
 
-La cookie de sesión es `HttpOnly`, `SameSite=Lax`, `Secure` en producción y contiene un JWE que solo puede descifrar el BFF. No persiste el refresh token. Las rutas vuelven a validar el access token, issuer, audiencia y perfil activo; los endpoints de negocio deben además aplicar `requireRoles()` o `requirePermissions()`.
+La cookie de sesión es `HttpOnly`, `SameSite=Lax`, `Secure` en producción y contiene un JWE comprimido que solo puede descifrar el BFF, con el access token, el ID token y el refresh token de Keycloak.
+
+### Renovación e inactividad
+
+- El `proxy` del BFF renueva el access token (grant `refresh_token`) cuando le quedan menos de 60 s, reemite la cookie y reenvía la cookie nueva a la ruta. Las peticiones simultáneas con la misma cookie comparten un único refresh, y el resultado se reutiliza 30 s para peticiones que salieron antes de recibir la cookie nueva; esto también es compatible con la rotación de refresh tokens.
+- La sesión vence por inactividad (`BFF_SESSION_IDLE_TIMEOUT_SECONDS`, 30 min) o por duración absoluta (`BFF_SESSION_MAX_LIFETIME_SECONDS`, 10 h), lo que ocurra primero, y nunca después del vencimiento del refresh token de Keycloak.
+- Solo `POST /api/auth/refresh` cuenta como actividad. `AuthProvider` (`@dss-monorepo/auth`) lo envía al cargar la página y, como máximo una vez por minuto, cuando detecta teclado, puntero, rueda o scroll en cualquier pestaña del portal. Las llamadas de datos en segundo plano no mantienen viva la sesión.
+- Dos minutos antes de vencer, `AuthProvider` muestra un aviso con cuenta regresiva (personalizable con `renderSessionWarning`, desactivable con `sessionTimeout={false}`); al vencer ejecuta el logout, que también cierra la sesión SSO.
+- Si Keycloak rechaza el refresh token, el BFF borra la cookie y responde 401; si Keycloak no está disponible, la sesión sigue mientras el access token sea válido y después responde 503 sin borrarla. Las rutas vuelven a validar el access token, issuer, audiencia y perfil activo; los endpoints de negocio deben además aplicar `requireRoles()` o `requirePermissions()`.
 
 El JWE stateless es la implementación inicial y funciona sin una base de sesiones. Para despliegues con varias instancias o revocación inmediata se puede evolucionar a un identificador opaco respaldado por Redis o una base de datos; esa migración no cambia el contrato de los portales. En producción se deben rotar `BFF_SESSION_SECRET` y `KEYCLOAK_BFF_CLIENT_SECRET`, usar HTTPS y mantener una lista explícita de orígenes.
 

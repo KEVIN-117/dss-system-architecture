@@ -32,10 +32,12 @@ export {
   createLogoutUrl,
   exchangeAuthorizationCode,
   KeycloakOidcClientError,
+  refreshAccessToken,
 } from './oidc/keycloak-oidc-client.js';
 export type {
   AuthorizationCodeExchange,
   AuthorizationRequest,
   KeycloakOidcClientConfig,
+  KeycloakRefreshedTokenSet,
   KeycloakTokenSet,
 } from './oidc/keycloak-oidc-client.js';

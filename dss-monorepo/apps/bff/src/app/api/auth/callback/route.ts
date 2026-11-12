@@ -6,13 +6,13 @@ import {
 } from '@dss-monorepo/auth-connector';
 import { NextResponse } from 'next/server';
 
-import { getBffAuthConfig, getBffSessionConfig } from '../../../../lib/bff-config';
+import { getBffAuthConfig } from '../../../../lib/bff-config';
 import {
   getOAuthTransactionCookieName,
   oauthTransactionCookieOptions,
   unsealOAuthTransaction,
 } from '../../_lib/oauth-transaction';
-import { sealSession } from '../../_lib/session-cookie';
+import { nowSeconds, sealSession, setSessionCookie } from '../../_lib/session-cookie';
 
 export const runtime = 'nodejs';
 
@@ -65,23 +65,24 @@ export async function GET(request: Request): Promise<NextResponse> {
     }
 
     stage = 'session_creation';
-    const session = await sealSession({
-      accessToken: tokens.accessToken,
-      idToken: tokens.idToken,
-    });
+    const now = nowSeconds();
+    const session = await sealSession(
+      {
+        accessToken: tokens.accessToken,
+        idToken: tokens.idToken,
+        refreshToken: tokens.refreshToken,
+        accessTokenExpiresAt: now + tokens.expiresIn,
+        ...(tokens.refreshExpiresIn
+          ? { refreshTokenExpiresAt: now + tokens.refreshExpiresIn }
+          : {}),
+        createdAt: now,
+        lastActivityAt: now,
+      },
+      now,
+    );
 
     const response = NextResponse.redirect(new URL(transaction.returnTo, requestUrl.origin), 303);
-    const sessionConfig = getBffSessionConfig();
-
-    response.cookies.set({
-      name: sessionConfig.cookieName,
-      value: session.value,
-      httpOnly: true,
-      secure: sessionConfig.secure,
-      sameSite: 'lax',
-      path: '/',
-      maxAge: session.maxAge,
-    });
+    setSessionCookie(response, session);
     response.cookies.set({
       name: getOAuthTransactionCookieName(),
       value: '',

@@ -19,7 +19,8 @@ El BFF es el límite servidor para OAuth/OIDC, sesión web y llamadas a auth/OLA
 | `BFF_ALLOWED_ORIGINS` | Sí | Origins HTTP(S) separados por comas. Debe contener orígenes de redirect/post-logout; sin `*`. |
 | `BFF_DEFAULT_POST_LOGIN_REDIRECT_URI` | Sí | URL por defecto después de login; su origin debe estar allowlisted. |
 | `BFF_SESSION_SECRET` | Sí, secreto | Clave de sesión de al menos 32 caracteres. No reutilizar secretos de OIDC. |
-| `BFF_SESSION_TTL_SECONDS` | Opcional | Entero 60–900; default 300 segundos. |
+| `BFF_SESSION_IDLE_TIMEOUT_SECONDS` | Opcional | Inactividad máxima, entero 300–28800; default 1800 (30 min). Alinear con `ssoSessionIdleTimeout` del realm. Solo el heartbeat de actividad de los portales (`POST /api/auth/refresh`) extiende esta ventana. |
+| `BFF_SESSION_MAX_LIFETIME_SECONDS` | Opcional | Duración absoluta desde el login, entero 900–86400 y ≥ idle; default 36000 (10 h). Alinear con `ssoSessionMaxLifespan`. |
 | `BFF_SESSION_COOKIE` | Opcional | Nombre seguro, caracteres alfanuméricos, `_` o `-`; default `dss_session`. |
 | `NODE_ENV` | Runtime | En `production`, la cookie se marca `Secure`; definirlo correctamente en el despliegue productivo. |
 

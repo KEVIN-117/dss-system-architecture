@@ -16,7 +16,12 @@ export interface BffAuthConfig {
 export interface BffSessionConfig {
   cookieName: string;
   secret: string;
-  ttlSeconds: number;
+  /** Inactivity window; only explicit user-activity heartbeats extend it. */
+  idleTimeoutSeconds: number;
+  /** Absolute cap measured from login, regardless of activity. */
+  maxLifetimeSeconds: number;
+  /** Access tokens are renewed when they have fewer seconds than this left. */
+  refreshLeewaySeconds: number;
   secure: boolean;
 }
 
@@ -26,7 +31,10 @@ export interface DwControlServiceRuntimeConfig {
 }
 
 export const DEFAULT_SESSION_COOKIE_NAME = 'dss_session';
-const DEFAULT_SESSION_TTL_SECONDS = 300;
+// Aligned with the realm's ssoSessionIdleTimeout / ssoSessionMaxLifespan.
+const DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS = 1800;
+const DEFAULT_SESSION_MAX_LIFETIME_SECONDS = 36_000;
+const SESSION_REFRESH_LEEWAY_SECONDS = 60;
 
 export class BffConfigurationError extends Error {
   constructor(message: string) {
@@ -126,12 +134,23 @@ export function getBffAuthConfig(
 export function getBffSessionConfig(
   environment: Environment = process.env,
 ): BffSessionConfig {
-  const ttl = environment.BFF_SESSION_TTL_SECONDS?.trim();
-  const ttlSeconds = ttl ? Number(ttl) : DEFAULT_SESSION_TTL_SECONDS;
-
-  if (!Number.isInteger(ttlSeconds) || ttlSeconds < 60 || ttlSeconds > 900) {
+  const idleTimeoutSeconds = integerSetting(
+    environment,
+    'BFF_SESSION_IDLE_TIMEOUT_SECONDS',
+    DEFAULT_SESSION_IDLE_TIMEOUT_SECONDS,
+    300,
+    28_800,
+  );
+  const maxLifetimeSeconds = integerSetting(
+    environment,
+    'BFF_SESSION_MAX_LIFETIME_SECONDS',
+    DEFAULT_SESSION_MAX_LIFETIME_SECONDS,
+    900,
+    86_400,
+  );
+  if (maxLifetimeSeconds < idleTimeoutSeconds) {
     throw new BffConfigurationError(
-      'BFF_SESSION_TTL_SECONDS must be an integer between 60 and 900 seconds',
+      'BFF_SESSION_MAX_LIFETIME_SECONDS must be greater than or equal to BFF_SESSION_IDLE_TIMEOUT_SECONDS',
     );
   }
 
@@ -152,7 +171,9 @@ export function getBffSessionConfig(
   return {
     cookieName,
     secret,
-    ttlSeconds,
+    idleTimeoutSeconds,
+    maxLifetimeSeconds,
+    refreshLeewaySeconds: SESSION_REFRESH_LEEWAY_SECONDS,
     secure: environment.NODE_ENV === 'production',
   };
 }
@@ -202,6 +223,23 @@ function assertPortalRedirect(
       `${variableName} must use an origin in BFF_ALLOWED_ORIGINS`,
     );
   }
+}
+
+function integerSetting(
+  environment: Environment,
+  name: string,
+  fallback: number,
+  min: number,
+  max: number,
+): number {
+  const raw = environment[name]?.trim();
+  const value = raw ? Number(raw) : fallback;
+  if (!Number.isInteger(value) || value < min || value > max) {
+    throw new BffConfigurationError(
+      `${name} must be an integer between ${min} and ${max} seconds`,
+    );
+  }
+  return value;
 }
 
 function requiredValue(environment: Environment, name: string): string {

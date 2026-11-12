@@ -11,6 +11,15 @@ import {
 } from 'react';
 
 import { AuthProfileError, fetchBffSession } from './auth-api';
+import {
+  SessionTimeoutDialog,
+  type SessionTimeoutDialogProps,
+} from './SessionTimeoutDialog';
+import {
+  useIdleSession,
+  type IdleSessionOptions,
+  type IdleSessionState,
+} from './useIdleSession';
 import type {
   AuthActions,
   AuthState,
@@ -21,11 +30,19 @@ import type {
 type AuthContextValue = AuthState & AuthActions;
 
 const AuthContext = createContext<AuthContextValue | null>(null);
+const SessionTimeoutContext = createContext<IdleSessionState | null>(null);
 
 export interface AuthProviderProps {
   children: ReactNode;
   /** Origin of the BFF, for example https://bff.example.edu. */
   bffBaseUrl: string;
+  /**
+   * Idle-session handling. Enabled by default: activity keeps the BFF session
+   * alive, inactivity ends it after a warning. Pass `false` to disable.
+   */
+  sessionTimeout?: false | IdleSessionOptions;
+  /** Replaces the built-in warning dialog. */
+  renderSessionWarning?: (props: SessionTimeoutDialogProps) => ReactNode;
 }
 
 const INITIAL_STATE: AuthState = {
@@ -40,7 +57,12 @@ const INITIAL_STATE: AuthState = {
   permissions: [],
 };
 
-export function AuthProvider({ bffBaseUrl, children }: AuthProviderProps) {
+export function AuthProvider({
+  bffBaseUrl,
+  children,
+  sessionTimeout,
+  renderSessionWarning,
+}: AuthProviderProps) {
   const [state, setState] = useState<AuthState>(INITIAL_STATE);
 
   useEffect(() => {
@@ -91,6 +113,14 @@ export function AuthProvider({ bffBaseUrl, children }: AuthProviderProps) {
     window.location.assign(`${bffBaseUrl.replace(/\/$/, '')}/api/auth/logout`);
   }, [bffBaseUrl]);
 
+  const idleSession = useIdleSession({
+    bffBaseUrl,
+    enabled: sessionTimeout !== false && state.isAuthenticated,
+    // Ends the Keycloak SSO session too, so the next visit asks for credentials.
+    onExpired: logout,
+    ...(sessionTimeout || {}),
+  });
+
   const register = useCallback((requestedReturnTo?: string) => {
     const returnTo = resolveReturnTo(requestedReturnTo);
     window.location.assign(
@@ -126,7 +156,36 @@ export function AuthProvider({ bffBaseUrl, children }: AuthProviderProps) {
     [state, login, logout, register, getToken, getUser, hasRole, hasPermission],
   );
 
-  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+  let warning: ReactNode = null;
+  if (idleSession.secondsLeft !== null) {
+    const warningProps: SessionTimeoutDialogProps = {
+      secondsLeft: idleSession.secondsLeft,
+      reason: idleSession.reason,
+      onContinue: idleSession.extend,
+      onLogout: logout,
+    };
+    warning = renderSessionWarning ? (
+      renderSessionWarning(warningProps)
+    ) : (
+      <SessionTimeoutDialog {...warningProps} />
+    );
+  }
+
+  return (
+    <AuthContext.Provider value={value}>
+      <SessionTimeoutContext.Provider value={idleSession}>
+        {children}
+        {warning}
+      </SessionTimeoutContext.Provider>
+    </AuthContext.Provider>
+  );
+}
+
+/** Idle-session state for portals that render their own countdown UI. */
+export function useSessionTimeout(): IdleSessionState {
+  const context = useContext(SessionTimeoutContext);
+  if (!context) throw new Error('useSessionTimeout must be used within an AuthProvider');
+  return context;
 }
 
 /** Obtiene el contexto de sesión del BFF. */

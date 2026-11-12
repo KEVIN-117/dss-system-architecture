@@ -79,6 +79,29 @@ paths:
             application/json:
               schema: { $ref: '#/components/schemas/SessionProfile' }
         '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/refresh:
+    post:
+      tags: [Sesión]
+      operationId: refreshSession
+      summary: Heartbeat de actividad que extiende la sesión
+      description: >-
+        Los portales lo envían mientras el usuario interactúa con la página.
+        Extiende la ventana de inactividad y, si el access token está por
+        vencer, el BFF lo renueva con el refresh token de Keycloak y reemite
+        la cookie `dss_session`. Ningún token se devuelve al navegador.
+      responses:
+        '200':
+          description: Sesión extendida.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [expiresAt, absoluteExpiresAt, idleTimeoutSeconds]
+                properties:
+                  expiresAt: { type: integer, description: 'Epoch ms en que la sesión vence sin nueva actividad.' }
+                  absoluteExpiresAt: { type: integer, description: 'Epoch ms del tope absoluto de la sesión.' }
+                  idleTimeoutSeconds: { type: integer }
+        '401': { $ref: '#/components/responses/Unauthorized' }
   /auth/logout:
     get:
       tags: [Sesión]
