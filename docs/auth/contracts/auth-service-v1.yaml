@@ -1,0 +1,259 @@
+openapi: 3.1.0
+info:
+  title: Auth Service API
+  version: 1.0.0-draft
+  description: >-
+    Contrato documental de las operaciones REST de auth-service redactado a partir
+    de los controladores `UserProfileController`, `AdminUserDirectoryController`,
+    `AcademicCatalogController` y `AcademicContextAssignmentController`. Los
+    endpoints de demostración (`/demo/*`, `/example-user`) y las rutas internas
+    servidor a servidor no forman parte de este contrato. Springdoc puede generar
+    el esquema en tiempo de ejecución con `AUTH_API_DOCS_ENABLED=true`; ante una
+    diferencia, prevalece la implementación y este archivo debe corregirse.
+servers:
+  - url: /api/v1
+security:
+  - bearerAuth: []
+tags:
+  - name: Perfil
+  - name: Directorio administrativo
+  - name: Catálogo académico
+paths:
+  /auth/me:
+    get:
+      tags: [Perfil]
+      operationId: getAuthenticatedUserProfile
+      summary: Obtiene el perfil del usuario autenticado
+      description: >-
+        Devuelve el perfil local sincronizado desde Keycloak y sus contextos
+        académicos. El usuario se identifica por el `sub` del JWT; no recibe
+        parámetros.
+      responses:
+        '200':
+          description: Perfil local del usuario.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AuthUserProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '404':
+          description: El perfil aún no se sincronizó desde Keycloak (`USER_NOT_SYNCED`).
+          content:
+            application/problem+json:
+              schema: { $ref: '#/components/schemas/Problem' }
+  /admin/users:
+    get:
+      tags: [Directorio administrativo]
+      operationId: listAdminUsers
+      summary: Lista el directorio de usuarios
+      x-required-permission: ROLE_SUPERADMIN
+      description: Directorio paginado con filtros opcionales por texto, estado, rol y ámbito académico.
+      parameters:
+        - name: q
+          in: query
+          description: Texto libre sobre nombre, usuario o correo (máximo 120 caracteres).
+          schema: { type: string, maxLength: 120 }
+        - name: active
+          in: query
+          schema: { type: boolean }
+        - name: role
+          in: query
+          description: Rol institucional, por ejemplo `DECANO` (máximo 50 caracteres).
+          schema: { type: string, maxLength: 50 }
+        - name: facultyId
+          in: query
+          schema: { type: integer, minimum: 0 }
+        - name: careerId
+          in: query
+          description: Código de carrera de tres caracteres alfanuméricos.
+          schema: { type: string, pattern: '^[A-Za-z0-9]{3}$' }
+        - name: page
+          in: query
+          schema: { type: integer, minimum: 0, default: 0 }
+        - name: size
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+      responses:
+        '200':
+          description: Página del directorio.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDirectoryPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/users/{userId}:
+    get:
+      tags: [Directorio administrativo]
+      operationId: getAdminUser
+      summary: Obtiene el detalle de un usuario
+      x-required-permission: ROLE_SUPERADMIN
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Usuario del directorio.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminUserDirectoryEntry' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/users/{userId}/academic-contexts:
+    put:
+      tags: [Directorio administrativo]
+      operationId: replaceAcademicContexts
+      summary: Reemplaza los contextos académicos de un usuario
+      x-required-permission: ROLE_SUPERADMIN
+      description: >-
+        Sustituye la lista completa de contextos académicos. Una carrera requiere
+        su facultad; `facultyId` no puede ser negativo y `careerId` tiene tres
+        caracteres sin espacios.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/AcademicContextAssignmentRequest' }
+      responses:
+        '200':
+          description: Contextos vigentes después del reemplazo.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/UserAcademicContext' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /admin/academic-catalog:
+    get:
+      tags: [Catálogo académico]
+      operationId: getAcademicCatalog
+      summary: Obtiene el catálogo de facultades y carreras
+      x-required-permission: ROLE_SUPERADMIN
+      responses:
+        '200':
+          description: Catálogo activo.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AcademicCatalog' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    UserId:
+      name: userId
+      in: path
+      required: true
+      description: Identificador local del usuario (UUID).
+      schema: { type: string, format: uuid }
+  responses:
+    BadRequest:
+      description: Parámetros o cuerpo inválidos (`INVALID_REQUEST` o error de dominio).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Token ausente, inválido o vencido.
+    Forbidden:
+      description: El token no incluye `ROLE_SUPERADMIN`.
+    NotFound:
+      description: Usuario inexistente.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    Problem:
+      type: object
+      description: RFC 9457 ProblemDetail emitido por `GlobalExceptionHandler`.
+      properties:
+        type: { type: string }
+        title: { type: string }
+        status: { type: integer }
+        detail: { type: string }
+        instance: { type: string }
+    UserAcademicContext:
+      type: object
+      required: [id, userId]
+      properties:
+        id: { type: string, format: uuid }
+        userId: { type: string, format: uuid }
+        facultyId: { type: [integer, 'null'], minimum: 0 }
+        careerId: { type: [string, 'null'], minLength: 3, maxLength: 3 }
+    AuthUserProfile:
+      type: object
+      required: [id, username, isActive, academicContexts]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        email: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        isActive: { type: boolean }
+        academicContexts:
+          type: array
+          items: { $ref: '#/components/schemas/UserAcademicContext' }
+    AdminUserDirectoryEntry:
+      type: object
+      required: [id, username, isActive, roles, academicContexts]
+      properties:
+        id: { type: string, format: uuid }
+        username: { type: string }
+        email: { type: string }
+        firstName: { type: string }
+        lastName: { type: string }
+        isActive: { type: boolean }
+        roles:
+          type: array
+          items: { type: string }
+        academicContexts:
+          type: array
+          items: { $ref: '#/components/schemas/UserAcademicContext' }
+    AdminUserDirectoryPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/AdminUserDirectoryEntry' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+    AcademicContextAssignmentRequest:
+      type: object
+      required: [contexts]
+      properties:
+        contexts:
+          type: array
+          items:
+            type: object
+            properties:
+              facultyId: { type: [integer, 'null'], minimum: 0 }
+              careerId: { type: [string, 'null'], minLength: 3, maxLength: 3 }
+    AcademicCatalog:
+      type: object
+      required: [faculties, careers]
+      properties:
+        faculties:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: integer }
+              name: { type: string }
+        careers:
+          type: array
+          items:
+            type: object
+            properties:
+              id: { type: string }
+              name: { type: string }
+              facultyId: { type: integer }

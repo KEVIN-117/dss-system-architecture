@@ -1,0 +1,62 @@
+export const metadata = { title: 'OLAP Workspace', audience: ['rector', 'decanos', 'directores', 'administradores'], classification: 'public-summary' }
+
+## Para qué sirve
+
+El OLAP Workspace es el espacio de análisis para ir más allá de los tableros: elegir un cubo, combinar dimensiones y medidas, ver el resultado en tabla o gráfico y exportarlo. Pueden usarlo Rector, Decanos, Directores y Administración. Decanos y directores solo ven datos de su facultad o carrera; el filtro se aplica en el servidor aunque la consulta no lo incluya.
+
+Ábrelo desde la opción <Ui>Exploración OLAP</Ui> de tu tablero. <Ui>Volver a mi portal</Ui> te regresa al tablero de tu rol.
+
+## Secciones
+
+| Sección | Uso |
+| --- | --- |
+| <Ui>Inicio</Ui> | Accesos rápidos al workspace. |
+| <Ui>Análisis OLAP</Ui> | Explorador de cubos para armar consultas propias. |
+| <Ui>Dashboards</Ui> | Tableros guardados en el repositorio de análisis (solo Administración, por ahora). |
+| <Ui>Apps</Ui> | Apps analíticas publicadas (solo Administración, por ahora). |
+| <Ui>MDX Workbench</Ui> | Consultas MDX y SQL para usuarios avanzados (solo Administración, por ahora). |
+
+## Armar una consulta
+
+1. En <Ui>Análisis OLAP</Ui>, elige un cubo. Hasta que lo hagas verás «Selecciona un cubo para comenzar».
+2. En el **explorador de cubos** aparecen las dimensiones (por ejemplo gestión, facultad, carrera) y las medidas (por ejemplo intentos de cursado o promedio final).
+3. Lleva las dimensiones al eje de **filas** o de **columnas** del área de consulta y agrega al menos una medida.
+4. Pulsa <Ui>Ejecutar consulta</Ui>. El resultado aparece en <Ui>Tabla</Ui>; cambia a <Ui>Gráfico</Ui> para verlo como barras, líneas, puntos, matriz o proporciones.
+
+### Ajustar el resultado
+
+Cada eje ofrece estas acciones:
+
+- <Ui>Invertir ejes</Ui>: intercambia filas y columnas.
+- <Ui>Ocultar vacíos</Ui>: oculta filas y columnas sin valores.
+- <Ui>Ordenar eje</Ui>: ordena por una medida.
+- <Ui>Limitar cantidad (Top/Bottom)</Ui>: muestra solo los primeros o últimos N elementos.
+- <Ui>Filtro de expresión MDX</Ui>: filtro avanzado escrito en MDX.
+- <Ui>Vaciar eje</Ui>: quita todo lo agregado al eje.
+
+### Funciones disponibles solo para Administración
+
+Hoy el BFF permite a Rector, Decanos y Directores **descubrir cubos y ejecutar consultas**. Las funciones que consultan otras rutas del servicio OLAP responden «sin permiso» para esos roles y solo funcionan con una cuenta de Administración:
+
+- **Filtro de miembros** (elegir valores concretos de un nivel, por ejemplo algunas gestiones).
+- **Detalle de registros** de una celda (drill-through) y **ver la consulta MDX** generada.
+- <Ui>Dashboards</Ui>, <Ui>Apps</Ui> y el <Ui>MDX Workbench</Ui>, que leen el repositorio de análisis.
+
+Si necesitas alguno de estos análisis, pide a la administración que lo prepare o lo publique en tu tablero.
+
+## Exportar y compartir
+
+- <Ui>Exportar a CSV</Ui> descarga el resultado visible para abrirlo en una hoja de cálculo.
+- La consulta se guarda en la dirección de la página: copia la URL para volver a ella o compartirla con alguien que tenga el mismo nivel de acceso. Cada persona verá los datos que su propio rol le permite.
+
+<Callout title="Datos sensibles">
+  Las exportaciones pueden incluir información académica. Guárdalas solo en equipos institucionales y no las compartas fuera de la universidad.
+</Callout>
+
+## Si algo no funciona
+
+- **«El cubo del enlace no está disponible para tu sesión.»**: la consulta compartida usa un cubo que tu rol no puede ver.
+- **«No hay apps publicadas»** o **«Sin páginas»**: todavía no se publicaron apps o dashboards.
+- **«This OLAP operation is not available for this role»** o error 403: la función solo está habilitada para Administración (ver arriba), o la consulta intenta salir de tu facultad o carrera.
+
+Para conocer cómo funciona el motor OLAP por dentro, consulta [Análisis OLAP](/docs/analisis-olap).

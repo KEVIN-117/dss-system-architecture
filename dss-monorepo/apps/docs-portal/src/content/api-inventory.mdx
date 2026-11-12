@@ -2,41 +2,37 @@ export const metadata = { title: 'Inventario de APIs', audience: ['directivos', 
 
 ## Estado de los contratos
 
-El catálogo del portal carga operaciones únicamente desde archivos OpenAPI YAML versionados en `docs/`. En la revisión del repositorio hay contratos para DW Control y Prediction Service. Ambos se identifican como borradores en sus metadatos; sus ejemplos solo se mostrarán cuando estén declarados en esos contratos.
+La [referencia API](/reference) se genera únicamente desde archivos OpenAPI YAML versionados en `docs/`. Todos están en estado **borrador**: describen la implementación revisada, pero ante una diferencia prevalece el código y el contrato debe corregirse en el mismo cambio.
 
-### DW Control
+| Servicio | Contrato | Alcance |
+| --- | --- | --- |
+| Auth Service | `docs/auth/contracts/auth-service-v1.yaml` | Perfil, directorio administrativo, contextos académicos y catálogo. |
+| BFF | `docs/bff/contracts/bff-v1.yaml` | Sesión, administración, Data Warehouse y fachadas de OLAP y Predicción. |
+| DW Control | `docs/dw/contracts/dw-control-service-v1.yaml` | Cierres académicos y ejecuciones ETL. |
+| OLAP Service | `docs/olap/contracts/olap-service-v1.yaml` | Subconjunto de Saiku que usan los portales: descubrimiento, consultas y administración. |
+| Prediction Service | `docs/prediction/contracts/prediction-api-v1.yaml` | Inferencia, lotes, publicaciones y entrenamiento. |
 
-Contrato `docs/dw/contracts/dw-control-service-v1.yaml`, borrador OpenAPI cargado en el catálogo.
+### Qué no cubren
 
-### Prediction Service
+- **Auth Service**: los endpoints de demostración y las rutas internas servidor a servidor no se publican. Springdoc puede generar el esquema en ejecución con `AUTH_API_DOCS_ENABLED=true` para contrastarlo.
+- **OLAP Service**: las rutas de IA, repositorio, apps, dashboards y GraphQL de Saiku siguen documentadas en `olap-service/docs/`. Los cuerpos `ThinQuery` y `QueryResult` se describen solo a nivel de propiedades estables.
+- **BFF**: el esquema GraphQL se describe en `docs/graphql/bff-analytics.md`.
+- **ETL Apache Hop**: no expone un API HTTP; su operación se explica en [Integración de datos](/docs/integracion-de-datos).
 
-Contrato `docs/prediction/contracts/prediction-api-v1.yaml`, borrador OpenAPI. Sus notas registran decisiones institucionales pendientes.
+## Cómo se publican en el portal
 
-### Auth Service
+El portal no lee `docs/` directamente: `scripts/sync-openapi.mjs` copia los contratos a `apps/docs-portal/openapi/` para que estén disponibles en la imagen Docker, cuyo contexto es `dss-monorepo/`.
 
-Swagger/OpenAPI se genera con springdoc y hay controladores REST y guía del servicio. No hay YAML versionado en `docs/`; corresponde exportar y revisar un contrato.
+1. Edita el contrato en `docs/<servicio>/contracts/`.
+2. Ejecuta `bun nx run @dss-monorepo/docs-portal:sync-openapi` (también corre antes de `dev` y `build`).
+3. Confirma en el mismo commit el YAML de `docs/` y su copia en `openapi/`. `bun nx run @dss-monorepo/docs-portal:check-openapi` falla si la copia está desactualizada.
 
-### Saiku / OLAP
+## Ejemplos
 
-OpenAPI se genera desde recursos JAX-RS y existen guías REST y GraphQL en `olap-service/docs/`. Falta un contrato YAML consolidado para el portal; conviene priorizar las rutas que consume el BFF.
-
-### BFF
-
-Las fuentes disponibles son `dss-monorepo/apps/bff/README.md`, las rutas implementadas y el contrato GraphQL en `docs/graphql/bff-analytics.md`. Falta un contrato OpenAPI YAML integral que distinga fachadas públicas de rutas internas.
-
-### ETL Apache Hop
-
-Hay workflows, pipelines y documentación del proyecto. No es un API HTTP del portal; ejecuciones y operación se explican en la guía de integración de datos.
-
-## Prioridad para cerrar brechas
-
-1. Exportar el esquema generado de Auth Service a YAML y revisar modelos, códigos de error y seguridad con su responsable.
-2. Definir el subconjunto de Saiku soportado por el DSS y exportar su OpenAPI generado; mantener las guías de consulta como contexto, no como contrato sustituto.
-3. Elaborar un contrato del BFF desde sus rutas y validadores reales, distinguiendo la sesión web de los accesos servidor a servidor.
-4. Añadir ejemplos de request y response al contrato fuente después de verificarlos contra implementación o fixtures autorizados. El portal no infiere payloads.
+Cada operación muestra ejemplos en cURL, JavaScript y Python. Si el contrato declara un ejemplo de solicitud, se usa tal cual; si no, el portal genera una **plantilla** con valores de tipo (`<texto>`, `0`) a partir del esquema y lo indica. Las respuestas solo muestran ejemplos declarados en el YAML: el portal no inventa payloads.
 
 <Callout title="Fuente de verdad">
-  La lista anterior indica fuentes y brechas revisadas en el repositorio. No convierte documentación narrativa ni anotaciones parciales en una especificación contractual.
+  Añade ejemplos de request y response al contrato solo después de verificarlos contra la implementación o fixtures autorizados, sin datos personales.
 </Callout>
 
 <Source path="auth-service/README.md" label="Auth Service" /> · <Source path="olap-service/docs/AI-QUERY-API.md" label="Saiku AI Query API" /> · <Source path="dss-monorepo/apps/bff/README.md" label="BFF" />

@@ -5,9 +5,23 @@
   "sourceRoot": "apps/docs-portal/src",
   "tags": ["type:app", "scope:shared"],
   "targets": {
+    "sync-openapi": {
+      "command": "node scripts/sync-openapi.mjs",
+      "options": {
+        "cwd": "apps/docs-portal"
+      },
+      "cache": false
+    },
+    "check-openapi": {
+      "command": "node scripts/sync-openapi.mjs --check",
+      "options": {
+        "cwd": "apps/docs-portal"
+      },
+      "cache": false
+    },
     "build": {
       "command": "next build --webpack",
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "sync-openapi"],
       "parallelism": false,
       "options": {
         "cwd": "apps/docs-portal",
@@ -17,6 +31,7 @@
       }
     },
     "dev": {
+      "dependsOn": ["sync-openapi"],
       "options": {
         "port": 3005
       }

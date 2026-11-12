@@ -64,6 +64,9 @@
       "path": "./apps/landing-e2e"
     },
     {
+      "path": "./apps/docs-portal-e2e"
+    },
+    {
       "path": "./apps/landing"
     },
     {

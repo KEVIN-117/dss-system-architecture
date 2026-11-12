@@ -1,0 +1,446 @@
+openapi: 3.1.0
+info:
+  title: BFF API
+  version: 1.0.0-draft
+  description: >-
+    Fachada HTTP que consumen los portales DSS. Redactada desde los route
+    handlers de `dss-monorepo/apps/bff/src/app/api`. El navegador usa la cookie
+    de sesión cifrada `dss_session` (HttpOnly); los llamados servidor a servidor
+    pueden enviar un Bearer token de Keycloak. Las rutas proxy a OLAP y
+    Predicción solo se resumen aquí: sus cuerpos siguen los contratos de cada
+    servicio. El BFF no propaga cuerpos de error internos.
+servers:
+  - url: /api
+security:
+  - sessionCookie: []
+  - bearerAuth: []
+tags:
+  - name: Salud
+  - name: Sesión
+  - name: Administración de usuarios
+  - name: Data Warehouse
+  - name: Proxies de servicios
+paths:
+  /health:
+    get:
+      tags: [Salud]
+      operationId: health
+      summary: Verifica que el BFF esté disponible
+      security: []
+      responses:
+        '200':
+          description: El proceso responde.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, const: ok }
+              example: { status: ok }
+  /auth/login:
+    get:
+      tags: [Sesión]
+      operationId: login
+      summary: Inicia el flujo Authorization Code + PKCE
+      security: []
+      description: Crea una transacción cifrada (state, nonce, PKCE) y redirige a Keycloak.
+      parameters:
+        - name: returnTo
+          in: query
+          description: URL de regreso; solo se aceptan orígenes incluidos en `BFF_ALLOWED_ORIGINS`.
+          schema: { type: string, format: uri }
+        - name: action
+          in: query
+          description: '`register` abre el registro cuando el realm lo permite.'
+          schema: { type: string, enum: [register] }
+      responses:
+        '302': { description: Redirección a Keycloak. }
+  /auth/callback:
+    get:
+      tags: [Sesión]
+      operationId: callback
+      summary: Completa el inicio de sesión y emite la cookie de sesión
+      security: []
+      parameters:
+        - { name: code, in: query, schema: { type: string } }
+        - { name: state, in: query, schema: { type: string } }
+        - { name: error, in: query, schema: { type: string } }
+      responses:
+        '302': { description: Redirección a `returnTo` con la cookie `dss_session` emitida, o a la pantalla de error. }
+  /auth/me:
+    get:
+      tags: [Sesión]
+      operationId: me
+      summary: Devuelve el perfil, roles y permisos de la sesión
+      responses:
+        '200':
+          description: Sesión válida.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SessionProfile' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    get:
+      tags: [Sesión]
+      operationId: logout
+      summary: Cierra la sesión local y la sesión SSO cuando es posible
+      responses:
+        '302': { description: Redirección al logout OIDC o a la página de inicio. }
+  /admin/users:
+    get:
+      tags: [Administración de usuarios]
+      operationId: listUsers
+      summary: Lista el directorio de usuarios
+      x-required-permission: SUPERADMIN
+      description: Proxy de `GET /admin/users` de Auth Service con los mismos filtros.
+      parameters:
+        - { name: q, in: query, schema: { type: string, maxLength: 120 } }
+        - { name: active, in: query, schema: { type: boolean } }
+        - { name: role, in: query, schema: { type: string, maxLength: 50 } }
+        - { name: facultyId, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: careerId, in: query, schema: { type: string, pattern: '^[A-Za-z0-9]{3}$' } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200': { description: Página del directorio (ver contrato de Auth Service). }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+  /admin/users/{userId}:
+    get:
+      tags: [Administración de usuarios]
+      operationId: getUser
+      summary: Obtiene el detalle de un usuario
+      x-required-permission: SUPERADMIN
+      parameters:
+        - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: Usuario del directorio. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+  /admin/users/{userId}/academic-contexts:
+    put:
+      tags: [Administración de usuarios]
+      operationId: replaceAcademicContexts
+      summary: Reemplaza los contextos académicos de un usuario
+      x-required-permission: SUPERADMIN
+      description: Auth Service vuelve a exigir `ROLE_SUPERADMIN` como segunda barrera.
+      parameters:
+        - { name: userId, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [contexts]
+              properties:
+                contexts:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      facultyId: { type: [integer, 'null'] }
+                      careerId: { type: [string, 'null'] }
+      responses:
+        '200': { description: Contextos vigentes. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+  /admin/academic-catalog:
+    get:
+      tags: [Administración de usuarios]
+      operationId: academicCatalog
+      summary: Obtiene facultades y carreras activas
+      x-required-permission: SUPERADMIN
+      responses:
+        '200': { description: Catálogo académico. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+  /admin/dw/capabilities:
+    get:
+      tags: [Data Warehouse]
+      operationId: dwCapabilities
+      summary: Indica qué operaciones de DW Control habilita la sesión
+      responses:
+        '200':
+          description: Capacidades booleanas; los roles de cliente no se exponen.
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  canReadClosures: { type: boolean }
+                  canManageClosures: { type: boolean }
+                  canReadEtlExecutions: { type: boolean }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /admin/dw/academic-closures:
+    get:
+      tags: [Data Warehouse]
+      operationId: listClosures
+      summary: Lista cierres académicos
+      x-required-permission: DW_CLOSURE_READ
+      parameters:
+        - { name: gestion, in: query, schema: { type: integer } }
+        - { name: periodo, in: query, schema: { type: integer } }
+        - { name: status, in: query, schema: { type: string, enum: [PENDIENTE, CERRADO, REABIERTO, PROCESADO] } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200': { description: Página de cierres (ver contrato de DW Control). }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Data Warehouse]
+      operationId: createClosure
+      summary: Crea un corte académico pendiente
+      x-required-permission: DW_CLOSURE_MANAGE
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [gestion, periodo, reason]
+              properties:
+                gestion: { type: integer }
+                periodo: { type: integer }
+                reason: { type: string, minLength: 1, maxLength: 2000 }
+      responses:
+        '201': { description: Cierre creado en estado PENDIENTE. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Ya existe un cierre para esa gestión y periodo. }
+  /admin/dw/academic-closures/{closureId}:
+    get:
+      tags: [Data Warehouse]
+      operationId: getClosure
+      summary: Obtiene un cierre académico
+      x-required-permission: DW_CLOSURE_READ
+      parameters:
+        - $ref: '#/components/parameters/ClosureId'
+      responses:
+        '200': { description: Cierre académico. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Cierre inexistente. }
+  /admin/dw/academic-closures/{closureId}/events:
+    get:
+      tags: [Data Warehouse]
+      operationId: listClosureEvents
+      summary: Consulta el historial de auditoría de un cierre
+      x-required-permission: DW_CLOSURE_READ
+      parameters:
+        - $ref: '#/components/parameters/ClosureId'
+      responses:
+        '200': { description: Eventos del cierre. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/dw/academic-closures/{closureId}/close:
+    post:
+      tags: [Data Warehouse]
+      operationId: closeClosure
+      summary: Autoriza el cierre de un periodo
+      x-required-permission: DW_CLOSURE_MANAGE
+      parameters:
+        - $ref: '#/components/parameters/ClosureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [effectiveAt, reason]
+              properties:
+                effectiveAt: { type: string, format: date-time }
+                reason: { type: string }
+      responses:
+        '200': { description: Cierre autorizado. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Transición incompatible con el estado actual. }
+  /admin/dw/academic-closures/{closureId}/reopen:
+    post:
+      tags: [Data Warehouse]
+      operationId: reopenClosure
+      summary: Reabre un periodo cerrado o procesado
+      x-required-permission: DW_CLOSURE_MANAGE
+      parameters:
+        - $ref: '#/components/parameters/ClosureId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [reason]
+              properties:
+                reason: { type: string }
+      responses:
+        '200': { description: Cierre reabierto. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { description: Transición incompatible con el estado actual. }
+  /admin/dw/etl/executions:
+    get:
+      tags: [Data Warehouse]
+      operationId: listEtlExecutions
+      summary: Lista ejecuciones ETL registradas
+      x-required-permission: DW_ETL_MONITOR_READ
+      parameters:
+        - { name: status, in: query, schema: { type: string } }
+        - { name: executionKind, in: query, schema: { type: string } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200': { description: Página de ejecuciones (ver contrato de DW Control). }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/dw/etl/executions/{runId}:
+    get:
+      tags: [Data Warehouse]
+      operationId: getEtlExecution
+      summary: Obtiene el detalle de una ejecución ETL
+      x-required-permission: DW_ETL_MONITOR_READ
+      parameters:
+        - { name: runId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Ejecución con pasos, métricas e incidencias. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Ejecución inexistente. }
+  /graphql:
+    post:
+      tags: [Proxies de servicios]
+      operationId: graphql
+      summary: Ejecuta una operación GraphQL de analítica
+      description: >-
+        Apollo Server con identidad y alcance académico, catálogo y metadatos
+        OLAP, `analyticQuery` y `predictionPublication`. El esquema se describe en
+        `docs/graphql/bff-analytics.md`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [query]
+              properties:
+                query: { type: string }
+                variables: { type: object }
+                operationName: { type: string }
+      responses:
+        '200': { description: Respuesta GraphQL (`data` y/o `errors`). }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /olap/rest/saiku/{path}:
+    post:
+      tags: [Proxies de servicios]
+      operationId: olapProxy
+      summary: Reenvía una operación permitida a OLAP Service
+      x-required-permission: RECTOR, DECANO, DIRECTOR o SUPERADMIN
+      description: >-
+        Los roles académicos solo pueden leer `/{username}/discover` y metadatos
+        de cubos, y ejecutar `POST /api/query/execute`; el BFF agrega el filtro
+        de ámbito académico de DECANO y DIRECTOR. Las rutas `/admin/*` exigen
+        SUPERADMIN. También acepta GET, PUT y DELETE según la ruta de destino.
+      parameters:
+        - { name: path, in: path, required: true, description: Ruta de Saiku posterior a `/rest/saiku/`., schema: { type: string } }
+      responses:
+        '200': { description: Respuesta de OLAP Service (ver su contrato). }
+        '400': { description: Ruta o consulta inválida. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '504': { description: OLAP no respondió en 30 segundos. }
+  /prediction/v1/{operation}:
+    post:
+      tags: [Proxies de servicios]
+      operationId: predictionProxy
+      summary: Reenvía una operación v1 documentada a Prediction Service
+      description: >-
+        Solo están habilitadas `POST predictions`, `POST training-jobs`,
+        `POST prediction-batches`, `POST datasets/upload` y las lecturas GET de
+        `training-jobs/{id}`, `prediction-batches/{id}`,
+        `prediction-publications`, `academic-options` y `datasets`.
+        Entrenamiento y datasets requieren SUPERADMIN; el servicio vuelve a
+        validar permiso y ámbito académico. Cualquier otra ruta responde 404.
+      parameters:
+        - { name: operation, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: Respuesta de Prediction Service (ver su contrato). }
+        '202': { description: Lote de predicción encolado. }
+        '400': { description: Cuerpo inválido. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Ruta o método no habilitado en la fachada. }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '504': { description: Prediction Service no respondió a tiempo. }
+components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: dss_session
+      description: Cookie JWE emitida por el BFF tras `/auth/callback`.
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  parameters:
+    ClosureId:
+      name: closureId
+      in: path
+      required: true
+      schema: { type: integer, format: int64 }
+  responses:
+    BadRequest:
+      description: Parámetros o cuerpo inválidos.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Unauthorized:
+      description: Sin sesión válida ni Bearer token aceptado.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Forbidden:
+      description: La sesión no tiene el rol o permiso requerido.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    BadGateway:
+      description: El servicio de destino no está disponible.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+  schemas:
+    Error:
+      type: object
+      properties:
+        error: { type: string }
+        code: { type: string }
+    SessionProfile:
+      type: object
+      required: [user, roles, permissions]
+      properties:
+        user:
+          type: object
+          description: Perfil local de Auth Service (id, username, email, nombres, isActive y academicContexts).
+        roles:
+          type: array
+          items: { type: string, enum: [SUPERADMIN, RECTOR, DECANO, DIRECTOR] }
+        permissions:
+          type: array
+          items: { type: string }

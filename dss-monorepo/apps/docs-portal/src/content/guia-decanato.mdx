@@ -1,0 +1,41 @@
+export const metadata = { title: 'Tablero de Decanato', audience: ['decanos'], classification: 'public-summary' }
+
+## Para qué sirve
+
+El tablero de Decanato muestra indicadores académicos **de tu facultad**. El sistema aplica automáticamente el filtro de facultad asignado a tu cuenta: no necesitas seleccionarla y no puedes consultar datos de otras facultades.
+
+<Callout title="Requisito">
+  Tu cuenta debe tener una facultad asignada como contexto académico. Si ves «El contexto académico autorizado no está disponible para esta cuenta», pide a la administración que lo asigne.
+</Callout>
+
+## Recorrido del tablero
+
+| Sección | Qué muestra |
+| --- | --- |
+| <Ui>Resumen</Ui> | Indicadores de la última gestión disponible y su evolución. |
+| <Ui>Rendimiento</Ui> → <Ui>Resultados por gestión</Ui> | Promedios, aprobación y reprobación por gestión. |
+| <Ui>Rendimiento</Ui> → <Ui>Regularidad y continuidad</Ui> | Repetición y abandono de intentos de cursado por gestión. |
+| <Ui>Admisión</Ui> → <Ui>Postulantes y resultados</Ui> | Postulantes, admitidos y resultados de ingreso. |
+| <Ui>Admisión</Ui> → <Ui>Distribución</Ui> | Postulantes y admitidos por género, carrera, sede y otras características. |
+| <Ui>Permanencia</Ui> → <Ui>Retención y deserción</Ui> | Retención y deserción observada en periodos cerrados. |
+| <Ui>Exploración OLAP</Ui> | Abre el OLAP Workspace para consultas propias, siempre dentro de tu facultad. |
+
+### Resumen
+
+Muestra los **indicadores de la última gestión disponible** (intentos de cursado, promedio final, postulantes, admisión y deserción observada) y la **síntesis de indicadores por gestión académica**. La variación compara cada valor con la gestión anterior disponible. Con <Ui>Periodo del resumen</Ui> puedes cambiar la gestión de referencia.
+
+### Reportes
+
+En cada reporte puedes cambiar el rango con <Ui>Últimas 5 gestiones</Ui>, <Ui>Últimas 10 gestiones</Ui> o <Ui>Histórico completo</Ui>, y filtrar la tabla con <Ui>Buscar en la tabla</Ui>.
+
+- **Distribución de postulantes**: elige la categoría del desglose (carrera, sede, género, tipo de colegio, colegio de origen o modalidad de ingreso) para comparar postulantes y admitidos.
+- **Regularidad y continuidad**: tasas de repetición y abandono. Se expresan como intentos de cursado, no como estudiantes únicos.
+- **Retención y deserción**: se calcula sobre snapshots evaluables de periodos cerrados. Si aún no hay cierres evaluables, verás «No hay cierres con snapshots evaluables para el contexto asignado».
+
+## Preguntas frecuentes
+
+**¿Por qué no veo la gestión actual?** Los indicadores se publican cuando los datos del periodo se cargan en el Data Warehouse; la permanencia, además, solo usa periodos cerrados.
+
+**¿Puedo descargar los datos?** Desde el [OLAP Workspace](/docs/guia-olap-workspace) puedes armar la consulta y exportarla a CSV.
+
+**«Tu rol no tiene permiso para consultar estos indicadores.»** Tu cuenta no tiene el rol de Decano. Consulta con la administración.

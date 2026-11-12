@@ -1,0 +1,75 @@
+export const metadata = { title: 'Portal de administración', audience: ['administradores'], classification: 'restricted', requiredRoles: ['SUPERADMIN'] }
+
+## Acceso
+
+El portal de administración requiere una sesión institucional con el rol `SUPERADMIN`. Cada operación vuelve a validarse en el servicio correspondiente: el BFF comprueba el rol y Auth Service, DW Control, OLAP o Prediction Service aplican sus propios permisos. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso de cliente necesario aunque tenga el rol.
+
+El menú lateral agrupa las secciones por servicio: **Plataforma**, **Auth Service**, **OLAP Service**, **DW Control Service** y **ML Service**.
+
+| Sección | Servicio | Uso |
+| --- | --- | --- |
+| <Ui>Resumen general</Ui> | Todos | Estado de los servicios y actividad reciente. |
+| <Ui>Usuarios</Ui> | Auth Service | Consultar usuarios y asignar su contexto académico. |
+| <Ui>Cierres académicos</Ui> | DW Control Service | Crear, autorizar y reabrir cortes de periodo. |
+| <Ui>Ejecuciones ETL</Ui> | DW Control Service | Revisar el historial y el detalle de las cargas. |
+| <Ui>Conexiones</Ui> | OLAP Service | Registrar y mantener datasources OLAP. |
+| <Ui>Esquemas y cubos</Ui> | OLAP Service | Subir y revisar esquemas Mondrian. |
+| <Ui>Operaciones ML</Ui> | ML Service | Subir datasets de entrenamiento y lanzar entrenamientos candidatos. |
+
+## Resumen general
+
+<Ui>Estado de servicios</Ui> indica para Auth Service, DW Control Service, OLAP Service y ML Service si están **Disponible**, **Sin conexión** o **En desarrollo**. <Ui>Actividad administrativa reciente</Ui> lista los últimos cierres y ejecuciones ETL. Si ves «Una parte de DW Control Service no respondió», el resto del portal sigue funcionando; revisa ese servicio.
+
+## Usuarios y contexto académico
+
+El **Directorio de usuarios** se puede filtrar por texto (<Ui>Nombre, usuario o correo</Ui>), rol y estado (<Ui>Activo</Ui> o <Ui>Inactivo</Ui>). Las cuentas se crean y desactivan en Keycloak; este portal no cambia contraseñas ni roles.
+
+Para asignar el alcance de un Decano o un Director:
+
+1. Busca al usuario y abre la acción de **contexto académico**.
+2. Elige la facultad del catálogo académico. Para un Director, elige también la carrera de esa facultad (<Ui>Selecciona una carrera de la facultad elegida.</Ui>).
+3. Guarda. Verás «Contexto académico actualizado.»
+
+Rector y Administrador no requieren contexto («El rol no requiere contexto académico»). El cambio reemplaza la lista completa de contextos del usuario y se aplica en su siguiente consulta.
+
+## Cierres académicos
+
+Un **cierre académico** autoriza que los datos de una gestión y periodo se consideren definitivos para el Data Warehouse. Estados: `PENDIENTE`, `CERRADO`, `REABIERTO` y `PROCESADO`.
+
+1. <Ui>Crear corte académico</Ui>: indica gestión, periodo y el motivo. El corte queda `PENDIENTE`.
+2. <Ui>Autorizar cierre académico</Ui>: indica la fecha y hora efectiva y el motivo, y pulsa <Ui>Confirmar cierre</Ui>.
+3. <Ui>Reabrir cierre académico</Ui>: requiere un motivo y <Ui>Confirmar reapertura</Ui>.
+
+<Ui>Ver detalle</Ui> muestra versión, quién creó y autorizó el cierre, la ejecución ETL asociada y el historial de auditoría. Crear y transicionar cierres requiere el permiso `DW_CLOSURE_MANAGE`; consultarlos, `DW_CLOSURE_READ`.
+
+<Callout title="DW Control no ejecuta el ETL" tone="warning">
+  Autorizar un cierre no inicia ni reintenta cargas. Las ejecuciones las realiza Apache Hop; aquí solo se registran y consultan.
+</Callout>
+
+## Ejecuciones ETL
+
+El **Historial de ejecuciones** se filtra por estado, tipo, gestión, periodo e ID de cierre. El detalle muestra solicitud, duración, pasos, métricas e incidencias. Requiere `DW_ETL_MONITOR_READ`.
+
+## Conexiones OLAP
+
+<Ui>Registrar conexión OLAP</Ui> crea una conexión **Mondrian (JDBC)** o **Ossie (SQL semántico)**. Completa nombre, URL JDBC, driver, esquema o modelo, usuario y contraseña de solo lectura. Al editar, deja la contraseña vacía para conservar la guardada. Usa <Ui>Restablecer conexión</Ui> después de cambiar un esquema para limpiar la caché.
+
+## Esquemas y cubos
+
+El **repositorio de esquemas** lista los XML Mondrian. Para subir uno, elige un archivo XML, revisa el contenido y confirma. <Ui>Ver esquema</Ui> abre su detalle. Guardar un esquema no crea tablas en el Data Warehouse ni lo asocia a una conexión: asígnalo en la conexión correspondiente.
+
+## Operaciones ML
+
+1. <Ui>Agregar dataset de entrenamiento</Ui>: sube un `.zip` con el dataset preparado (<Ui>Subir y validar dataset</Ui>). El fixture sintético incluido solo sirve para validar el flujo y no representa datos institucionales.
+2. <Ui>Nuevo entrenamiento</Ui>: elige dataset y algoritmo (Random Forest o XGBoost). En el diálogo <Ui>Confirmar entrenamiento candidato</Ui> revisa algoritmo, dataset y configuración, y pulsa <Ui>Iniciar entrenamiento</Ui>.
+3. Revisa el estado del job. El panel muestra la configuración del worker (CPU, memoria, timeout y concurrencia máxima).
+
+Un entrenamiento produce un **candidato**; no lo aprueba para uso institucional. Consulta [Motor predictivo](/docs/prediccion).
+
+## Buenas prácticas
+
+- Registra en cada motivo de cierre o reapertura la decisión institucional que lo respalda.
+- No pegues contraseñas, tokens ni datos personales en motivos, capturas o reportes.
+- Antes de cambiar una conexión o un esquema en producción, coordina con el mantenedor de OLAP: los tableros de las autoridades dependen de ellos.
+
+<Source path="auth-service/README.md" label="Directorio administrativo de Auth Service" /> · <Source path="dss-monorepo/apps/bff/README.md" label="Permisos de las rutas administrativas" />

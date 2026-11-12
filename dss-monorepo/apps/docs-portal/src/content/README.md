@@ -1,16 +1,28 @@
 # Contenido del portal
 
-Las guías del portal se mantienen en archivos `.mdx` versionados junto a `apps/docs-portal`. Next.js compila estos archivos con `@next/mdx`; se pueden importar desde la interfaz como componentes React y pueden incluir JSX.
+Las guías del portal se mantienen en archivos `.mdx` versionados junto a `apps/docs-portal`. Next.js compila estos archivos con `@next/mdx`.
 
-## Convenciones
+## Añadir o cambiar una guía
 
-- Cada archivo exporta un objeto `metadata` con `title`, `audience` y `classification`; los documentos se enumeran explícitamente en `registry.ts`, que establece su URL estable `/docs/<slug>`.
-- Clasificaciones admitidas: `public`, `public-summary` y `restricted`. Los documentos restringidos declaran `requiredRoles`; la ruta del servidor comprueba la sesión mediante `/api/auth/me` del BFF antes de renderizar el MDX y falla cerrada si el BFF no responde. Nunca importes una página restringida en un componente cliente.
-- Usa `Callout` para observaciones que cambian cómo se debe interpretar o usar el contenido.
-- Usa `Source` para enlazar el documento original del que se preparó el resumen. Conserva una sola fuente de verdad cuando el material original ya esté bien mantenido.
-- Antes de copiar información de despliegue, administración o seguridad, define su clasificación y el acceso necesario. No publiques secretos ni valores de ambiente.
-- Revisa [EDITORIAL.md](../EDITORIAL.md) antes de cambiar una guía. La clasificación y los roles deben coincidir tanto en el `metadata` MDX como en `registry.ts`.
-- Para que el control restringido funcione en despliegue, configura las URL BFF/portal a partir de `.env.example` y agrega el origen HTTPS de docs a `BFF_ALLOWED_ORIGINS`. La URL del BFF solo de servidor no se expone al navegador.
-- El frontmatter YAML no está habilitado por defecto. La integración utiliza exportaciones JavaScript/MDX para metadatos, siguiendo la guía de Next.js.
+1. Crea o edita `src/content/<archivo>.mdx`. Empieza con `export const metadata = { title, audience, classification }` y usa `##`/`###` para las secciones: cada título recibe un ancla y aparece en «En esta página».
+2. Declara la guía una sola vez en `catalog.ts` (slug, título, resumen, grupo, audiencia, clasificación y, si aplica, `requiredRoles`). La barra lateral, el inicio, el buscador y los enlaces anterior/siguiente se derivan de esa lista.
+3. Asocia el componente MDX al slug en `registry.ts`.
+4. Ejecuta `bun nx lint docs-portal`, `bun nx build docs-portal` y `bun nx e2e docs-portal-e2e`.
 
-La configuración sigue la [guía oficial de MDX para App Router](https://nextjs.org/docs/app/guides/mdx): `next.config.mjs`, `pageExtensions`, `src/mdx-components.tsx` e importación de contenido. La [guía de Pages Router](https://nextjs.org/docs/pages/guides/mdx) comparte la configuración del compilador y los ejemplos de importación, pero sus convenciones de rutas no se aplican a esta app.
+## Componentes MDX
+
+- `Callout` (`tone="warning"` opcional): observaciones que cambian cómo se debe interpretar o usar el contenido.
+- `Ui`: nombre de un botón o menú tal como aparece en pantalla.
+- `Source`: enlace al documento original del repositorio (audiencia técnica). Las guías de uso no deberían depender de él: el personal administrativo no tiene acceso al repositorio.
+
+## Clasificación
+
+- Clasificaciones admitidas: `public`, `public-summary` y `restricted`. Deben coincidir en el `metadata` MDX y en `catalog.ts`.
+- Cada guía restringida necesita además su propia ruta dinámica `src/app/docs/<slug>/page.tsx` (copia `guia-portal-administracion/page.tsx`): `/docs/[slug]` es estática y solo sirve guías públicas.
+- Los documentos restringidos declaran `requiredRoles`; la ruta del servidor comprueba la sesión mediante `/api/auth/me` del BFF antes de renderizar el MDX y falla cerrada si el BFF no responde. Su texto no entra en el índice de búsqueda. Nunca importes una guía restringida en un componente cliente.
+- Antes de copiar información de despliegue, administración o seguridad, define su clasificación y el acceso necesario. No publiques secretos ni valores de ambiente. Revisa [EDITORIAL.md](../../EDITORIAL.md).
+- Para que el control restringido funcione en despliegue, configura las URL BFF/portal a partir de `.env.example` y agrega el origen HTTPS de docs a `BFF_ALLOWED_ORIGINS`.
+
+## Contratos OpenAPI
+
+La referencia API se genera desde `openapi/`, una copia de los contratos de `<repo>/docs/**` creada por `scripts/sync-openapi.mjs`. Edita siempre el YAML en `docs/` y vuelve a sincronizar; `check-openapi` detecta copias desactualizadas.

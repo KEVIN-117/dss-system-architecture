@@ -1,0 +1,664 @@
+openapi: 3.1.0
+info:
+  title: DSS-UATF Prediction Service API
+  version: 1.0.0-draft
+  summary: Contratos iniciales PRED-001; inferencia puntual implementada en PRED-006.
+  description: >-
+    La ruta de inferencia puntual y sus validaciones técnicas están implementadas.
+    Las decisiones institucionales de target/horizonte, audiencia/roles y publicación
+    descritas en contract-notes.md aún requieren aprobación antes de habilitar uso real.
+servers:
+  - url: /api/prediction
+    description: Ruta interna del BFF; proxy efectivo y prefijo por confirmar.
+security:
+  - keycloakBearer: []
+tags:
+  - name: Predictions
+  - name: Training
+paths:
+  /v1/predictions:
+    post:
+      tags: [Predictions]
+      operationId: predictOne
+      summary: Inferencia puntual de abandono de materia o programa
+      description: >-
+        El servidor obtiene features desde un corte confiable; el cliente no
+        envía una declaración libre de elegibilidad ni sustituye la fuente
+        académica. `event_type` distingue abandono de materia y de programa;
+        la autorización se evalúa para cada estudiante/programa.
+        What-If y explicaciones SHAP no forman parte de este borrador base.
+      security:
+        - keycloakBearer: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PredictionRequest'
+      responses:
+        '200':
+          description: Predicción generada con un solo artefacto aprobado.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PredictionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+        '504':
+          $ref: '#/components/responses/Timeout'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/prediction-batches:
+    post:
+      tags: [Predictions]
+      operationId: submitPredictionBatch
+      summary: Solicita scoring poblacional de un programa y corte
+      description: >-
+        El API valida el token, el permiso explícito de submitter y el ámbito
+        académico. El lote fija una versión aprobada de modelo y se publica solo
+        al terminar completo. Requiere una configuración separada de roles de
+        submitter; no se infiere de los roles de lectura analítica.
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/PredictionBatchRequest' }
+      responses:
+        '202':
+          description: Lote aceptado para scoring asíncrono.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PredictionBatch' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/Unprocessable' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/academic-options:
+    get:
+      tags: [Predictions]
+      operationId: getAuthorizedAcademicOptions
+      summary: Lista programas y cierres procesados dentro del ámbito del usuario
+      description: >-
+        Devuelve programas activos y cierres con hechos de retención publicados
+        por ejecuciones exitosas. Prediction Service valida el JWT y filtra cada
+        opción usando los roles permitidos y los academicContexts de Auth Service.
+        El cliente debe limitar los cierres al programa seleccionado; las
+        operaciones de publicación vuelven a validar el ámbito en el servidor.
+      responses:
+        '200':
+          description: Opciones académicas autorizadas para el usuario actual.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [programs, cuts]
+                properties:
+                  programs:
+                    type: array
+                    items:
+                      type: object
+                      required: [program_ref, name, faculty_id]
+                      properties:
+                        program_ref: { type: string }
+                        name: { type: string }
+                        faculty_id: { type: integer }
+                  cuts:
+                    type: array
+                    items:
+                      type: object
+                      required: [program_ref, cut_id, academic_year, academic_period, cadence]
+                      properties:
+                        program_ref: { type: string }
+                        cut_id: { type: string }
+                        academic_year: { type: integer }
+                        academic_period: { type: integer }
+                        cadence: { type: string, enum: [ANUAL, SEMESTRAL, OTRO] }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/prediction-publications:
+    get:
+      tags: [Predictions]
+      operationId: getCurrentPredictionPublication
+      summary: Consulta la publicación completa vigente para programa y corte
+      parameters:
+        - { name: program_ref, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 64 } }
+        - { name: cut_id, in: query, required: true, schema: { type: string, minLength: 1, maxLength: 128 } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 1000, default: 100 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 25000, default: 0 } }
+      responses:
+        '200':
+          description: Lote publicado o publicación nula si aún no existe.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/CurrentPublication' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/prediction-batches/{batchId}:
+    get:
+      tags: [Predictions]
+      operationId: getPredictionBatch
+      summary: Consulta estado e historial de un lote dentro del ámbito autorizado
+      parameters:
+        - { name: batchId, in: path, required: true, schema: { type: string, format: uuid } }
+        - { name: limit, in: query, required: false, schema: { type: integer, minimum: 1, maximum: 1000, default: 100 } }
+        - { name: offset, in: query, required: false, schema: { type: integer, minimum: 0, maximum: 25000, default: 0 } }
+      responses:
+        '200':
+          description: Estado del lote; resultados solo cuando status es PUBLISHED.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PredictionBatch' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '503': { $ref: '#/components/responses/Unavailable' }
+  /v1/training-jobs:
+    post:
+      tags: [Training]
+      operationId: submitTrainingJob
+      summary: Solicita un entrenamiento asíncrono
+      description: >-
+        Requiere permiso de operador ML explícitamente aprobado; nombre del
+        permiso y asignación de rol siguen pendientes. Nunca entrena dentro de
+        la petición. Idempotency-Key evita jobs duplicados al reintentar.
+      security:
+        - keycloakBearer: []
+      parameters:
+        - $ref: '#/components/parameters/RequestId'
+        - $ref: '#/components/parameters/IdempotencyKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TrainingJobRequest'
+      responses:
+        '202':
+          description: Trabajo aceptado y separado del proceso de inferencia.
+          headers:
+            Location:
+              description: URI para consultar el estado del trabajo.
+              schema: { type: string, format: uri-reference }
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingJob'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unprocessable'
+        '429':
+          $ref: '#/components/responses/TooManyRequests'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /v1/training-jobs/{jobId}:
+    get:
+      tags: [Training]
+      operationId: getTrainingJob
+      summary: Consulta un trabajo dentro del ámbito autorizado
+      security:
+        - keycloakBearer: []
+      parameters:
+        - name: jobId
+          in: path
+          required: true
+          schema: { type: string, format: uuid }
+        - $ref: '#/components/parameters/RequestId'
+      responses:
+        '200':
+          description: Estado vigente con metadatos no sensibles del trabajo.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TrainingJob'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/Unavailable'
+        '500':
+          $ref: '#/components/responses/InternalError'
+components:
+  securitySchemes:
+    keycloakBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: >-
+        Access token DSS validado por firma, issuer, audience, nbf y exp.
+        Audience, realm y cliente de roles se configuran por entorno; no hay
+        valores predeterminados. La política académica debe aprobarse por IAM/DSA.
+  parameters:
+    RequestId:
+      name: X-Request-ID
+      in: header
+      required: false
+      schema: { type: string, minLength: 1, maxLength: 128 }
+    IdempotencyKey:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: Reutilizar para reintentos del mismo submit; no repetir efectos.
+      schema: { type: string, minLength: 16, maxLength: 128 }
+  responses:
+    BadRequest:
+      description: JSON inválido, parámetro ausente o formato no válido.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unauthorized:
+      description: Token ausente, expirado o inválido.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Forbidden:
+      description: Actor autenticado sin permiso o fuera de su ámbito académico.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    NotFound:
+      description: Recurso no disponible dentro del ámbito del solicitante.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Idempotency conflict, corte/modelo incompatible o estado inválido.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unprocessable:
+      description: Entrada válida sintácticamente, pero no elegible o sin datos suficientes.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    TooManyRequests:
+      description: Capacidad de jobs ocupada; cliente reintenta con backoff.
+      headers:
+        Retry-After:
+          schema: { type: integer, minimum: 1 }
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Unavailable:
+      description: DW, workspace o modelo aprobado no disponible.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Timeout:
+      description: Inferencia excedió el límite de respuesta configurado.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    InternalError:
+      description: Fallo interno con detalle saneado y request_id para correlación.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+  schemas:
+    PredictionRequest:
+      type: object
+      additionalProperties: false
+      required: [contract_version, subject_ref, program_ref, academic_cut]
+      allOf:
+        - if:
+            properties:
+              event_type: { const: course_abandonment }
+          then:
+            required: [course_ref]
+        - if:
+            properties:
+              event_type: { const: program_dropout }
+          then:
+            properties:
+              course_ref: { type: 'null' }
+      properties:
+        contract_version: { type: string, const: '1.0' }
+        event_type:
+          type: string
+          enum: [course_abandonment, program_dropout]
+          default: program_dropout
+        subject_ref:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: >-
+            Identificador académico resuelto contra el DW; sensible, excluido de logs
+            y solo reflejado en la respuesta autorizada de la misma solicitud.
+        program_ref:
+          type: string
+          minLength: 1
+          maxLength: 64
+        course_ref:
+          type: [string, 'null']
+          minLength: 1
+          maxLength: 128
+          description: Requerido únicamente para event_type=course_abandonment.
+        academic_cut:
+          $ref: '#/components/schemas/AcademicCutRef'
+    PredictionResponse:
+      type: object
+      additionalProperties: false
+      required: [contract_version, prediction_id, subject_ref, program_ref, event_type, event_code, predicted_class, model, academic_cut, generated_at]
+      properties:
+        contract_version: { type: string, const: '1.0' }
+        prediction_id: { type: string, format: uuid }
+        subject_ref:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Referencia de estudiante solicitada; sensible y excluida de logs.
+        program_ref:
+          type: string
+          minLength: 1
+          maxLength: 64
+        event_type:
+          type: string
+          enum: [course_abandonment, program_dropout]
+        course_ref:
+          type: [string, 'null']
+          description: Materia evaluada; null para abandono del programa.
+        event_code:
+          type: string
+          minLength: 1
+          description: Evento objetivo definido en el manifiesto de modelo aprobado.
+        predicted_class:
+          type: string
+          enum: [POSITIVE_EVENT, NEGATIVE_EVENT]
+          description: Clase binaria asociada explícitamente al evento del modelo.
+        event_probability:
+          type: [number, 'null']
+          minimum: 0
+          maximum: 1
+          description: Probabilidad del evento positivo; null si el modelo no la produce.
+        model:
+          $ref: '#/components/schemas/ModelReference'
+        academic_cut:
+          $ref: '#/components/schemas/AcademicCutRef'
+        generated_at: { type: string, format: date-time }
+    PredictionBatchRequest:
+      type: object
+      additionalProperties: false
+      required: [contract_version, program_ref, academic_cut]
+      properties:
+        contract_version: { type: string, const: '1.0' }
+        event_type: { type: string, const: program_dropout, default: program_dropout }
+        program_ref: { type: string, minLength: 1, maxLength: 64 }
+        academic_cut: { $ref: '#/components/schemas/AcademicCutRef' }
+    PredictionBatch:
+      type: object
+      required: [batch_id, event_code, program_ref, closure_id, model_id, model_version, status, result_count]
+      properties:
+        batch_id: { type: string, format: uuid }
+        event_code: { type: string, const: PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE }
+        program_ref: { type: string }
+        closure_id: { type: [string, integer] }
+        model_id: { type: string }
+        model_version: { type: string }
+        status: { type: string, enum: [QUEUED, RUNNING, PUBLISHED, FAILED] }
+        result_count: { type: integer, minimum: 0 }
+        created_at: { type: string, format: date-time }
+        published_at: { type: [string, 'null'], format: date-time }
+        source_execution_ids: { type: array, items: { type: string, format: uuid } }
+        error: { type: [object, 'null'] }
+        results:
+          type: array
+          items: { $ref: '#/components/schemas/PublishedPrediction' }
+        result_offset: { type: integer, minimum: 0 }
+        result_limit: { type: integer, minimum: 1 }
+        has_more: { type: boolean }
+    CurrentPublication:
+      type: object
+      required: [publication]
+      properties:
+        publication:
+          oneOf:
+            - { $ref: '#/components/schemas/PredictionBatch' }
+            - { type: 'null' }
+    PublishedPrediction:
+      type: object
+      required: [subject_ref, program_ref, closure_id, predicted_class, model_id, model_version, generated_at]
+      properties:
+        subject_ref: { type: string, description: Estudiante; solo se revela tras validar rol y ámbito en servidor. }
+        program_ref: { type: string }
+        closure_id: { type: integer }
+        predicted_class: { type: string, enum: [POSITIVE_EVENT, NEGATIVE_EVENT] }
+        event_probability: { type: [number, 'null'], minimum: 0, maximum: 1 }
+        model_id: { type: string }
+        model_version: { type: string }
+        generated_at: { type: string, format: date-time }
+    AcademicCutRef:
+      type: object
+      additionalProperties: false
+      required: [cut_id]
+      properties:
+        cut_id:
+          type: string
+          minLength: 1
+          maxLength: 128
+          description: Referencia al cierre/corte DW; el mapeo físico a closure_id se resuelve con DW.
+    ModelReference:
+      type: object
+      additionalProperties: false
+      required: [model_id, version]
+      properties:
+        model_id: { type: string, minLength: 1, maxLength: 128 }
+        version: { type: string, minLength: 1, maxLength: 128 }
+    TrainingJobRequest:
+      type: object
+      additionalProperties: false
+      required: [dataset_ref, algorithm]
+      properties:
+        dataset_ref:
+          type: string
+          minLength: 1
+          maxLength: 256
+          description: Identificador de snapshot/manifest validado; no una ruta arbitraria de archivo.
+        algorithm:
+          type: string
+          enum: [random_forest, xgboost]
+        configuration_ref:
+          type: string
+          maxLength: 128
+          description: Referencia a configuración versionada y permitida por el entorno.
+    TrainingJob:
+      type: object
+      additionalProperties: false
+      required: [job_id, contract_version, dataset_ref, algorithm, status, created_at, submitted_by]
+      properties:
+        job_id: { type: string, format: uuid }
+        contract_version: { type: string, const: '1.0' }
+        dataset_ref: { type: string }
+        algorithm: { type: string, enum: [random_forest, xgboost] }
+        status:
+          type: string
+          enum: [QUEUED, RUNNING, SUCCEEDED, FAILED, CANCELLED]
+        progress:
+          type: [integer, 'null']
+          minimum: 0
+          maximum: 100
+          description: Progreso aproximado; null si la fase no permite medirlo.
+        created_at: { type: string, format: date-time }
+        started_at: { type: [string, 'null'], format: date-time }
+        finished_at: { type: [string, 'null'], format: date-time }
+        submitted_by:
+          type: string
+          description: Subject autenticado; minimizar exposición en consultas/logs.
+        model_candidate:
+          oneOf:
+            - { $ref: '#/components/schemas/ModelReference' }
+            - { type: 'null' }
+        error:
+          oneOf:
+            - { $ref: '#/components/schemas/Problem' }
+            - { type: 'null' }
+    DatasetManifest:
+      type: object
+      additionalProperties: false
+      required: [contract_version, dataset_id, snapshot_ref, source, grain, academic_cut, schema_version, created_at, row_count, exclusions]
+      properties:
+        contract_version: { type: string, const: '1.0' }
+        dataset_id: { type: string, format: uuid }
+        snapshot_ref: { type: string, minLength: 1, maxLength: 256 }
+        source:
+          type: object
+          additionalProperties: false
+          required: [system, contract_ref]
+          properties:
+            system: { type: string, const: 'dw' }
+            contract_ref: { type: string, minLength: 1, maxLength: 256 }
+            run_id: { type: [string, 'null'], format: uuid }
+        grain: { type: string, const: 'student_program_academic_cut' }
+        academic_cut:
+          $ref: '#/components/schemas/AcademicCutRef'
+        schema_version: { type: string, minLength: 1, maxLength: 128 }
+        target_definition:
+          oneOf:
+            - { $ref: '#/components/schemas/TargetDefinition' }
+            - { type: 'null' }
+        created_at: { type: string, format: date-time }
+        row_count: { type: integer, minimum: 0 }
+        class_counts:
+          type: [object, 'null']
+          description: Conteos observados por clase según TargetDefinition; null hasta aprobar semántica del objetivo.
+          additionalProperties: { type: integer, minimum: 0 }
+        exclusions:
+          type: object
+          additionalProperties: { type: integer, minimum: 0 }
+        fields:
+          type: array
+          items: { $ref: '#/components/schemas/FieldDefinition' }
+        content_digest:
+          type: [string, 'null']
+          pattern: '^[a-f0-9]{64}$'
+          description: SHA-256 del snapshot canónico, cuando calculable.
+    TargetDefinition:
+      type: object
+      additionalProperties: false
+      required: [event_code, positive_class, negative_class, horizon_ref, label_source]
+      properties:
+        event_code: { type: string, minLength: 1 }
+        positive_class: { type: string, minLength: 1 }
+        negative_class: { type: string, minLength: 1 }
+        horizon_ref: { type: string, minLength: 1 }
+        label_source: { type: string, minLength: 1 }
+        unevaluable_policy:
+          type: string
+          const: EXCLUDE_AND_REPORT
+    FieldDefinition:
+      type: object
+      additionalProperties: false
+      required: [name, logical_type, role, nullable]
+      properties:
+        name: { type: string, minLength: 1 }
+        logical_type: { type: string, enum: [string, integer, number, boolean, date, datetime, category] }
+        role: { type: string, enum: [identifier, feature, target, audit] }
+        nullable: { type: boolean }
+        source_field: { type: [string, 'null'] }
+        available_at_cut: { type: [boolean, 'null'] }
+        sensitivity: { type: string, enum: [public, internal, confidential, personal] }
+    ModelManifest:
+      type: object
+      additionalProperties: false
+      required: [contract_version, model_id, version, algorithm, dataset_id, input_schema_version, classes, created_at, evaluation_ref, lifecycle_state, artifact_digest, artifact_files, input_schema, probability_definition]
+      properties:
+        contract_version: { type: string, const: '1.0' }
+        model_id: { type: string, format: uuid }
+        version: { type: string, minLength: 1, maxLength: 128 }
+        algorithm: { type: string, enum: [random_forest, xgboost] }
+        dataset_id: { type: string, format: uuid }
+        input_schema_version: { type: string, minLength: 1 }
+        classes:
+          type: object
+          additionalProperties: false
+          required: [positive_class, negative_class, event_code]
+          properties:
+            positive_class: { type: string }
+            negative_class: { type: string }
+            event_code: { type: string }
+        created_at: { type: string, format: date-time }
+        evaluation_ref: { type: string, minLength: 1 }
+        lifecycle_state: { type: string, enum: [CANDIDATE, APPROVED, REJECTED, RETIRED] }
+        artifact_digest: { type: string, pattern: '^[a-f0-9]{64}$' }
+        artifact_files:
+          type: object
+          minProperties: 1
+          additionalProperties: { type: string, pattern: '^[a-f0-9]{64}$' }
+        input_schema:
+          type: object
+          required: [version, feature_names, fields, required, additional_properties]
+          properties:
+            version: { type: string }
+            feature_names: { type: array, minItems: 1, items: { type: string } }
+            fields:
+              type: array
+              minItems: 1
+              items:
+                type: object
+                required: [name, logical_type, nullable]
+                properties:
+                  name: { type: string }
+                  logical_type: { type: string, enum: [string, integer, number, boolean, date, datetime, category] }
+                  nullable: { type: boolean }
+            required: { type: array, items: { type: string } }
+            additional_properties: { type: boolean, const: false }
+        probability_definition:
+          type: object
+          required: [positive_class, class_order, meaning]
+          properties:
+            positive_class: { type: string }
+            class_order: { type: array, minItems: 2, maxItems: 2, items: { type: string } }
+            meaning: { type: string }
+        artifact_uri: { type: string, minLength: 1 }
+        preprocessing_ref: { type: string, minLength: 1 }
+        dependency_lock_ref: { type: string, minLength: 1 }
+        training_config_ref: { type: string, minLength: 1 }
+        approved_at: { type: [string, 'null'], format: date-time }
+        approved_by: { type: [string, 'null'] }
+        approval_evaluation_ref: { type: [string, 'null'] }
+    Problem:
+      type: object
+      additionalProperties: false
+      required: [type, title, status, code, request_id]
+      properties:
+        type: { type: string, format: uri-reference }
+        title: { type: string, minLength: 1, maxLength: 160 }
+        status: { type: integer, minimum: 400, maximum: 599 }
+        detail:
+          type: string
+          maxLength: 500
+          description: Mensaje saneado; no incluir datos personales, SQL ni paths.
+        code:
+          type: string
+          enum: [INVALID_REQUEST, INVALID_TOKEN, INSUFFICIENT_SCOPE, RESOURCE_NOT_FOUND, INCOMPATIBLE_SCHEMA, INELIGIBLE_PROFILE, DATA_UNAVAILABLE, AUTHORIZATION_UNAVAILABLE, NO_ACTIVE_MODEL, JOB_CAPACITY, JOB_FAILED, CONFLICT, TIMEOUT, INTERNAL_ERROR]
+        request_id: { type: string, minLength: 1, maxLength: 128 }

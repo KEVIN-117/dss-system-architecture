@@ -2,19 +2,28 @@ export const metadata = { title: 'Primeros pasos', audience: ['directivos', 'des
 
 ## Qué encontrarás en el portal
 
-La documentación del DSS está organizada por servicio y por tarea. Desde el explorador puedes abrir una guía o consultar las operaciones disponibles para revisar su propósito, acceso y contrato.
+El DSS integra y prepara información académica para su análisis. Sus portales presentan indicadores de rendimiento, admisión y permanencia; el motor predictivo forma parte de la arquitectura, aunque sus resultados y usos institucionales todavía dependen de las aprobaciones documentadas.
 
-El sistema integra y prepara información académica para su análisis. Sus portales presentan indicadores de matrícula, rendimiento y demanda; el motor predictivo forma parte de la arquitectura, aunque sus resultados y usos institucionales todavía dependen de las aprobaciones documentadas.
+La documentación tiene dos zonas, accesibles desde la barra superior:
+
+- **Guías**: manual de uso por rol, conceptos de la plataforma y guías para desarrolladores.
+- **Referencia API**: operaciones de cada servicio generadas desde sus contratos OpenAPI, con ejemplos de código.
+
+Usa el buscador (<Ui>Ctrl K</Ui>) para encontrar cualquier término en el texto de las guías y en las rutas de la API.
+
+## Por dónde empezar
+
+| Si eres… | Empieza por |
+| --- | --- |
+| Rector, decano o director | [Ingresar al sistema](/docs/acceso-al-sistema) y luego la guía de tu tablero. |
+| Administración del sistema | [Portal de administración](/docs/guia-portal-administracion) (requiere sesión `SUPERADMIN`). |
+| Desarrollador | [Puesta en marcha local](/docs/puesta-en-marcha), [Arquitectura](/docs/arquitectura) y el [Inventario de APIs](/docs/inventario-de-apis). |
 
 ## Consultar una API
 
-Antes de integrar una operación, abre el contrato OpenAPI del servicio. Ahí se definen las rutas, los parámetros, el formato de los datos y las respuestas previstas. Revisa también los permisos: pueden variar entre operaciones del mismo servicio.
+Antes de integrar una operación, abre su página en la [referencia API](/reference): ahí están la ruta, la autenticación y el permiso requerido, los parámetros, el cuerpo, las respuestas y ejemplos en cURL, JavaScript y Python.
 
-Para comprobar que el BFF está activo, `GET /api/health` responde `{ "status": "ok" }` y no requiere autenticación. Esta ruta de salud pertenece al BFF y no forma parte de los contratos de microservicio que aparecen en el catálogo. Las demás operaciones pueden necesitar una sesión o un token Bearer, según el contrato.
-
-## Estado de la documentación
-
-Los contratos de DW Control y Predicción están versionados en `docs/dw/contracts/` y `docs/prediction/contracts/`. Ambos son borradores OpenAPI; el contrato predictivo señala decisiones de uso institucional aún pendientes. El portal debe distinguir estos contratos de las APIs que todavía no tienen una especificación consolidada.
+Para comprobar que el BFF está activo, `GET /api/health` responde `{ "status": "ok" }` y no requiere autenticación. Las demás operaciones necesitan la cookie de sesión del BFF o un token Bearer, según el contrato.
 
 <Callout title="Mantener la referencia al día">
   Cuando cambie una ruta, un permiso o el comportamiento de un servicio, actualiza su contrato y la guía relacionada en el mismo cambio.

@@ -1,194 +1,134 @@
-import Link from 'next/link';
+import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { getApiCatalog } from '../../../../lib/api-catalog';
+import { MethodBadge, ParameterTable, SchemaTree } from '../../../../components/api-parts';
+import CodeTabs from '../../../../components/code-tabs';
+import InlineMd from '../../../../components/inline-md';
+import PageFrame from '../../../../components/page-frame';
+import type { TocItem } from '../../../../components/toc';
+import { findOperation, getApiCatalog } from '../../../../lib/api-catalog';
+import { buildCodeSamples } from '../../../../lib/code-samples';
 
-export const dynamic = 'force-dynamic';
+type Params = { params: Promise<{ service: string; operation: string }> };
 
 export function generateStaticParams() {
   return getApiCatalog().flatMap((service) =>
-    service.operations.map((operation) => ({
-      service: service.id,
-      operation: operation.referenceSlug,
-    })),
+    service.operations.map((operation) => ({ service: service.id, operation: operation.referenceSlug })),
   );
 }
 
-function SchemaFields({
-  fields,
-  level = 0,
-}: {
-  fields: Array<{
-    name: string;
-    type: string;
-    required: boolean;
-    description?: string;
-    enum?: string[];
-    children?: Array<any>;
-  }>;
-  level?: number;
-}) {
-  if (!fields.length)
-    return <p>El contrato no declara propiedades para este esquema.</p>;
-  return (
-    <ul className="schemaFields">
-      {fields.map((field) => (
-        <li key={`${level}-${field.name}`}>
-          <code>{field.name}</code>
-          <span>
-            {field.type}
-            {field.required ? ' · requerido' : ''}
-          </span>
-          {field.enum?.length ? (
-            <small>Valores: {field.enum.join(', ')}</small>
-          ) : null}
-          {field.description ? <small>{field.description}</small> : null}
-          {field.children?.length ? (
-            <SchemaFields fields={field.children} level={level + 1} />
-          ) : null}
-        </li>
-      ))}
-    </ul>
-  );
+export async function generateMetadata({ params }: Params): Promise<Metadata> {
+  const { service, operation } = await params;
+  const found = findOperation(service, operation);
+  return found ? { title: `${found.operation.summary} · ${found.service.name}` } : {};
 }
 
-export default async function ApiReferencePage({
-  params,
-}: {
-  params: Promise<{ service: string; operation: string }>;
-}) {
-  const { service: serviceId, operation: operationId } = await params;
-  const service = getApiCatalog().find((item) => item.id === serviceId);
-  const operation = service?.operations.find(
-    (item) => item.referenceSlug === operationId,
-  );
-  if (!service || !operation) notFound();
-  const curl = [
-    `curl --request ${operation.method}`,
-    `  --url 'https://<base-url>${operation.path}'`,
-    ...(operation.auth.includes('Bearer')
-      ? ["  --header 'Authorization: Bearer <token>'"]
-      : []),
-    ...(operation.requestContentType
-      ? [`  --header 'Content-Type: ${operation.requestContentType}'`]
-      : []),
-    ...(operation.requestExample !== undefined
-      ? [`  --data '${JSON.stringify(operation.requestExample)}'`]
-      : []),
-  ].join(' \\\n');
+export default async function ApiReferencePage({ params }: Params) {
+  const { service: serviceId, operation: slug } = await params;
+  const found = findOperation(serviceId, slug);
+  if (!found) notFound();
+  const { service, operation } = found;
+  const { samples, isTemplate } = buildCodeSamples(operation);
+
+  const toc: TocItem[] = [
+    { id: 'autenticacion', text: 'Autenticación', depth: 2 },
+    ...(operation.parameters.length ? [{ id: 'parametros', text: 'Parámetros', depth: 2 as const }] : []),
+    ...(operation.requestContentType ? [{ id: 'cuerpo', text: 'Cuerpo de la solicitud', depth: 2 as const }] : []),
+    { id: 'respuestas', text: 'Respuestas', depth: 2 },
+    { id: 'ejemplos', text: 'Ejemplos de código', depth: 2 },
+  ];
+
   return (
-    <main className="docsPage">
-      <nav>
-        <Link href="/">DSS UATF · Documentación</Link>
-        <span>/</span>
-        <Link href="/docs/inventario-de-apis">APIs</Link>
-        <span>/</span>
-        <span>{service.name}</span>
-      </nav>
-      <article className="docsArticle">
-        <header>
-          <p>REFERENCIA API · {service.version}</p>
+    <PageFrame
+      crumbs={[
+        { href: '/reference', label: 'Referencia API' },
+        { href: `/reference/${service.id}`, label: service.name },
+        { label: operation.summary },
+      ]}
+      toc={toc}
+    >
+      <article className="dp-article">
+        <header className="dp-doc-header">
+          <p className="dp-eyebrow">
+            {service.name} · {operation.tags.join(' · ') || 'Operación'}
+          </p>
           <h1>{operation.summary}</h1>
-          <p>
-            <strong>{operation.method}</strong> <code>{operation.path}</code>
+          <div className="dp-endpoint">
+            <MethodBadge method={operation.method} large />
+            <code>{operation.path}</code>
+          </div>
+          {operation.description && <p className="dp-lead"><InlineMd text={operation.description} /></p>}
+          <p className="dp-meta">
+            <span className="dp-badge">{operation.serviceVersion}</span>
+            <a href={`https://github.com/KEVIN-117/dss-system-architecture/blob/main/${operation.sourcePath}`} target="_blank" rel="noreferrer">
+              Contrato OpenAPI
+            </a>
           </p>
-          <p>{operation.description}</p>
         </header>
-        <section>
-          <h2>Autenticación y permisos</h2>
-          <p>
-            {operation.auth}
-            {operation.permission ? ` · Permiso: ${operation.permission}` : ''}
-          </p>
-        </section>
-        <section>
-          <h2>Parámetros</h2>
-          {operation.parameters.length ? (
-            <SchemaFields
-              fields={operation.parameters.map((p) => ({
-                name: `${p.name} (${p.location})`,
-                type: p.schemaType ?? 'sin tipo',
-                required: p.required,
-                description: [
-                  p.description,
-                  p.defaultValue !== undefined
-                    ? `Predeterminado: ${p.defaultValue}`
-                    : undefined,
-                  p.minimum !== undefined || p.maximum !== undefined
-                    ? `Rango: ${p.minimum ?? 'sin mínimo'}–${p.maximum ?? 'sin máximo'}`
-                    : undefined,
-                  p.enum?.length ? `Valores: ${p.enum.join(', ')}` : undefined,
-                ]
-                  .filter(Boolean)
-                  .join(' · '),
-              }))}
-            />
-          ) : (
-            <p>El contrato no declara parámetros.</p>
+
+        <div className="dp-prose">
+          <h2 id="autenticacion">Autenticación</h2>
+          <p>{operation.auth}</p>
+          {operation.permission && (
+            <p>
+              Permiso o rol requerido: <code>{operation.permission}</code>
+            </p>
           )}
-        </section>
-        <section>
-          <h2>Solicitud</h2>
-          {operation.requestContentType ? (
+
+          {operation.parameters.length > 0 && (
             <>
-              <p>
-                {operation.requestContentType} ·{' '}
-                {operation.requestRequired ? 'requerida' : 'opcional'}
-              </p>
-              <SchemaFields fields={operation.requestFields} />
-              {operation.requestExample !== undefined ? (
-                <pre>
-                  <code>
-                    {JSON.stringify(operation.requestExample, null, 2)}
-                  </code>
-                </pre>
-              ) : (
-                <p>El YAML no declara un ejemplo de solicitud.</p>
-              )}
+              <h2 id="parametros">Parámetros</h2>
+              <ParameterTable parameters={operation.parameters} />
             </>
-          ) : (
-            <p>El contrato no define cuerpo de solicitud.</p>
           )}
-          <h3>Comando curl</h3>
-          <p>
-            Reemplaza la URL base y, si corresponde, el token con valores del
-            entorno autorizado. Si no existe ejemplo en YAML, este comando no
-            añade un cuerpo inventado.
-          </p>
-          <pre>
-            <code>{curl}</code>
-          </pre>
-        </section>
-        <section>
-          <h2>Respuestas</h2>
-          {operation.responses.map((response) => (
-            <div key={response.status}>
-              <h3>
-                {response.status} · {response.description}
-              </h3>
+
+          {operation.requestContentType && (
+            <>
+              <h2 id="cuerpo">Cuerpo de la solicitud</h2>
               <p>
-                {response.contentTypes.join(', ') || 'Sin cuerpo documentado'}
+                <span className="dp-badge">{operation.requestContentType}</span>{' '}
+                {operation.requestRequired ? 'Requerido.' : 'Opcional.'}
               </p>
-              {response.schemaFields.length ? (
-                <SchemaFields fields={response.schemaFields} />
-              ) : null}
-              {response.example !== undefined ? (
-                <pre>
-                  <code>{JSON.stringify(response.example, null, 2)}</code>
-                </pre>
-              ) : (
-                <p>El YAML no declara un ejemplo para esta respuesta.</p>
-              )}
-            </div>
-          ))}
-        </section>
-        <footer>
-          <a
-            href={`https://github.com/KEVIN-117/dss-system-architecture/blob/feature/DOC-001/${operation.sourcePath}`}
-          >
-            Abrir contrato YAML ↗
-          </a>
-        </footer>
+              <SchemaTree fields={operation.requestFields} />
+            </>
+          )}
+
+          <h2 id="respuestas">Respuestas</h2>
+          <div className="dp-responses">
+            {operation.responses.map((response) => (
+              <details key={response.status} className="dp-response" open={response.status.startsWith('2') || undefined}>
+                <summary>
+                  <span className={`dp-status dp-status-${response.status[0]}`}>{response.status}</span>
+                  <span><InlineMd text={response.description} /></span>
+                  {response.contentTypes.length > 0 && <small>{response.contentTypes.join(', ')}</small>}
+                </summary>
+                <div className="dp-response-body">
+                  {response.schemaFields.length > 0 ? <SchemaTree fields={response.schemaFields} /> : <p className="dp-muted">Sin esquema declarado.</p>}
+                  {response.example !== undefined && (
+                    <pre className="dp-pre">
+                      <code>{JSON.stringify(response.example, null, 2)}</code>
+                    </pre>
+                  )}
+                </div>
+              </details>
+            ))}
+          </div>
+
+          <h2 id="ejemplos">Ejemplos de código</h2>
+          <p className="dp-muted">
+            Define <code>BASE_URL</code> con la URL del servicio (o del BFF para sus rutas) y{' '}
+            {operation.authKinds.includes('cookie') ? 'usa la cookie de sesión del navegador' : <>
+              <code>TOKEN</code> con un access token válido
+            </>}
+            .{' '}
+            {isTemplate
+              ? 'El cuerpo es una plantilla generada desde el esquema: reemplaza cada valor antes de enviarlo.'
+              : operation.requestExample !== undefined
+                ? 'El cuerpo proviene del ejemplo declarado en el contrato.'
+                : ''}
+          </p>
+          <CodeTabs samples={samples} />
+        </div>
       </article>
-    </main>
+    </PageFrame>
   );
 }
