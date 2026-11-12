@@ -197,7 +197,11 @@ def train_model_task(
             memory_limit_mb=worker_settings.memory_limit_mb,
         )
 
-        # 5. Persist artifacts under this claim's attempt number.
+        # 5. Persist artifacts under this claim's attempt number. The dataset's
+        # feature contract travels into the bundle (and its digest) so serving
+        # can prove it computes features exactly as they were trained.
+        if manifest.get("feature_contract") is not None:
+            train_result.manifest["feature_contract"] = manifest["feature_contract"]
         attempt_artifact_id = f"{job_id}-attempt-{attempt}"
         final_manifest = write_training_artifacts(
             job_id=attempt_artifact_id,
@@ -296,7 +300,7 @@ def train_model_task(
 @celery_app.task(bind=True, name="prediction.publish_population")
 def publish_population_task(self: Any, batch_id: str, artifacts_dir: str) -> dict[str, Any]:
     """Score one authorized program/cut and atomically expose the completed batch."""
-    from inference import InferenceFailure, score_loaded_model
+    from inference import score_loaded_model
     from inference_adapters import DwPredictionDataProvider
     from training.model_registry import ModelRegistry
     from training.prediction_publication_store import PredictionPublicationStore
@@ -322,17 +326,15 @@ def publish_population_task(self: Any, batch_id: str, artifacts_dir: str) -> dic
         if bundle.model_id != batch["model_id"] or bundle.version != batch["model_version"]:
             raise ValueError("The approved active model changed before scoring; resubmit against the current model.")
         data = DwPredictionDataProvider()
-        subjects, source_runs = data.list_program_population(context)
+        # One point-in-time query for the whole program/cut, with the exact SQL
+        # and eligibility rule used by single-student inference.
+        population, ineligible, source_runs = data.load_population_features(context, bundle.manifest)
+        if ineligible:
+            logger.info("Prediction batch %s excluded ineligible profiles: %s", batch_id, ineligible)
         generated_at = datetime.now(timezone.utc).isoformat()
         results: list[dict[str, Any]] = []
-        for subject_ref in subjects:
-            try:
-                features = data.load_features(subject_ref, context, bundle.manifest, "program_dropout")
-                predicted_class, probability, _ = score_loaded_model(bundle, features)
-            except InferenceFailure as exc:
-                if exc.code in {"INELIGIBLE_PROFILE", "RESOURCE_NOT_FOUND"}:
-                    continue
-                raise
+        for subject_ref, features in population.items():
+            predicted_class, probability, _ = score_loaded_model(bundle, features)
             results.append({
                 "subject_ref": subject_ref,
                 "program_ref": batch["program_ref"],

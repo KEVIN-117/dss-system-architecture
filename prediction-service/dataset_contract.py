@@ -199,6 +199,7 @@ def validate_prepared_dataset(
         issues.append(ValidationIssue("POPULATION_NOT_APPROVED", "population_definition_ref", "A DSA-approved population rule is required before preparation.", blocking=True))
     if not feature_names:
         issues.append(ValidationIssue("NO_APPROVED_FEATURES", "feature_fields", "No predictors are declared.", blocking=True))
+    _validate_feature_contract(manifest, issues)
 
     row_count = 0
     population_counts: Counter[str] = Counter()
@@ -444,6 +445,34 @@ def _validate_manifest(manifest: Mapping[str, Any], issues: list[ValidationIssue
                 raise ValueError("timezone required")
         except ValueError:
             issues.append(ValidationIssue("INVALID_TIMESTAMP", name, "Timestamp must be an ISO-8601 string."))
+
+
+def _validate_feature_contract(manifest: Mapping[str, Any], issues: list[ValidationIssue]) -> None:
+    """Bind institutional datasets to the point-in-time features used at serving.
+
+    Synthetic fixtures are exempt (they never reach institutional serving). Any
+    other dataset must be produced by ``training.dw_extract`` -- i.e. carry a
+    ``feature_contract`` matching the running definitions -- or stays BLOCKED.
+    """
+    reference = manifest.get("feature_contract")
+    if reference is None:
+        if manifest.get("fixture_only") is not True:
+            issues.append(ValidationIssue(
+                "FEATURE_CONTRACT_MISSING", "feature_contract",
+                "Institutional datasets must be extracted with the serving feature contract (training.dw_extract).",
+                blocking=True,
+            ))
+        return
+    from feature_contract import FeatureContractError, verify_reference
+
+    features = manifest.get("feature_fields")
+    fields = manifest.get("fields")
+    event_code = (manifest.get("target_definition") or {}).get("event_code") if isinstance(manifest.get("target_definition"), Mapping) else None
+    try:
+        verify_reference(reference, event_code, list(features) if isinstance(features, list) else [],
+                         [field for field in fields if isinstance(field, Mapping)] if isinstance(fields, list) else [])
+    except FeatureContractError as exc:
+        issues.append(ValidationIssue("FEATURE_CONTRACT_MISMATCH", "feature_contract", str(exc)))
 
 
 def _canonical_json_value(value: Any) -> str:

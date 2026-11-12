@@ -109,11 +109,23 @@ class TrainingApiTests(unittest.TestCase):
 
     @patch("training.tasks.train_model_task.apply_async", side_effect=RuntimeError("broker unavailable"))
     def test_dispatch_failure_keeps_job_queued_for_outbox_retry(self, mock_dispatch) -> None:
+        from datetime import datetime, timezone
+        before_request = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
         response = self.operator.post("/v1/training-jobs", json={"dataset_ref":"fixture:pred003_synthetic-v1","algorithm":"random_forest"}, headers={"Idempotency-Key":"outbox-retry-key-001"})
         self.assertEqual(response.status_code, 202)
         self.assertEqual(response.json()["status"], "QUEUED")
         store = JobStore(self.store_path)
-        self.assertEqual(store.pending_outbox(), [])  # exponential retry delay avoids a tight retry loop
+        # The failed publish is recorded with a future retry time (exponential
+        # backoff). Assert the scheduled state instead of racing the 1 s initial
+        # delay against wall-clock time, which made this test flaky.
+        with store._connect() as connection:
+            outbox = connection.execute(
+                "SELECT published_at, attempts, last_error, next_attempt_at > ? AS scheduled "
+                "FROM outbox WHERE job_id=?", (before_request, response.json()["job_id"])).fetchone()
+        self.assertIsNone(outbox["published_at"])
+        self.assertEqual(outbox["attempts"], 1)
+        self.assertIn("broker unavailable", outbox["last_error"])
+        self.assertEqual(outbox["scheduled"], 1)
         with store._connect() as connection:
             connection.execute("UPDATE outbox SET next_attempt_at='2000-01-01 00:00:00' WHERE job_id=?", (response.json()["job_id"],))
         self.assertEqual(store.pending_outbox(), [response.json()["job_id"]])

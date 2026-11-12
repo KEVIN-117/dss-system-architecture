@@ -106,6 +106,19 @@ El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.
 
 Los cuatro endpoints de entrenamiento y datasets validan el JWT de Keycloak dentro del propio servicio (no dependen solo del BFF) y exigen un rol de `PREDICTION_TRAINING_ROLES`: `401` sin token válido, `403` sin rol de operador ML.
 
+## Contrato de features (paridad entrenamiento/servicio)
+
+`feature_contract.py` es la única definición de cómo se calcula cada predictor a partir del DW en un corte procesado: la expresión SQL de cada feature, una única consulta *point-in-time* por evento (todo filtrado por `effective_at` del corte) y la regla de elegibilidad (primeros tres años académicos, cadencia única, fecha de inscripción confiable). La usan los dos lados:
+
+- **Entrenamiento:** `python -m training.dw_extract --program <id> --cadence ANUAL|SEMESTRAL --output <dir>` ejecuta la consulta para cada cierre procesado del programa, aplica la regla de elegibilidad, seudonimiza al estudiante con una clave descartada y escribe `manifest.json` + `rows.jsonl` en el contrato `prepared-dataset-v1`, con `feature_contract` (versión, evento, digest y features). Solo marca el dataset como aprobado si se pasan `--dsa-approved`, `--target-definition-ref` y `--population-definition-ref`; si no, queda `BLOCKED`. El directorio de salida puede ser `/app/custom-datasets/<uuid>` para entrenar con `custom:<uuid>`.
+- **Servicio:** `DwPredictionDataProvider` ejecuta la misma consulta: una fila para `/v1/predictions` y la población completa en **una sola consulta** para el scoring por lotes (antes eran dos consultas por estudiante).
+
+El digest del contrato cubre definiciones, texto SQL y versión de la regla de elegibilidad. El contrato de datasets rechaza un `feature_contract` distinto del vigente (`FEATURE_CONTRACT_MISMATCH`) y bloquea datasets institucionales sin él (`FEATURE_CONTRACT_MISSING`; los fixtures sintéticos están exentos). El worker copia el contrato al manifest del bundle (incluido en `artifact_digest`) y el servicio responde `503 INCOMPATIBLE_SCHEMA` ante un bundle sin contrato o con un digest distinto. Cambiar cómo se calcula una feature obliga a re-extraer y reentrenar en lugar de producir una diferencia silenciosa.
+
+`tests/integration/feature_parity_check.py` compara, contra un DW real y en solo lectura, las filas del extractor con lo que devuelve el servicio para los mismos estudiantes. Solo imprime conteos agregados.
+
+El abandono de materia usa el mismo catálogo para servir, pero su extractor de entrenamiento todavía no existe; esos modelos siguen entrenándose con `scripts/run_pred006_faker_experiments.py`.
+
 ## Pipeline de Preparación y Modelado
 
 - **Partición temporal y agrupamiento:** `temporal_student_grouped_split` reserva un bloque global de periodos futuros para test, excluye el historial de estudiantes del test del train y comprueba que no haya solapamiento.
