@@ -14,6 +14,15 @@ import jwt
 import psycopg
 from jwt import PyJWKClient
 
+from feature_contract import (
+    COURSE_ABANDONMENT_EVENT,
+    PROGRAM_DROPOUT_EVENT,
+    FeatureContractError,
+    course_abandonment_query,
+    program_dropout_ineligibility,
+    program_dropout_query,
+    verify_reference,
+)
 from inference import (
     AuthorizationPolicy,
     InferenceFailure,
@@ -98,14 +107,6 @@ class ConfiguredAcademicPolicy(AuthorizationPolicy):
 
 class DwPredictionDataProvider:
     """Resolve one processed DW cut and its point-in-time academic features."""
-
-    _FEATURE_COLUMNS = {
-        "materias_cursadas": "f.materias_cursadas",
-        "materias_aprobadas": "f.materias_aprobadas",
-        "materias_reprobadas": "f.materias_reprobadas",
-        "materias_arrastradas": "f.materias_arrastradas",
-        "ppa_acumulado": "f.ppa_acumulado",
-    }
 
     def __init__(self, database_url: str | None = None):
         self.database_url = database_url or os.getenv("PREDICTION_DW_DATABASE_URL", "").strip()
@@ -243,11 +244,9 @@ class DwPredictionDataProvider:
             raise InferenceFailure("DATA_UNAVAILABLE", 503, "The program population lineage could not be loaded from the DW.") from exc
         return ([row[0] for row in rows], sorted({row[0] for row in source_runs if row[0]}))
 
-    def load_features(self, subject_ref: str, context: ProgramContext, manifest: Mapping[str, Any],
-                      event_type: str = "program_dropout", course_ref: str | None = None) -> Mapping[str, Any]:
-        if not subject_ref.isdecimal() or int(subject_ref) <= 0:
-            raise InferenceFailure("INVALID_REQUEST", 400, "subject_ref must identify a positive academic student ID.")
-        expected_event = "COURSE_ABANDONMENT" if event_type == "course_abandonment" else "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"
+    def _serving_schema(self, manifest: Mapping[str, Any], event_type: str, context: ProgramContext) -> list[str]:
+        """Validate the bundle against the request and the running feature contract."""
+        expected_event = COURSE_ABANDONMENT_EVENT if event_type == "course_abandonment" else PROGRAM_DROPOUT_EVENT
         if manifest.get("classes", {}).get("event_code") != expected_event:
             raise InferenceFailure("INCOMPATIBLE_SCHEMA", 503, "The active model does not serve the requested prediction event.")
         scope = manifest.get("serving_scope", {})
@@ -261,159 +260,100 @@ class DwPredictionDataProvider:
             raise InferenceFailure("INCOMPATIBLE_SCHEMA", 503, "The active model serving schema is invalid.")
         if any(by_name[name].get("available_at_cut") is not True for name in feature_names):
             raise InferenceFailure("INCOMPATIBLE_SCHEMA", 503, "A model feature lacks proof of availability at the requested cut.")
-        if event_type == "course_abandonment":
-            if not course_ref or not course_ref.isdecimal() or int(course_ref) <= 0:
-                raise InferenceFailure("INVALID_REQUEST", 400, "course_ref must identify a positive academic subject ID.")
-            feature_sql = {
-                "materia_ciclo": "m.ciclo::text", "materia_nivel": "m.nivel_academico::text",
-                "prior_course_count": "coalesce(hist.prior_course_count, 0)::integer",
-                "prior_abandonment_count": "coalesce(hist.prior_abandonment_count, 0)::integer",
-            }
-            if any(name not in feature_sql for name in feature_names):
-                raise InferenceFailure("INCOMPATIBLE_SCHEMA", 503, "The course model requests a feature outside the point-in-time DW serving contract.")
-            columns = ", ".join(f'{feature_sql[name]} AS "{name}"' for name in feature_names)
-            sql = f"""
-                WITH cut AS (
-                    SELECT closure_id, gestion, periodo, effective_at FROM etl_control.academic_period_closure
-                    WHERE closure_id=%s::bigint AND status='PROCESADO' AND processed_at IS NOT NULL
-                      AND effective_at <= clock_timestamp()
-                ), history AS (
-                    SELECT count(*)::integer AS prior_course_count,
-                           count(*) FILTER (WHERE fc.es_abandono IS TRUE)::integer AS prior_abandonment_count
-                    FROM dw.fact_cursado fc
-                    JOIN dw.dim_estudiante e ON e.estudiante_sk=fc.estudiante_sk AND e.member_type='STANDARD'
-                    JOIN dw.dim_programa p ON p.programa_sk=fc.programa_sk AND p.member_type='STANDARD'
-                    JOIN dw.dim_periodo_academico pa ON pa.periodo_academico_sk=fc.periodo_academico_sk
-                    JOIN etl_control.academic_period_closure prev ON prev.closure_id=pa.closure_id
-                    CROSS JOIN cut c
-                    WHERE e.id_alumno=%s AND p.id_programa=%s AND prev.status='PROCESADO'
-                      AND prev.effective_at < c.effective_at
-                ), first_course AS (
-                    SELECT c0.gestion, c0.periodo
-                    FROM dw.fact_cursado fc
-                    JOIN dw.dim_estudiante e ON e.estudiante_sk=fc.estudiante_sk AND e.member_type='STANDARD'
-                    JOIN dw.dim_programa p ON p.programa_sk=fc.programa_sk AND p.member_type='STANDARD'
-                    JOIN dw.dim_periodo_academico pa ON pa.periodo_academico_sk=fc.periodo_academico_sk
-                    JOIN etl_control.academic_period_closure c0 ON c0.closure_id=pa.closure_id
-                    CROSS JOIN cut requested
-                    WHERE e.id_alumno=%s AND p.id_programa=%s AND c0.status='PROCESADO'
-                      AND c0.effective_at <= requested.effective_at
-                    ORDER BY c0.gestion, CASE c0.periodo WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 1 ELSE 9 END, c0.closure_id
-                    LIMIT 1
-                ), cadence AS (
-                    SELECT count(DISTINCT CASE WHEN pa.periodo=3 THEN 'ANUAL' WHEN pa.periodo IN (1,2) THEN 'SEMESTRAL' END) AS n,
-                           min(CASE WHEN pa.periodo=3 THEN 'ANUAL' WHEN pa.periodo IN (1,2) THEN 'SEMESTRAL' END) AS value
-                    FROM dw.fact_cursado fc
-                    JOIN dw.dim_estudiante e ON e.estudiante_sk=fc.estudiante_sk AND e.member_type='STANDARD'
-                    JOIN dw.dim_programa p ON p.programa_sk=fc.programa_sk AND p.member_type='STANDARD'
-                    JOIN dw.dim_periodo_academico pa ON pa.periodo_academico_sk=fc.periodo_academico_sk
-                    JOIN etl_control.academic_period_closure c0 ON c0.closure_id=pa.closure_id
-                    CROSS JOIN cut c
-                    WHERE e.id_alumno=%s AND p.id_programa=%s AND pa.periodo IN (1,2,3)
-                      AND c0.status='PROCESADO' AND c0.effective_at<=c.effective_at
-                )
-                SELECT {columns}, cd.n, cd.value, fc_target.run_id
-                FROM cut c
-                JOIN dw.dim_estudiante e ON e.member_type='STANDARD' AND e.id_alumno=%s
-                JOIN dw.dim_programa p ON p.member_type='STANDARD' AND p.id_programa=%s AND p.activo='A'
-                JOIN dw.fact_cursado fc_target ON fc_target.estudiante_sk=e.estudiante_sk AND fc_target.programa_sk=p.programa_sk
-                JOIN dw.dim_materia m ON m.materia_sk=fc_target.materia_sk AND m.member_type='STANDARD' AND m.id_materia=%s
-                JOIN dw.dim_periodo_academico pa ON pa.periodo_academico_sk=fc_target.periodo_academico_sk AND pa.closure_id=c.closure_id
-                JOIN history hist ON TRUE CROSS JOIN first_course st CROSS JOIN cadence cd
-                WHERE EXISTS (SELECT 1 FROM etl_control.etl_execution run WHERE run.run_id=fc_target.run_id AND run.status='EXITOSA')
-                  AND ((cd.value='ANUAL' AND c.periodo=3 AND (c.gestion-st.gestion+1) BETWEEN 1 AND 3)
-                    OR (cd.value='SEMESTRAL' AND c.periodo IN (1,2)
-                      AND ((c.gestion-st.gestion)*2+c.periodo-st.periodo+1) BETWEEN 1 AND 6))
-                  AND cd.n=1
-            """
-            params = (int(context.cut_id), int(subject_ref), context.program_code, int(subject_ref), context.program_code,
-                      int(subject_ref), context.program_code, int(subject_ref), context.program_code, int(course_ref))
-            try:
-                with psycopg.connect(self.database_url, connect_timeout=5, options="-c default_transaction_read_only=on") as connection:
-                    rows = connection.execute(sql, params).fetchall()
-            except Exception as exc:
-                raise InferenceFailure("DATA_UNAVAILABLE", 503, "Trusted course feature data could not be loaded from the DW.") from exc
-            if len(rows) != 1:
-                raise InferenceFailure("INELIGIBLE_PROFILE", 422, "No eligible course record is available at the requested cut.")
-            row = rows[0]
-            if row[-3] != 1 or row[-2] != context.cadence:
-                raise InferenceFailure("INELIGIBLE_PROFILE", 422, "The student's academic cadence is mixed or differs from the requested cut.")
-            return {name: row[index] for index, name in enumerate(feature_names)}
-
-        if course_ref is not None:
-            raise InferenceFailure("INVALID_REQUEST", 400, "course_ref is only valid for course_abandonment.")
-        if any(name not in self._FEATURE_COLUMNS for name in feature_names):
-            raise InferenceFailure("INCOMPATIBLE_SCHEMA", 503, "The active model requests a feature not exposed by the DW serving contract.")
-
-        columns = ", ".join(f"{self._FEATURE_COLUMNS[name]} AS \"{name}\"" for name in feature_names)
-        sql = f"""
-            SELECT {columns}, c.gestion, c.periodo, start_period.gestion, start_period.periodo,
-                   e.fec_inscripcion
-            FROM dw.fact_retencion_desercion f
-            JOIN etl_control.academic_period_closure c ON c.closure_id = f.closure_id
-              AND c.status = 'PROCESADO' AND c.processed_at IS NOT NULL
-              AND c.effective_at <= clock_timestamp()
-            JOIN dw.dim_estudiante e ON e.estudiante_sk = f.estudiante_sk
-              AND e.member_type = 'STANDARD' AND e.id_alumno = %s
-              AND e.valid_from <= c.effective_at
-              AND (e.valid_to IS NULL OR e.valid_to > c.effective_at)
-              AND e.fec_inscripcion <= c.effective_at::date
-            JOIN dw.dim_programa p ON p.programa_sk = f.programa_sk
-              AND p.member_type = 'STANDARD' AND p.id_programa = %s
-            JOIN LATERAL (
-                SELECT first_cut.gestion, first_cut.periodo
-                FROM dw.fact_cursado fc
-                JOIN dw.dim_estudiante first_student ON first_student.estudiante_sk = fc.estudiante_sk
-                  AND first_student.member_type = 'STANDARD' AND first_student.id_alumno = e.id_alumno
-                JOIN dw.dim_programa first_program ON first_program.programa_sk = fc.programa_sk
-                  AND first_program.member_type = 'STANDARD' AND first_program.id_programa = p.id_programa
-                JOIN dw.dim_periodo_academico first_period ON first_period.periodo_academico_sk = fc.periodo_academico_sk
-                JOIN etl_control.academic_period_closure first_cut ON first_cut.closure_id = first_period.closure_id
-                  AND first_cut.status = 'PROCESADO' AND first_cut.effective_at <= c.effective_at
-                ORDER BY first_cut.gestion,
-                    CASE first_cut.periodo WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 1 ELSE 9 END,
-                    first_cut.closure_id
-                LIMIT 1
-            ) start_period ON TRUE
-            WHERE f.closure_id = %s::bigint
-              AND EXISTS (SELECT 1 FROM etl_control.etl_execution run
-                          WHERE run.run_id = f.run_id AND run.status = 'EXITOSA')
-        """
         try:
-            with psycopg.connect(self.database_url, connect_timeout=5, options="-c default_transaction_read_only=on") as connection:
-                rows = connection.execute(sql, (int(subject_ref), context.program_code, int(context.cut_id))).fetchall()
-                distinct_cadences = connection.execute(
-                    """SELECT count(DISTINCT CASE WHEN pa.periodo = 3 THEN 'ANUAL'
-                                WHEN pa.periodo IN (1,2) THEN 'SEMESTRAL' ELSE 'OTRO' END)
-                       FROM dw.fact_cursado fc
-                       JOIN dw.dim_estudiante e ON e.estudiante_sk=fc.estudiante_sk AND e.id_alumno=%s
-                       JOIN dw.dim_programa p ON p.programa_sk=fc.programa_sk AND p.id_programa=%s
-                       JOIN dw.dim_periodo_academico pa ON pa.periodo_academico_sk=fc.periodo_academico_sk
-                       JOIN etl_control.academic_period_closure c ON c.closure_id=pa.closure_id AND c.status='PROCESADO'
-                       WHERE pa.periodo IN (1,2,3) AND c.effective_at <= %s::timestamptz""",
-                    (int(subject_ref), context.program_code, context.effective_at),
-                ).fetchone()[0]
+            # The bundle must have been trained on data extracted with exactly
+            # the feature definitions this service is about to compute.
+            verify_reference(manifest.get("feature_contract"), expected_event, list(feature_names), fields)
+        except FeatureContractError as exc:
+            raise InferenceFailure("INCOMPATIBLE_SCHEMA", 503, str(exc)) from exc
+        return list(feature_names)
+
+    def _connect(self):
+        return psycopg.connect(self.database_url, connect_timeout=5, options="-c default_transaction_read_only=on")
+
+    def load_features(self, subject_ref: str, context: ProgramContext, manifest: Mapping[str, Any],
+                      event_type: str = "program_dropout", course_ref: str | None = None) -> Mapping[str, Any]:
+        if not subject_ref.isdecimal() or int(subject_ref) <= 0:
+            raise InferenceFailure("INVALID_REQUEST", 400, "subject_ref must identify a positive academic student ID.")
+        if event_type != "course_abandonment" and course_ref is not None:
+            raise InferenceFailure("INVALID_REQUEST", 400, "course_ref is only valid for course_abandonment.")
+        feature_names = self._serving_schema(manifest, event_type, context)
+        if event_type == "course_abandonment":
+            return self._load_course_features(subject_ref, context, feature_names, course_ref)
+
+        sql = program_dropout_query(feature_names)
+        params = {"program": context.program_code, "closure": int(context.cut_id), "subject": int(subject_ref), "limit": 2}
+        try:
+            with self._connect() as connection:
+                cursor = connection.execute(sql, params)
+                columns = [column.name for column in cursor.description]
+                rows = [dict(zip(columns, values)) for values in cursor.fetchall()]
         except Exception as exc:
             raise InferenceFailure("DATA_UNAVAILABLE", 503, "Trusted feature data could not be loaded from the DW.") from exc
         if len(rows) != 1:
             raise InferenceFailure("RESOURCE_NOT_FOUND", 404, "No eligible student record is available in this academic scope.")
+        reason = program_dropout_ineligibility(rows[0])
+        if reason is not None:
+            raise InferenceFailure("INELIGIBLE_PROFILE", 422, _INELIGIBILITY_DETAIL[reason])
+        return {name: rows[0][name] for name in feature_names}
 
-        values = rows[0]
-        current_year, current_period, start_year, start_period, enrollment_date = values[-5:]
-        if enrollment_date is None:
-            raise InferenceFailure("INELIGIBLE_PROFILE", 422, "The student has no trusted enrollment date.")
-        if distinct_cadences != 1:
-            raise InferenceFailure("INELIGIBLE_PROFILE", 422, "The student's academic cadence is mixed or cannot be established.")
-        if int(current_period) == 3 and int(start_period) == 3:
-            elapsed_academic_periods = int(current_year) - int(start_year) + 1
-        elif int(current_period) in (1, 2) and int(start_period) in (1, 2):
-            elapsed_academic_periods = (int(current_year) - int(start_year)) * 2 + int(current_period) - int(start_period) + 1
-        else:
-            elapsed_academic_periods = 0
-        maximum = 3 if int(current_period) == 3 else 6
-        if elapsed_academic_periods < 1 or elapsed_academic_periods > maximum:
-            raise InferenceFailure("INELIGIBLE_PROFILE", 422, "The student is outside the first-three-academic-years prediction window.")
-        return {name: values[index] for index, name in enumerate(feature_names)}
+    def load_population_features(self, context: ProgramContext, manifest: Mapping[str, Any],
+                                 limit: int = 25000) -> tuple[dict[str, Mapping[str, Any]], dict[str, int], list[str]]:
+        """Load every eligible student's features for one program/cut in a single query.
+
+        Uses the exact query and eligibility rule of ``load_features``. Returns
+        ``(features_by_subject, ineligible_counts_by_reason, source_run_ids)``.
+        """
+        if not self.database_url:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "The read-only prediction DW connection is not configured.")
+        feature_names = self._serving_schema(manifest, "program_dropout", context)
+        sql = program_dropout_query(feature_names)
+        params = {"program": context.program_code, "closure": int(context.cut_id), "subject": None, "limit": limit + 1}
+        try:
+            with self._connect() as connection:
+                cursor = connection.execute(sql, params)
+                columns = [column.name for column in cursor.description]
+                rows = [dict(zip(columns, values)) for values in cursor.fetchall()]
+        except Exception as exc:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "The program population could not be loaded from the DW.") from exc
+        if len(rows) > limit:
+            raise InferenceFailure("POPULATION_LIMIT_EXCEEDED", 422, "The requested program population exceeds the configured batch limit.")
+        features: dict[str, Mapping[str, Any]] = {}
+        ineligible: dict[str, int] = {}
+        for row in rows:
+            reason = program_dropout_ineligibility(row)
+            if reason is not None:
+                ineligible[reason] = ineligible.get(reason, 0) + 1
+                continue
+            features[row["subject_ref"]] = {name: row[name] for name in feature_names}
+        source_runs = sorted({row["source_run_id"] for row in rows if row.get("source_run_id")})
+        return features, ineligible, source_runs
+
+    def _load_course_features(self, subject_ref: str, context: ProgramContext, feature_names: list[str],
+                              course_ref: str | None) -> Mapping[str, Any]:
+        if not course_ref or not course_ref.isdecimal() or int(course_ref) <= 0:
+            raise InferenceFailure("INVALID_REQUEST", 400, "course_ref must identify a positive academic subject ID.")
+        sql = course_abandonment_query(feature_names)
+        params = {"closure": int(context.cut_id), "subject": int(subject_ref), "program": context.program_code,
+                  "course": int(course_ref)}
+        try:
+            with self._connect() as connection:
+                rows = connection.execute(sql, params).fetchall()
+        except Exception as exc:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "Trusted course feature data could not be loaded from the DW.") from exc
+        if len(rows) != 1:
+            raise InferenceFailure("INELIGIBLE_PROFILE", 422, "No eligible course record is available at the requested cut.")
+        row = rows[0]
+        if row[-3] != 1 or row[-2] != context.cadence:
+            raise InferenceFailure("INELIGIBLE_PROFILE", 422, "The student's academic cadence is mixed or differs from the requested cut.")
+        return {name: row[index] for index, name in enumerate(feature_names)}
+
+
+_INELIGIBILITY_DETAIL = {
+    "NO_ENROLLMENT_DATE": "The student has no trusted enrollment date.",
+    "MIXED_CADENCE": "The student's academic cadence is mixed or cannot be established.",
+    "OUTSIDE_WINDOW": "The student is outside the first-three-academic-years prediction window.",
+}
 
 
 def _required_env(name: str) -> str:

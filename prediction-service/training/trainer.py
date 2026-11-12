@@ -393,6 +393,10 @@ def train_model(
     }
     if serving_scope is not None:
         manifest["serving_scope"] = serving_scope
+    if test_probabilities is not None:
+        # Serving must classify with the same validation-selected threshold that
+        # produced the reported metrics; the value is bound into the bundle digest.
+        manifest["decision_threshold"] = float(decision_threshold)
     training_config = {
         "algorithm": algorithm,
         "seed": seed,

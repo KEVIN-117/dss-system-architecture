@@ -22,11 +22,15 @@ from training.tasks import train_model_task, worker_settings
 API_URL = os.getenv("PREDICTION_TEST_API_URL", "http://prediction-service:8000")
 FIXTURE = "fixture:pred003_synthetic-v1"
 TIMEOUT_SECONDS = int(os.getenv("PREDICTION_INTEGRATION_TIMEOUT_SECONDS", "240"))
+# Training endpoints verify the JWT and ML-operator role inside the API.
+OPERATOR_TOKEN = os.getenv("PREDICTION_TEST_OPERATOR_TOKEN", "")
 
 
 def request_json(method: str, path: str, body: dict | None = None, headers: dict | None = None):
     payload = json.dumps(body).encode() if body is not None else None
     request_headers = {"Content-Type": "application/json", **(headers or {})}
+    if OPERATOR_TOKEN:
+        request_headers.setdefault("Authorization", f"Bearer {OPERATOR_TOKEN}")
     req = Request(API_URL + path, data=payload, headers=request_headers, method=method)
     try:
         with urlopen(req, timeout=10) as response:
@@ -95,6 +99,8 @@ def seed_pending_job(store: JobStore, *, status: JobStatus = JobStatus.QUEUED) -
 
 
 def main() -> None:
+    if not OPERATOR_TOKEN:
+        raise SystemExit("Set PREDICTION_TEST_OPERATOR_TOKEN to an ML-operator access token for the API.")
     assert_container_resource_caps()
     # 1. Submit through HTTP; verify DB-backed idempotency and asynchronous result.
     key = f"integration-{uuid4()}"

@@ -39,6 +39,8 @@ class ModelRegistryTests(unittest.TestCase):
         feature_names: tuple[str, ...] = ("score",),
         event_code: str = "RETENTION_RISK",
         cadence: str | None = None,
+        threshold: float | None = None,
+        evaluated_threshold: float | None = None,
     ) -> tuple[Path, Path]:
         values = [
             [float(row + column) for column in range(len(feature_names))]
@@ -54,9 +56,13 @@ class ModelRegistryTests(unittest.TestCase):
         }
         if cadence:
             manifest["serving_scope"] = {"event_type": "course_abandonment" if event_code == "COURSE_ABANDONMENT" else "program_dropout", "cadence": cadence, "evaluation_unit": "test_unit"}
+        metrics: dict = {"accuracy": 0.8}
+        if threshold is not None:
+            manifest["decision_threshold"] = threshold
+            metrics["decision_threshold"] = threshold if evaluated_threshold is None else evaluated_threshold
         folder = self.root / name
         write_training_artifacts(
-            name, self.root, model, pipeline, manifest, {"accuracy": 0.8}, {"evaluation_protocol": {}},
+            name, self.root, model, pipeline, manifest, metrics, {"evaluation_protocol": {}},
             {"technique": None}, list(feature_names),
             {"python": "3.14.0", "scikit_learn": "test", "xgboost": "test", "joblib": "test"},
             {"dataset_ref": name, "dataset_digest": "digest-dataset"},
@@ -201,6 +207,34 @@ class ModelRegistryTests(unittest.TestCase):
 
         self.assertEqual(self.registry.active("COURSE_ABANDONMENT", "SEMESTRAL").model_id, "course-1")
         self.assertEqual(self.registry.active("PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", "ANUAL").model_id, "program-1")
+
+    def test_decision_threshold_is_served_from_the_approved_bundle(self) -> None:
+        _, report = self._candidate("candidate", "model-1", threshold=0.35)
+        self.registry.promote("model-1", "v1", "operator", report)
+        self.assertEqual(ModelRegistry(self.root).active().manifest["decision_threshold"], 0.35)
+
+    def test_decision_threshold_cannot_be_changed_after_approval(self) -> None:
+        folder, report = self._candidate("candidate", "model-1", threshold=0.35)
+        self.registry.promote("model-1", "v1", "operator", report)
+        manifest_path = folder / "manifest.json"
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+        manifest["decision_threshold"] = 0.01
+        manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
+        with self.assertRaises(InvalidModelArtifact):
+            ModelRegistry(self.root).active()
+        # Recomputing the digest still cannot hide the change from the bundle identity.
+        self.assertNotEqual(_compute_bundle_digest(manifest), json.loads(
+            (self.root / ".model-registry" / "active.json").read_text(encoding="utf-8"))["active"]["artifact_digest"])
+
+    def test_threshold_that_differs_from_evaluation_is_rejected(self) -> None:
+        _, report = self._candidate("candidate", "model-1", threshold=0.35, evaluated_threshold=0.5)
+        with self.assertRaisesRegex(InvalidModelArtifact, "differs from the evaluated threshold"):
+            self.registry.promote("model-1", "v1", "operator", report)
+
+    def test_out_of_range_threshold_is_rejected(self) -> None:
+        _, report = self._candidate("candidate", "model-1", threshold=1.5)
+        with self.assertRaisesRegex(InvalidModelArtifact, "decision threshold"):
+            self.registry.promote("model-1", "v1", "operator", report)
 
     def test_tampered_bundle_is_rejected_after_restart(self) -> None:
         folder, report = self._candidate("candidate", "model-1")

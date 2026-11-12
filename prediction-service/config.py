@@ -6,6 +6,7 @@ import json
 import logging
 import os
 from dataclasses import dataclass
+from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -116,6 +117,26 @@ class Settings:
             except Exception:
                 missing.append("PREDICTION_ALLOWED_ROLES (invalid JSON)")
 
+        submitter_roles_raw = os.getenv("PREDICTION_BATCH_SUBMITTER_ROLES")
+        if submitter_roles_raw is not None:
+            try:
+                submitter_roles = json.loads(submitter_roles_raw)
+                # An empty list is valid: it explicitly disables population submission.
+                if not isinstance(submitter_roles, list) or any(r not in {"DIRECTOR", "DECANO", "RECTOR"} for r in submitter_roles):
+                    missing.append("PREDICTION_BATCH_SUBMITTER_ROLES (invalid role format)")
+            except Exception:
+                missing.append("PREDICTION_BATCH_SUBMITTER_ROLES (invalid JSON)")
+
+        training_roles_raw = os.getenv("PREDICTION_TRAINING_ROLES")
+        if training_roles_raw is not None:
+            try:
+                training_roles = json.loads(training_roles_raw)
+                if (not isinstance(training_roles, list) or not training_roles
+                        or any(not isinstance(r, str) or not r.strip() for r in training_roles)):
+                    missing.append("PREDICTION_TRAINING_ROLES (invalid role format)")
+            except Exception:
+                missing.append("PREDICTION_TRAINING_ROLES (invalid JSON)")
+
         if missing:
             msg = f"Runtime configuration missing or invalid: {', '.join(missing)}"
             if self.environment == "production":
@@ -136,6 +157,7 @@ class WorkerSettings:
     memory_limit_mb: int
     artifacts_dir: str
     random_seed: int
+    max_job_attempts: int
 
     @classmethod
     def from_environment(cls) -> "WorkerSettings":
@@ -159,7 +181,35 @@ class WorkerSettings:
             memory_limit_mb=_read_int("WORKER_MEMORY_LIMIT_MB", 2048),
             artifacts_dir=os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"),
             random_seed=_read_int("WORKER_RANDOM_SEED", 42, minimum=0),
+            max_job_attempts=_read_int("WORKER_MAX_JOB_ATTEMPTS", 3),
         )
+
+
+def custom_dataset_roots() -> list[Path]:
+    """Directories holding uploaded datasets, in resolution order.
+
+    ``PREDICTION_CUSTOM_DATASET_ROOT`` is the writable store shared by the API
+    (read-write) and the worker (read-only). ``PREDICTION_DATASET_ROOT/custom``
+    remains a read-only fallback for snapshots provisioned by operators.
+    """
+    roots: list[Path] = []
+    explicit = os.getenv("PREDICTION_CUSTOM_DATASET_ROOT", "").strip()
+    if explicit:
+        roots.append(Path(explicit).resolve())
+    snapshots = os.getenv("PREDICTION_DATASET_ROOT", "").strip()
+    if snapshots:
+        legacy = (Path(snapshots) / "custom").resolve()
+        if legacy not in roots:
+            roots.append(legacy)
+    return roots
+
+
+def dataset_upload_max_bytes() -> int:
+    return _read_int("PREDICTION_DATASET_UPLOAD_MAX_BYTES", 50 * 1024 * 1024)
+
+
+def dataset_max_uncompressed_bytes() -> int:
+    return _read_int("PREDICTION_DATASET_MAX_UNCOMPRESSED_BYTES", 200 * 1024 * 1024)
 
 
 settings = Settings.from_environment()

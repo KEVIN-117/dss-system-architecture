@@ -10,6 +10,7 @@ from dataset_contract import (
     compute_snapshot_digest,
     validate_prepared_dataset,
 )
+from feature_contract import PROGRAM_DROPOUT_EVENT, contract_reference
 
 
 RUN_ID = "8ef1a80e-a16a-4e89-88e2-45d2d5fab02a"
@@ -39,12 +40,13 @@ def valid_manifest(row_count: int = 2) -> dict:
         "target_definition": {
             "positive_class": "RISK",
             "negative_class": "NO_RISK",
-            "event_code": "NEXT_CLOSURE_DROPOUT",
+            "event_code": PROGRAM_DROPOUT_EVENT,
             "horizon_ref": "next-processed-closure",
             "label_source": "dw.fact_retencion_desercion",
         },
         "target_field": "target_class",
         "feature_fields": ["materias_cursadas"],
+        "feature_contract": contract_reference(PROGRAM_DROPOUT_EVENT, ["materias_cursadas"]),
         "fields": [
             {"name": "student_ref", "logical_type": "string", "role": "identifier", "nullable": False},
             {"name": "program_ref", "logical_type": "string", "role": "identifier", "nullable": False},
@@ -90,6 +92,27 @@ def validate(manifest: dict, rows: list[dict]):
 
 
 class PreparedDatasetContractTests(unittest.TestCase):
+    def test_institutional_dataset_without_feature_contract_is_blocked(self) -> None:
+        manifest = valid_manifest()
+        del manifest["feature_contract"]
+        report = validate(manifest, [row("pseudonym-a", "DESERTOR"), row("pseudonym-b", "RETENIDO")])
+        self.assertEqual(report.status, "BLOCKED")
+        self.assertIn("FEATURE_CONTRACT_MISSING", {issue.code for issue in report.issues})
+
+    def test_stale_or_mismatched_feature_contract_is_invalid(self) -> None:
+        for change in ({"digest": "0" * 64}, {"features": ["materias_aprobadas"]}, {"event_code": "COURSE_ABANDONMENT"}):
+            manifest = valid_manifest()
+            manifest["feature_contract"] = {**manifest["feature_contract"], **change}
+            report = validate(manifest, [row("pseudonym-a", "DESERTOR"), row("pseudonym-b", "RETENIDO")])
+            self.assertEqual(report.status, "INVALID", change)
+            self.assertIn("FEATURE_CONTRACT_MISMATCH", {issue.code for issue in report.issues})
+
+    def test_feature_type_must_match_contract(self) -> None:
+        manifest = valid_manifest()
+        next(field for field in manifest["fields"] if field["name"] == "materias_cursadas")["logical_type"] = "number"
+        report = validate(manifest, [row("pseudonym-a", "DESERTOR"), row("pseudonym-b", "RETENIDO")])
+        self.assertIn("FEATURE_CONTRACT_MISMATCH", {issue.code for issue in report.issues})
+
     def test_dw_shaped_fixture_is_structural_but_blocked_without_dsa_approval(self) -> None:
         fixture_dir = Path(__file__).parent / "fixtures" / "pred002_synthetic"
         manifest = json.loads((fixture_dir / "manifest.json").read_text(encoding="utf-8"))

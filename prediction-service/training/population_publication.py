@@ -10,7 +10,7 @@ from uuid import uuid4
 from inference import InferenceFailure
 from inference_adapters import ConfiguredAcademicPolicy, DwPredictionDataProvider, KeycloakIdentityProvider
 from training.model_registry import InvalidModelArtifact, ModelRegistry, NoActiveModel
-from training.prediction_publication_store import PredictionPublicationStore
+from training.prediction_publication_store import PredictionPublicationStore, PublicationConflict
 
 
 class PopulationPublicationService:
@@ -84,7 +84,11 @@ class PopulationPublicationService:
                                  "faculty_id": context.faculty_id, "roles": sorted(principal.roles)},
             "created_at": datetime.now(timezone.utc).isoformat(),
         }
-        return _public_batch(self.store.create(batch, scope))
+        try:
+            return _public_batch(self.store.create(batch, scope))
+        except PublicationConflict as exc:
+            # A concurrent request reused the key with a different body.
+            raise InferenceFailure("IDEMPOTENCY_CONFLICT", 409, "Idempotency-Key was already used for a different publication request.") from exc
 
     def current(self, access_token: str, program_ref: str, closure_id: str, limit: int = 100, offset: int = 0) -> dict[str, Any]:
         principal = self.identity.authenticate(access_token)

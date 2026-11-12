@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -13,7 +14,7 @@ from celery import Celery
 from celery.signals import worker_ready
 from kombu import Exchange, Queue
 
-from config import WorkerSettings
+from config import WorkerSettings, custom_dataset_roots
 from training.job_store import JobStatus, JobStore
 
 logger = logging.getLogger(__name__)
@@ -61,16 +62,42 @@ celery_app.conf.update(
 )
 
 
+def _exhausted_error(request_id: str, operation: str) -> dict[str, Any]:
+    return {
+        "type": "about:blank",
+        "title": f"{operation} attempts exhausted",
+        "status": 500,
+        "code": "ATTEMPTS_EXHAUSTED",
+        "detail": f"{operation} did not finish within {worker_settings.max_job_attempts} attempts "
+                  "(worker lost or time limit exceeded); inspect worker logs.",
+        "request_id": request_id,
+    }
+
+
+_CUSTOM_DATASET_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}")
+
+
+def _resolve_custom_dataset(name: str) -> Path:
+    """Find an uploaded/provisioned dataset by opaque name in the trusted roots."""
+    if not _CUSTOM_DATASET_NAME.fullmatch(name):
+        raise ValueError("Custom dataset references must be opaque identifiers.")
+    for root in custom_dataset_roots():
+        candidate = (root / name).resolve()
+        if root not in candidate.parents:
+            raise ValueError("Dataset reference escapes the configured dataset root.")
+        if candidate.is_dir():
+            return candidate
+    raise FileNotFoundError(f"Unknown dataset reference: custom:{name}")
+
+
 def _resolve_dataset(dataset_ref: str) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Resolve and load manifest and rows from dataset_ref."""
-    normalized_ref = dataset_ref.removeprefix("custom:")
     dataset_root = os.getenv("PREDICTION_DATASET_ROOT")
-    if dataset_root and not dataset_ref.startswith(("synthetic:", "fixture:")):
+    if dataset_ref.startswith("custom:"):
+        ref_path = _resolve_custom_dataset(dataset_ref.removeprefix("custom:"))
+    elif dataset_root and not dataset_ref.startswith(("synthetic:", "fixture:")):
         root = Path(dataset_root).resolve()
-        # Permitir resolución directa de carpetas o carpetas dentro de custom/
-        ref_path = (root / normalized_ref).resolve()
-        if not ref_path.is_dir() and (root / "custom" / normalized_ref).is_dir():
-            ref_path = (root / "custom" / normalized_ref).resolve()
+        ref_path = (root / dataset_ref).resolve()
         if root not in ref_path.parents and ref_path != root:
             raise ValueError("Dataset reference escapes the configured snapshot root.")
     else:
@@ -127,20 +154,22 @@ def train_model_task(
     config = resolve_training_configuration(config)
     seed = config.get("seed", worker_settings.random_seed)
 
-    # Redeliveries are expected; only a queued job can be claimed.
-    if not store.claim(job_id, worker_settings.job_timeout_seconds + 300):
+    # Redeliveries are expected; only a queued job (or one whose lease expired)
+    # can be claimed, and never more than WORKER_MAX_JOB_ATTEMPTS times.
+    attempt = store.claim_attempt(job_id, worker_settings.job_timeout_seconds + 300, worker_settings.max_job_attempts)
+    if attempt is None:
+        if store.fail_exhausted(job_id, worker_settings.max_job_attempts, _exhausted_error(job_id, "Training")):
+            logger.error("Training job %s FAILED: %s attempts exhausted", job_id, worker_settings.max_job_attempts)
+            return {"job_id": job_id, "status": "FAILED"}
         current = store.get(job_id)
         if current and current.status == JobStatus.RUNNING:
             # A late-acked task can be redelivered immediately after worker loss.
             # Keep it alive until the DB lease expires so the next delivery can
-            # reclaim the job instead of acknowledging it and stranding RUNNING.
+            # reclaim the job (or fail it once attempts are exhausted).
             raise self.retry(countdown=60, max_retries=None)
         return {"job_id": job_id, "status": current.status.value if current else "MISSING"}
 
-    # 1. Mark as RUNNING
-    now_iso = datetime.now(timezone.utc).isoformat()
-    store.update_status(job_id, JobStatus.RUNNING, started_at=now_iso)
-    logger.info("Starting training job %s for algorithm=%s, dataset=%s", job_id, algorithm, dataset_ref)
+    logger.info("Starting training job %s attempt=%s algorithm=%s dataset=%s", job_id, attempt, algorithm, dataset_ref)
 
     try:
         # 2. Resolve dataset
@@ -168,9 +197,12 @@ def train_model_task(
             memory_limit_mb=worker_settings.memory_limit_mb,
         )
 
-        # 5. Persist artifacts
-        current_job = store.get(job_id)
-        attempt_artifact_id = f"{job_id}-attempt-{current_job.attempt if current_job else 1}"
+        # 5. Persist artifacts under this claim's attempt number. The dataset's
+        # feature contract travels into the bundle (and its digest) so serving
+        # can prove it computes features exactly as they were trained.
+        if manifest.get("feature_contract") is not None:
+            train_result.manifest["feature_contract"] = manifest["feature_contract"]
+        attempt_artifact_id = f"{job_id}-attempt-{attempt}"
         final_manifest = write_training_artifacts(
             job_id=attempt_artifact_id,
             artifacts_dir=artifacts_path,
@@ -216,14 +248,19 @@ def train_model_task(
             "model_id": final_manifest["model_id"],
             "version": final_manifest["version"],
         }
-        store.update_status(
+        if not store.update_status(
             job_id,
             JobStatus.SUCCEEDED,
+            expected_attempt=attempt,
             finished_at=finished_iso,
             model_candidate=model_candidate,
             dependency_versions=train_result.dependency_lock,
             lease_until=None,
-        )
+        ):
+            # The lease expired and a newer attempt owns the job; its result wins.
+            logger.warning("Training job %s attempt %s lost its lease; result left as orphan candidate %s",
+                           job_id, attempt, attempt_artifact_id)
+            return {"job_id": job_id, "status": "SUPERSEDED", "attempt": attempt}
         logger.info("Training job %s SUCCEEDED with model %s", job_id, model_candidate["model_id"])
 
         return {
@@ -243,13 +280,16 @@ def train_model_task(
             "detail": "Training failed; inspect worker logs using the request identifier.",
             "request_id": job_id,
         }
-        store.update_status(
+        if not store.update_status(
             job_id,
             JobStatus.FAILED,
+            expected_attempt=attempt,
             finished_at=finished_iso,
             error=error_detail,
             lease_until=None,
-        )
+        ):
+            logger.warning("Training job %s attempt %s lost its lease; failure not recorded", job_id, attempt)
+            return {"job_id": job_id, "status": "SUPERSEDED", "attempt": attempt}
         return {
             "job_id": job_id,
             "status": "FAILED",
@@ -260,13 +300,17 @@ def train_model_task(
 @celery_app.task(bind=True, name="prediction.publish_population")
 def publish_population_task(self: Any, batch_id: str, artifacts_dir: str) -> dict[str, Any]:
     """Score one authorized program/cut and atomically expose the completed batch."""
-    from inference import InferenceFailure, score_loaded_model
+    from inference import score_loaded_model
     from inference_adapters import DwPredictionDataProvider
     from training.model_registry import ModelRegistry
     from training.prediction_publication_store import PredictionPublicationStore
 
     store = PredictionPublicationStore()
-    if not store.claim(batch_id, worker_settings.job_timeout_seconds + 300):
+    attempt = store.claim_attempt(batch_id, worker_settings.job_timeout_seconds + 300, worker_settings.max_job_attempts)
+    if attempt is None:
+        if store.fail_exhausted(batch_id, worker_settings.max_job_attempts, _exhausted_error(batch_id, "Population scoring")):
+            logger.error("Prediction batch %s FAILED: %s attempts exhausted", batch_id, worker_settings.max_job_attempts)
+            return {"batch_id": batch_id, "status": "FAILED"}
         current = store.get(batch_id)
         if current and current["status"] == "RUNNING":
             raise self.retry(countdown=60, max_retries=None)
@@ -282,17 +326,15 @@ def publish_population_task(self: Any, batch_id: str, artifacts_dir: str) -> dic
         if bundle.model_id != batch["model_id"] or bundle.version != batch["model_version"]:
             raise ValueError("The approved active model changed before scoring; resubmit against the current model.")
         data = DwPredictionDataProvider()
-        subjects, source_runs = data.list_program_population(context)
+        # One point-in-time query for the whole program/cut, with the exact SQL
+        # and eligibility rule used by single-student inference.
+        population, ineligible, source_runs = data.load_population_features(context, bundle.manifest)
+        if ineligible:
+            logger.info("Prediction batch %s excluded ineligible profiles: %s", batch_id, ineligible)
         generated_at = datetime.now(timezone.utc).isoformat()
         results: list[dict[str, Any]] = []
-        for subject_ref in subjects:
-            try:
-                features = data.load_features(subject_ref, context, bundle.manifest, "program_dropout")
-                predicted_class, probability, _ = score_loaded_model(bundle, features)
-            except InferenceFailure as exc:
-                if exc.code in {"INELIGIBLE_PROFILE", "RESOURCE_NOT_FOUND"}:
-                    continue
-                raise
+        for subject_ref, features in population.items():
+            predicted_class, probability, _ = score_loaded_model(bundle, features)
             results.append({
                 "subject_ref": subject_ref,
                 "program_ref": batch["program_ref"],
@@ -303,16 +345,18 @@ def publish_population_task(self: Any, batch_id: str, artifacts_dir: str) -> dic
                 "model_version": bundle.version,
                 "generated_at": generated_at,
             })
-        store.publish(batch_id, results, source_runs)
+        store.publish(batch_id, results, source_runs, attempt=attempt)
         logger.info("Prediction batch %s published rows=%s model=%s:%s", batch_id, len(results), bundle.model_id, bundle.version)
         return {"batch_id": batch_id, "status": "PUBLISHED", "result_count": len(results)}
     except Exception as exc:
         logger.exception("Prediction batch %s failed", batch_id)
-        store.fail(batch_id, {
+        if not store.fail(batch_id, {
             "code": getattr(exc, "code", "PREDICTION_PUBLICATION_FAILED"),
             "detail": "Population scoring failed; no complete publication is available.",
             "request_id": batch_id,
-        })
+        }, attempt=attempt):
+            logger.warning("Prediction batch %s attempt %s lost its lease; failure not recorded", batch_id, attempt)
+            return {"batch_id": batch_id, "status": "SUPERSEDED", "attempt": attempt}
         return {"batch_id": batch_id, "status": "FAILED"}
 
 @worker_ready.connect

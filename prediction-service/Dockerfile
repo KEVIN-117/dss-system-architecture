@@ -7,15 +7,15 @@ WORKDIR /app
 
 RUN groupadd --system --gid 10001 app \
     && useradd --system --uid 10001 --gid app --no-create-home app \
-    && mkdir -p /app/artifacts \
-    && chown -R app:app /app/artifacts
+    && mkdir -p /app/artifacts /app/custom-datasets \
+    && chown -R app:app /app/artifacts /app/custom-datasets
 
 COPY pyproject.toml uv.lock ./
 ARG UV_VERSION=0.11.32
 RUN pip install --no-cache-dir "uv==${UV_VERSION}" \
     && uv sync --locked --extra ml --no-dev --no-install-project
 
-COPY --chown=app:app config.py main.py dataset_contract.py inference.py inference_adapters.py ./
+COPY --chown=app:app config.py main.py dataset_contract.py feature_contract.py inference.py inference_adapters.py ./
 COPY --chown=app:app training/ ./training/
 
 ENV PATH="/app/.venv/bin:${PATH}" \
@@ -24,7 +24,8 @@ ENV PATH="/app/.venv/bin:${PATH}" \
     PREDICTION_ENV=production \
     PREDICTION_LOG_LEVEL=info \
     PREDICTION_RELOAD=false \
-    WORKER_ARTIFACTS_DIR=/app/artifacts
+    WORKER_ARTIFACTS_DIR=/app/artifacts \
+    PREDICTION_CUSTOM_DATASET_ROOT=/app/custom-datasets
 
 USER app
 EXPOSE 8000
