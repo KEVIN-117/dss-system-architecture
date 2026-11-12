@@ -53,6 +53,9 @@ out
 
 test-output
 
+# Local Vitest/Node compile cache
+.tmp-vitest/
+
 vitest.config.*.timestamp*
 vite.config.*.timestamp*
 
