@@ -124,7 +124,14 @@
     <Attributes>
       <Attribute name="Period SK" keyColumn="periodo_academico_sk" hasHierarchy="false" />
       <Attribute name="Academic Year" keyColumn="gestion" nameColumn="gestion" />
-      <Attribute name="Period Number" keyColumn="periodo" nameColumn="periodo" />
+      <!-- periodo repeats every year: the key must include gestion or Mondrian
+           collapses all semesters of all years into two members. -->
+      <Attribute name="Period Number" nameColumn="periodo" orderByColumn="periodo">
+        <Key>
+          <Column name="gestion" />
+          <Column name="periodo" />
+        </Key>
+      </Attribute>
     </Attributes>
     <Hierarchies>
       <Hierarchy name="Academic Period">
@@ -199,6 +206,8 @@
           <Measure name="Failed Attempts" column="conteo_reprobado" aggregator="sum" formatString="#,##0" />
           <Measure name="Repeated Attempts" column="conteo_repeticion" aggregator="sum" formatString="#,##0" />
           <Measure name="Abandoned Attempts" column="conteo_abandono" aggregator="sum" formatString="#,##0" />
+          <Measure name="Attempts With Known Repetition" column="conteo_repeticion_conocida" aggregator="sum" formatString="#,##0" />
+          <Measure name="Attempts With Known Abandonment" column="conteo_abandono_conocido" aggregator="sum" formatString="#,##0" />
         </Measures>
         <DimensionLinks>
           <ForeignKeyLink dimension="Academic Program" foreignKeyColumn="programa_sk" />
@@ -211,6 +220,29 @@
         </DimensionLinks>
       </MeasureGroup>
     </MeasureGroups>
+    <!--
+      Rates use explicit denominators and return empty (never 0%) when the
+      denominator is empty, so missing outcome flags are not shown as results.
+      Each rate divides only by attempts whose outcome flag is known.
+    -->
+    <CalculatedMembers>
+      <CalculatedMember name="Pass Rate" dimension="Measures"
+          formula="IIf(([Measures].[Passed Attempts] + [Measures].[Failed Attempts]) = 0, NULL, [Measures].[Passed Attempts] / ([Measures].[Passed Attempts] + [Measures].[Failed Attempts]))">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+      </CalculatedMember>
+      <CalculatedMember name="Failure Rate" dimension="Measures"
+          formula="IIf(([Measures].[Passed Attempts] + [Measures].[Failed Attempts]) = 0, NULL, [Measures].[Failed Attempts] / ([Measures].[Passed Attempts] + [Measures].[Failed Attempts]))">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+      </CalculatedMember>
+      <CalculatedMember name="Repetition Rate" dimension="Measures"
+          formula="IIf([Measures].[Attempts With Known Repetition] = 0, NULL, [Measures].[Repeated Attempts] / [Measures].[Attempts With Known Repetition])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+      </CalculatedMember>
+      <CalculatedMember name="Abandonment Rate" dimension="Measures"
+          formula="IIf([Measures].[Attempts With Known Abandonment] = 0, NULL, [Measures].[Abandoned Attempts] / [Measures].[Attempts With Known Abandonment])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+      </CalculatedMember>
+    </CalculatedMembers>
   </Cube>
 
   <Cube name="Academic Admission" defaultMeasure="Applicants">
@@ -230,6 +262,8 @@
           <Measure name="Admitted Applicants" column="admitted_person_sk" aggregator="distinct-count" formatString="#,##0" />
           <Measure name="Known Admission Outcomes" column="known_outcome_person_sk" aggregator="distinct-count" formatString="#,##0" />
           <Measure name="Applications" column="conteo_postulacion" aggregator="sum" formatString="#,##0" />
+          <Measure name="Admitted Applications" column="conteo_admitido" aggregator="sum" formatString="#,##0" />
+          <Measure name="Applications With Known Outcome" column="conteo_resultado_conocido" aggregator="sum" formatString="#,##0" />
           <Measure name="Average Admission Score" column="puntaje_examen" aggregator="avg" formatString="#,##0.00" />
           <Measure name="Attempt Count" column="applicant_person_sk" aggregator="distinct-count" formatString="#,##0" />
         </Measures>
@@ -244,6 +278,31 @@
         </DimensionLinks>
       </MeasureGroup>
     </MeasureGroups>
+    <!--
+      Admission rates use people (or applications) with a known outcome as the
+      denominator. Year-over-year growth compares against the same member of the
+      previous academic year on the Academic Period hierarchy; it is empty at the
+      All level, without a previous year, or when the previous-year count is below
+      the k-anonymity threshold (5), so a growth value cannot reveal a masked cell.
+    -->
+    <CalculatedMembers>
+      <CalculatedMember name="Admission Rate" dimension="Measures"
+          formula="IIf([Measures].[Known Admission Outcomes] = 0, NULL, [Measures].[Admitted Applicants] / [Measures].[Known Admission Outcomes])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+      </CalculatedMember>
+      <CalculatedMember name="Application Admission Rate" dimension="Measures"
+          formula="IIf([Measures].[Applications With Known Outcome] = 0, NULL, [Measures].[Admitted Applications] / [Measures].[Applications With Known Outcome])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+      </CalculatedMember>
+      <CalculatedMember name="Applicants YoY Growth" dimension="Measures"
+          formula="IIf([Academic Period].[Academic Period].CurrentMember.Level.Ordinal = 0, NULL, IIf(IsEmpty(([Measures].[Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))) OR ([Measures].[Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember)) &lt; 5, NULL, ([Measures].[Applicants] - ([Measures].[Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))) / ([Measures].[Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))))">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="+0.0%;-0.0%;0.0%" />
+      </CalculatedMember>
+      <CalculatedMember name="Admitted Applicants YoY Growth" dimension="Measures"
+          formula="IIf([Academic Period].[Academic Period].CurrentMember.Level.Ordinal = 0, NULL, IIf(IsEmpty(([Measures].[Admitted Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))) OR ([Measures].[Admitted Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember)) &lt; 5, NULL, ([Measures].[Admitted Applicants] - ([Measures].[Admitted Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))) / ([Measures].[Admitted Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))))">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="+0.0%;-0.0%;0.0%" />
+      </CalculatedMember>
+    </CalculatedMembers>
   </Cube>
 
   <Cube name="Academic Retention" defaultMeasure="Student Snapshots">
@@ -279,5 +338,16 @@
         </DimensionLinks>
       </MeasureGroup>
     </MeasureGroups>
+    <!-- NO_EVALUABLE snapshots stay out of both rates (see dw.vw_fact_retencion_olap). -->
+    <CalculatedMembers>
+      <CalculatedMember name="Dropout Rate" dimension="Measures"
+          formula="IIf([Measures].[Evaluable Retention Outcomes] = 0, NULL, [Measures].[Observed Dropouts] / [Measures].[Evaluable Retention Outcomes])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+      </CalculatedMember>
+      <CalculatedMember name="Retention Rate" dimension="Measures"
+          formula="IIf([Measures].[Evaluable Retention Outcomes] = 0, NULL, [Measures].[Retained Students] / [Measures].[Evaluable Retention Outcomes])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+      </CalculatedMember>
+    </CalculatedMembers>
   </Cube>
 </Schema>

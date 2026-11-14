@@ -14,6 +14,23 @@ Las analíticas descriptivas se sirven desde los cubos OLAP `Academic Admission`
 | Promedio, aprobaciones, reprobaciones, repeticiones y abandonos | `fact_cursado`; medidas de `Academic Performance` | Cubo y medidas agregadas publicados. |
 | Retención y deserción observada | `fact_retencion_desercion`; `Academic Retention` | Solo snapshots de periodos cerrados y evaluables entran en las tasas. |
 
+## Tasas publicadas como miembros calculados
+
+Las tasas se definen una sola vez en el esquema Mondrian (`infra/olap/schemas/uatf-rendimiento-academico.xml`) para que portales, OLAP Workspace y consultas ad hoc usen la misma fórmula. Todas devuelven vacío (nunca 0 %) cuando el denominador está vacío.
+
+| Cubo | Miembro calculado | Fórmula |
+| --- | --- | --- |
+| Academic Admission | `Admission Rate` | `Admitted Applicants / Known Admission Outcomes` (personas) |
+| Academic Admission | `Application Admission Rate` | `Admitted Applications / Applications With Known Outcome` (postulaciones) |
+| Academic Admission | `Applicants YoY Growth`, `Admitted Applicants YoY Growth` | Variación contra el mismo miembro de la gestión anterior (`ParallelPeriod` sobre `Academic Year`) |
+| Academic Performance | `Pass Rate`, `Failure Rate` | Aprobados o reprobados / (aprobados + reprobados) |
+| Academic Performance | `Repetition Rate`, `Abandonment Rate` | Intentos con la bandera verdadera / intentos con la bandera conocida (`Attempts With Known Repetition`, `Attempts With Known Abandonment`) |
+| Academic Retention | `Dropout Rate`, `Retention Rate` | Desertores o retenidos / `Evaluable Retention Outcomes` |
+
+- El crecimiento interanual solo se calcula sobre la jerarquía `Academic Period` (gestión o gestión-periodo). Queda vacío en el nivel `All`, sin gestión anterior o cuando el valor de la gestión anterior es menor que 5, para que la variación no revele una celda que la k-anonimidad enmascara.
+- La tasa por persona y la tasa por postulación responden preguntas distintas: una persona con varias postulaciones cuenta como admitida si al menos una fue admitida.
+- Desde la migración 0044, `fact_cursado` deriva las banderas con reglas MVP: un intento se aprueba si `GREATEST(nota, nota_2da, nota_ex_mesa) >= 51`, se reprueba si esa nota es mayor que 0 y menor que 51, y queda sin resultado si es 0 o nula. Es repetición cuando la misma persona (`id_alumno`) ya cursó la misma materia (`id_materia`) en un cierre académico anterior. `notas_planilla.estado` no se usa para aprobar.
+
 No existe actualmente un atributo de área de conocimiento en el contrato `dim_programa` ni en su ETL. Por ello, el cubo no inventa una clasificación derivada de facultades o carreras. Para cubrir esa dimensión se necesita aprobar y cargar un catálogo institucional con su relación carrera-área.
 
 Las postulaciones que no pudieron vincularse con una persona identificada no incrementan las medidas de personas distintas; sí permanecen en `Applications`. Esto evita presentar registros repetidos o claves técnicas como si fueran personas únicas.
