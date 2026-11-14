@@ -24,7 +24,7 @@ CONTRACT_VERSION = "dw-point-in-time-v1"
 PROGRAM_DROPOUT_EVENT = "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"
 COURSE_ABANDONMENT_EVENT = "COURSE_ABANDONMENT"
 # Bump when the Python eligibility rule below changes.
-ELIGIBILITY_RULE_VERSION = "first-three-academic-years-v1"
+ELIGIBILITY_RULE_VERSION = "first-three-academic-years-v2"
 
 
 @dataclass(frozen=True)
@@ -70,9 +70,37 @@ FEATURES_BY_EVENT: dict[str, dict[str, FeatureSpec]] = {
 #   %(subject)s  optional student id; NULL returns the whole program population
 #   %(limit)s    maximum rows
 _PROGRAM_DROPOUT_QUERY = """
+WITH requested AS MATERIALIZED (
+    SELECT closure_id, effective_at FROM etl_control.academic_period_closure
+    WHERE closure_id = %(closure)s::bigint
+), program_cadence AS MATERIALIZED (
+    -- Period 3 is an annual closure only for programs without semester
+    -- closures; in semester programs it is an inter-semester (summer) term.
+    SELECT EXISTS (
+        SELECT 1 FROM dw.fact_cursado pc
+        JOIN dw.dim_programa pp ON pp.programa_sk = pc.programa_sk
+          AND pp.member_type = 'STANDARD' AND pp.id_programa = %(program)s
+        JOIN dw.dim_periodo_academico ppa ON ppa.periodo_academico_sk = pc.periodo_academico_sk
+        JOIN etl_control.academic_period_closure pcut ON pcut.closure_id = ppa.closure_id
+          AND pcut.status = 'PROCESADO'
+        CROSS JOIN requested r
+        WHERE ppa.periodo IN (1, 2) AND pcut.effective_at <= r.effective_at
+    ) AS semestral
+), coverage AS MATERIALIZED (
+    -- First processed closure of the cadence: a student first seen there may
+    -- have started earlier (left-censored history).
+    SELECT cov.gestion, cov.periodo
+    FROM etl_control.academic_period_closure cov
+    CROSS JOIN program_cadence pc CROSS JOIN requested r
+    WHERE cov.status = 'PROCESADO' AND cov.effective_at <= r.effective_at
+      AND CASE WHEN pc.semestral THEN cov.periodo IN (1, 2) ELSE cov.periodo = 3 END
+    ORDER BY cov.gestion, cov.periodo, cov.closure_id
+    LIMIT 1
+)
 SELECT e.id_alumno::text AS subject_ref, {columns},
        c.closure_id::text AS cut_id, c.gestion AS cut_year, c.periodo AS cut_period,
        start_period.gestion AS start_year, start_period.periodo AS start_period,
+       coverage.gestion AS history_start_year, coverage.periodo AS history_start_period,
        e.fec_inscripcion AS enrollment_date, cadence.n AS cadence_count,
        f.run_id::text AS source_run_id, f.resultado_retencion, f.es_desercion,
        f.conteo_snapshot, f.conteo_evaluable, f.conteo_desercion
@@ -84,10 +112,13 @@ JOIN dw.dim_estudiante e ON e.estudiante_sk = f.estudiante_sk
   AND e.member_type = 'STANDARD'
   AND e.valid_from <= c.effective_at
   AND (e.valid_to IS NULL OR e.valid_to > c.effective_at)
-  AND e.fec_inscripcion <= c.effective_at::date
+  -- No fec_inscripcion bound: it is rewritten in the source; the SCD2 version
+  -- valid at the cut already proves presence (DW 0041).
 JOIN dw.dim_programa p ON p.programa_sk = f.programa_sk
   AND p.member_type = 'STANDARD' AND p.id_programa = %(program)s
-JOIN LATERAL (
+CROSS JOIN program_cadence pcad
+LEFT JOIN coverage ON TRUE
+LEFT JOIN LATERAL (
     SELECT first_cut.gestion, first_cut.periodo
     FROM dw.fact_cursado fc
     JOIN dw.dim_estudiante first_student ON first_student.estudiante_sk = fc.estudiante_sk
@@ -97,14 +128,13 @@ JOIN LATERAL (
     JOIN dw.dim_periodo_academico first_period ON first_period.periodo_academico_sk = fc.periodo_academico_sk
     JOIN etl_control.academic_period_closure first_cut ON first_cut.closure_id = first_period.closure_id
       AND first_cut.status = 'PROCESADO' AND first_cut.effective_at <= c.effective_at
-    ORDER BY first_cut.gestion,
-        CASE first_cut.periodo WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 1 ELSE 9 END,
-        first_cut.closure_id
+    WHERE CASE WHEN pcad.semestral THEN first_cut.periodo IN (1, 2) ELSE first_cut.periodo = 3 END
+    ORDER BY first_cut.gestion, first_cut.periodo, first_cut.closure_id
     LIMIT 1
 ) start_period ON TRUE
 JOIN LATERAL (
-    SELECT count(DISTINCT CASE WHEN pa.periodo = 3 THEN 'ANUAL'
-                               WHEN pa.periodo IN (1, 2) THEN 'SEMESTRAL' END) AS n
+    SELECT count(DISTINCT CASE WHEN pa.periodo IN (1, 2) THEN 'SEMESTRAL'
+                               WHEN pa.periodo = 3 AND NOT pcad.semestral THEN 'ANUAL' END) AS n
     FROM dw.fact_cursado hc
     JOIN dw.dim_estudiante he ON he.estudiante_sk = hc.estudiante_sk AND he.id_alumno = e.id_alumno
     JOIN dw.dim_programa hp ON hp.programa_sk = hc.programa_sk AND hp.id_programa = p.id_programa
@@ -140,6 +170,24 @@ WITH cut AS (
     CROSS JOIN cut c
     WHERE e.id_alumno=%(subject)s::bigint AND p.id_programa=%(program)s AND prev.status='PROCESADO'
       AND prev.effective_at < c.effective_at
+), program_cadence AS (
+    -- Period 3 is annual only for programs without semester closures.
+    SELECT EXISTS (
+        SELECT 1 FROM dw.fact_cursado pc
+        JOIN dw.dim_programa pp ON pp.programa_sk=pc.programa_sk AND pp.member_type='STANDARD'
+          AND pp.id_programa=%(program)s
+        JOIN dw.dim_periodo_academico ppa ON ppa.periodo_academico_sk=pc.periodo_academico_sk
+        JOIN etl_control.academic_period_closure pcut ON pcut.closure_id=ppa.closure_id AND pcut.status='PROCESADO'
+        CROSS JOIN cut c
+        WHERE ppa.periodo IN (1,2) AND pcut.effective_at<=c.effective_at
+    ) AS semestral
+), coverage AS (
+    SELECT cov.gestion, cov.periodo
+    FROM etl_control.academic_period_closure cov CROSS JOIN program_cadence pcad CROSS JOIN cut c
+    WHERE cov.status='PROCESADO' AND cov.effective_at<=c.effective_at
+      AND CASE WHEN pcad.semestral THEN cov.periodo IN (1,2) ELSE cov.periodo=3 END
+    ORDER BY cov.gestion, cov.periodo, cov.closure_id
+    LIMIT 1
 ), first_course AS (
     SELECT c0.gestion, c0.periodo
     FROM dw.fact_cursado fc
@@ -147,20 +195,23 @@ WITH cut AS (
     JOIN dw.dim_programa p ON p.programa_sk=fc.programa_sk AND p.member_type='STANDARD'
     JOIN dw.dim_periodo_academico pa ON pa.periodo_academico_sk=fc.periodo_academico_sk
     JOIN etl_control.academic_period_closure c0 ON c0.closure_id=pa.closure_id
-    CROSS JOIN cut requested
+    CROSS JOIN cut requested CROSS JOIN program_cadence pcad
     WHERE e.id_alumno=%(subject)s::bigint AND p.id_programa=%(program)s AND c0.status='PROCESADO'
       AND c0.effective_at <= requested.effective_at
-    ORDER BY c0.gestion, CASE c0.periodo WHEN 1 THEN 1 WHEN 2 THEN 2 WHEN 3 THEN 1 ELSE 9 END, c0.closure_id
+      AND CASE WHEN pcad.semestral THEN c0.periodo IN (1,2) ELSE c0.periodo=3 END
+    ORDER BY c0.gestion, c0.periodo, c0.closure_id
     LIMIT 1
 ), cadence AS (
-    SELECT count(DISTINCT CASE WHEN pa.periodo=3 THEN 'ANUAL' WHEN pa.periodo IN (1,2) THEN 'SEMESTRAL' END) AS n,
-           min(CASE WHEN pa.periodo=3 THEN 'ANUAL' WHEN pa.periodo IN (1,2) THEN 'SEMESTRAL' END) AS value
+    SELECT count(DISTINCT CASE WHEN pa.periodo IN (1,2) THEN 'SEMESTRAL'
+                               WHEN pa.periodo=3 AND NOT pcad.semestral THEN 'ANUAL' END) AS n,
+           min(CASE WHEN pa.periodo IN (1,2) THEN 'SEMESTRAL'
+                    WHEN pa.periodo=3 AND NOT pcad.semestral THEN 'ANUAL' END) AS value
     FROM dw.fact_cursado fc
     JOIN dw.dim_estudiante e ON e.estudiante_sk=fc.estudiante_sk AND e.member_type='STANDARD'
     JOIN dw.dim_programa p ON p.programa_sk=fc.programa_sk AND p.member_type='STANDARD'
     JOIN dw.dim_periodo_academico pa ON pa.periodo_academico_sk=fc.periodo_academico_sk
     JOIN etl_control.academic_period_closure c0 ON c0.closure_id=pa.closure_id
-    CROSS JOIN cut c
+    CROSS JOIN cut c CROSS JOIN program_cadence pcad
     WHERE e.id_alumno=%(subject)s::bigint AND p.id_programa=%(program)s AND pa.periodo IN (1,2,3)
       AND c0.status='PROCESADO' AND c0.effective_at<=c.effective_at
 )
@@ -171,8 +222,10 @@ JOIN dw.dim_programa p ON p.member_type='STANDARD' AND p.id_programa=%(program)s
 JOIN dw.fact_cursado fc_target ON fc_target.estudiante_sk=e.estudiante_sk AND fc_target.programa_sk=p.programa_sk
 JOIN dw.dim_materia m ON m.materia_sk=fc_target.materia_sk AND m.member_type='STANDARD' AND m.id_materia=%(course)s::bigint
 JOIN dw.dim_periodo_academico pa ON pa.periodo_academico_sk=fc_target.periodo_academico_sk AND pa.closure_id=c.closure_id
-JOIN history hist ON TRUE CROSS JOIN first_course st CROSS JOIN cadence cd
+JOIN history hist ON TRUE CROSS JOIN first_course st CROSS JOIN cadence cd CROSS JOIN coverage cov
 WHERE EXISTS (SELECT 1 FROM etl_control.etl_execution run WHERE run.run_id=fc_target.run_id AND run.status='EXITOSA')
+  -- Left-censored history: a first course in the first loaded closure may not be the real start.
+  AND (st.gestion, st.periodo) <> (cov.gestion, cov.periodo)
   AND ((cd.value='ANUAL' AND c.periodo=3 AND (c.gestion-st.gestion+1) BETWEEN 1 AND 3)
     OR (cd.value='SEMESTRAL' AND c.periodo IN (1,2)
       AND ((c.gestion-st.gestion)*2+c.periodo-st.periodo+1) BETWEEN 1 AND 6))
@@ -271,10 +324,14 @@ def program_dropout_ineligibility(row: Mapping[str, Any]) -> str | None:
     """
     if row.get("enrollment_date") is None:
         return "NO_ENROLLMENT_DATE"
-    if row.get("cadence_count") != 1:
+    if row.get("cadence_count") != 1 or row.get("start_year") is None or row.get("start_period") is None:
         return "MIXED_CADENCE"
     current_year, current_period = int(row["cut_year"]), int(row["cut_period"])
     start_year, start_period = int(row["start_year"]), int(row["start_period"])
+    history_start = (row.get("history_start_year"), row.get("history_start_period"))
+    if None not in history_start and (start_year, start_period) == tuple(int(v) for v in history_start):
+        # First seen in the first loaded closure: the real start may be earlier.
+        return "LEFT_CENSORED_START"
     if current_period == 3 and start_period == 3:
         elapsed = current_year - start_year + 1
     elif current_period in (1, 2) and start_period in (1, 2):

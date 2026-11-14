@@ -353,6 +353,7 @@ _INELIGIBILITY_DETAIL = {
     "NO_ENROLLMENT_DATE": "The student has no trusted enrollment date.",
     "MIXED_CADENCE": "The student's academic cadence is mixed or cannot be established.",
     "OUTSIDE_WINDOW": "The student is outside the first-three-academic-years prediction window.",
+    "LEFT_CENSORED_START": "The student's start predates the loaded DW history, so the window cannot be established.",
 }
 
 

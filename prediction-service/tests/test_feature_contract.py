@@ -94,6 +94,26 @@ class FeatureContractTests(unittest.TestCase):
         self.assertIn("hcut.effective_at <= c.effective_at", sql)
         self.assertIn("e.valid_from <= c.effective_at", sql)
         self.assertNotIn("resultado_retencion AS", sql)
+        # Coverage and program cadence are also bounded by the requested cut.
+        self.assertIn("cov.effective_at <= r.effective_at", sql)
+        self.assertIn("pcut.effective_at <= r.effective_at", sql)
+
+    def test_inter_semester_period_does_not_make_semester_students_mixed(self) -> None:
+        sql = program_dropout_query(FEATURES)
+        # Period 3 counts as ANUAL only when the program has no semester closures.
+        self.assertIn("WHEN pa.periodo = 3 AND NOT pcad.semestral THEN 'ANUAL'", sql)
+        self.assertIn("CASE WHEN pcad.semestral THEN first_cut.periodo IN (1, 2) ELSE first_cut.periodo = 3 END", sql)
+
+    def test_left_censored_and_missing_start_are_ineligible(self) -> None:
+        cut = CUTS[3]
+        row = contract_row(950, cut, start=(2026, 1), outcome="RETENIDO", reprobadas=0)
+        self.assertIsNone(program_dropout_ineligibility(row))
+        censored = {**row, "history_start_year": 2026, "history_start_period": 1}
+        self.assertEqual(program_dropout_ineligibility(censored), "LEFT_CENSORED_START")
+        covered = {**row, "history_start_year": 2025, "history_start_period": 2}
+        self.assertIsNone(program_dropout_ineligibility(covered))
+        self.assertEqual(program_dropout_ineligibility({**row, "start_year": None, "start_period": None}),
+                         "MIXED_CADENCE")
 
 
 class ExtractionParityTests(unittest.TestCase):
