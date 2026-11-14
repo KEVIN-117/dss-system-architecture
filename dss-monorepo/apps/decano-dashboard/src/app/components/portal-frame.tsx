@@ -86,7 +86,7 @@ export function PortalFrame({ children }: { children: ReactNode }) {
       title: 'Exploración OLAP',
       items: [
         {
-          title: 'OLAP Workspace',
+          title: 'Espacio de análisis OLAP',
           href:
             process.env.NEXT_PUBLIC_OLAP_WORKSPACE_URL?.trim() ||
             'http://localhost:3007/analysis',

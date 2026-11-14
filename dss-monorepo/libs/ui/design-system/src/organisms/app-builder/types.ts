@@ -26,10 +26,10 @@ export interface AppBuilderConfig {
 }
 
 export const defaultAppBuilderConfig: AppBuilderConfig = {
-  name: 'Untitled workspace',
+  name: 'Espacio de trabajo sin título',
   description: '',
   navigation: 'rail',
   headerEyebrow: '',
   showAssistant: false,
-  pages: [{ id: 'overview', title: 'Overview' }],
+  pages: [{ id: 'overview', title: 'Resumen' }],
 };

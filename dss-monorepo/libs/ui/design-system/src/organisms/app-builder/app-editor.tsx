@@ -19,11 +19,11 @@ export interface AppEditorProps {
 }
 
 const sections: { id: AppBuilderSection; label: string }[] = [
-  { id: 'theme', label: 'Brand' },
-  { id: 'header', label: 'Header' },
-  { id: 'navigation', label: 'Navigation' },
-  { id: 'assistant', label: 'Assistant' },
-  { id: 'pages', label: 'Pages' },
+  { id: 'theme', label: 'Identidad' },
+  { id: 'header', label: 'Encabezado' },
+  { id: 'navigation', label: 'Navegación' },
+  { id: 'assistant', label: 'Asistente' },
+  { id: 'pages', label: 'Páginas' },
 ];
 
 /** App authoring surface. It owns local editing state; hosts own persistence and route lifecycle. */
@@ -31,7 +31,7 @@ export function AppEditor({
   initialApp = defaultAppBuilderConfig,
   onAppChange,
   onSave,
-  saveLabel = 'Save app',
+  saveLabel = 'Guardar aplicación',
   className,
 }: AppEditorProps) {
   const [app, setApp] = React.useState(initialApp);
@@ -55,7 +55,7 @@ export function AppEditor({
       ...app,
       pages: [
         ...app.pages,
-        { id: `page-${Date.now()}`, title: `Page ${app.pages.length + 1}` },
+        { id: `page-${Date.now()}`, title: `Página ${app.pages.length + 1}` },
       ],
     };
     updateApp(next);
@@ -82,7 +82,7 @@ export function AppEditor({
       <header className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-background px-4 py-3 md:px-5">
         <div className="min-w-0">
           <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-            App builder
+            Editor de aplicaciones
           </p>
           <h1 className="truncate text-base font-semibold">{app.name}</h1>
         </div>
@@ -96,12 +96,12 @@ export function AppEditor({
             {editable ? (
               <>
                 <Eye className="size-4" />
-                Preview
+                Vista previa
               </>
             ) : (
               <>
                 <Pencil className="size-4" />
-                Edit
+                Editar
               </>
             )}
           </Button>
@@ -113,7 +113,7 @@ export function AppEditor({
               aria-expanded={!!section}
             >
               <Settings2 className="size-4" />
-              Configure
+              Configurar
             </Button>
           )}
           <Button
@@ -123,14 +123,14 @@ export function AppEditor({
             loading={saving}
           >
             <Save className="size-4" />
-            {saving ? 'Saving…' : saveLabel}
+            {saving ? 'Guardando…' : saveLabel}
           </Button>
         </div>
       </header>
       {editable && (
         <nav
           className="flex gap-1 overflow-x-auto border-b border-border px-3 py-2"
-          aria-label="App configuration sections"
+          aria-label="Secciones de configuración de la aplicación"
         >
           {sections.map((item) => (
             <Button

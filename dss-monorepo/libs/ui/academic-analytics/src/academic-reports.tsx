@@ -206,7 +206,7 @@ async function request<T>(query: string, variables?: JsonRecord): Promise<T> {
       );
     if (code === 'ACADEMIC_CONTEXT_REQUIRED')
       throw new Error(
-        'Auth Service no tiene un contexto académico asignado a esta cuenta.',
+        'El servicio de autenticación no tiene un contexto académico asignado a esta cuenta.',
       );
     throw new Error(
       error?.message ?? 'No se pudieron consultar los cubos OLAP.',

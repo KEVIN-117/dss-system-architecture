@@ -345,7 +345,7 @@ function OlapSchemaViewerCanvas({
           <Button
             variant="outline"
             size="icon"
-            aria-label="Back to schemas"
+            aria-label="Volver a esquemas"
             onClick={onBack}
           >
             <ArrowLeft className="size-4" aria-hidden="true" />
@@ -428,7 +428,7 @@ function OlapSchemaViewerCanvas({
                 <Controls
                   position="bottom-left"
                   className="cube-designer-controls"
-                  aria-label="Canvas controls"
+                  aria-label="Controles del diagrama"
                 />
                 <MiniMap
                   position="bottom-right"
@@ -466,7 +466,7 @@ function OlapSchemaViewerCanvas({
           </div>
         </section>
 
-        <aside className="space-y-4" aria-label="Cube definition">
+        <aside className="space-y-4" aria-label="Definición del cubo">
           <section className="rounded-xl border border-border bg-card">
             <div className="border-b border-border px-4 py-3">
               <h2 className="flex items-center gap-2 font-medium">

@@ -66,7 +66,7 @@ export function AppShell({
         'flex min-h-[34rem] w-full overflow-hidden rounded-xl border border-border bg-background text-foreground shadow-sm',
         className,
       )}
-      aria-label={`${app.name} app preview`}
+      aria-label={`Vista previa de ${app.name}`}
     >
       {app.navigation === 'rail' && (
         <aside
@@ -74,7 +74,7 @@ export function AppShell({
             'hidden shrink-0 flex-col border-r border-border bg-card transition-[width] md:flex',
             collapsed ? 'w-16' : 'w-60',
           )}
-          aria-label="App navigation"
+          aria-label="Navegación de la aplicación"
         >
           <div className="flex h-16 items-center gap-3 border-b border-border px-3">
             <span className="flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary text-primary-foreground">
@@ -100,14 +100,14 @@ export function AppShell({
               size="icon-sm"
               className="ml-auto"
               aria-label={
-                collapsed ? 'Expand navigation' : 'Collapse navigation'
+                collapsed ? 'Expandir navegación' : 'Contraer navegación'
               }
               onClick={() => setCollapsed((value) => !value)}
             >
               <PanelLeft className="size-4" />
             </Button>
           </div>
-          <nav className="flex-1 space-y-1 p-2" aria-label="Pages">
+          <nav className="flex-1 space-y-1 p-2" aria-label="Páginas">
             {app.pages.map((page) => {
               const active = page.id === activePage?.id;
               return (
@@ -137,7 +137,7 @@ export function AppShell({
                 onClick={onAddPage}
               >
                 <Plus className="size-4" />
-                {!collapsed && 'Add page'}
+                {!collapsed && 'Agregar página'}
               </Button>
             )}
           </nav>
@@ -149,7 +149,7 @@ export function AppShell({
                 className="w-full justify-start"
                 onClick={() => onEditSection?.('navigation')}
               >
-                Navigation settings
+                Configuración de navegación
               </Button>
             </div>
           )}
@@ -175,7 +175,7 @@ export function AppShell({
               type="button"
               className="max-w-full truncate text-left text-sm font-semibold hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               onClick={() => editable && onEditSection?.('header')}
-              aria-label="Edit app header"
+              aria-label="Editar encabezado de la aplicación"
             >
               {app.name}
             </button>
@@ -186,23 +186,23 @@ export function AppShell({
               size="sm"
               onClick={() => onEditSection?.('header')}
             >
-              Edit header
+              Editar encabezado
             </Button>
           )}
           {app.showAssistant && (
             <Button variant="outline" size="sm" className="gap-2">
               <Sparkles className="size-4" />
-              Ask
+              Preguntar
             </Button>
           )}
-          <Button variant="ghost" size="icon-sm" aria-label="Workspace options">
+          <Button variant="ghost" size="icon-sm" aria-label="Opciones del espacio de trabajo">
             <ChevronDown className="size-4" />
           </Button>
         </header>
         {app.navigation === 'top' && (
           <nav
             className="flex gap-1 overflow-x-auto border-b border-border px-4 md:px-6"
-            aria-label="Pages"
+            aria-label="Páginas"
           >
             {app.pages.map((page) => (
               <button
@@ -224,7 +224,7 @@ export function AppShell({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label="Add page"
+                aria-label="Agregar página"
                 onClick={onAddPage}
               >
                 <Plus className="size-4" />
@@ -235,7 +235,7 @@ export function AppShell({
         {app.navigation === 'rail' && (
           <nav
             className="flex gap-1 overflow-x-auto border-b border-border px-3 py-2 md:hidden"
-            aria-label="Pages"
+            aria-label="Páginas"
           >
             {app.pages.map((page) => (
               <button
@@ -272,23 +272,23 @@ export function AppShell({
                     </p>
                   )}
                 </div>
-                {editable && <Badge variant="outline">Draft preview</Badge>}
+                {editable && <Badge variant="outline">Vista previa del borrador</Badge>}
               </div>
               {activePage.content ?? emptyContent ?? (
                 <div className="flex min-h-64 flex-col items-center justify-center rounded-xl border border-dashed border-border bg-background text-center">
                   <span className="mb-3 flex size-11 items-center justify-center rounded-xl bg-muted text-muted-foreground">
                     <LayoutDashboard className="size-5" />
                   </span>
-                  <p className="font-medium">Your page is ready</p>
+                  <p className="font-medium">Tu página está lista</p>
                   <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-                    Add dashboard tiles and content to start building this page.
+                    Agrega bloques de tablero y contenido para comenzar a crear esta página.
                   </p>
                 </div>
               )}
             </>
           ) : (
             <div className="flex min-h-64 items-center justify-center rounded-xl border border-dashed border-border bg-background text-sm text-muted-foreground">
-              Add a page to start building your app.
+              Agrega una página para comenzar a crear tu aplicación.
             </div>
           )}
         </main>

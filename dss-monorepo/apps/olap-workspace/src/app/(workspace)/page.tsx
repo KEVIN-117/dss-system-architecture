@@ -9,13 +9,13 @@ export default function OlapWorkspacePage() {
     <div className="mx-auto w-full max-w-7xl space-y-8">
       <DashboardToolbar
         title="Tu espacio de análisis"
-        description="Explora dashboards, consultas multidimensionales y experiencias analíticas avanzadas para profundizar en los datos institucionales."
-        context="OLAP Workspace"
+        description="Explora tableros, consultas multidimensionales y experiencias analíticas avanzadas para profundizar en los datos institucionales."
+        context="Espacio de análisis OLAP"
       />
 
       <section
         className="grid gap-4 lg:grid-cols-[1.2fr_1fr]"
-        aria-label="Accesos al workspace"
+        aria-label="Accesos al espacio de análisis"
       >
         <Link
           href="/dashboards"
@@ -26,7 +26,7 @@ export default function OlapWorkspacePage() {
           </span>
           <span className="mt-8 block max-w-xl">
             <span className="block text-xl font-semibold tracking-tight">
-              Dashboards
+              Tableros
             </span>
             <span className="mt-2 block text-sm leading-6 text-muted-foreground">
               Abre análisis guardados, revisa cómo se relacionan sus bloques y
@@ -34,7 +34,7 @@ export default function OlapWorkspacePage() {
             </span>
           </span>
           <span className="mt-6 inline-flex items-center gap-2 text-sm font-medium text-primary">
-            Explorar dashboards
+            Explorar tableros
             <ArrowRight
               aria-hidden="true"
               className="size-4 transition-transform group-hover:translate-x-1"
@@ -53,7 +53,7 @@ export default function OlapWorkspacePage() {
             <div className="min-w-0 flex-1">
               <h2 className="font-semibold text-foreground">Explorador OLAP</h2>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                Lienzo drag-and-drop de dimensiones, filtros de miembros y celdas con drillthrough transaccional.
+                Organiza dimensiones arrastrándolas, filtra miembros y consulta el detalle de las celdas.
               </p>
               <span className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
                 Iniciar análisis{' '}
@@ -73,12 +73,12 @@ export default function OlapWorkspacePage() {
               <Code2 aria-hidden="true" className="size-5" />
             </span>
             <div className="min-w-0 flex-1">
-              <h2 className="font-semibold text-foreground">MDX & SQL Workbench</h2>
+              <h2 className="font-semibold text-foreground">Editor de MDX y SQL</h2>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 Consola con Monaco Editor para escribir consultas MDX directas y previsualizar la traducción a SQL.
               </p>
               <span className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
-                Abrir Workbench{' '}
+                Abrir editor{' '}
                 <ArrowRight
                   aria-hidden="true"
                   className="size-3.5 transition-transform group-hover:translate-x-1"
@@ -95,12 +95,12 @@ export default function OlapWorkspacePage() {
               <AppWindow aria-hidden="true" className="size-5" />
             </span>
             <span className="min-w-0 flex-1">
-              <span className="block font-semibold text-foreground">Apps analíticas</span>
+              <span className="block font-semibold text-foreground">Aplicaciones analíticas</span>
               <span className="mt-1 block text-xs leading-5 text-muted-foreground">
                 Experiencias estructuradas con múltiples páginas de análisis institucional.
               </span>
               <span className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-primary">
-                Ver apps{' '}
+                Ver aplicaciones{' '}
                 <ArrowRight
                   aria-hidden="true"
                   className="size-3.5 transition-transform group-hover:translate-x-1"

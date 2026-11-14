@@ -205,7 +205,7 @@ export function AdminDatasources({
         <div className="max-w-2xl">
           <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
             <Cable className="size-4" aria-hidden="true" />
-            OLAP Service
+            servicio OLAP
           </div>
           <h1
             id="admin-datasources-title"
@@ -307,7 +307,7 @@ export function AdminDatasources({
                   <TableHead>Conexión</TableHead>
                   <TableHead>Tipo</TableHead>
                   <TableHead>Esquema / modelo</TableHead>
-                  <TableHead>Endpoint</TableHead>
+                  <TableHead>Dirección de conexión</TableHead>
                   <TableHead className="w-36 text-right">Acciones</TableHead>
                 </TableRow>
               </TableHeader>

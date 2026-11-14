@@ -115,17 +115,16 @@ export function AdminSchemas({
         <div>
           <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
             <Database className="size-4" />
-            OLAP administration
+            Administración OLAP
           </div>
           <h1
             id="admin-schemas-title"
             className="text-2xl font-semibold tracking-tight"
           >
-            OLAP schemas
+            Esquemas OLAP
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Manage XML schemas for configured OLAP data sources. Requests are
-            sent through the authenticated BFF.
+            Administra los esquemas XML de las fuentes de datos OLAP configuradas.
           </p>
         </div>
         <div className="flex gap-2">
@@ -135,7 +134,7 @@ export function AdminSchemas({
             disabled={!onRefresh || loading}
           >
             <RefreshCw className="size-4" />
-            Refresh
+            Actualizar
           </Button>
           <Button
             onClick={() => {
@@ -144,7 +143,7 @@ export function AdminSchemas({
             }}
           >
             <FileUp className="size-4" />
-            Upload schema
+            Subir esquema
           </Button>
         </div>
       </header>
@@ -153,7 +152,7 @@ export function AdminSchemas({
           role="alert"
           className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
         >
-          <p className="font-medium">Schemas could not be loaded</p>
+          <p className="font-medium">No se pudieron cargar los esquemas</p>
           <p className="mt-1 whitespace-pre-wrap">{error}</p>
           <Button
             className="mt-3"
@@ -161,32 +160,32 @@ export function AdminSchemas({
             size="sm"
             onClick={onRefresh}
           >
-            Try again
+            Reintentar
           </Button>
         </div>
       )}
       <div className="rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <div>
-            <h2 className="font-medium">Schema repository</h2>
+            <h2 className="font-medium">Repositorio de esquemas</h2>
             <p className="mt-1 text-xs text-muted-foreground">
               {loading
-                ? 'Loading schemas…'
-                : `${filteredSchemas.length} ${filteredSchemas.length === 1 ? 'schema' : 'schemas'}`}
+                ? 'Cargando esquemas…'
+                : `${filteredSchemas.length} ${filteredSchemas.length === 1 ? 'esquema' : 'esquemas'}`}
             </p>
           </div>
           <div className="w-full sm:w-72">
             <Input
-              aria-label="Search schemas"
+              aria-label="Buscar esquemas"
               iconLeft={<Search className="size-4" />}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search name or path"
+              placeholder="Buscar nombre o ruta"
             />
           </div>
         </div>
         {loading ? (
-          <div className="space-y-3 p-4" aria-label="Loading schemas">
+          <div className="space-y-3 p-4" aria-label="Cargando esquemas">
             {Array.from({ length: 4 }, (_, i) => (
               <Skeleton key={i} className="h-12 w-full" />
             ))}
@@ -195,10 +194,10 @@ export function AdminSchemas({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Name</TableHead>
-                <TableHead>Repository path</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="w-28 text-right">Actions</TableHead>
+                <TableHead>Nombre</TableHead>
+                <TableHead>Ruta en el repositorio</TableHead>
+                <TableHead>Tipo</TableHead>
+                <TableHead className="w-28 text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -222,7 +221,7 @@ export function AdminSchemas({
                     <div className="flex justify-end gap-1">
                       {onView && (
                         <Button
-                          aria-label={`View ${schema.name}`}
+                          aria-label={`Ver ${schema.name}`}
                           title="Ver esquema"
                           variant="ghost"
                           size="icon-sm"
@@ -232,7 +231,7 @@ export function AdminSchemas({
                         </Button>
                       )}
                       <Button
-                        aria-label={`Delete ${schema.name}`}
+                        aria-label={`Eliminar ${schema.name}`}
                         variant="ghost"
                         size="icon-sm"
                         className="text-destructive hover:text-destructive"
@@ -254,8 +253,8 @@ export function AdminSchemas({
                     className="h-32 text-center font-sans text-muted-foreground"
                   >
                     {schemas.length === 0
-                      ? 'No schemas in the repository yet.'
-                      : 'No schemas match your search.'}
+                      ? 'Aún no hay esquemas en el repositorio.'
+                      : 'Ningún esquema coincide con la búsqueda.'}
                   </TableCell>
                 </TableRow>
               )}
@@ -273,10 +272,9 @@ export function AdminSchemas({
       >
         <DialogContent className="sm:max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Upload schema</DialogTitle>
+            <DialogTitle>Subir esquema</DialogTitle>
             <DialogDescription>
-              Choose an XML file or paste its content. The schema name
-              determines its repository entry.
+              Elige un archivo XML o pega su contenido. El nombre identifica el esquema en el repositorio.
             </DialogDescription>
           </DialogHeader>
           <form
@@ -284,7 +282,7 @@ export function AdminSchemas({
             onSubmit={(event) => void upload(event)}
             className="space-y-4"
           >
-            <FormField label="Schema name" htmlFor="admin-schema-name" required>
+            <FormField label="Nombre del esquema" htmlFor="admin-schema-name" required>
               <Input
                 id="admin-schema-name"
                 value={name}
@@ -294,9 +292,9 @@ export function AdminSchemas({
               />
             </FormField>
             <FormField
-              label="XML file"
+              label="Archivo XML"
               htmlFor="admin-schema-file"
-              description="Only XML files can be selected. You can review or edit the content before uploading."
+              description="Solo se pueden seleccionar archivos XML. Puedes revisar o editar el contenido antes de subirlo."
             >
               <Input
                 id="admin-schema-file"
@@ -306,7 +304,7 @@ export function AdminSchemas({
                 className="h-auto py-2 file:mr-3 file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1 file:text-xs file:font-medium file:text-secondary-foreground"
               />
             </FormField>
-            <FormField label="XML content" htmlFor="admin-schema-xml" required>
+            <FormField label="Contenido XML" htmlFor="admin-schema-xml" required>
               <Textarea
                 id="admin-schema-xml"
                 value={xml}
@@ -334,7 +332,7 @@ export function AdminSchemas({
               onClick={closeUpload}
               disabled={uploading}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               type="submit"
@@ -342,7 +340,7 @@ export function AdminSchemas({
               loading={uploading}
               disabled={!name.trim() || !xml.trim()}
             >
-              Upload schema
+              Subir esquema
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -359,10 +357,9 @@ export function AdminSchemas({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete schema?</DialogTitle>
+            <DialogTitle>¿Eliminar esquema?</DialogTitle>
             <DialogDescription>
-              Deleting <strong>{deleting?.name}</strong> can prevent data
-              sources and cubes using it from loading.
+              Eliminar <strong>{deleting?.name}</strong> puede impedir la carga de las fuentes de datos y cubos que lo utilizan.
             </DialogDescription>
           </DialogHeader>
           {mutationError && (
@@ -379,14 +376,14 @@ export function AdminSchemas({
               onClick={() => setDeleting(null)}
               disabled={removing}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               variant="destructive"
               onClick={() => void remove()}
               loading={removing}
             >
-              Delete schema
+              Eliminar esquema
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -187,7 +187,7 @@ export function MdxWorkbench({
       setSqlText(sql);
       setActiveTab('sql');
     } catch (err) {
-      setSqlError(err instanceof Error ? err.message : 'No se pudo generar el SQL preview.');
+      setSqlError(err instanceof Error ? err.message : 'No se pudo generar el vista previa de SQL.');
       setActiveTab('sql');
     } finally {
       setPreviewingSql(false);
@@ -214,7 +214,7 @@ export function MdxWorkbench({
       setDrillResult({
         columns: [],
         rows: [],
-        error: err instanceof Error ? err.message : 'Fallo en consulta drillthrough.',
+        error: err instanceof Error ? err.message : 'Fallo en consulta de detalle.',
       });
     } finally {
       setDrillLoading(false);
@@ -231,7 +231,7 @@ export function MdxWorkbench({
               Cubo activo:
             </span>
             <Select
-              aria-label="Seleccionar cubo para el Workbench"
+              aria-label="Seleccionar cubo para el editor"
               value={cube ? `${cube.connection}/${cube.catalog}/${cube.schema}/${cube.name}` : ''}
               onChange={(e) => handleCubeChange(e.target.value)}
               className="h-9 w-60 text-xs"

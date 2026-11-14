@@ -47,13 +47,18 @@ export function MemberSelectionModal({
   const [selected, setSelected] = React.useState<Set<string>>(new Set(initialSelected));
   const [type, setType] = React.useState<'INCLUSION' | 'EXCLUSION'>(initialSelectionType);
 
+  // Reset only when the modal opens (or the initial selection actually changes).
+  // `initialSelected` defaults to a fresh `[]` each render, so it can't be an
+  // effect dependency by reference without causing an infinite update loop.
+  const initialSelectedKey = initialSelected.join('\u0000');
+
   React.useEffect(() => {
     if (open) {
-      setSelected(new Set(initialSelected));
+      setSelected(new Set(initialSelectedKey ? initialSelectedKey.split('\u0000') : []));
       setType(initialSelectionType);
       setSearch('');
     }
-  }, [open, initialSelected, initialSelectionType]);
+  }, [open, initialSelectedKey, initialSelectionType]);
 
   const normalizedSearch = search.trim().toLocaleLowerCase();
   const filteredMembers = React.useMemo(() => {

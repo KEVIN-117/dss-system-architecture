@@ -101,10 +101,10 @@ export default function WorkbenchPage() {
           id="workbench-heading"
           className="mt-1 text-2xl font-semibold text-foreground tracking-tight"
         >
-          MDX & SQL Workbench
+          Editor de MDX y SQL
         </h1>
         <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-          Escribe consultas MDX con Monaco Editor, previsualiza el SQL traducido por Mondrian/Calcite e inspecciona resultados con drillthrough interactivo.
+          Escribe consultas MDX, consulta el SQL generado e inspecciona el detalle de los resultados.
         </p>
       </header>
 

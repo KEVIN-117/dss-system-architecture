@@ -4,7 +4,7 @@ export const metadata = { title: 'Diagnóstico inicial', audience: ['desarrollad
 
 1. Comprueba que el portal y el BFF estén disponibles. El BFF documenta `GET /api/health` como verificación pública de disponibilidad.
 2. Si falla el inicio de sesión, revisa que las URL de callback y los orígenes configurados coincidan con el cliente `dss-bff` en Keycloak.
-3. Si el BFF no puede validar el perfil, confirma que Auth Service esté activo y que el usuario tenga un perfil local vigente.
+3. Si el BFF no puede validar el perfil, confirma que servicio de autenticación esté activo y que el usuario tenga un perfil local vigente.
 4. Si una consulta de datos falla, revisa el estado del servicio correspondiente y su contrato. DW Control consulta cierres/ejecuciones; no inicia ni reintenta ETL.
 5. En problemas de predicción, contrasta la ruta y los estados contra el YAML y revisa las decisiones pendientes en `docs/prediction/contract-notes.md`.
 

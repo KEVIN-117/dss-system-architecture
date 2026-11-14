@@ -530,7 +530,7 @@ export function OlapQueryWorkspace() {
         columns: [],
         rows: [],
         error:
-          err instanceof Error ? err.message : 'Error en consulta drillthrough',
+          err instanceof Error ? err.message : 'Error en consulta de detalle',
       });
     } finally {
       setDrillLoading(false);

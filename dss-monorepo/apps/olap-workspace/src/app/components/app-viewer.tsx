@@ -42,7 +42,7 @@ export function AppViewer({ path }: { path: string }) {
           setError(
             cause instanceof Error
               ? cause.message
-              : 'No se pudo abrir la app solicitada.',
+              : 'No se pudo abrir la aplicación solicitada.',
           );
         }
       })
@@ -58,7 +58,7 @@ export function AppViewer({ path }: { path: string }) {
     if (!app) return null;
     return {
       name: app.name,
-      description: `App analítica · ${app.tags.join(' · ')}`,
+      description: `Aplicación analítica · ${app.tags.join(' · ')}`,
       logoUrl: app.logo ?? undefined,
       navigation: app.nav.position,
       headerEyebrow: app.header?.eyebrow,
@@ -74,7 +74,7 @@ export function AppViewer({ path }: { path: string }) {
 
   if (loading)
     return (
-      <Loader text="Cargando app…" fullScreen={false} className="rounded-xl" />
+      <Loader text="Cargando aplicación…" fullScreen={false} className="rounded-xl" />
     );
   if (error || !app || !appConfig) {
     return (
@@ -86,9 +86,9 @@ export function AppViewer({ path }: { path: string }) {
           aria-hidden="true"
           className="mx-auto size-7 text-destructive"
         />
-        <h1 className="mt-3 text-lg font-semibold">No se pudo abrir la app</h1>
+        <h1 className="mt-3 text-lg font-semibold">No se pudo abrir la aplicación</h1>
         <p className="mt-1 text-sm text-muted-foreground">
-          {error ?? 'No encontramos esa app en el repositorio.'}
+          {error ?? 'No encontramos esa aplicación en el repositorio.'}
         </p>
         <div className="mt-5 flex justify-center gap-2">
           <Button
@@ -101,7 +101,7 @@ export function AppViewer({ path }: { path: string }) {
           <Button asChild variant="ghost">
             <Link href="/apps">
               <ArrowLeft aria-hidden="true" className="size-4" />
-              Volver a apps
+              Volver a aplicaciones
             </Link>
           </Button>
         </div>
@@ -116,7 +116,7 @@ export function AppViewer({ path }: { path: string }) {
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
-        Todas las apps
+        Todas las aplicaciones
       </Link>
       <AppShell
         app={appConfig}
@@ -126,7 +126,7 @@ export function AppViewer({ path }: { path: string }) {
           <div className="rounded-xl border border-dashed border-border bg-background p-8 text-center">
             <Badge variant="outline">Sin páginas</Badge>
             <p className="mt-2 text-sm text-muted-foreground">
-              Esta app todavía no contiene páginas.
+              Esta aplicación todavía no contiene páginas.
             </p>
           </div>
         }
@@ -176,7 +176,7 @@ function AppPagePreview({ page }: { page: AppPage }) {
                 }
                 emptyMessage={
                   tile.type === 'filter'
-                    ? 'Los filtros interactivos se habilitan desde el editor de la app.'
+                    ? 'Los filtros interactivos se habilitan desde el editor de la aplicación.'
                     : 'Este bloque no tiene una consulta asociada.'
                 }
               >

@@ -78,7 +78,7 @@ async function loadAuthReport(): Promise<ServiceReport> {
     return {
       state: 'available',
       metric: new Intl.NumberFormat('es-BO').format(result.totalElements),
-      description: 'cuentas registradas en Auth Service',
+      description: 'cuentas registradas en el servicio de autenticación',
     };
   } catch (error) {
     return {
@@ -108,7 +108,7 @@ async function loadOlapReport(): Promise<ServiceReport> {
       description:
         failure?.status === 'rejected'
           ? errorMessage(failure.reason)
-          : 'No se pudo consultar OLAP Service.',
+          : 'No se pudo consultar el servicio OLAP.',
     };
   }
 
@@ -119,7 +119,7 @@ async function loadOlapReport(): Promise<ServiceReport> {
   const hasPartialFailure = available < 2;
   return {
     state: hasPartialFailure ? 'degraded' : 'available',
-    metric: `${datasourceCount ?? '—'} conexiones · ${schemaCount ?? '—'} esquemas`,
+    metric: `${datasourceCount ?? '—'} ${datasourceCount === 1 ? 'conexión' : 'conexiones'} · ${schemaCount ?? '—'} ${schemaCount === 1 ? 'esquema' : 'esquemas'}`,
     description: hasPartialFailure
       ? 'Una parte del catálogo OLAP no respondió.'
       : 'Conectividad y catálogos administrativos disponibles.',
@@ -184,7 +184,7 @@ async function loadDwReport(): Promise<DwReportResult> {
       description:
         successfulQueries === 2
           ? 'Gestión de cierres y seguimiento ETL disponibles.'
-          : (failures[0] ?? 'Una parte de DW Control Service no respondió.'),
+          : (failures[0] ?? 'Una parte del servicio de control del almacén de datos no respondió.'),
     },
     executions: executionPage?.items ?? [],
     closures: closurePage?.items ?? [],
@@ -351,32 +351,32 @@ export function AdminOverviewPage() {
 
   const services = [
     {
-      title: 'Auth Service',
+      title: 'Servicio de autenticación',
       href: '/users',
       icon: Users,
       report: snapshot.auth,
     },
     {
-      title: 'OLAP Service',
+      title: 'Servicio OLAP',
       href: '/datasources',
       icon: Database,
       report: snapshot.olap,
     },
     {
-      title: 'DW Control Service',
+      title: 'Servicio de control del almacén de datos',
       href: '/academic-closures',
       icon: CalendarClock,
       report: snapshot.dw,
     },
     {
-      title: 'ML Service',
+      title: 'Servicio de aprendizaje automático',
       href: '/ml-operations',
       icon: BrainCircuit,
       report: {
         state: 'degraded' as const,
-        metric: 'Dataset sintético',
+        metric: 'Conjunto de datos sintético',
         description:
-          'Los jobs de entrenamiento están habilitados. El catálogo institucional de modelos y datasets pertenece a la siguiente etapa.',
+          'Los procesos de entrenamiento están habilitados. El catálogo institucional de modelos y conjuntos de datos pertenece a la siguiente etapa.',
       },
     },
   ];
@@ -437,7 +437,7 @@ export function AdminOverviewPage() {
                 Ejecuciones ETL recientes
               </CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Actividad más reciente reportada por DW Control Service.
+                Actividad más reciente reportada por el servicio de control del almacén de datos.
               </p>
             </div>
             <Activity
@@ -497,7 +497,7 @@ export function AdminOverviewPage() {
                 Cierres académicos recientes
               </CardTitle>
               <p className="mt-1 text-sm text-muted-foreground">
-                Periodos gestionados desde DW Control Service.
+                Periodos gestionados desde el servicio de control del almacén de datos.
               </p>
             </div>
             <History

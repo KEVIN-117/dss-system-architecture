@@ -172,7 +172,7 @@ function CubeDesignerCanvas({
       setActionError(
         error instanceof Error
           ? error.message
-          : 'The action could not be completed.',
+          : 'No se pudo completar la acción.',
       );
     } finally {
       setBusyAction(null);
@@ -182,7 +182,7 @@ function CubeDesignerCanvas({
   return (
     <section
       className={`flex min-h-[680px] min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-background text-foreground ${className ?? ''}`}
-      aria-label="Cube Designer"
+      aria-label="Diseñador de cubos"
     >
       <header className="flex flex-wrap items-center gap-3 border-b border-border px-4 py-3">
         <span className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
@@ -193,8 +193,8 @@ function CubeDesignerCanvas({
           <p className="text-xs text-muted-foreground">{description}</p>
         </div>
         <div className="hidden items-center gap-2 text-xs text-muted-foreground md:flex">
-          <Badge variant="secondary">{nodes.length} tables</Badge>
-          <Badge variant="secondary">{edges.length} joins</Badge>
+          <Badge variant="secondary">{nodes.length} tablas</Badge>
+          <Badge variant="secondary">{edges.length} relaciones</Badge>
         </div>
         {onSave && (
           <Button
@@ -203,7 +203,7 @@ function CubeDesignerCanvas({
             disabled={busyAction !== null}
           >
             <ArrowDownToLine className="size-4" />
-            {busyAction === 'save' ? 'Saving…' : 'Save draft'}
+            {busyAction === 'save' ? 'Guardando…' : 'Guardar borrador'}
           </Button>
         )}
         {onPublish && (
@@ -212,7 +212,7 @@ function CubeDesignerCanvas({
             disabled={busyAction !== null}
           >
             <Sparkles className="size-4" />
-            {busyAction === 'publish' ? 'Publishing…' : 'Publish cube'}
+            {busyAction === 'publish' ? 'Publicando…' : 'Publicar cubo'}
           </Button>
         )}
       </header>
@@ -227,20 +227,20 @@ function CubeDesignerCanvas({
       <div className="flex min-h-0 flex-1">
         <aside
           className="flex w-64 shrink-0 flex-col border-r border-border bg-card"
-          aria-label="Table catalog"
+          aria-label="Catálogo de tablas"
         >
           <div className="border-b border-border p-3">
             <div className="mb-2 flex items-center justify-between">
               <h2 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">
-                Data catalog
+                Catálogo de datos
               </h2>
               <Badge variant="outline">{tables.length}</Badge>
             </div>
             <label className="relative block">
               <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                aria-label="Search tables"
-                placeholder="Search tables…"
+                aria-label="Buscar tablas"
+                placeholder="Buscar tablas…"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
                 className="pl-8"
@@ -250,7 +250,7 @@ function CubeDesignerCanvas({
           <div className="min-h-0 flex-1 overflow-y-auto p-2">
             {filteredTables.length === 0 ? (
               <p className="px-3 py-8 text-center text-xs text-muted-foreground">
-                No tables match your search.
+                Ninguna tabla coincide con la búsqueda.
               </p>
             ) : (
               filteredTables.map((table) => {
@@ -261,7 +261,7 @@ function CubeDesignerCanvas({
                     type="button"
                     onClick={() => addTable(table)}
                     className="mb-1 flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    aria-label={`${placed ? 'Focus' : 'Add'} ${table.name}`}
+                    aria-label={`${placed ? 'Enfocar' : 'Agregar'} ${table.name}`}
                   >
                     <Database className="size-4 shrink-0 text-muted-foreground" />
                     <span className="min-w-0 flex-1">
@@ -269,12 +269,12 @@ function CubeDesignerCanvas({
                         {table.name}
                       </span>
                       <span className="block truncate text-xs text-muted-foreground">
-                        {table.schema ?? 'Default'} · {table.columns.length}{' '}
-                        fields
+                        {table.schema ?? 'Predeterminado'} · {table.columns.length}{' '}
+                        campos
                       </span>
                     </span>
                     {placed ? (
-                      <Badge variant="secondary">Added</Badge>
+                      <Badge variant="secondary">Agregada</Badge>
                     ) : (
                       <Plus className="size-4 text-primary" />
                     )}
@@ -284,21 +284,20 @@ function CubeDesignerCanvas({
             )}
           </div>
           <div className="border-t border-border p-3 text-xs text-muted-foreground">
-            Drag nodes to arrange. Connect key handles to define joins.
+            Arrastra las tablas para ordenarlas. Conecta las claves para definir relaciones.
           </div>
         </aside>
         <main
           className="relative min-h-[560px] min-w-0 flex-1 bg-muted/20"
-          aria-label="Schema canvas"
+          aria-label="Diagrama del esquema"
         >
           {nodes.length === 0 ? (
             <div className="absolute inset-0 z-10 flex items-center justify-center">
               <div className="max-w-sm rounded-xl border border-dashed border-border bg-background p-6 text-center shadow-sm">
                 <Layers3 className="mx-auto size-8 text-muted-foreground" />
-                <h2 className="mt-3 font-semibold">Start with a table</h2>
+                <h2 className="mt-3 font-semibold">Comienza con una tabla</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  Add a fact table, then connect the dimensions that describe
-                  it.
+                  Agrega una tabla de hechos y conecta las dimensiones que la describen.
                 </p>
               </div>
             </div>
@@ -333,7 +332,7 @@ function CubeDesignerCanvas({
             <Controls
               position="bottom-left"
               className="cube-designer-controls"
-              aria-label="Canvas controls"
+              aria-label="Controles del diagrama"
             />
             <MiniMap
               position="bottom-right"
@@ -347,14 +346,14 @@ function CubeDesignerCanvas({
             <div className="react-flow__panel react-flow__panel-top-right flex gap-1 rounded-lg border border-border bg-background/95 p-1 shadow-sm">
               <span className="px-2 py-1.5 text-xs text-muted-foreground">
                 <GitBranch className="mr-1 inline size-3.5" />
-                Schema canvas
+                Diagrama del esquema
               </span>
             </div>
           </ReactFlow>
         </main>
         <aside
           className="hidden w-72 shrink-0 border-l border-border bg-card xl:flex xl:flex-col"
-          aria-label="Table inspector"
+          aria-label="Inspector de tablas"
         >
           {selectedNode ? (
             <>
@@ -366,23 +365,23 @@ function CubeDesignerCanvas({
                   {selectedNode.data.table.name}
                 </h2>
                 <p className="text-xs text-muted-foreground">
-                  {selectedNode.data.table.schema ?? 'Default schema'}
+                  {selectedNode.data.table.schema ?? 'Esquema predeterminado'}
                 </p>
               </div>
               <div className="space-y-4 p-4">
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">
-                    Table role
+                    Función de la tabla
                   </p>
                   <p className="mt-1 text-sm">
                     {selectedNode.data.table.role === 'fact'
-                      ? 'Fact table'
-                      : 'Dimension table'}
+                      ? 'Tabla de hechos'
+                      : 'Tabla de dimensión'}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">
-                    Columns
+                    Columnas
                   </p>
                   <p className="mt-1 text-2xl font-semibold tabular-nums">
                     {selectedNode.data.table.columns.length}
@@ -390,7 +389,7 @@ function CubeDesignerCanvas({
                 </div>
                 <div>
                   <p className="text-xs font-medium text-muted-foreground">
-                    Connected joins
+                    Relaciones conectadas
                   </p>
                   <p className="mt-1 text-2xl font-semibold tabular-nums">
                     {
@@ -403,17 +402,16 @@ function CubeDesignerCanvas({
                   </p>
                 </div>
                 <div className="rounded-lg bg-muted/50 p-3 text-xs leading-relaxed text-muted-foreground">
-                  Connect a column handle on this table to a column on another
-                  table to create a relationship.
+                  Conecta una columna de esta tabla con una columna de otra tabla para crear una relación.
                 </div>
               </div>
             </>
           ) : (
             <div className="m-auto px-5 text-center">
               <Database className="mx-auto size-6 text-muted-foreground" />
-              <h2 className="mt-2 text-sm font-semibold">Nothing selected</h2>
+              <h2 className="mt-2 text-sm font-semibold">Ninguna tabla seleccionada</h2>
               <p className="mt-1 text-xs text-muted-foreground">
-                Select a table on the canvas to inspect it.
+                Selecciona una tabla del diagrama para inspeccionarla.
               </p>
             </div>
           )}
@@ -428,10 +426,10 @@ export function CubeDesigner(props: CubeDesignerProps) {
     <ReactFlowProvider>
       <CubeDesignerCanvas
         {...props}
-        title={props.title ?? 'Cube Designer'}
+        title={props.title ?? 'Diseñador de cubos'}
         description={
           props.description ??
-          'Model tables and relationships for your analytical cube.'
+          'Modela tablas y relaciones para tu cubo analítico.'
         }
       />
     </ReactFlowProvider>

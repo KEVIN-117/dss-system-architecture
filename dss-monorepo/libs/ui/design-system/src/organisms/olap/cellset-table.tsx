@@ -169,7 +169,7 @@ function renderCell(
         className={`${baseClass} group/cell relative cursor-pointer text-foreground tabular-nums transition-colors hover:bg-primary/10 hover:text-primary ${
           isSelected ? 'bg-primary/15 ring-1 ring-inset ring-primary' : ''
         }`}
-        title={`Ver detalle transaccional (Drillthrough): ${content}`}
+        title={`Ver detalle transaccional: ${content}`}
         tabIndex={0}
         role="button"
         aria-label={`Detalle de celda con valor ${content}`}

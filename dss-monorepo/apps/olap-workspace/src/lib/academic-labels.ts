@@ -44,6 +44,8 @@ const labels: Record<string, string> = {
   'Admitted Applicants': 'Postulantes admitidos',
   'Known Admission Outcomes': 'Resultados de admisión conocidos',
   Applications: 'Postulaciones',
+  'Admitted Applications': 'Postulaciones admitidas',
+  'Applications With Known Outcome': 'Postulaciones con resultado conocido',
   'Average Admission Score': 'Puntaje promedio de admisión',
   'Student Snapshots': 'Registros de estudiantes',
   'Evaluable Retention Outcomes': 'Casos evaluables de permanencia',

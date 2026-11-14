@@ -2,23 +2,23 @@ export const metadata = { title: 'Portal de administración', audience: ['admini
 
 ## Acceso
 
-El portal de administración requiere una sesión institucional con el rol `SUPERADMIN`. Cada operación vuelve a validarse en el servicio correspondiente: el BFF comprueba el rol y Auth Service, DW Control, OLAP o Prediction Service aplican sus propios permisos. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso de cliente necesario aunque tenga el rol.
+El portal de administración requiere una sesión institucional con el rol `SUPERADMIN`. Cada operación vuelve a validarse en el servicio correspondiente: el BFF comprueba el rol y servicio de autenticación, DW Control, OLAP o Prediction Service aplican sus propios permisos. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso de cliente necesario aunque tenga el rol.
 
-El menú lateral agrupa las secciones por servicio: **Plataforma**, **Auth Service**, **OLAP Service**, **DW Control Service** y **ML Service**.
+El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio de autenticación**, **servicio OLAP**, **servicio de control del almacén de datos** y **servicio de aprendizaje automático**.
 
 | Sección | Servicio | Uso |
 | --- | --- | --- |
 | <Ui>Resumen general</Ui> | Todos | Estado de los servicios y actividad reciente. |
-| <Ui>Usuarios</Ui> | Auth Service | Consultar usuarios y asignar su contexto académico. |
-| <Ui>Cierres académicos</Ui> | DW Control Service | Crear, autorizar y reabrir cortes de periodo. |
-| <Ui>Ejecuciones ETL</Ui> | DW Control Service | Revisar el historial y el detalle de las cargas. |
-| <Ui>Conexiones</Ui> | OLAP Service | Registrar y mantener datasources OLAP. |
-| <Ui>Esquemas y cubos</Ui> | OLAP Service | Subir y revisar esquemas Mondrian. |
-| <Ui>Operaciones ML</Ui> | ML Service | Subir datasets de entrenamiento y lanzar entrenamientos candidatos. |
+| <Ui>Usuarios</Ui> | servicio de autenticación | Consultar usuarios y asignar su contexto académico. |
+| <Ui>Cierres académicos</Ui> | servicio de control del almacén de datos | Crear, autorizar y reabrir cortes de periodo. |
+| <Ui>Ejecuciones ETL</Ui> | servicio de control del almacén de datos | Revisar el historial y el detalle de las cargas. |
+| <Ui>Conexiones</Ui> | servicio OLAP | Registrar y mantener conexiones OLAP. |
+| <Ui>Esquemas y cubos</Ui> | servicio OLAP | Subir y revisar esquemas Mondrian. |
+| <Ui>Operaciones ML</Ui> | servicio de aprendizaje automático | Subir conjuntos de datos de entrenamiento y lanzar entrenamientos candidatos. |
 
 ## Resumen general
 
-<Ui>Estado de servicios</Ui> indica para Auth Service, DW Control Service, OLAP Service y ML Service si están **Disponible**, **Sin conexión** o **En desarrollo**. <Ui>Actividad administrativa reciente</Ui> lista los últimos cierres y ejecuciones ETL. Si ves «Una parte de DW Control Service no respondió», el resto del portal sigue funcionando; revisa ese servicio.
+<Ui>Estado de servicios</Ui> indica para servicio de autenticación, servicio de control del almacén de datos, servicio OLAP y servicio de aprendizaje automático si están **Disponible**, **Sin conexión** o **En desarrollo**. <Ui>Actividad administrativa reciente</Ui> lista los últimos cierres y ejecuciones ETL. Si ves «Una parte de servicio de control del almacén de datos no respondió», el resto del portal sigue funcionando; revisa ese servicio.
 
 ## Usuarios y contexto académico
 
@@ -60,9 +60,9 @@ El **repositorio de esquemas** lista los XML Mondrian. Para subir uno, elige un 
 
 ## Operaciones ML
 
-1. <Ui>Agregar dataset de entrenamiento</Ui>: sube un `.zip` con el dataset preparado (<Ui>Subir y validar dataset</Ui>). El fixture sintético incluido solo sirve para validar el flujo y no representa datos institucionales.
-2. <Ui>Nuevo entrenamiento</Ui>: elige dataset y algoritmo (Random Forest o XGBoost). En el diálogo <Ui>Confirmar entrenamiento candidato</Ui> revisa algoritmo, dataset y configuración, y pulsa <Ui>Iniciar entrenamiento</Ui>.
-3. Revisa el estado del job. El panel muestra la configuración del worker (CPU, memoria, timeout y concurrencia máxima).
+1. <Ui>Agregar conjunto de datos de entrenamiento</Ui>: sube un `.zip` con el conjunto de datos preparado (<Ui>Subir y validar conjunto de datos</Ui>). El conjunto de prueba sintético incluido solo sirve para validar el flujo y no representa datos institucionales.
+2. <Ui>Nuevo entrenamiento</Ui>: elige un conjunto de datos y un algoritmo (Random Forest o XGBoost). En el diálogo <Ui>Confirmar entrenamiento candidato</Ui> revisa algoritmo, conjunto de datos y configuración, y pulsa <Ui>Iniciar entrenamiento</Ui>.
+3. Revisa el estado del proceso. El panel muestra la configuración del proceso de trabajo (CPU, memoria, tiempo límite y concurrencia máxima).
 
 Un entrenamiento produce un **candidato**; no lo aprueba para uso institucional. Consulta [Motor predictivo](/docs/prediccion).
 
@@ -72,4 +72,4 @@ Un entrenamiento produce un **candidato**; no lo aprueba para uso institucional.
 - No pegues contraseñas, tokens ni datos personales en motivos, capturas o reportes.
 - Antes de cambiar una conexión o un esquema en producción, coordina con el mantenedor de OLAP: los tableros de las autoridades dependen de ellos.
 
-<Source path="auth-service/README.md" label="Directorio administrativo de Auth Service" /> · <Source path="dss-monorepo/apps/bff/README.md" label="Permisos de las rutas administrativas" />
+<Source path="auth-service/README.md" label="Directorio administrativo de servicio de autenticación" /> · <Source path="dss-monorepo/apps/bff/README.md" label="Permisos de las rutas administrativas" />

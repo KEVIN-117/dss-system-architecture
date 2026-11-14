@@ -61,7 +61,7 @@ export function AdminPortalLayout({
             ],
           },
           {
-            title: 'Auth Service',
+            title: 'Servicio de autenticación',
             items: [
               navigationItem(
                 'Usuarios',
@@ -71,7 +71,7 @@ export function AdminPortalLayout({
             ],
           },
           {
-            title: 'OLAP Service',
+            title: 'Servicio OLAP',
             items: [
               navigationItem(
                 'Conexiones',
@@ -88,7 +88,7 @@ export function AdminPortalLayout({
         ]
       : []),
     {
-      title: 'DW Control Service',
+      title: 'Servicio de control del almacén de datos',
       items: [
         navigationItem(
           'Cierres académicos',
@@ -105,7 +105,7 @@ export function AdminPortalLayout({
     ...(isSuperAdmin
       ? [
           {
-            title: 'ML Service',
+            title: 'Servicio de aprendizaje automático',
             items: [
               navigationItem(
                 'Operaciones ML',

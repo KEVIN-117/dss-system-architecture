@@ -84,7 +84,7 @@ export function DashboardToolbar({
         )}
       </div>
       <nav
-        aria-label="Acciones del dashboard"
+        aria-label="Acciones del tablero"
         className="flex flex-wrap items-center gap-2"
       >
         {onFilters && (
