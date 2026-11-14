@@ -1,5 +1,6 @@
 import { notFound } from 'next/navigation';
 import { AcademicReports } from '@dss-monorepo/academic-analytics';
+import { RectorPerformanceReport } from '../../components/rector-performance-report';
 
 const sections = {
   rendimiento: {
@@ -35,11 +36,15 @@ export default async function ReportsPage({
           </h1>
           <p className="text-muted-foreground">{selected.description}</p>
         </header>
-        <AcademicReports
-          key={selected.key}
-          section={selected.key}
-          scope="global"
-        />
+        {selected.key === 'performance' ? (
+          <RectorPerformanceReport />
+        ) : (
+          <AcademicReports
+            key={selected.key}
+            section={selected.key}
+            scope="global"
+          />
+        )}
       </div>
     </>
   );

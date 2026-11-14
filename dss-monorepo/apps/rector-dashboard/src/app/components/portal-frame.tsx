@@ -65,7 +65,7 @@ export function PortalFrame({ children }: { children: ReactNode }) {
       title: 'Exploración OLAP',
       items: [
         {
-          title: 'OLAP Workspace',
+          title: 'Espacio de análisis OLAP',
           href: olapWorkspaceUrl,
           icon: <Database aria-hidden="true" />,
         },

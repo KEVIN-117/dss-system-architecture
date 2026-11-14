@@ -41,37 +41,172 @@ function displayName(value: unknown): string | null {
 }
 
 function findByName(collection: unknown, name: string): RecordValue | null {
-  return values(collection).find((candidate) => displayName(candidate)?.toLocaleLowerCase() === name.toLocaleLowerCase()) as RecordValue | undefined ?? null;
+  return (
+    (values(collection).find(
+      (candidate) =>
+        displayName(candidate)?.toLocaleLowerCase() ===
+        name.toLocaleLowerCase(),
+    ) as RecordValue | undefined) ?? null
+  );
 }
 
-export function resolveAcademicCubePaths(schema: unknown): AcademicCubePaths | null {
+export function resolveAdmissionPaths(schema: unknown) {
   if (!isRecord(schema)) return null;
-  const measures = values(schema.measures).filter((item): item is RecordValue => isRecord(item) && item.visible !== false && item.pii !== true);
-  const findMeasure = (name: string) => measures.find((measure) => displayName(measure)?.toLocaleLowerCase() === name.toLocaleLowerCase());
+  const measures = values(schema.measures).filter(
+    (item): item is RecordValue =>
+      isRecord(item) && item.visible !== false && item.pii !== true,
+  );
+  const measure = (name: string) =>
+    measures.find(
+      (item) =>
+        displayName(item)?.toLocaleLowerCase() === name.toLocaleLowerCase(),
+    )?.name;
+  const axis = (
+    dimensionName: string,
+    hierarchyName: string,
+    levelName: string,
+  ): CubeAxisPath | null => {
+    const dimension = findByName(schema.dimensions, dimensionName);
+    const hierarchy =
+      dimension && findByName(dimension.hierarchies, hierarchyName);
+    const level = hierarchy && findByName(hierarchy.levels, levelName);
+    return dimension && hierarchy && level
+      ? {
+          dimension: dimension.name as string,
+          hierarchy: hierarchy.name as string,
+          level: level.name as string,
+        }
+      : null;
+  };
+  const year = axis('Academic Period', 'Academic Period', 'Academic Year');
+  const faculty = axis('Academic Program', 'Program', 'Faculty');
+  const applications = measure('Applications');
+  const applicants = measure('Applicants');
+  const admitted = measure('Admitted Applicants');
+  const admittedApplications = measure('Admitted Applications');
+  const knownApplications = measure('Applications With Known Outcome');
+  if (
+    !year ||
+    !faculty ||
+    typeof applications !== 'string' ||
+    typeof applicants !== 'string' ||
+    typeof admitted !== 'string'
+  )
+    return null;
+  return {
+    year,
+    faculty,
+    applications,
+    applicants,
+    admitted,
+    admittedApplications:
+      typeof admittedApplications === 'string' ? admittedApplications : null,
+    knownApplications:
+      typeof knownApplications === 'string' ? knownApplications : null,
+  };
+}
+
+export function resolveRetentionPaths(schema: unknown) {
+  if (!isRecord(schema)) return null;
+  const dimension = findByName(schema.dimensions, 'Academic Period');
+  const hierarchy =
+    dimension && findByName(dimension.hierarchies, 'Academic Period');
+  const level = hierarchy && findByName(hierarchy.levels, 'Academic Year');
+  const measures = values(schema.measures).filter(
+    (item): item is RecordValue =>
+      isRecord(item) && item.visible !== false && item.pii !== true,
+  );
+  const retained = measures.find(
+    (item) => displayName(item)?.toLocaleLowerCase() === 'retained students',
+  )?.name;
+  const evaluable = measures.find(
+    (item) =>
+      displayName(item)?.toLocaleLowerCase() === 'evaluable retention outcomes',
+  )?.name;
+  if (
+    !dimension ||
+    !hierarchy ||
+    !level ||
+    typeof retained !== 'string' ||
+    typeof evaluable !== 'string'
+  )
+    return null;
+  return {
+    year: {
+      dimension: dimension.name as string,
+      hierarchy: hierarchy.name as string,
+      level: level.name as string,
+    },
+    retained,
+    evaluable,
+  };
+}
+
+export function resolveAcademicCubePaths(
+  schema: unknown,
+): AcademicCubePaths | null {
+  if (!isRecord(schema)) return null;
+  const measures = values(schema.measures).filter(
+    (item): item is RecordValue =>
+      isRecord(item) && item.visible !== false && item.pii !== true,
+  );
+  const findMeasure = (name: string) =>
+    measures.find(
+      (measure) =>
+        displayName(measure)?.toLocaleLowerCase() === name.toLocaleLowerCase(),
+    );
   const enrollmentMeasure = findMeasure('Enrollment Attempts');
   const gradeMeasure = findMeasure('Average Final Grade');
   const enrollmentAttempts = enrollmentMeasure?.name;
   const averageFinalGrade = gradeMeasure?.name;
   const dimensions = schema.dimensions;
-  if (typeof enrollmentAttempts !== 'string' || typeof averageFinalGrade !== 'string' || !isRecord(dimensions)) return null;
+  if (
+    typeof enrollmentAttempts !== 'string' ||
+    typeof averageFinalGrade !== 'string' ||
+    !isRecord(dimensions)
+  )
+    return null;
 
-  const findPath = (dimensionName: string, hierarchyName: string, levelName: string): CubeAxisPath | null => {
+  const findPath = (
+    dimensionName: string,
+    hierarchyName: string,
+    levelName: string,
+  ): CubeAxisPath | null => {
     const dimension = findByName(dimensions, dimensionName);
-    const hierarchy = dimension && findByName(dimension.hierarchies, hierarchyName);
+    const hierarchy =
+      dimension && findByName(dimension.hierarchies, hierarchyName);
     const level = hierarchy && findByName(hierarchy.levels, levelName);
     if (!dimension || !hierarchy || !level) return null;
-    return { dimension: dimension.name as string, hierarchy: hierarchy.name as string, level: level.name as string };
+    return {
+      dimension: dimension.name as string,
+      hierarchy: hierarchy.name as string,
+      level: level.name as string,
+    };
   };
 
-  const academicYear = findPath('Academic Period', 'Academic Period', 'Academic Year');
-  const academicPeriod = findPath('Academic Period', 'Academic Period', 'Period Number');
+  const academicYear = findPath(
+    'Academic Period',
+    'Academic Period',
+    'Academic Year',
+  );
+  const academicPeriod = findPath(
+    'Academic Period',
+    'Academic Period',
+    'Period Number',
+  );
   const faculty = findPath('Academic Program', 'Program', 'Faculty');
   if (!academicYear || !academicPeriod || !faculty) return null;
   return {
     enrollmentAttempts,
     averageFinalGrade,
-    enrollmentUnit: typeof enrollmentMeasure?.unit === 'string' ? enrollmentMeasure.unit : 'intentos',
-    gradeUnit: typeof gradeMeasure?.unit === 'string' ? gradeMeasure.unit : 'escala de calificación institucional',
+    enrollmentUnit:
+      typeof enrollmentMeasure?.unit === 'string'
+        ? enrollmentMeasure.unit
+        : 'intentos',
+    gradeUnit:
+      typeof gradeMeasure?.unit === 'string'
+        ? gradeMeasure.unit
+        : 'escala de calificación institucional',
     academicYear,
     academicPeriod,
     faculty,
@@ -80,10 +215,19 @@ export function resolveAcademicCubePaths(schema: unknown): AcademicCubePaths | n
 
 export function readPublishedMembers(value: unknown): PublishedMember[] {
   if (!Array.isArray(value)) return [];
-  return value.filter((member): member is PublishedMember =>
-    isRecord(member) && typeof member.name === 'string' && typeof member.uniqueName === 'string' &&
-    typeof (member.caption ?? member.name) === 'string',
-  ).map((member) => ({ name: member.name, uniqueName: member.uniqueName, caption: member.caption ?? member.name }));
+  return value
+    .filter(
+      (member): member is PublishedMember =>
+        isRecord(member) &&
+        typeof member.name === 'string' &&
+        typeof member.uniqueName === 'string' &&
+        typeof (member.caption ?? member.name) === 'string',
+    )
+    .map((member) => ({
+      name: member.name,
+      uniqueName: member.uniqueName,
+      caption: member.caption ?? member.name,
+    }));
 }
 
 function normalize(value: string): string {
@@ -93,13 +237,20 @@ function normalize(value: string): string {
 function readCellNumber(value: unknown): number | null {
   const raw = isRecord(value) ? value.value : value;
   if (typeof raw === 'string' && !raw.trim()) return null;
-  const parsed = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw.trim()) : Number.NaN;
+  const parsed =
+    typeof raw === 'number'
+      ? raw
+      : typeof raw === 'string'
+        ? Number(raw.trim())
+        : Number.NaN;
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 function findCell(row: RecordValue, name: string): unknown {
   const target = normalize(name);
-  const match = Object.entries(row).find(([key]) => normalize(key) === target || normalize(key).endsWith(target));
+  const match = Object.entries(row).find(
+    ([key]) => normalize(key) === target || normalize(key).endsWith(target),
+  );
   return match?.[1];
 }
 
@@ -108,7 +259,8 @@ function readLabel(row: RecordValue, levelName: string): string | null {
   if (typeof cell === 'string' || typeof cell === 'number') return String(cell);
   if (isRecord(cell)) {
     for (const key of ['caption', 'name', 'value']) {
-      if (typeof cell[key] === 'string' || typeof cell[key] === 'number') return String(cell[key]);
+      if (typeof cell[key] === 'string' || typeof cell[key] === 'number')
+        return String(cell[key]);
     }
   }
   return null;
@@ -119,7 +271,11 @@ export function readMetric(rows: unknown, measureName: string): number | null {
   return readCellNumber(findCell(rows[0], measureName));
 }
 
-export function readDimensionSeries(rows: unknown, levelName: string, measureName: string): ChartPoint[] {
+export function readDimensionSeries(
+  rows: unknown,
+  levelName: string,
+  measureName: string,
+): ChartPoint[] {
   if (!Array.isArray(rows)) return [];
   return rows.flatMap((row): ChartPoint[] => {
     if (!isRecord(row)) return [];
@@ -129,18 +285,25 @@ export function readDimensionSeries(rows: unknown, levelName: string, measureNam
   });
 }
 
-export function readDimensionSeriesByLevels(rows: unknown, levelNames: string[], measureName: string): ChartPoint[] {
+export function readDimensionSeriesByLevels(
+  rows: unknown,
+  levelNames: string[],
+  measureName: string,
+): ChartPoint[] {
   if (!Array.isArray(rows)) return [];
   return rows.flatMap((row): ChartPoint[] => {
     if (!isRecord(row)) return [];
     const labels = levelNames.map((levelName) => readLabel(row, levelName));
     const value = readCellNumber(findCell(row, measureName));
-    return labels.every((label): label is string => label !== null) && value !== null
+    return labels.every((label): label is string => label !== null) &&
+      value !== null
       ? [{ label: labels.join(' · '), value }]
       : [];
   });
 }
 
 export function sortAcademicPeriods(points: ChartPoint[]): ChartPoint[] {
-  return [...points].sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true }));
+  return [...points].sort((left, right) =>
+    left.label.localeCompare(right.label, undefined, { numeric: true }),
+  );
 }

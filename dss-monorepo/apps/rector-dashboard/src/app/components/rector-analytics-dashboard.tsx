@@ -12,7 +12,7 @@ import {
 } from '@dss-monorepo/design-system';
 import { TrendLineChart } from '@dss-monorepo/charts';
 import { AcademicSparkline } from '@dss-monorepo/academic-analytics';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   BookOpenCheck,
   CalendarDays,
@@ -21,12 +21,11 @@ import {
 } from 'lucide-react';
 import {
   readDimensionSeries,
-  readDimensionSeriesByLevels,
   readMetric,
   readPublishedMembers,
-  resolveAcademicCubePaths,
+  resolveAdmissionPaths,
+  resolveRetentionPaths,
   sortAcademicPeriods,
-  type AcademicCubePaths,
   type ChartPoint,
   type PublishedMember,
 } from './analytics-data';
@@ -36,26 +35,6 @@ interface CubeSummary {
   cubeName: string;
   cubeCaption?: string | null;
 }
-
-interface AnalyticsState {
-  enrollment: number | null;
-  averageGrade: number | null;
-  gradeSeries: ChartPoint[];
-  facultySeries: ChartPoint[];
-  periodSeries: ChartPoint[];
-  facultyCount: number;
-  cutLabel: string;
-}
-
-const EMPTY_ANALYTICS: AnalyticsState = {
-  enrollment: null,
-  averageGrade: null,
-  gradeSeries: [],
-  facultySeries: [],
-  periodSeries: [],
-  facultyCount: 0,
-  cutLabel: 'Cubo académico publicado',
-};
 
 const CUBES_QUERY = `query RectorCubes {
   olapCubes { cubeId cubeName cubeCaption }
@@ -116,604 +95,606 @@ async function graphql<T>(
   return payload.data;
 }
 
-function makePeriodFilter(
-  paths: AcademicCubePaths,
-  member: PublishedMember | null,
+type AdmissionPaths = NonNullable<ReturnType<typeof resolveAdmissionPaths>>;
+type RetentionPaths = NonNullable<ReturnType<typeof resolveRetentionPaths>>;
+type FacultyRow = {
+  label: string;
+  applications: number;
+  admitted: number | null;
+  admittedApplications: number | null;
+  known: number | null;
+};
+type QueryResponse = { analyticQuery: { data: unknown[]; totalRows: number } };
+
+function yearFilter(
+  axis: AdmissionPaths['year'],
+  member: PublishedMember | undefined,
 ) {
-  if (!member) return [];
-  return [
-    {
-      ...paths.academicYear,
-      op: 'IN' as const,
-      members: [member.uniqueName],
-    },
-  ];
+  return member ? [{ ...axis, op: 'IN', members: [member.uniqueName] }] : [];
 }
 
+const count = (value: number | null) =>
+  value === null
+    ? '—'
+    : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 0 }).format(
+        value,
+      );
+const percent = (numerator: number | null, denominator: number | null) =>
+  numerator === null || denominator === null || denominator <= 0
+    ? '—'
+    : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 1 }).format(
+        (numerator / denominator) * 100,
+      ) + ' %';
+
 export function RectorAnalyticsDashboard() {
-  const [cubeId, setCubeId] = useState('');
-  const [paths, setPaths] = useState<AcademicCubePaths | null>(null);
-  const [periodMembers, setPeriodMembers] = useState<PublishedMember[]>([]);
+  const [admission, setAdmission] = useState<{
+    id: string;
+    paths: AdmissionPaths;
+    members: PublishedMember[];
+  } | null>(null);
+  const [retention, setRetention] = useState<{
+    id: string;
+    paths: RetentionPaths;
+    members: PublishedMember[];
+  } | null>(null);
   const [selectedYear, setSelectedYear] = useState('');
-  const [tableFilter, setTableFilter] = useState('');
-  const [tablePage, setTablePage] = useState(0);
-  const [analytics, setAnalytics] = useState<AnalyticsState>(EMPTY_ANALYTICS);
-  const [initialLoading, setInitialLoading] = useState(true);
+  const [filter, setFilter] = useState('');
+  const [page, setPage] = useState(0);
+  const [loading, setLoading] = useState(true);
   const [queryLoading, setQueryLoading] = useState(false);
-  const [filterReady, setFilterReady] = useState(false);
   const [error, setError] = useState('');
-  const [emptyMessage, setEmptyMessage] = useState('');
-
-  const selectedMember = useMemo(
-    () =>
-      periodMembers.find(
-        (member) =>
-          member.caption === selectedYear || member.name === selectedYear,
-      ) ?? null,
-    [periodMembers, selectedYear],
-  );
-
-  const loadCube = useCallback(async () => {
-    setInitialLoading(true);
-    setError('');
-    setFilterReady(false);
-    setCubeId('');
-    setPaths(null);
-    setPeriodMembers([]);
-    setAnalytics(EMPTY_ANALYTICS);
-    setEmptyMessage('');
-    try {
-      const cubesResponse = await graphql<{ olapCubes: CubeSummary[] }>(
-        CUBES_QUERY,
-      );
-      const cube = (cubesResponse.olapCubes ?? []).find(
-        (candidate) =>
-          candidate.cubeName.toLocaleLowerCase() === 'academic performance' ||
-          candidate.cubeCaption?.toLocaleLowerCase() === 'academic performance',
-      );
-      if (!cube) {
-        setEmptyMessage(
-          'El cubo Academic Performance no está publicado para esta conexión.',
-        );
-        return;
-      }
-      const schemaResponse = await graphql<{ olapCubeSchema: unknown }>(
-        SCHEMA_QUERY,
-        { cubeId: cube.cubeId },
-      );
-      const resolvedPaths = resolveAcademicCubePaths(
-        schemaResponse.olapCubeSchema,
-      );
-      if (!resolvedPaths)
-        throw new Error(
-          'El esquema publicado no contiene las medidas y dimensiones requeridas para el tablero del Rector.',
-        );
-      const membersResponse = await graphql<{ olapCubeMembers: unknown }>(
-        MEMBERS_QUERY,
-        {
-          cubeId: cube.cubeId,
-          ...resolvedPaths.academicYear,
-          limit: 100,
-        },
-      );
-      const members = readPublishedMembers(membersResponse.olapCubeMembers);
-      const url = new URL(window.location.href);
-      const requestedYear = url.searchParams.get('gestion') ?? '';
-      const urlMember = members.find(
-        (member) =>
-          member.caption === requestedYear || member.name === requestedYear,
-      );
-      setCubeId(cube.cubeId);
-      setPaths(resolvedPaths);
-      setPeriodMembers(members);
-      setSelectedYear(urlMember?.caption ?? '');
-      setFilterReady(true);
-    } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : 'No se pudo cargar el esquema académico.',
-      );
-    } finally {
-      setInitialLoading(false);
-    }
-  }, []);
+  const [retentionError, setRetentionError] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  const [data, setData] = useState<{
+    applications: number | null;
+    admitted: number | null;
+    admittedApplications: number | null;
+    known: number | null;
+    retained: number | null;
+    evaluable: number | null;
+    faculty: FacultyRow[];
+    trend: ChartPoint[];
+  }>({
+    applications: null,
+    admitted: null,
+    admittedApplications: null,
+    known: null,
+    retained: null,
+    evaluable: null,
+    faculty: [],
+    trend: [],
+  });
 
   useEffect(() => {
-    void loadCube();
-  }, [loadCube]);
-
-  const loadAnalytics = useCallback(async () => {
-    if (!cubeId || !paths || !filterReady) return;
-    setQueryLoading(true);
-    setError('');
-    setEmptyMessage('');
-    try {
-      const filters = makePeriodFilter(paths, selectedMember);
-      const baseInput = { cubeId, filters, limit: 100 };
-      const overviewRequest = graphql<{
-        analyticQuery: { data: unknown[]; totalRows: number };
-      }>(ANALYTIC_QUERY, {
-        input: {
-          ...baseInput,
-          measures: [
-            { name: paths.enrollmentAttempts },
-            { name: paths.averageFinalGrade },
-          ],
-        },
-      });
-      const facultyRequest = graphql<{
-        analyticQuery: { data: unknown[]; totalRows: number };
-      }>(ANALYTIC_QUERY, {
-        input: {
-          ...baseInput,
-          measures: [{ name: paths.enrollmentAttempts }],
-          rows: [{ ...paths.faculty }],
-          order: [{ by: paths.enrollmentAttempts, direction: 'DESC' }],
-        },
-      });
-      const periodRequest = selectedMember
-        ? Promise.resolve(null)
-        : graphql<{ analyticQuery: { data: unknown[]; totalRows: number } }>(
-            ANALYTIC_QUERY,
+    let active = true;
+    async function load() {
+      setLoading(true);
+      setError('');
+      setAdmission(null);
+      setRetention(null);
+      setRetentionError(false);
+      try {
+        const { olapCubes } = await graphql<{ olapCubes: CubeSummary[] }>(
+          CUBES_QUERY,
+        );
+        const findCube = (name: string) =>
+          olapCubes.find((cube) => cube.cubeName.toLowerCase() === name);
+        const admissionCube = findCube('academic admission');
+        if (!admissionCube)
+          throw new Error('El cubo de admisión no está disponible.');
+        const admissionSchema = await graphql<{ olapCubeSchema: unknown }>(
+          SCHEMA_QUERY,
+          { cubeId: admissionCube.cubeId },
+        );
+        const paths = resolveAdmissionPaths(admissionSchema.olapCubeSchema);
+        if (!paths)
+          throw new Error(
+            'El cubo de admisión no contiene las medidas y dimensiones necesarias.',
+          );
+        const result = await graphql<{ olapCubeMembers: unknown }>(
+          MEMBERS_QUERY,
+          { cubeId: admissionCube.cubeId, ...paths.year, limit: 100 },
+        );
+        const members = readPublishedMembers(result.olapCubeMembers).sort(
+          (a, b) =>
+            (a.caption ?? a.name).localeCompare(
+              b.caption ?? b.name,
+              undefined,
+              { numeric: true },
+            ),
+        );
+        if (!active) return;
+        const requested = new URL(window.location.href).searchParams.get(
+          'gestion',
+        );
+        const selected =
+          requested === 'todas'
+            ? ''
+            : (members.find((m) => (m.caption ?? m.name) === requested)
+                ?.caption ??
+              members.at(-1)?.caption ??
+              members.at(-1)?.name ??
+              '');
+        setSelectedYear(selected);
+        setAdmission({ id: admissionCube.cubeId, paths, members });
+        const retentionCube = findCube('academic retention');
+        if (!retentionCube) {
+          setRetentionError(true);
+          return;
+        }
+        try {
+          const schema = await graphql<{ olapCubeSchema: unknown }>(
+            SCHEMA_QUERY,
+            { cubeId: retentionCube.cubeId },
+          );
+          const retentionPaths = resolveRetentionPaths(schema.olapCubeSchema);
+          if (!retentionPaths)
+            throw new Error('Esquema de permanencia incompleto');
+          const retentionMembers = await graphql<{ olapCubeMembers: unknown }>(
+            MEMBERS_QUERY,
             {
-              input: {
-                ...baseInput,
-                measures: [
-                  { name: paths.enrollmentAttempts },
-                  { name: paths.averageFinalGrade },
-                ],
-                rows: [{ ...paths.academicYear }, { ...paths.academicPeriod }],
-              },
+              cubeId: retentionCube.cubeId,
+              ...retentionPaths.year,
+              limit: 100,
             },
           );
-      const [overview, faculty, period] = await Promise.all([
-        overviewRequest,
-        facultyRequest,
-        periodRequest,
-      ]);
-      const overviewRows = overview.analyticQuery.data ?? [];
-      const facultySeries = readDimensionSeries(
-        faculty.analyticQuery.data,
-        paths.faculty.level,
-        paths.enrollmentAttempts,
-      ).sort((left, right) => right.value - left.value);
-      const periodSeries = period
-        ? sortAcademicPeriods(
-            readDimensionSeriesByLevels(
-              period.analyticQuery.data,
-              [paths.academicYear.level, paths.academicPeriod.level],
-              paths.enrollmentAttempts,
-            ),
-          )
-        : [];
-      const gradeSeries = period
-        ? sortAcademicPeriods(
-            readDimensionSeriesByLevels(
-              period.analyticQuery.data,
-              [paths.academicYear.level, paths.academicPeriod.level],
-              paths.averageFinalGrade,
-            ),
-          )
-        : [];
-      const enrollment = readMetric(overviewRows, paths.enrollmentAttempts);
-      const averageGrade = readMetric(overviewRows, paths.averageFinalGrade);
-      const hasAnyValues =
-        enrollment !== null ||
-        averageGrade !== null ||
-        facultySeries.length > 0 ||
-        periodSeries.length > 0;
-      const cutLabel = selectedMember
-        ? `Filtro temporal: gestión ${selectedMember.caption ?? selectedMember.name}`
-        : periodSeries.at(-1)?.label
-          ? `Histórico completo · última gestión con actividad: ${periodSeries.at(-1)?.label}`
-          : 'Histórico completo · sin periodos con actividad';
-      setAnalytics({
-        enrollment,
-        averageGrade,
-        gradeSeries,
-        facultySeries: facultySeries.slice(0, 12),
-        facultyCount: faculty.analyticQuery.totalRows ?? facultySeries.length,
-        periodSeries,
-        cutLabel,
-      });
-      setEmptyMessage(
-        hasAnyValues
-          ? ''
-          : 'El cubo está disponible, pero no tiene indicadores para los filtros seleccionados.',
-      );
-      const url = new URL(window.location.href);
-      if (selectedMember)
-        url.searchParams.set(
-          'gestion',
-          String(selectedMember.caption ?? selectedMember.name),
-        );
-      else url.searchParams.delete('gestion');
-      window.history.replaceState({}, '', url);
-    } catch (reason) {
-      setError(
-        reason instanceof Error
-          ? reason.message
-          : 'No se pudieron cargar los indicadores del cubo.',
-      );
-    } finally {
-      setQueryLoading(false);
+          if (active)
+            setRetention({
+              id: retentionCube.cubeId,
+              paths: retentionPaths,
+              members: readPublishedMembers(retentionMembers.olapCubeMembers),
+            });
+        } catch {
+          if (active) setRetentionError(true);
+        }
+      } catch (reason) {
+        if (active)
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : 'No se pudo cargar la analítica institucional.',
+          );
+      } finally {
+        if (active) setLoading(false);
+      }
     }
-  }, [cubeId, filterReady, paths, selectedMember]);
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [refresh]);
 
   useEffect(() => {
-    void loadAnalytics();
-  }, [loadAnalytics]);
-
-  const formatInteger = (value: number | null) =>
-    value === null
-      ? '—'
-      : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 0 }).format(
-          value,
+    if (!admission || loading) return;
+    let active = true;
+    async function load() {
+      if (!admission) return;
+      setQueryLoading(true);
+      setError('');
+      try {
+        const { paths, id, members } = admission;
+        const member = members.find(
+          (m) => (m.caption ?? m.name) === selectedYear,
         );
-  const formatGrade = (value: number | null) =>
-    value === null
-      ? '—'
-      : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 2 }).format(
-          value,
-        );
+        const filters = yearFilter(paths.year, member);
+        const query = (input: Record<string, unknown>) =>
+          graphql<QueryResponse>(ANALYTIC_QUERY, { input });
+        const measures = [
+          paths.applications,
+          paths.admitted,
+          paths.admittedApplications,
+          paths.knownApplications,
+        ]
+          .filter((name): name is string => name !== null)
+          .map((name) => ({ name }));
+        const [overall, facultyResult, trendResult] = await Promise.all([
+          query({ cubeId: id, filters, measures, limit: 100 }),
+          query({
+            cubeId: id,
+            filters,
+            measures,
+            rows: [paths.faculty],
+            order: [{ by: paths.applications, direction: 'DESC' }],
+            limit: 100,
+          }),
+          query({
+            cubeId: id,
+            measures: [{ name: paths.applicants }],
+            rows: [paths.year],
+            limit: 100,
+          }),
+        ]);
+        let retained: number | null = null;
+        let evaluable: number | null = null;
+        let failedRetention = !retention;
+        if (retention) {
+          const retentionMember = retention.members.find(
+            (m) => (m.caption ?? m.name) === selectedYear,
+          );
+          if (!selectedYear || retentionMember) {
+            try {
+              const result = await query({
+                cubeId: retention.id,
+                filters: yearFilter(retention.paths.year, retentionMember),
+                measures: [
+                  { name: retention.paths.retained },
+                  { name: retention.paths.evaluable },
+                ],
+                limit: 100,
+              });
+              retained = readMetric(
+                result.analyticQuery.data,
+                retention.paths.retained,
+              );
+              evaluable = readMetric(
+                result.analyticQuery.data,
+                retention.paths.evaluable,
+              );
+            } catch {
+              failedRetention = true;
+            }
+          }
+        }
+        if (!active) return;
+        const faculty = (facultyResult.analyticQuery.data ?? [])
+          .flatMap((row) => {
+            const point = readDimensionSeries(
+              [row],
+              paths.faculty.level,
+              paths.applications,
+            )[0];
+            return point
+              ? [
+                  {
+                    label: point.label,
+                    applications: point.value,
+                    admitted: readMetric([row], paths.admitted),
+                    admittedApplications: paths.admittedApplications
+                      ? readMetric([row], paths.admittedApplications)
+                      : null,
+                    known: paths.knownApplications
+                      ? readMetric([row], paths.knownApplications)
+                      : null,
+                  },
+                ]
+              : [];
+          })
+          .sort((a, b) => b.applications - a.applications);
+        setData({
+          applications: readMetric(
+            overall.analyticQuery.data,
+            paths.applications,
+          ),
+          admitted: readMetric(overall.analyticQuery.data, paths.admitted),
+          admittedApplications: paths.admittedApplications
+            ? readMetric(overall.analyticQuery.data, paths.admittedApplications)
+            : null,
+          known: paths.knownApplications
+            ? readMetric(overall.analyticQuery.data, paths.knownApplications)
+            : null,
+          retained,
+          evaluable,
+          faculty,
+          trend: sortAcademicPeriods(
+            readDimensionSeries(
+              trendResult.analyticQuery.data,
+              paths.year.level,
+              paths.applicants,
+            ),
+          ),
+        });
+        setRetentionError(failedRetention);
+        const url = new URL(window.location.href);
+        url.searchParams.set('gestion', selectedYear || 'todas');
+        window.history.replaceState({}, '', url);
+      } catch (reason) {
+        if (active) {
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : 'No se pudieron cargar los indicadores.',
+          );
+          setData({
+            applications: null,
+            admitted: null,
+            admittedApplications: null,
+            known: null,
+            retained: null,
+            evaluable: null,
+            faculty: [],
+            trend: [],
+          });
+        }
+      } finally {
+        if (active) setQueryLoading(false);
+      }
+    }
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [admission, retention, selectedYear, loading]);
 
+  const busy = loading || queryLoading;
+  const filtered = (busy ? [] : data.faculty).filter((row) =>
+    row.label.toLocaleLowerCase().includes(filter.toLocaleLowerCase().trim()),
+  );
+  const currentLabel = selectedYear
+    ? 'Gestión ' + selectedYear
+    : 'Todas las gestiones';
   return (
     <div className="mx-auto w-full max-w-[1600px] space-y-5">
       <header className="flex flex-col gap-4 pb-1 lg:flex-row lg:items-end lg:justify-between">
         <div className="max-w-3xl space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
             Resumen institucional
           </h1>
-          <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-            Indicadores agregados del cubo institucional de rendimiento
-            académico. Los datos siguen el alcance global autorizado para
-            Rectoría.
+          <p className="text-sm text-muted-foreground sm:text-base">
+            Demanda de ingreso, admisión y permanencia en el ámbito
+            institucional autorizado para Rectoría.
           </p>
         </div>
         <Button
           variant="outline"
-          onClick={() => void loadCube()}
-          disabled={initialLoading || queryLoading}
+          onClick={() => setRefresh((value) => value + 1)}
+          disabled={busy}
         >
-          {initialLoading || queryLoading
-            ? 'Actualizando…'
-            : 'Actualizar datos'}
+          {busy ? 'Actualizando…' : 'Actualizar datos'}
         </Button>
         <Link
-          className="w-fit text-sm font-medium text-primary underline underline-offset-4 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="text-sm font-medium text-primary underline underline-offset-4"
           href="/predictions"
         >
           Consultar predicciones de abandono
         </Link>
-        <section
-          aria-label="Filtros de analítica"
-          className="flex flex-wrap items-center gap-3"
-        >
-          <div className="space-y-1">
-            <label
-              htmlFor="academic-year"
-              className="text-sm font-medium text-foreground"
-            >
-              Gestión académica
-            </label>
-          </div>
+        <label className="grid gap-1 text-sm">
+          Gestión académica
           <select
-            id="academic-year"
-            className="min-h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring sm:max-w-xs"
+            className="min-h-10 rounded-md border border-input bg-background px-3"
             value={selectedYear}
+            disabled={loading || !admission?.members.length}
             onChange={(event) => {
               setSelectedYear(event.target.value);
-              setTablePage(0);
+              setPage(0);
             }}
-            disabled={initialLoading || periodMembers.length === 0}
           >
             <option value="">Todas las gestiones</option>
-            {periodMembers.map((member) => {
-              const label = member.caption ?? member.name;
-              return (
-                <option value={label} key={member.uniqueName}>
-                  {label}
-                </option>
-              );
-            })}
+            {admission?.members.map((member) => (
+              <option
+                key={member.uniqueName}
+                value={member.caption ?? member.name}
+              >
+                {member.caption ?? member.name}
+              </option>
+            ))}
           </select>
-        </section>
+        </label>
       </header>
-
       {error && (
         <div
           role="alert"
-          className="flex flex-col gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-4 sm:flex-row sm:items-center sm:justify-between"
+          className="rounded-lg border border-destructive/40 p-4 text-sm"
         >
-          <p className="text-sm text-foreground">{error}</p>
+          {error}{' '}
           <Button
             variant="outline"
-            onClick={() => void (cubeId ? loadAnalytics() : loadCube())}
+            onClick={() => setRefresh((value) => value + 1)}
           >
             Reintentar
           </Button>
         </div>
       )}
-
-      {emptyMessage && !initialLoading && !queryLoading && !error && (
-        <div
-          role="status"
-          className="rounded-lg border border-border bg-muted/30 p-6 text-sm text-muted-foreground"
-        >
-          {emptyMessage}
-        </div>
+      {retentionError && !loading && (
+        <p role="status" className="text-sm text-muted-foreground">
+          No se pudo consultar la permanencia. Los indicadores de admisión
+          permanecen disponibles.
+        </p>
       )}
-
+      {admission &&
+        (!admission.paths.admittedApplications ||
+          !admission.paths.knownApplications) && (
+          <p role="status" className="text-sm text-muted-foreground">
+            La tasa de admisión no está disponible: el catálogo OLAP debe
+            actualizarse con las medidas de postulaciones admitidas y resultados
+            conocidos.
+          </p>
+        )}
       <section
         aria-label="Indicadores institucionales"
-        aria-busy={initialLoading || queryLoading}
+        aria-busy={busy}
         className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
       >
         <MetricCard
-          icon={<UsersRound aria-hidden="true" className="size-6" />}
-          label={
-            selectedMember
-              ? `Intentos acumulados · gestión ${selectedMember.caption ?? selectedMember.name}`
-              : 'Intentos acumulados · histórico'
-          }
-          formattedValue={formatInteger(analytics.enrollment)}
-          unit={paths?.enrollmentUnit ?? 'intentos'}
-          series={analytics.periodSeries}
-          loading={initialLoading || queryLoading}
+          icon={<UsersRound aria-hidden="true" />}
+          label="Postulaciones"
+          formattedValue={count(data.applications)}
+          unit="registros de postulación"
+          loading={busy}
         />
         <MetricCard
-          icon={<GraduationCap aria-hidden="true" className="size-6" />}
-          label={
-            selectedMember
-              ? `Nota final promedio · gestión ${selectedMember.caption ?? selectedMember.name}`
-              : 'Nota final promedio · histórico'
-          }
-          formattedValue={formatGrade(analytics.averageGrade)}
-          unit={paths?.gradeUnit ?? 'escala de calificación institucional'}
-          series={analytics.gradeSeries}
-          loading={initialLoading || queryLoading}
+          icon={<GraduationCap aria-hidden="true" />}
+          label="Personas admitidas"
+          formattedValue={count(data.admitted)}
+          unit="personas identificadas"
+          loading={busy}
         />
         <MetricCard
-          icon={<BookOpenCheck aria-hidden="true" className="size-6" />}
-          label="Facultades con actividad"
-          formattedValue={formatInteger(
-            initialLoading || queryLoading ? null : analytics.facultyCount,
-          )}
-          unit="facultades"
-          loading={initialLoading || queryLoading}
+          icon={<BookOpenCheck aria-hidden="true" />}
+          label="Tasa de admisión"
+          formattedValue={percent(data.admittedApplications, data.known)}
+          unit="postulaciones admitidas entre postulaciones con resultado conocido"
+          loading={busy}
         />
         <MetricCard
-          icon={<CalendarDays aria-hidden="true" className="size-6" />}
-          label="Periodos con actividad"
-          formattedValue={formatInteger(
-            initialLoading || queryLoading || selectedMember
-              ? null
-              : analytics.periodSeries.length,
-          )}
-          unit={
-            selectedMember
-              ? 'selecciona todas las gestiones'
-              : 'periodos publicados'
-          }
-          loading={initialLoading || queryLoading}
+          icon={<CalendarDays aria-hidden="true" />}
+          label="Permanencia observada"
+          formattedValue={percent(data.retained, data.evaluable)}
+          unit="registros retenidos entre resultados evaluables"
+          loading={busy}
         />
       </section>
-
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <p className="text-sm text-muted-foreground">
+      <div className="flex flex-wrap justify-between gap-2 text-sm text-muted-foreground">
+        <span>
           Corte visible:{' '}
-          <span className="font-medium text-foreground">
-            {initialLoading ? 'consultando…' : analytics.cutLabel}
-          </span>
-        </p>
-        <p className="text-xs text-muted-foreground">
-          Fuente: cubo OLAP Academic Performance
-        </p>
+          <strong className="text-foreground">{currentLabel}</strong>
+        </span>
+        <span>Fuente: cubos de admisión y permanencia</span>
       </div>
-
       <section
         aria-label="Visualizaciones institucionales"
         className="grid gap-5 xl:grid-cols-[minmax(0,1.55fr)_minmax(21rem,1fr)]"
       >
-        <Card className={`min-w-0 ${CARD_CLASS}`}>
-          <CardHeader className="px-6 pt-5">
-            <CardTitle>Intentos por facultad</CardTitle>
+        <Card className={CARD_CLASS}>
+          <CardHeader>
+            <CardTitle>Postulaciones por facultad</CardTitle>
             <CardDescription>
-              Facultades con mayor volumen en la cobertura seleccionada.
+              Registros de postulación en la selección actual. Una persona puede
+              presentar más de una postulación.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-4 px-6 pb-6">
-            {initialLoading ? (
+          <CardContent>
+            {busy ? (
               <ChartSkeleton />
-            ) : analytics.facultySeries.length === 0 ? (
+            ) : data.faculty.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
-                No hay actividad de inscripción para esta gestión.
+                No hay postulaciones para esta selección.
               </p>
             ) : (
               <ol
-                aria-label="Facultades ordenadas por intentos de cursado"
                 className="space-y-4"
+                aria-label="Facultades ordenadas por postulaciones"
               >
-                {analytics.facultySeries.slice(0, 7).map((faculty, index) => {
-                  const maximum = analytics.facultySeries[0]?.value ?? 0;
-                  const share =
-                    maximum > 0 ? (faculty.value / maximum) * 100 : 0;
-                  return (
-                    <li
-                      key={`${faculty.label}-${index}`}
-                      className="space-y-1.5"
+                {data.faculty.slice(0, 7).map((row) => (
+                  <li key={row.label}>
+                    <div className="flex justify-between gap-3 text-sm">
+                      <span>{row.label}</span>
+                      <strong>{count(row.applications)}</strong>
+                    </div>
+                    <div
+                      className="mt-2 h-2 rounded-full bg-muted"
+                      role="img"
+                      aria-label={
+                        row.label +
+                        ': ' +
+                        count(row.applications) +
+                        ' postulaciones'
+                      }
                     >
-                      <div className="flex min-w-0 items-baseline justify-between gap-3 text-sm">
-                        <span
-                          className="min-w-0 truncate text-foreground"
-                          title={faculty.label}
-                        >
-                          {faculty.label}
-                        </span>
-                        <span className="shrink-0 font-medium tabular-nums text-foreground">
-                          {formatInteger(faculty.value)}
-                        </span>
-                      </div>
                       <div
-                        className="h-2 overflow-hidden rounded-full bg-muted"
-                        role="img"
-                        aria-label={`${faculty.label}: ${Math.round(share)}% del volumen de la facultad con más intentos`}
-                      >
-                        <div
-                          className="h-full rounded-full bg-[var(--role-accent,var(--primary))]"
-                          style={{ width: `${share}%` }}
-                        />
-                      </div>
-                    </li>
-                  );
-                })}
+                        className="h-full rounded-full bg-primary"
+                        style={{
+                          width:
+                            (data.faculty[0].applications > 0
+                              ? (row.applications /
+                                  data.faculty[0].applications) *
+                                100
+                              : 0) + '%',
+                        }}
+                      />
+                    </div>
+                  </li>
+                ))}
               </ol>
             )}
           </CardContent>
         </Card>
-
-        <Card className={`min-w-0 ${CARD_CLASS}`}>
-          <CardHeader className="px-6 pt-5">
-            <CardTitle>Tendencia por periodo académico</CardTitle>
+        <Card className={CARD_CLASS}>
+          <CardHeader>
+            <CardTitle>Postulantes por gestión</CardTitle>
             <CardDescription>
-              {selectedMember
-                ? 'La serie histórica se omite al seleccionar una gestión para evitar mezclar periodos.'
-                : 'Intentos agregados por gestión y periodo del cubo publicado.'}
+              Personas identificadas que postularon en cada gestión; la
+              tendencia muestra todo el histórico disponible.
             </CardDescription>
           </CardHeader>
-          <CardContent className="min-h-80 px-6 pb-4">
-            {initialLoading ? (
+          <CardContent>
+            {busy ? (
               <ChartSkeleton />
-            ) : selectedMember ? (
-              <div
-                role="status"
-                className="grid min-h-80 place-items-center rounded-md bg-muted/20 p-6 text-center text-sm text-muted-foreground"
-              >
-                Selecciona “Todas las gestiones” para consultar la tendencia
-                histórica completa.
-              </div>
             ) : (
               <TrendLineChart
-                data={analytics.periodSeries}
-                title="Intentos por gestión y periodo"
-                ariaLabel={`Tendencia de intentos de inscripción por periodo académico. ${analytics.periodSeries.length} periodos.`}
-                loading={queryLoading}
-                emptyMessage="El cubo no devolvió periodos con actividad."
+                data={data.trend}
+                title="Evolución de postulantes"
+                ariaLabel="Personas postulantes identificadas por gestión"
+                emptyMessage="No hay postulantes disponibles para graficar."
                 height={320}
               />
             )}
           </CardContent>
         </Card>
       </section>
-
-      <section
-        aria-labelledby="overview-table-title"
-        className="rounded-xl border border-border bg-card px-5 py-5 sm:px-6"
-      >
-        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 id="overview-table-title" className="text-lg font-semibold">
-              Actividad por facultad
-            </h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Las 12 facultades con más intentos en la selección actual.
-            </p>
-          </div>
-          <label className="grid gap-1 text-sm">
-            <span className="sr-only">Buscar facultad</span>
-            <input
-              type="search"
-              value={tableFilter}
-              onChange={(event) => {
-                setTableFilter(event.target.value);
-                setTablePage(0);
-              }}
-              placeholder="Buscar facultad…"
-              className="min-h-10 w-full rounded-md border border-input bg-background px-3 text-foreground placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:w-64"
-            />
-          </label>
-        </div>
+      <section className="rounded-xl border border-border bg-card px-5 py-5">
+        <h2 className="text-lg font-semibold">
+          Resumen de admisión por facultad
+        </h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Postulaciones, personas admitidas y tasa calculada sobre postulaciones
+          con resultado conocido.
+        </p>
+        <label className="mt-4 block text-sm">
+          <span className="sr-only">Buscar facultad</span>
+          <input
+            type="search"
+            value={filter}
+            onChange={(event) => {
+              setFilter(event.target.value);
+              setPage(0);
+            }}
+            placeholder="Buscar facultad…"
+            className="min-h-10 rounded-md border border-input bg-background px-3"
+          />
+        </label>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[24rem] text-left text-sm">
-            <caption className="sr-only">
-              Facultad e intentos de cursado
-            </caption>
-            <thead className="bg-muted/50 text-muted-foreground">
+          <table className="mt-4 w-full min-w-[40rem] text-left text-sm">
+            <thead>
               <tr>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Facultad
-                </th>
-                <th scope="col" className="px-4 py-3 text-right font-medium">
-                  Intentos de cursado
-                </th>
+                <th className="p-3">Facultad</th>
+                <th className="p-3 text-right">Postulaciones</th>
+                <th className="p-3 text-right">Personas admitidas</th>
+                <th className="p-3 text-right">Tasa de admisión</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
-              {analytics.facultySeries
-                .filter((row) =>
-                  row.label
-                    .toLocaleLowerCase()
-                    .includes(tableFilter.toLocaleLowerCase().trim()),
-                )
-                .slice(tablePage * 5, tablePage * 5 + 5)
-                .map((row, index) => (
-                  <tr key={`${tablePage * 5 + index}-${row.label}`}>
-                    <td className="px-4 py-3">{row.label}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">
-                      {formatInteger(row.value)}
-                    </td>
-                  </tr>
-                ))}
+            <tbody>
+              {filtered.slice(page * 5, page * 5 + 5).map((row) => (
+                <tr key={row.label} className="border-t border-border">
+                  <td className="p-3">{row.label}</td>
+                  <td className="p-3 text-right">{count(row.applications)}</td>
+                  <td className="p-3 text-right">{count(row.admitted)}</td>
+                  <td className="p-3 text-right">
+                    {percent(row.admittedApplications, row.known)}
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
         </div>
-        {analytics.facultySeries.length === 0 && (
-          <p className="px-4 py-6 text-sm text-muted-foreground">
-            No hay datos disponibles para esta selección.
+        {!busy && filtered.length === 0 && (
+          <p className="p-3 text-sm text-muted-foreground">
+            No hay resultados para mostrar.
           </p>
         )}
-        <div className="mt-4 flex items-center justify-between gap-3 text-sm text-muted-foreground">
-          <span>
-            Resultados:{' '}
-            {
-              analytics.facultySeries.filter((row) =>
-                row.label
-                  .toLocaleLowerCase()
-                  .includes(tableFilter.toLocaleLowerCase().trim()),
-              ).length
-            }
-          </span>
+        <div className="mt-4 flex items-center justify-between text-sm">
+          <span>Resultados: {filtered.length}</span>
           <div className="flex gap-2">
             <Button
               variant="outline"
-              disabled={tablePage === 0}
-              onClick={() => setTablePage((page) => page - 1)}
+              disabled={page === 0}
+              onClick={() => setPage((value) => value - 1)}
             >
               Anterior
             </Button>
             <Button
               variant="outline"
-              disabled={
-                (tablePage + 1) * 5 >=
-                analytics.facultySeries.filter((row) =>
-                  row.label
-                    .toLocaleLowerCase()
-                    .includes(tableFilter.toLocaleLowerCase().trim()),
-                ).length
-              }
-              onClick={() => setTablePage((page) => page + 1)}
+              disabled={(page + 1) * 5 >= filtered.length}
+              onClick={() => setPage((value) => value + 1)}
             >
               Siguiente
             </Button>
           </div>
         </div>
       </section>
-
-      <footer className="border-t border-border pt-4 text-xs leading-5 text-muted-foreground">
-        Las cifras corresponden a agregados disponibles en el cubo OLAP. Los
-        filtros refinan la consulta; el BFF conserva la autorización y el
-        alcance global de Rectoría.
+      <footer className="text-sm text-muted-foreground">
+        Los conteos de personas son distintos dentro de cada ámbito; no deben
+        sumarse entre facultades o gestiones. La permanencia se calcula sobre
+        registros evaluables de periodos cerrados.
       </footer>
     </div>
   );
