@@ -24,6 +24,7 @@
     <Table name="vw_fact_matricula_olap" />
     <Table name="vw_fact_cursado_olap" />
     <Table name="vw_fact_retencion_olap" />
+    <Table name="vw_fact_rendimiento_estudiante_olap" />
     <Table name="vw_dim_programa_olap"><Key><Column name="programa_sk" /></Key></Table>
     <Table name="vw_dim_periodo_olap"><Key><Column name="periodo_academico_sk" /></Key></Table>
     <Table name="vw_dim_estudiante_olap"><Key><Column name="estudiante_sk" /></Key></Table>
@@ -31,6 +32,7 @@
     <Table name="vw_dim_tipo_estudiante_olap"><Key><Column name="codigo" /></Key></Table>
     <Table name="vw_dim_cohorte_olap"><Key><Column name="cohorte" /></Key></Table>
     <Table name="dim_materia"><Key><Column name="materia_sk" /></Key></Table>
+    <Table name="vw_dim_gestion_olap"><Key><Column name="gestion" /></Key></Table>
   </PhysicalSchema>
 
   <!-- ===================================================== dimensiones -->
@@ -109,6 +111,14 @@
         <Level attribute="Periodo" />
       </Hierarchy>
     </Hierarchies>
+  </Dimension>
+
+  <!-- Grano anual (Boletín DSA): la gestión agrupa todos sus periodos. -->
+  <Dimension name="Gestión" table="vw_dim_gestion_olap" key="Gestión"
+      description="Gestión académica (año), con todos sus periodos.">
+    <Attributes>
+      <Attribute name="Gestión" keyColumn="gestion" nameColumn="gestion_nombre" orderByColumn="gestion" />
+    </Attributes>
   </Dimension>
 
   <!-- Solo atributos agregables; ningún identificador personal llega a Mondrian. -->
@@ -389,10 +399,112 @@
         <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
         <CalculatedMemberProperty name="DESCRIPTION" value="Inscripciones abandonadas sobre inscripciones con estado conocido." />
       </CalculatedMember>
+      <CalculatedMember name="Materias sin nota" dimension="Measures"
+          formula="[Measures].[Inscripciones en materias] - [Measures].[Inscripciones con resultado]">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="#,##0" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Materias programadas sin nota o con nota 0: el abandono (AB) del Boletín DSA." />
+      </CalculatedMember>
+      <CalculatedMember name="Porcentaje de materias aprobadas" dimension="Measures"
+          formula="IIf([Measures].[Inscripciones en materias] = 0, NULL, [Measures].[Materias aprobadas] / [Measures].[Inscripciones en materias])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Materias aprobadas sobre el total de materias programadas (como el Boletín DSA)." />
+      </CalculatedMember>
+      <CalculatedMember name="Porcentaje de materias reprobadas" dimension="Measures"
+          formula="IIf([Measures].[Inscripciones en materias] = 0, NULL, [Measures].[Materias reprobadas] / [Measures].[Inscripciones en materias])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Materias reprobadas sobre el total de materias programadas." />
+      </CalculatedMember>
+      <CalculatedMember name="Porcentaje de materias sin nota" dimension="Measures"
+          formula="IIf([Measures].[Inscripciones en materias] = 0, NULL, ([Measures].[Inscripciones en materias] - [Measures].[Inscripciones con resultado]) / [Measures].[Inscripciones en materias])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Materias sin nota (abandono) sobre el total de materias programadas." />
+      </CalculatedMember>
       <CalculatedMember name="Materias por estudiante" dimension="Measures"
           formula="IIf([Measures].[Estudiantes] = 0, NULL, [Measures].[Inscripciones en materias] / [Measures].[Estudiantes])">
         <CalculatedMemberProperty name="FORMAT_STRING" value="#,##0.00" />
         <CalculatedMemberProperty name="DESCRIPTION" value="Inscripciones en materias por estudiante distinto." />
+      </CalculatedMember>
+    </CalculatedMembers>
+  </Cube>
+
+  <Cube name="Rendimiento estudiantil" defaultMeasure="Estudiantes programados"
+      description="Evaluación anual de cada estudiante en su carrera (Boletín DSA): aprobados, reprobados, abandono, promedio de notas, repitencia y retención.">
+    <Dimensions>
+      <Dimension source="Gestión" />
+      <Dimension source="Programa" />
+      <Dimension source="Sede" />
+      <Dimension source="Perfil del estudiante" />
+      <Dimension source="Procedencia" />
+      <Dimension source="Ámbito de facultad" visible="false" />
+      <Dimension source="Ámbito de carrera" visible="false" />
+    </Dimensions>
+    <MeasureGroups>
+      <MeasureGroup name="Rendimiento estudiantil" table="vw_fact_rendimiento_estudiante_olap">
+        <Measures>
+          <Measure name="Estudiantes programados" column="conteo_estudiante" aggregator="sum" formatString="#,##0"
+              description="Estudiantes con al menos una materia programada en la carrera y la gestión." />
+          <Measure name="Estudiantes aprobados" column="conteo_aprobado" aggregator="sum" formatString="#,##0"
+              description="Aprobaron al menos la mitad de sus materias programadas en la gestión." />
+          <Measure name="Estudiantes reprobados" column="conteo_reprobado" aggregator="sum" formatString="#,##0"
+              description="No aprobaron la mitad de sus materias y tienen más reprobadas que sin nota." />
+          <Measure name="Estudiantes en abandono" column="conteo_abandono" aggregator="sum" formatString="#,##0"
+              description="No aprobaron la mitad de sus materias y la mayoría quedó sin nota." />
+          <Measure name="Estudiantes que repiten" column="conteo_repite" aggregator="sum" formatString="#,##0"
+              description="Estudiantes con al menos una materia que ya habían cursado antes (numerador del IRE)." />
+          <Measure name="Estudiantes con historial" column="conteo_repite_evaluable" aggregator="sum" formatString="#,##0"
+              description="Estudiantes de gestiones con historia previa cargada; base del IRE (excluye 2015)." />
+          <Measure name="Promedio de notas" column="promedio_notas" aggregator="avg" formatString="#,##0.0"
+              description="PN del Boletín DSA: promedio por estudiante de la nota de sus materias de la gestión, contando 0 las materias sin nota." />
+          <Measure name="Materias programadas por estudiante" column="materias" aggregator="avg" formatString="#,##0.0"
+              description="Promedio de materias programadas por estudiante en la gestión." />
+          <Measure name="Estudiantes evaluables para retención" column="conteo_evaluable_retencion" aggregator="sum" formatString="#,##0"
+              description="Estudiantes de gestiones cuya gestión siguiente ya está publicada." />
+          <Measure name="Estudiantes retenidos" column="conteo_retenido" aggregator="sum" formatString="#,##0"
+              description="Estudiantes que vuelven a programar materias en la misma carrera la gestión siguiente." />
+          <Measure name="Conteo de privacidad" column="estudiante_sk" aggregator="distinct-count" formatString="#,##0"
+              description="Uso interno: estudiantes distintos por celda para el control de privacidad." />
+        </Measures>
+        <DimensionLinks>
+          <ForeignKeyLink dimension="Gestión" foreignKeyColumn="gestion" />
+          <ForeignKeyLink dimension="Programa" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Sede" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Perfil del estudiante" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Procedencia" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Ámbito de facultad" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Ámbito de carrera" foreignKeyColumn="programa_sk" />
+        </DimensionLinks>
+      </MeasureGroup>
+    </MeasureGroups>
+    <CalculatedMembers>
+      <CalculatedMember name="Porcentaje de aprobados" dimension="Measures"
+          formula="IIf([Measures].[Estudiantes programados] = 0, NULL, [Measures].[Estudiantes aprobados] / [Measures].[Estudiantes programados])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Estudiantes aprobados sobre estudiantes programados." />
+      </CalculatedMember>
+      <CalculatedMember name="Porcentaje de reprobados" dimension="Measures"
+          formula="IIf([Measures].[Estudiantes programados] = 0, NULL, [Measures].[Estudiantes reprobados] / [Measures].[Estudiantes programados])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Estudiantes reprobados sobre estudiantes programados." />
+      </CalculatedMember>
+      <CalculatedMember name="Porcentaje en abandono" dimension="Measures"
+          formula="IIf([Measures].[Estudiantes programados] = 0, NULL, [Measures].[Estudiantes en abandono] / [Measures].[Estudiantes programados])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Estudiantes en abandono sobre estudiantes programados." />
+      </CalculatedMember>
+      <CalculatedMember name="Índice de repitencia de estudiantes" dimension="Measures"
+          formula="IIf([Measures].[Estudiantes con historial] = 0, NULL, [Measures].[Estudiantes que repiten] / [Measures].[Estudiantes con historial])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="IRE del Boletín DSA: estudiantes que repiten al menos una materia sobre estudiantes programados (desde 2016)." />
+      </CalculatedMember>
+      <CalculatedMember name="Índice de retención" dimension="Measures"
+          formula="IIf([Measures].[Estudiantes evaluables para retención] = 0, NULL, [Measures].[Estudiantes retenidos] / [Measures].[Estudiantes evaluables para retención])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="IRETE del Boletín DSA: estudiantes que siguen en la carrera la gestión siguiente sobre los evaluables." />
+      </CalculatedMember>
+      <CalculatedMember name="Índice de deserción" dimension="Measures"
+          formula="IIf([Measures].[Estudiantes evaluables para retención] = 0, NULL, 1 - [Measures].[Estudiantes retenidos] / [Measures].[Estudiantes evaluables para retención])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="IDESE del Boletín DSA: estudiantes que no vuelven a programar en la carrera la gestión siguiente." />
       </CalculatedMember>
     </CalculatedMembers>
   </Cube>

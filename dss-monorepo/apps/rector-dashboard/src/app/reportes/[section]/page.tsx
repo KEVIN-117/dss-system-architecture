@@ -1,13 +1,7 @@
 import { notFound } from 'next/navigation';
 import { AcademicReports } from '@dss-monorepo/academic-analytics';
-import { RectorPerformanceReport } from '../../components/rector-performance-report';
 
 const sections = {
-  rendimiento: {
-    key: 'performance',
-    title: 'Rendimiento académico',
-    description: 'Resultados de cursado y regularidad por gestión.',
-  },
   admision: {
     key: 'admission',
     title: 'Admisión estudiantil',
@@ -36,15 +30,11 @@ export default async function ReportsPage({
           </h1>
           <p className="text-muted-foreground">{selected.description}</p>
         </header>
-        {selected.key === 'performance' ? (
-          <RectorPerformanceReport />
-        ) : (
-          <AcademicReports
-            key={selected.key}
-            section={selected.key}
-            scope="global"
-          />
-        )}
+        <AcademicReports
+          key={selected.key}
+          section={selected.key}
+          scope="global"
+        />
       </div>
     </>
   );

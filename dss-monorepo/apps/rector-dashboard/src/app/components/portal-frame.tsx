@@ -16,6 +16,11 @@ import {
   Database,
   UsersRound,
   BrainCircuit,
+  ClipboardCheck,
+  UserCheck,
+  Calculator,
+  Repeat,
+  TrendingDown,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 
@@ -28,11 +33,6 @@ export function PortalFrame({ children }: { children: ReactNode }) {
       title: 'Resumen',
       href: '/',
       icon: <LayoutDashboard aria-hidden="true" />,
-    },
-    {
-      title: 'Rendimiento',
-      href: '/reportes/rendimiento',
-      icon: <ChartColumn aria-hidden="true" />,
     },
     {
       title: 'Admisión',
@@ -53,10 +53,25 @@ export function PortalFrame({ children }: { children: ReactNode }) {
   const olapWorkspaceUrl =
     process.env.NEXT_PUBLIC_OLAP_WORKSPACE_URL?.trim() ||
     'http://localhost:3007/analysis';
+  const performanceLinks = [
+    { title: 'Resumen', href: '/reportes/rendimiento', icon: <ChartColumn aria-hidden="true" /> },
+    { title: 'Evaluación de materias', href: '/reportes/rendimiento/materias', icon: <ClipboardCheck aria-hidden="true" /> },
+    { title: 'Evaluación de estudiantes', href: '/reportes/rendimiento/estudiantes', icon: <UserCheck aria-hidden="true" /> },
+    { title: 'Promedio de notas (PN)', href: '/reportes/rendimiento/promedio-notas', icon: <Calculator aria-hidden="true" /> },
+    { title: 'Repitencia (IRE e IRM)', href: '/reportes/rendimiento/repitencia', icon: <Repeat aria-hidden="true" /> },
+    { title: 'Retención y deserción', href: '/reportes/rendimiento/retencion', icon: <TrendingDown aria-hidden="true" /> },
+  ];
   const navGroups: NavigationGroup[] = [
     {
       title: 'Analítica académica',
       items: links.map((item) => ({
+        ...item,
+        isActive: pathname === item.href,
+      })),
+    },
+    {
+      title: 'Rendimiento académico',
+      items: performanceLinks.map((item) => ({
         ...item,
         isActive: pathname === item.href,
       })),
