@@ -14,12 +14,13 @@ export interface Member {
   caption: string;
 }
 
-export type CubeName = 'Rendimiento académico' | 'Rendimiento estudiantil';
+export type CubeName = 'Rendimiento académico' | 'Rendimiento estudiantil' | 'Admisión';
 
 /** Year axis of each cube: coursework is by period, students by gestión. */
 export const YEAR_AXIS: Record<CubeName, Axis> = {
   'Rendimiento académico': { dimension: 'Periodo', hierarchy: 'Gestión y periodo', level: 'Gestión' },
   'Rendimiento estudiantil': { dimension: 'Gestión', hierarchy: 'Gestión', level: 'Gestión' },
+  Admisión: { dimension: 'Periodo', hierarchy: 'Gestión y periodo', level: 'Gestión' },
 };
 export const FACULTY_AXIS: Axis = { dimension: 'Programa', hierarchy: 'Facultad y carrera', level: 'Facultad' };
 export const CAREER_AXIS: Axis = { dimension: 'Programa', hierarchy: 'Facultad y carrera', level: 'Carrera' };

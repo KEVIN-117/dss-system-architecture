@@ -29,6 +29,9 @@ export interface NavigationItem {
 export interface NavigationGroup {
   title: string;
   items: NavigationItem[];
+  content?: React.ReactNode;
+  expanded?: boolean;
+  onExpandedChange?: (expanded: boolean) => void;
 }
 
 export interface DashboardTemplateProps
@@ -170,7 +173,7 @@ function DashboardTemplateFrame({
         <SidebarContent className="gap-0 px-3 py-3 group-data-[collapsible=icon]:px-2">
           <nav aria-label="Navegación principal">
             {groups.map((group, index) => {
-              const isExpanded = !collapsedGroups.has(group.title);
+              const isExpanded = group.expanded ?? !collapsedGroups.has(group.title);
               const contentId = `${groupIdPrefix}-navigation-group-${index}-${toNavigationIdSegment(group.title)}`;
               return (
                 <SidebarGroup
@@ -190,14 +193,18 @@ function DashboardTemplateFrame({
                       aria-expanded={isExpanded}
                       aria-controls={contentId}
                       className="flex h-full w-full items-center justify-between rounded-md px-3 text-left text-xs font-semibold tracking-wide transition-colors hover:bg-sidebar-accent/60 hover:text-sidebar-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-                      onClick={() =>
+                      onClick={() => {
+                        if (group.onExpandedChange) {
+                          group.onExpandedChange(!isExpanded);
+                          return;
+                        }
                         setCollapsedGroups((current) => {
                           const next = new Set(current);
                           if (next.has(group.title)) next.delete(group.title);
                           else next.add(group.title);
                           return next;
-                        })
-                      }
+                        });
+                      }}
                     >
                       <span className="truncate">{group.title}</span>
                       <ChevronDown
@@ -257,6 +264,11 @@ function DashboardTemplateFrame({
                         </SidebarMenuItem>
                       ))}
                     </SidebarMenu>
+                    {group.content && (
+                      <div className="group-data-[collapsible=icon]:hidden">
+                        {group.content}
+                      </div>
+                    )}
                   </SidebarGroupContent>
                 </SidebarGroup>
               );

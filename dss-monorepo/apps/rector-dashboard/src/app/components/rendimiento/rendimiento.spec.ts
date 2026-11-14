@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { formatValue, readLabel, readNumber, YEAR_AXIS } from './rendimiento-data';
 import { RENDIMIENTO_VIEWS, findView } from './rendimiento-views';
+import { ADMISION_VIEWS, findAdmisionView } from './admision-views';
 
 describe('Rendimiento data mapping', () => {
   it('reads Saiku record cells by name, tolerating accents and value wrappers', () => {
@@ -43,5 +44,23 @@ describe('Rendimiento views', () => {
   it('never shows the old "cursados" wording', () => {
     const text = JSON.stringify(RENDIMIENTO_VIEWS).toLocaleLowerCase('es');
     expect(text).not.toContain('cursados');
+  });
+});
+
+describe('Admisión views', () => {
+  it('covers the Boletín 1 sections over the admission cube', () => {
+    expect(ADMISION_VIEWS.map((view) => view.slug)).toEqual([
+      'resumen', 'sexo', 'area-conocimiento', 'facultades', 'sedes', 'procedencia', 'tipo-colegio', 'modalidad',
+    ]);
+    for (const view of ADMISION_VIEWS) {
+      expect(view.section).toBe('Admisión académica');
+      expect(view.measures.every((measure) => measure.source === 'Admisión')).toBe(true);
+      expect(view.measures.some((measure) => measure.name === view.headline)).toBe(true);
+      expect(view.breakdowns?.length).toBeGreaterThan(0);
+      if (view.composition) expect(view.measures.some((m) => m.name === view.composition?.measure)).toBe(true);
+    }
+    expect(findAdmisionView('procedencia')?.breakdowns?.map((b) => b.first.dimension)).toEqual([
+      'Procedencia educativa', 'Lugar de nacimiento',
+    ]);
   });
 });

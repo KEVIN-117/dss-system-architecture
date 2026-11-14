@@ -2,11 +2,6 @@ import { notFound } from 'next/navigation';
 import { AcademicReports } from '@dss-monorepo/academic-analytics';
 
 const sections = {
-  admision: {
-    key: 'admission',
-    title: 'Admisión estudiantil',
-    description: 'Postulaciones y resultados de ingreso por gestión.',
-  },
   permanencia: {
     key: 'retention',
     title: 'Permanencia estudiantil',

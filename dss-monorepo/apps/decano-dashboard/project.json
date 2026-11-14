@@ -3,11 +3,16 @@
   "$schema": "../../node_modules/nx/schemas/project-schema.json",
   "projectType": "application",
   "sourceRoot": "apps/decano-dashboard/src",
-  "tags": ["type:app", "scope:decano"],
+  "tags": [
+    "type:app",
+    "scope:decano"
+  ],
   "targets": {
     "build": {
       "command": "next build --webpack",
-      "dependsOn": ["^build"],
+      "dependsOn": [
+        "^build"
+      ],
       "parallelism": false,
       "options": {
         "cwd": "apps/decano-dashboard",
@@ -18,8 +23,10 @@
     },
     "dev": {
       "options": {
-        "port": 3002
-      }
+        "port": 3002,
+        "cwd": "apps/decano-dashboard"
+      },
+      "command": "next dev --webpack"
     },
     "serve": {
       "options": {

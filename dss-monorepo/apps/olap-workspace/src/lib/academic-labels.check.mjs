@@ -1,23 +1,19 @@
 import { strict as assert } from 'node:assert';
 import { test } from 'node:test';
-import { academicLabel, chartLabel, isUatfCube } from './academic-labels.ts';
+import { academicLabel, chartLabel, isUatfCube, measureDescription } from './academic-labels.ts';
 
-test('translates known academic captions without changing unknown values or identifiers', () => {
-  assert.equal(academicLabel('Academic Admission'), 'Admisión académica');
-  assert.equal(
-    academicLabel('Applicant Profile - Gender'),
-    'Perfil del postulante · Género',
-  );
-  assert.equal(academicLabel('Admitted Applicants'), 'Postulantes admitidos');
-  assert.equal(
-    academicLabel('All By School Types'),
-    'Todos los tipos de colegio',
-  );
-  assert.equal(
-    academicLabel('[Academic Program].[Program]'),
-    '[Academic Program].[Program]',
-  );
+test('shows Spanish identifiers as they are and keeps old English names readable', () => {
+  assert.equal(academicLabel('Admisión'), 'Admisión');
+  assert.equal(academicLabel('Tasa de admisión'), 'Tasa de admisión');
+  assert.equal(academicLabel('Academic Admission'), 'Admisión');
+  assert.equal(academicLabel('Applicant Profile - Gender'), 'Perfil del estudiante · Sexo');
+  assert.equal(academicLabel('Admitted Applicants'), 'Admitidos');
   assert.equal(academicLabel('Colegio San Luis'), 'Colegio San Luis');
+});
+
+test('describes published measures in plain Spanish', () => {
+  assert.match(measureDescription('Estudiantes nuevos') ?? '', /primera vez/);
+  assert.equal(measureDescription('Medida desconocida'), null);
 });
 
 test('recognizes only the UATF catalog and schema and translates chart controls', () => {

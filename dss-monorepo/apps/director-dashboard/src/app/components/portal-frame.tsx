@@ -7,7 +7,8 @@ import {
   DashboardTemplate,
   Loader,
   type NavigationGroup,
-} from '@dss-monorepo/design-system';
+} from '@dss-monorepo/design-system/portal';
+import { OlapSidebarProvider, useOlapSidebar } from '@dss-monorepo/academic-analytics/olap-sidebar';
 import { RoleGuard } from '@dss-monorepo/rbac';
 import {
   LayoutDashboard,
@@ -19,9 +20,14 @@ import {
 import type { ReactNode } from 'react';
 
 export function PortalFrame({ children }: { children: ReactNode }) {
+  return <OlapSidebarProvider><PortalFrameContent>{children}</PortalFrameContent></OlapSidebarProvider>;
+}
+
+function PortalFrameContent({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { setTarget, expanded, setExpanded } = useOlapSidebar();
   const links = [
     {
       title: 'Resumen',
@@ -44,9 +50,6 @@ export function PortalFrame({ children }: { children: ReactNode }) {
       icon: <UsersRound aria-hidden="true" />,
     },
   ];
-  const olapWorkspaceUrl =
-    process.env.NEXT_PUBLIC_OLAP_WORKSPACE_URL?.trim() ||
-    'http://localhost:3007/analysis';
   const navGroups: NavigationGroup[] = [
     {
       title: 'Analítica académica',
@@ -57,13 +60,17 @@ export function PortalFrame({ children }: { children: ReactNode }) {
     },
     {
       title: 'Exploración OLAP',
+      expanded,
+      onExpandedChange: setExpanded,
       items: [
         {
           title: 'Espacio de análisis OLAP',
-          href: olapWorkspaceUrl,
+          href: '/analisis-olap',
           icon: <Database aria-hidden="true" />,
+          isActive: pathname === '/analisis-olap',
         },
       ],
+      content: pathname === '/analisis-olap' ? <div ref={setTarget} /> : undefined,
     },
   ];
   return (

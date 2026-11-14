@@ -25,6 +25,36 @@ test('shows access denied to an authenticated user without the director role', a
   await expect(page.getByText('Director Dashboard')).toHaveCount(0);
 });
 
+
+test('integrates OLAP into the portal sidebar', async ({ page }) => {
+  await mockSession(page, 'http://localhost:3003', ['DIRECTOR']);
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Espacio de análisis OLAP' }).click();
+  await expect(page).toHaveURL(/\/analisis-olap$/);
+  await expect(page.getByRole('heading', { name: 'Consulta OLAP' })).toBeVisible();
+  const explorer = page.getByRole('complementary', { name: 'Explorador de cubos' });
+  await expect(explorer.getByLabel('Cubo')).toBeVisible();
+  await expect(page.getByRole('main').getByRole('complementary', { name: 'Explorador de cubos' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Exploración OLAP' }).click();
+  await expect(explorer).toBeHidden();
+  await page.getByRole('button', { name: 'Explorar cubos' }).click();
+  await expect(explorer).toBeVisible();
+});
+
+test('opens the OLAP explorer on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockSession(page, 'http://localhost:3003', ['DIRECTOR']);
+  await page.goto('/analisis-olap');
+  await page.getByRole('button', { name: 'Explorar cubos' }).click();
+  await expect(page.getByRole('complementary', { name: 'Explorador de cubos' }).getByLabel('Cubo')).toBeVisible();
+});
+
+test('rejects another role on the OLAP route', async ({ page }) => {
+  await mockSession(page, 'http://localhost:3003', ['DECANO']);
+  await page.goto('/analisis-olap');
+  await expect(page.getByRole('heading', { name: 'Acceso no autorizado' })).toBeVisible();
+});
+
 async function mockSession(page: import('@playwright/test').Page, origin: string, roles: string[]) {
   await page.route('http://localhost:3006/api/auth/me', (route) => route.fulfill({
     status: 200,

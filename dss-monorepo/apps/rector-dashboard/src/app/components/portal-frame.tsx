@@ -7,7 +7,7 @@ import {
   DashboardTemplate,
   Loader,
   type NavigationGroup,
-} from '@dss-monorepo/design-system';
+} from '@dss-monorepo/design-system/portal';
 import { RoleGuard } from '@dss-monorepo/rbac';
 import {
   LayoutDashboard,
@@ -21,23 +21,30 @@ import {
   Calculator,
   Repeat,
   TrendingDown,
+  Venus,
+  Library,
+  Building2,
+  MapPin,
+  School,
+  DoorOpen,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { OlapSidebarProvider, useOlapSidebar } from '@dss-monorepo/academic-analytics/olap-sidebar';
 
 export function PortalFrame({ children }: { children: ReactNode }) {
+  return <OlapSidebarProvider><PortalFrameContent>{children}</PortalFrameContent></OlapSidebarProvider>;
+}
+
+function PortalFrameContent({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { setTarget, expanded, setExpanded } = useOlapSidebar();
   const links = [
     {
       title: 'Resumen',
       href: '/',
       icon: <LayoutDashboard aria-hidden="true" />,
-    },
-    {
-      title: 'Admisión',
-      href: '/reportes/admision',
-      icon: <GraduationCap aria-hidden="true" />,
     },
     {
       title: 'Permanencia',
@@ -50,9 +57,6 @@ export function PortalFrame({ children }: { children: ReactNode }) {
       icon: <BrainCircuit aria-hidden="true" />,
     },
   ];
-  const olapWorkspaceUrl =
-    process.env.NEXT_PUBLIC_OLAP_WORKSPACE_URL?.trim() ||
-    'http://localhost:3007/analysis';
   const performanceLinks = [
     { title: 'Resumen', href: '/reportes/rendimiento', icon: <ChartColumn aria-hidden="true" /> },
     { title: 'Evaluación de materias', href: '/reportes/rendimiento/materias', icon: <ClipboardCheck aria-hidden="true" /> },
@@ -61,10 +65,27 @@ export function PortalFrame({ children }: { children: ReactNode }) {
     { title: 'Repitencia (IRE e IRM)', href: '/reportes/rendimiento/repitencia', icon: <Repeat aria-hidden="true" /> },
     { title: 'Retención y deserción', href: '/reportes/rendimiento/retencion', icon: <TrendingDown aria-hidden="true" /> },
   ];
+  const admissionLinks = [
+    { title: 'Resumen', href: '/reportes/admision', icon: <GraduationCap aria-hidden="true" /> },
+    { title: 'Por sexo', href: '/reportes/admision/sexo', icon: <Venus aria-hidden="true" /> },
+    { title: 'Área de conocimiento', href: '/reportes/admision/area-conocimiento', icon: <Library aria-hidden="true" /> },
+    { title: 'Facultad y carrera', href: '/reportes/admision/facultades', icon: <Building2 aria-hidden="true" /> },
+    { title: 'Central y sedes', href: '/reportes/admision/sedes', icon: <MapPin aria-hidden="true" /> },
+    { title: 'Procedencia y nacimiento', href: '/reportes/admision/procedencia', icon: <MapPin aria-hidden="true" /> },
+    { title: 'Tipo de colegio', href: '/reportes/admision/tipo-colegio', icon: <School aria-hidden="true" /> },
+    { title: 'Modalidad de ingreso', href: '/reportes/admision/modalidad', icon: <DoorOpen aria-hidden="true" /> },
+  ];
   const navGroups: NavigationGroup[] = [
     {
       title: 'Analítica académica',
       items: links.map((item) => ({
+        ...item,
+        isActive: pathname === item.href,
+      })),
+    },
+    {
+      title: 'Admisión académica',
+      items: admissionLinks.map((item) => ({
         ...item,
         isActive: pathname === item.href,
       })),
@@ -78,13 +99,17 @@ export function PortalFrame({ children }: { children: ReactNode }) {
     },
     {
       title: 'Exploración OLAP',
+      expanded,
+      onExpandedChange: setExpanded,
       items: [
         {
           title: 'Espacio de análisis OLAP',
-          href: olapWorkspaceUrl,
+          href: '/analisis-olap',
           icon: <Database aria-hidden="true" />,
+          isActive: pathname === '/analisis-olap',
         },
       ],
+      content: pathname === '/analisis-olap' ? <div ref={setTarget} /> : undefined,
     },
   ];
   return (

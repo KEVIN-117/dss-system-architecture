@@ -31,7 +31,7 @@ const BREAKDOWN_OPTIONS = [
   {
     id: 'gender',
     label: 'Sexo',
-    dimension: 'Perfil del estudiante',
+    dimension: 'Sexo del postulante',
     hierarchy: 'Sexo',
     level: 'Sexo',
   },
@@ -59,16 +59,16 @@ const BREAKDOWN_OPTIONS = [
   {
     id: 'schoolType',
     label: 'Tipo de colegio',
-    dimension: 'Perfil del estudiante',
+    dimension: 'Tipo de colegio del postulante',
     hierarchy: 'Tipo de colegio',
     level: 'Tipo de colegio',
   },
   {
     id: 'origin',
-    label: 'Procedencia (departamento)',
-    dimension: 'Procedencia',
-    hierarchy: 'Departamento, provincia y localidad',
-    level: 'Departamento',
+    label: 'Procedencia educativa',
+    dimension: 'Procedencia educativa',
+    hierarchy: 'Ámbito y departamento',
+    level: 'Ámbito',
   },
   {
     id: 'admissionMode',

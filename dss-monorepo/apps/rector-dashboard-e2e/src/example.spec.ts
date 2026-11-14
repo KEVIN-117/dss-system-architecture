@@ -23,6 +23,38 @@ test('shows access denied to an authenticated user without the rector role', asy
   await expect(page.getByText('Rector Dashboard')).toHaveCount(0);
 });
 
+test('keeps OLAP analysis inside the rector portal', async ({ page }) => {
+  await mockSession(page, 'http://localhost:3004', ['RECTOR']);
+  await page.goto('/');
+  await page.getByRole('link', { name: 'Espacio de análisis OLAP' }).click();
+  await expect(page).toHaveURL(/\/analisis-olap$/);
+  await expect(page.getByRole('main').getByRole('heading', { name: 'Consulta OLAP' })).toBeVisible();
+  await expect(page.getByText('Rectoría', { exact: true }).first()).toBeVisible();
+  const explorer = page.getByRole('complementary', { name: 'Explorador de cubos' });
+  await expect(explorer.getByLabel('Cubo')).toBeVisible();
+  await expect(page.getByRole('main').getByRole('complementary', { name: 'Explorador de cubos' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Exploración OLAP' }).click();
+  await expect(explorer).toBeHidden();
+  await page.getByRole('button', { name: 'Explorar cubos' }).click();
+  await expect(explorer).toBeVisible();
+});
+
+test('opens the unified OLAP explorer on mobile', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockSession(page, 'http://localhost:3004', ['RECTOR']);
+  await page.goto('/analisis-olap');
+  await page.getByRole('button', { name: 'Explorar cubos' }).click();
+  await expect(page.getByRole('complementary', { name: 'Explorador de cubos' }).getByLabel('Cubo')).toBeVisible();
+});
+
+test('protects the integrated OLAP route', async ({ page }) => {
+  await page.goto('/analisis-olap');
+  await expect(page.getByRole('heading', { name: 'Sesión requerida' })).toBeVisible();
+  await mockSession(page, 'http://localhost:3004', ['DIRECTOR']);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Acceso no autorizado' })).toBeVisible();
+});
+
 async function mockSession(page: import('@playwright/test').Page, origin: string, roles: string[]) {
   const bffBaseURL = process.env.NEXT_PUBLIC_BFF_URL ?? 'http://localhost:3006';
   await page.route(`${bffBaseURL}/api/auth/me`, (route) => route.fulfill({

@@ -46,10 +46,19 @@ SELECT params.run_id, params.run_id AS staging_run_id,
            'id_ra', p.id_ra,
            'id_programa', p.id_programa, 'id_gestion', p.id_gestion,
            'id_periodo', p.id_periodo, 'id_acceso', p.id_acceso,
-           'nota', p.nota, 'estado', p.estado
+           'nota', p.nota, 'estado', p.estado,
+           -- Admission mode: examen is complete since 2019 (id_acceso is empty);
+           -- both use the public.prs_examen codes.
+           'modalidad', coalesce(p.examen::text, nullif(btrim(p.id_acceso), '')),
+           -- Applicant profile from the person (id_ra), for every application.
+           'postulante_sexo', u.id_sexo, 'postulante_tipo_colegio', c.tipo,
+           'colegio_pais', c.id_pais, 'colegio_departamento', c.cod_dep, 'colegio_provincia', c.cod_prov, 'colegio_localidad', c.cod_loc,
+           'nacimiento_pais', u.nac_pais, 'nacimiento_departamento', u.id_dep, 'nacimiento_provincia', u.id_prov, 'nacimiento_localidad', u.id_loc
        ) AS source_data
 FROM public.postulantes p CROSS JOIN params
 JOIN academico.alm_programas programa ON programa.id_programa=p.id_programa
+LEFT JOIN public.uatf_datos u ON u.id_ra=p.id_ra
+LEFT JOIN public.prs_colegios c ON c.id_colegio=u.id_colegio
 LEFT JOIN application_link alumno
        ON alumno.id_postulante=p.id_alumno AND alumno.id_programa=p.id_programa
 LEFT JOIN first_coursework fcw ON fcw.id_alumno=alumno.id_alumno

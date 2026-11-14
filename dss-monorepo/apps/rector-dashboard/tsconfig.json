@@ -68,6 +68,15 @@
       "path": "../../libs/rbac"
     },
     {
+      "path": "../../libs/shared/olap-models"
+    },
+    {
+      "path": "../../libs/shared/olap-data-access"
+    },
+    {
+      "path": "../../libs/connectors/olap-connector"
+    },
+    {
       "path": "../../libs/ui/design-system"
     },
     {

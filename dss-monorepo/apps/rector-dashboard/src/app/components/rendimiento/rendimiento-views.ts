@@ -1,4 +1,4 @@
-import type { CubeName, MeasureFormat } from './rendimiento-data';
+import { CAREER_AXIS, FACULTY_AXIS, type Axis, type CubeName, type MeasureFormat } from './rendimiento-data';
 
 /** One measure shown in a view; `source` is the cube that publishes it. */
 export interface ViewMeasure {
@@ -9,6 +9,28 @@ export interface ViewMeasure {
   /** Short plain-language meaning shown under the table. */
   help?: string;
 }
+
+/** A ranking of the selected gestión by one dimension, optionally drillable into a second. */
+export interface Breakdown {
+  id: string;
+  /** Selector text, e.g. "Procedencia educativa". */
+  label: string;
+  first: Axis;
+  /** Plural noun for the first level, e.g. "Facultades". */
+  firstPlural: string;
+  second?: Axis;
+  /** Plural noun for the second level, e.g. "Carreras". */
+  secondPlural?: string;
+}
+
+export const FACULTY_BREAKDOWN: Breakdown = {
+  id: 'facultad',
+  label: 'Facultad y carrera',
+  first: FACULTY_AXIS,
+  firstPlural: 'Facultades',
+  second: CAREER_AXIS,
+  secondPlural: 'Carreras',
+};
 
 export interface RendimientoView {
   slug: string;
@@ -24,6 +46,14 @@ export interface RendimientoView {
   notes?: string[];
   /** How many leading measures are shown as indicator cards (default 4). */
   kpiCount?: number;
+  /** Rankings of the selected gestión (default: facultad, drillable to carrera). */
+  breakdowns?: Breakdown[];
+  /** Composition of one count measure by a category, for every gestión. */
+  composition?: { source: CubeName; measure: string; axis: Axis; label: string };
+  /** Section shown above the title (default "Rendimiento académico"). */
+  section?: string;
+  /** Data source note shown at the end of the page. */
+  sourceNote?: string;
 }
 
 const M = 'Rendimiento académico' as const;

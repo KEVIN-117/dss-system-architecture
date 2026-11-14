@@ -16,7 +16,7 @@ export default async function RendimientoVistaPage({ params }: { params: Promise
         <p className="text-sm font-medium text-muted-foreground">Rendimiento académico</p>
         <h1 className="text-3xl font-semibold tracking-tight text-foreground">{view.title}</h1>
       </header>
-      <RendimientoViewPanel view={view} />
+      <RendimientoViewPanel key={view.slug} view={view} />
     </div>
   );
 }

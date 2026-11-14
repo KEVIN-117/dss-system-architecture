@@ -33,18 +33,26 @@
     <Table name="vw_dim_cohorte_olap"><Key><Column name="cohorte" /></Key></Table>
     <Table name="dim_materia"><Key><Column name="materia_sk" /></Key></Table>
     <Table name="vw_dim_gestion_olap"><Key><Column name="gestion" /></Key></Table>
+    <Table name="vw_dim_sexo_olap"><Key><Column name="codigo" /></Key></Table>
+    <Table name="vw_dim_tipo_colegio_olap"><Key><Column name="codigo" /></Key></Table>
+    <Table name="vw_dim_ubicacion_olap"><Key><Column name="ubicacion" /></Key></Table>
   </PhysicalSchema>
 
   <!-- ===================================================== dimensiones -->
   <Dimension name="Programa" table="vw_dim_programa_olap" key="Clave programa"
-      description="Facultad, carrera y régimen (anual o semestral) del programa académico.">
+      description="Facultad, carrera, régimen (anual o semestral) y área de conocimiento RAN del programa académico.">
     <Attributes>
       <Attribute name="Clave programa" keyColumn="programa_sk" hasHierarchy="false" />
       <Attribute name="Facultad" keyColumn="facultad_codigo" nameColumn="facultad" orderByColumn="facultad" hasHierarchy="false" />
       <Attribute name="Carrera" keyColumn="carrera_codigo" nameColumn="carrera" orderByColumn="carrera" hasHierarchy="false" />
       <Attribute name="Régimen" keyColumn="regimen_codigo" nameColumn="regimen" orderByColumn="regimen" hasHierarchy="false" />
+      <Attribute name="Área de conocimiento" keyColumn="area_codigo" nameColumn="area" orderByColumn="area_orden" hasHierarchy="false" />
     </Attributes>
     <Hierarchies>
+      <Hierarchy name="Área y carrera" allMemberName="Todas las áreas">
+        <Level attribute="Área de conocimiento" />
+        <Level attribute="Carrera" />
+      </Hierarchy>
       <Hierarchy name="Facultad y carrera" allMemberName="Todas las facultades">
         <Level attribute="Facultad" />
         <Level attribute="Carrera" />
@@ -119,6 +127,55 @@
     <Attributes>
       <Attribute name="Gestión" keyColumn="gestion" nameColumn="gestion_nombre" orderByColumn="gestion" />
     </Attributes>
+  </Dimension>
+
+  <!-- Perfil del postulante (persona que postula, para todas las postulaciones). -->
+  <Dimension name="Sexo del postulante" table="vw_dim_sexo_olap" key="Sexo"
+      description="Sexo registrado de la persona que postula.">
+    <Attributes>
+      <Attribute name="Sexo" keyColumn="codigo" nameColumn="nombre" orderByColumn="nombre" />
+    </Attributes>
+  </Dimension>
+
+  <Dimension name="Tipo de colegio del postulante" table="vw_dim_tipo_colegio_olap" key="Tipo de colegio"
+      description="Tipo del colegio de egreso de la persona que postula (fiscal, particular, convenio).">
+    <Attributes>
+      <Attribute name="Tipo de colegio" keyColumn="codigo" nameColumn="nombre" orderByColumn="nombre" />
+    </Attributes>
+  </Dimension>
+
+  <Dimension name="Procedencia educativa" table="vw_dim_ubicacion_olap" key="Clave ubicación"
+      description="Ubicación del colegio de egreso del postulante: ciudad capital o provincias de Potosí, otros departamentos o exterior.">
+    <Attributes>
+      <Attribute name="Clave ubicación" keyColumn="ubicacion" hasHierarchy="false" />
+      <Attribute name="Ámbito" keyColumn="ambito_orden" nameColumn="ambito" orderByColumn="ambito_orden" hasHierarchy="false" />
+      <Attribute name="Departamento" keyColumn="departamento" nameColumn="departamento_nombre" orderByColumn="departamento_nombre" hasHierarchy="false" />
+      <Attribute name="Provincia" keyColumn="ubicacion" nameColumn="provincia_nombre" orderByColumn="provincia_nombre" hasHierarchy="false" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Ámbito y departamento" allMemberName="Todos los lugares">
+        <Level attribute="Ámbito" />
+        <Level attribute="Departamento" />
+        <Level attribute="Provincia" />
+      </Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
+  <Dimension name="Lugar de nacimiento" table="vw_dim_ubicacion_olap" key="Clave ubicación"
+      description="Lugar de nacimiento del postulante: ciudad capital o provincias de Potosí, otros departamentos o exterior.">
+    <Attributes>
+      <Attribute name="Clave ubicación" keyColumn="ubicacion" hasHierarchy="false" />
+      <Attribute name="Ámbito" keyColumn="ambito_orden" nameColumn="ambito" orderByColumn="ambito_orden" hasHierarchy="false" />
+      <Attribute name="Departamento" keyColumn="departamento" nameColumn="departamento_nombre" orderByColumn="departamento_nombre" hasHierarchy="false" />
+      <Attribute name="Provincia" keyColumn="ubicacion" nameColumn="provincia_nombre" orderByColumn="provincia_nombre" hasHierarchy="false" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Ámbito y departamento" allMemberName="Todos los lugares">
+        <Level attribute="Ámbito" />
+        <Level attribute="Departamento" />
+        <Level attribute="Provincia" />
+      </Hierarchy>
+    </Hierarchies>
   </Dimension>
 
   <!-- Solo atributos agregables; ningún identificador personal llega a Mondrian. -->
@@ -213,14 +270,16 @@
 
   <!-- ========================================================== cubos -->
   <Cube name="Admisión" defaultMeasure="Postulaciones"
-      description="Postulaciones y admisiones por carrera, sede, modalidad y gestión.">
+      description="Postulaciones y admisiones por carrera, área, sede, modalidad y perfil del postulante (Boletín 1 DSA).">
     <Dimensions>
       <Dimension source="Programa" />
       <Dimension source="Sede" />
       <Dimension source="Periodo" />
       <Dimension source="Modalidad de admisión" />
-      <Dimension source="Perfil del estudiante" />
-      <Dimension source="Procedencia" />
+      <Dimension source="Sexo del postulante" />
+      <Dimension source="Tipo de colegio del postulante" />
+      <Dimension source="Procedencia educativa" />
+      <Dimension source="Lugar de nacimiento" />
       <Dimension source="Ámbito de facultad" visible="false" />
       <Dimension source="Ámbito de carrera" visible="false" />
     </Dimensions>
@@ -245,8 +304,10 @@
           <ForeignKeyLink dimension="Sede" foreignKeyColumn="programa_sk" />
           <ForeignKeyLink dimension="Periodo" foreignKeyColumn="periodo_academico_sk" />
           <ForeignKeyLink dimension="Modalidad de admisión" foreignKeyColumn="admision_sk" />
-          <ForeignKeyLink dimension="Perfil del estudiante" foreignKeyColumn="estudiante_sk" />
-          <ForeignKeyLink dimension="Procedencia" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Sexo del postulante" foreignKeyColumn="sexo_codigo" />
+          <ForeignKeyLink dimension="Tipo de colegio del postulante" foreignKeyColumn="tipo_colegio_codigo" />
+          <ForeignKeyLink dimension="Procedencia educativa" foreignKeyColumn="colegio_ubicacion" />
+          <ForeignKeyLink dimension="Lugar de nacimiento" foreignKeyColumn="nacimiento_ubicacion" />
           <ForeignKeyLink dimension="Ámbito de facultad" foreignKeyColumn="programa_sk" />
           <ForeignKeyLink dimension="Ámbito de carrera" foreignKeyColumn="programa_sk" />
         </DimensionLinks>

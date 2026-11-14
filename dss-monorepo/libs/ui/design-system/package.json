@@ -14,7 +14,8 @@
       "import": "./dist/index.js",
       "default": "./dist/index.js"
     },
-    "./styles/globals.css": "./src/styles/globals.css"
+    "./styles/globals.css": "./src/styles/globals.css",
+    "./portal": "./src/portal.ts"
   },
   "nx": {
     "tags": [
