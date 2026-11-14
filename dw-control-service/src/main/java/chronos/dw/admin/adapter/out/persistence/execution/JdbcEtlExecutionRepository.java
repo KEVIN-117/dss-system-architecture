@@ -87,16 +87,22 @@ public class JdbcEtlExecutionRepository implements QueryEtlExecutionsPort {
     public List<EtlExecutionMetric> findMetrics(UUID runId) {
         return jdbcTemplate.query(
                 """
-                SELECT metric_name, metric_value, metric_unit, measured_at
-                FROM etl_control.etl_execution_metric
-                WHERE run_id = ?
-                ORDER BY measured_at DESC, metric_id DESC
+                SELECT m.metric_name, m.metric_value, m.metric_unit, m.measured_at,
+                       NULLIF(btrim(m.dimensions ->> 'source_contract_id'), '') AS source_contract_id,
+                       s.step_code
+                FROM etl_control.etl_execution_metric m
+                LEFT JOIN etl_control.etl_execution_step s
+                  ON s.step_id = m.step_id AND s.run_id = m.run_id
+                WHERE m.run_id = ?
+                ORDER BY m.measured_at DESC, m.metric_id DESC
                 """,
                 (resultSet, rowNumber) -> new EtlExecutionMetric(
                         resultSet.getString("metric_name"),
                         resultSet.getBigDecimal("metric_value"),
                         resultSet.getString("metric_unit"),
-                        instant(resultSet, "measured_at")),
+                        instant(resultSet, "measured_at"),
+                        resultSet.getString("source_contract_id"),
+                        resultSet.getString("step_code")),
                 runId);
     }
 

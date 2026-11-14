@@ -35,6 +35,11 @@ const summary = {
   endedAt: '2026-10-25T10:03:00Z',
 };
 
+/** Las llamadas con size=1 son los conteos de los indicadores. */
+function tableCalls() {
+  return listEtlExecutions.mock.calls.filter(([filters]) => filters.size === 20);
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   getDwClosureCapabilities.mockResolvedValue({
@@ -42,99 +47,58 @@ beforeEach(() => {
     canManageClosures: false,
     canReadEtlExecutions: true,
   });
-  listEtlExecutions.mockResolvedValue({
-    items: [summary],
-    page: 0,
-    size: 20,
-    totalElements: 25,
-    totalPages: 2,
-  });
-  getEtlExecution.mockResolvedValue({
-    ...summary,
-    steps: [
-      {
-        stepCode: 'VALIDAR_CARGA',
-        phase: 'VALIDACION',
-        status: 'FALLIDO',
-        stepOrder: 1,
-        startedAt: '2026-10-25T10:02:00Z',
-        endedAt: '2026-10-25T10:03:00Z',
-      },
-    ],
-    metrics: [
-      {
-        name: 'Filas procesadas',
-        value: 842,
-        unit: 'filas',
-        measuredAt: '2026-10-25T10:03:00Z',
-      },
-    ],
-    errors: [
-      {
-        severity: 'ERROR',
-        code: 'DATA_QUALITY',
-        message: 'La validación académica encontró inconsistencias.',
-        stepCode: 'VALIDAR_CARGA',
-        occurredAt: '2026-10-25T10:03:00Z',
-      },
-    ],
-  });
+  listEtlExecutions.mockImplementation(async (filters: { size: number; page: number }) =>
+    filters.size === 1
+      ? { items: [], page: 0, size: 1, totalElements: 3, totalPages: 3 }
+      : { items: [summary], page: filters.page, size: 20, totalElements: 25, totalPages: 2 },
+  );
 });
 
 describe('AdminEtlExecutionsPage', () => {
-  it('lists executions, applies filters and pages through results', async () => {
+  it('lists executions with readable labels, filters by status tab and pages through results', async () => {
     render(<AdminEtlExecutionsPage />);
     expect(await screen.findByText('248c6e1c…')).toBeTruthy();
+    expect(screen.getAllByText('Cierre académico').length).toBeGreaterThan(0);
     expect(screen.getByText('Cierre #12')).toBeTruthy();
+    expect(screen.getAllByText('Fallida').length).toBeGreaterThan(0);
 
-    fireEvent.change(screen.getByLabelText('Filtrar por estado'), {
-      target: { value: 'FALLIDA' },
-    });
-    fireEvent.change(screen.getByLabelText('Filtrar por gestión'), {
-      target: { value: '2026' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtros' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Fallidas/ }));
     await waitFor(() =>
-      expect(listEtlExecutions).toHaveBeenLastCalledWith(
-        { page: 0, size: 20, status: 'FALLIDA', gestion: 2026 },
-        expect.any(AbortSignal),
-      ),
+      expect(tableCalls().at(-1)?.[0]).toEqual({ page: 0, size: 20, status: 'FALLIDA' }),
     );
 
-    listEtlExecutions.mockResolvedValueOnce({
-      items: [summary],
-      page: 1,
-      size: 20,
-      totalElements: 25,
-      totalPages: 2,
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Página siguiente' }));
+    fireEvent.click(screen.getByRole('button', { name: /Más filtros/ }));
+    fireEvent.change(screen.getByLabelText('Gestión'), { target: { value: '2026' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtros' }));
     await waitFor(() =>
-      expect(listEtlExecutions).toHaveBeenLastCalledWith(
-        { page: 1, size: 20, status: 'FALLIDA', gestion: 2026 },
-        expect.any(AbortSignal),
-      ),
+      expect(tableCalls().at(-1)?.[0]).toEqual({
+        page: 0,
+        size: 20,
+        status: 'FALLIDA',
+        gestion: 2026,
+      }),
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Página siguiente' }));
+    await waitFor(() =>
+      expect(tableCalls().at(-1)?.[0]).toEqual({
+        page: 1,
+        size: 20,
+        status: 'FALLIDA',
+        gestion: 2026,
+      }),
     );
   });
 
-  it('shows execution detail, steps, metrics and sanitized errors read-only', async () => {
+  it('shows KPI counts from the API and links each row to its detail page', async () => {
     render(<AdminEtlExecutionsPage />);
     const row = await screen.findByRole('row', { name: /248c6e1c/ });
-    fireEvent.click(within(row).getByRole('button', { name: 'Ver detalle' }));
-    const dialog = await screen.findByRole('dialog');
-    expect(await within(dialog).findByText('VALIDAR CARGA')).toBeTruthy();
-    expect(within(dialog).getByText('842 filas')).toBeTruthy();
-    expect(
-      within(dialog).getByText(
-        'La validación académica encontró inconsistencias.',
-      ),
-    ).toBeTruthy();
-    expect(
-      within(dialog).queryByRole('button', {
-        name: /iniciar|reintentar|retry/i,
-      }),
-    ).toBeNull();
-    expect(getEtlExecution).toHaveBeenCalledWith(summary.runId);
+    const link = within(row).getByRole('link', { name: /Ver detalle/ });
+    expect(link.getAttribute('href')).toBe(`/etl-executions/${summary.runId}`);
+    expect(await screen.findByText('Ejecuciones registradas')).toBeTruthy();
+    await waitFor(() =>
+      expect(listEtlExecutions.mock.calls.filter(([f]) => f.size === 1)).toHaveLength(7),
+    );
   });
 
   it('blocks access when the role is missing and does not call the executions API', async () => {
@@ -145,9 +109,7 @@ describe('AdminEtlExecutionsPage', () => {
     });
     render(<AdminEtlExecutionsPage />);
     expect(
-      await screen.findByText(
-        'Tu cuenta no tiene permiso para consultar ejecuciones ETL.',
-      ),
+      await screen.findByText('Tu cuenta no tiene permiso para consultar ejecuciones ETL.'),
     ).toBeTruthy();
     expect(listEtlExecutions).not.toHaveBeenCalled();
   });
@@ -161,10 +123,9 @@ describe('AdminEtlExecutionsPage', () => {
       totalPages: 0,
     });
     render(<AdminEtlExecutionsPage />);
-    expect(
-      await screen.findByText('No hay ejecuciones para mostrar'),
-    ).toBeTruthy();
+    expect(await screen.findByText('No hay ejecuciones para mostrar')).toBeTruthy();
+    const before = tableCalls().length;
     fireEvent.click(screen.getByRole('button', { name: /Actualizar/ }));
-    await waitFor(() => expect(listEtlExecutions).toHaveBeenCalledTimes(2));
+    await waitFor(() => expect(tableCalls().length).toBe(before + 1));
   });
 });

@@ -1,78 +1,89 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
-  Badge,
   Button,
   Input,
   Loader,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
   Table,
   TableBody,
+  TableCaption,
   TableCell,
   TableHead,
   TableHeader,
   TableRow,
 } from '@dss-monorepo/design-system';
-import { ChevronLeft, ChevronRight, RefreshCw } from 'lucide-react';
+import {
+  Activity,
+  ChevronLeft,
+  ChevronRight,
+  CircleCheck,
+  CircleX,
+  Database,
+  RefreshCw,
+  SlidersHorizontal,
+  X,
+} from 'lucide-react';
 
 import {
   getDwClosureCapabilities,
-  getEtlExecution,
   listEtlExecutions,
   type DwClosureCapabilities,
-  type EtlExecutionDetail,
   type EtlExecutionSummary,
   type ExecutionFilters,
   type ExecutionKind,
   type ExecutionStatus,
 } from '../data-access/dw-control';
+import {
+  ACTIVE_STATUSES,
+  KIND_LABEL,
+  STATUS_META,
+  dateLabel,
+  durationLabel,
+  formatNumber,
+  relativeLabel,
+} from './etl/etl-format';
+import {
+  AutoRefreshSwitch,
+  CopyButton,
+  KpiCard,
+  StatusPill,
+  useNow,
+} from './etl/EtlUi';
 
 const PAGE_SIZE = 20;
-const STATUSES: ExecutionStatus[] = [
-  'SOLICITADA',
-  'EN_EJECUCION',
-  'PUBLICANDO',
-  'EXITOSA',
-  'FALLIDA',
-  'CANCELADA',
-];
+const AUTO_REFRESH_SECONDS = 15;
 const KINDS: ExecutionKind[] = ['HISTORICA', 'CIERRE_ACADEMICO', 'REPROCESO'];
 
-function dateLabel(value: string | null): string {
-  if (!value) return '—';
-  const date = new Date(value);
-  return Number.isNaN(date.getTime())
-    ? '—'
-    : new Intl.DateTimeFormat('es-BO', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-      }).format(date);
-}
+type StatusTab = 'ALL' | ExecutionStatus;
 
-function durationLabel(start: string | null, end: string | null): string {
-  if (!start) return '—';
-  const from = new Date(start).getTime();
-  const to = end ? new Date(end).getTime() : Date.now();
-  if (!Number.isFinite(from) || !Number.isFinite(to) || to < from) return '—';
-  const seconds = Math.floor((to - from) / 1000);
-  if (seconds < 60) return `${seconds} s`;
-  const minutes = Math.floor(seconds / 60);
-  return `${minutes} min ${seconds % 60} s`;
-}
+const TABS: { id: StatusTab; label: string }[] = [
+  { id: 'ALL', label: 'Todas' },
+  { id: 'EN_EJECUCION', label: 'En ejecución' },
+  { id: 'FALLIDA', label: 'Fallidas' },
+  { id: 'EXITOSA', label: 'Exitosas' },
+  { id: 'CANCELADA', label: 'Canceladas' },
+];
 
-function statusVariant(
-  status: ExecutionStatus,
-): React.ComponentProps<typeof Badge>['variant'] {
-  if (status === 'EXITOSA') return 'secondary';
-  if (status === 'FALLIDA') return 'destructive';
-  if (status === 'CANCELADA') return 'outline';
-  return 'default';
+type Counts = {
+  total: number;
+  active: number;
+  running: number;
+  failed: number;
+  succeeded: number;
+  cancelled: number;
+};
+
+async function countByStatus(
+  status: ExecutionStatus | undefined,
+  signal: AbortSignal,
+): Promise<number> {
+  const page = await listEtlExecutions(
+    { page: 0, size: 1, ...(status ? { status } : {}) },
+    signal,
+  );
+  return page.totalElements;
 }
 
 export function AdminEtlExecutionsPage() {
@@ -90,7 +101,8 @@ export function AdminEtlExecutionsPage() {
     page: 0,
     size: PAGE_SIZE,
   });
-  const [statusInput, setStatusInput] = React.useState('');
+  const [tab, setTab] = React.useState<StatusTab>('ALL');
+  const [showAdvanced, setShowAdvanced] = React.useState(false);
   const [kindInput, setKindInput] = React.useState('');
   const [gestionInput, setGestionInput] = React.useState('');
   const [periodoInput, setPeriodoInput] = React.useState('');
@@ -98,11 +110,8 @@ export function AdminEtlExecutionsPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [updatedAt, setUpdatedAt] = React.useState<string | null>(null);
-  const [selected, setSelected] = React.useState<EtlExecutionDetail | null>(
-    null,
-  );
-  const [detailLoading, setDetailLoading] = React.useState(false);
-  const [detailError, setDetailError] = React.useState<string | null>(null);
+  const [counts, setCounts] = React.useState<Counts | null>(null);
+  const [autoRefresh, setAutoRefresh] = React.useState(true);
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -123,10 +132,37 @@ export function AdminEtlExecutionsPage() {
     return () => controller.abort();
   }, []);
 
+  const loadCounts = React.useCallback(async () => {
+    const controller = new AbortController();
+    try {
+      const [total, requested, running, publishing, failed, succeeded, cancelled] =
+        await Promise.all([
+          countByStatus(undefined, controller.signal),
+          countByStatus('SOLICITADA', controller.signal),
+          countByStatus('EN_EJECUCION', controller.signal),
+          countByStatus('PUBLICANDO', controller.signal),
+          countByStatus('FALLIDA', controller.signal),
+          countByStatus('EXITOSA', controller.signal),
+          countByStatus('CANCELADA', controller.signal),
+        ]);
+      setCounts({
+        total,
+        active: requested + running + publishing,
+        running,
+        failed,
+        succeeded,
+        cancelled,
+      });
+    } catch {
+      // Los indicadores son complementarios: la tabla informa del error.
+      setCounts(null);
+    }
+  }, []);
+
   const loadExecutions = React.useCallback(
-    async (nextFilters: ExecutionFilters) => {
+    async (nextFilters: ExecutionFilters, quiet = false) => {
       const controller = new AbortController();
-      setLoading(true);
+      if (!quiet) setLoading(true);
       setError(null);
       try {
         const result = await listEtlExecutions(nextFilters, controller.signal);
@@ -142,20 +178,40 @@ export function AdminEtlExecutionsPage() {
             : 'No se pudieron cargar las ejecuciones.',
         );
       } finally {
-        setLoading(false);
+        if (!quiet) setLoading(false);
       }
     },
     [],
   );
 
-  React.useEffect(() => {
-    if (capabilities?.canReadEtlExecutions) void loadExecutions(filters);
-  }, [capabilities?.canReadEtlExecutions, filters, loadExecutions]);
+  const canRead = capabilities?.canReadEtlExecutions === true;
 
-  function applyFilters(event: React.FormEvent<HTMLFormElement>) {
-    event.preventDefault();
+  React.useEffect(() => {
+    if (canRead) void loadExecutions(filters);
+  }, [canRead, filters, loadExecutions]);
+
+  React.useEffect(() => {
+    if (canRead) void loadCounts();
+  }, [canRead, loadCounts]);
+
+  const hasActive =
+    (counts?.active ?? 0) > 0 ||
+    items.some((item) => ACTIVE_STATUSES.includes(item.status));
+
+  React.useEffect(() => {
+    if (!canRead || !autoRefresh || !hasActive) return;
+    const id = window.setInterval(() => {
+      void loadExecutions(filters, true);
+      void loadCounts();
+    }, AUTO_REFRESH_SECONDS * 1000);
+    return () => window.clearInterval(id);
+  }, [canRead, autoRefresh, hasActive, filters, loadExecutions, loadCounts]);
+
+  const now = useNow(hasActive);
+
+  function buildFilters(nextTab: StatusTab): ExecutionFilters {
     const next: ExecutionFilters = { page: 0, size: PAGE_SIZE };
-    if (statusInput) next.status = statusInput as ExecutionStatus;
+    if (nextTab !== 'ALL') next.status = nextTab;
     if (kindInput) next.executionKind = kindInput as ExecutionKind;
     if (gestionInput && Number.isInteger(Number(gestionInput)))
       next.gestion = Number(gestionInput);
@@ -163,29 +219,32 @@ export function AdminEtlExecutionsPage() {
       next.periodo = Number(periodoInput);
     if (closureInput && Number.isInteger(Number(closureInput)))
       next.closureId = Number(closureInput);
+    return next;
+  }
+
+  function selectTab(nextTab: StatusTab) {
+    setTab(nextTab);
+    setFilters(buildFilters(nextTab));
+  }
+
+  function applyFilters(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setFilters(buildFilters(tab));
+  }
+
+  function clearFilters() {
+    setKindInput('');
+    setGestionInput('');
+    setPeriodoInput('');
+    setClosureInput('');
+    const next: ExecutionFilters = { page: 0, size: PAGE_SIZE };
+    if (tab !== 'ALL') next.status = tab;
     setFilters(next);
   }
 
-  function goToPage(nextPage: number) {
-    const next = { ...filters, page: nextPage };
-    setFilters(next);
-  }
-
-  async function openDetail(runId: string) {
-    setSelected(null);
-    setDetailError(null);
-    setDetailLoading(true);
-    try {
-      setSelected(await getEtlExecution(runId));
-    } catch (cause) {
-      setDetailError(
-        cause instanceof Error
-          ? cause.message
-          : 'No se pudo cargar el detalle.',
-      );
-    } finally {
-      setDetailLoading(false);
-    }
+  function refresh() {
+    void loadExecutions(filters);
+    void loadCounts();
   }
 
   if (capabilityLoading)
@@ -203,7 +262,7 @@ export function AdminEtlExecutionsPage() {
         {capabilityError}
       </section>
     );
-  if (!capabilities?.canReadEtlExecutions)
+  if (!canRead)
     return (
       <section className="m-6 rounded-md border border-border bg-card p-6">
         <h1 className="text-lg font-semibold">Acceso restringido</h1>
@@ -215,9 +274,26 @@ export function AdminEtlExecutionsPage() {
 
   const firstRecord = totalElements === 0 ? 0 : page * PAGE_SIZE + 1;
   const lastRecord = Math.min((page + 1) * PAGE_SIZE, totalElements);
+  const advancedCount = [kindInput, gestionInput, periodoInput, closureInput].filter(
+    Boolean,
+  ).length;
+  const tabCount = (id: StatusTab): number | undefined => {
+    if (!counts) return undefined;
+    if (id === 'ALL') return counts.total;
+    if (id === 'EN_EJECUCION') return counts.running;
+    if (id === 'FALLIDA') return counts.failed;
+    if (id === 'EXITOSA') return counts.succeeded;
+    if (id === 'CANCELADA') return counts.cancelled;
+    return undefined;
+  };
+  const finished = counts ? counts.succeeded + counts.failed : 0;
+  const successRate =
+    counts && finished > 0
+      ? Math.round((counts.succeeded / finished) * 100)
+      : null;
 
   return (
-    <section className="space-y-6 p-6" aria-labelledby="etl-executions-title">
+    <section className="space-y-6 p-4 md:p-6" aria-labelledby="etl-executions-title">
       <header className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="text-sm text-muted-foreground">
@@ -226,202 +302,301 @@ export function AdminEtlExecutionsPage() {
           <h1 id="etl-executions-title" className="mt-1 text-2xl font-semibold">
             Ejecuciones ETL
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Consulta el estado, los pasos y las métricas de las cargas. Esta
-            vista es de solo lectura.
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+            Monitorea las cargas del Data Warehouse: estado, avance por fases,
+            métricas e incidencias. Vista de solo lectura.
           </p>
         </div>
-        <Button
-          variant="outline"
-          disabled={loading}
-          onClick={() => void loadExecutions(filters)}
-        >
-          <RefreshCw aria-hidden="true" className="mr-2 size-4" /> Actualizar
-        </Button>
-      </header>
-
-      <form
-        onSubmit={applyFilters}
-        className="grid gap-3 rounded-lg border border-border bg-card p-4 sm:grid-cols-2 xl:grid-cols-6"
-      >
-        <label className="space-y-1 text-sm font-medium">
-          Estado
-          <select
-            aria-label="Filtrar por estado"
-            value={statusInput}
-            onChange={(event) => setStatusInput(event.target.value)}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">Todos</option>
-            {STATUSES.map((status) => (
-              <option key={status} value={status}>
-                {status}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1 text-sm font-medium">
-          Tipo
-          <select
-            aria-label="Filtrar por tipo"
-            value={kindInput}
-            onChange={(event) => setKindInput(event.target.value)}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
-          >
-            <option value="">Todos</option>
-            {KINDS.map((kind) => (
-              <option key={kind} value={kind}>
-                {kind}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="space-y-1 text-sm font-medium">
-          Gestión
-          <Input
-            aria-label="Filtrar por gestión"
-            type="number"
-            min="2000"
-            value={gestionInput}
-            onChange={(event) => setGestionInput(event.target.value)}
-            placeholder="Ej. 2026"
-          />
-        </label>
-        <label className="space-y-1 text-sm font-medium">
-          Periodo
-          <Input
-            aria-label="Filtrar por periodo"
-            type="number"
-            min="1"
-            value={periodoInput}
-            onChange={(event) => setPeriodoInput(event.target.value)}
-            placeholder="Ej. 1"
-          />
-        </label>
-        <label className="space-y-1 text-sm font-medium">
-          ID de cierre
-          <Input
-            aria-label="Filtrar por ID de cierre"
-            type="number"
-            min="1"
-            value={closureInput}
-            onChange={(event) => setClosureInput(event.target.value)}
-            placeholder="Opcional"
-          />
-        </label>
-        <div className="flex items-end">
-          <Button type="submit" className="w-full">
-            Aplicar filtros
+        <div className="flex flex-wrap items-center gap-4">
+          {hasActive && (
+            <AutoRefreshSwitch
+              checked={autoRefresh}
+              onChange={setAutoRefresh}
+              seconds={AUTO_REFRESH_SECONDS}
+            />
+          )}
+          <Button variant="outline" disabled={loading} onClick={refresh}>
+            <RefreshCw
+              aria-hidden="true"
+              className={`mr-2 size-4 ${loading ? 'motion-safe:animate-spin' : ''}`}
+            />
+            Actualizar
           </Button>
         </div>
-      </form>
+      </header>
 
-      <div className="rounded-lg border border-border bg-card">
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
-          <h2 className="font-medium">Historial de ejecuciones</h2>
-          <span className="text-sm text-muted-foreground">
-            {totalElements} registros
-          </span>
+      {/* Indicadores */}
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        <KpiCard
+          label="Ejecuciones registradas"
+          value={counts ? formatNumber(counts.total) : '—'}
+          hint="Historial completo"
+          icon={Database}
+        />
+        <KpiCard
+          label="En curso"
+          value={counts ? formatNumber(counts.active) : '—'}
+          hint={counts?.active ? 'Solicitadas, en ejecución o publicando' : 'Ninguna carga activa'}
+          icon={Activity}
+          tone={counts?.active ? 'running' : 'neutral'}
+        />
+        <KpiCard
+          label="Fallidas"
+          value={counts ? formatNumber(counts.failed) : '—'}
+          hint={counts?.failed ? 'Revisa sus incidencias' : 'Sin fallos registrados'}
+          icon={CircleX}
+          tone={counts?.failed ? 'danger' : 'neutral'}
+        />
+        <KpiCard
+          label="Tasa de éxito"
+          value={successRate === null ? '—' : `${successRate}%`}
+          hint={counts ? `${formatNumber(counts.succeeded)} exitosas de ${formatNumber(finished)} finalizadas` : undefined}
+          icon={CircleCheck}
+          tone="success"
+        >
+          {successRate !== null && (
+            <div
+              role="progressbar"
+              aria-label="Tasa de éxito"
+              aria-valuenow={successRate}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"
+            >
+              <div className="h-full rounded-full bg-success" style={{ width: `${successRate}%` }} />
+            </div>
+          )}
+        </KpiCard>
+      </div>
+
+      <div className="rounded-xl border border-border bg-card">
+        {/* Pestañas de estado + filtros */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-3">
+          <div role="group" aria-label="Filtrar por estado" className="flex flex-wrap gap-1">
+            {TABS.map((t) => {
+              const count = tabCount(t.id);
+              const active = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  aria-pressed={active}
+                  onClick={() => selectTab(t.id)}
+                  className={`inline-flex h-9 items-center gap-2 rounded-lg px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                    active
+                      ? 'bg-primary text-primary-foreground'
+                      : 'text-muted-foreground hover:bg-muted hover:text-foreground'
+                  }`}
+                >
+                  {t.label}
+                  {count !== undefined && (
+                    <span
+                      className={`rounded-full px-1.5 text-xs tabular-nums ${
+                        active ? 'bg-primary-foreground/20' : 'bg-muted'
+                      }`}
+                    >
+                      {formatNumber(count)}
+                    </span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            aria-expanded={showAdvanced}
+            aria-controls="etl-advanced-filters"
+            onClick={() => setShowAdvanced((v) => !v)}
+          >
+            <SlidersHorizontal aria-hidden="true" className="mr-1.5 size-4" />
+            Más filtros
+            {advancedCount > 0 && (
+              <span className="ml-1.5 rounded-full bg-primary px-1.5 text-xs text-primary-foreground">
+                {advancedCount}
+              </span>
+            )}
+          </Button>
         </div>
+
+        <form
+          id="etl-advanced-filters"
+          hidden={!showAdvanced}
+          onSubmit={applyFilters}
+          className="grid gap-3 border-b border-border p-4 sm:grid-cols-2 xl:grid-cols-5"
+        >
+          <label className="space-y-1.5 text-sm font-medium">
+            <span>Tipo de ejecución</span>
+            <select
+              value={kindInput}
+              onChange={(event) => setKindInput(event.target.value)}
+              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            >
+              <option value="">Todos</option>
+              {KINDS.map((kind) => (
+                <option key={kind} value={kind}>
+                  {KIND_LABEL[kind]}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="space-y-1.5 text-sm font-medium">
+            <span>Gestión</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min="2000"
+              value={gestionInput}
+              onChange={(event) => setGestionInput(event.target.value)}
+              placeholder="Ej. 2026"
+            />
+          </label>
+          <label className="space-y-1.5 text-sm font-medium">
+            <span>Periodo</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min="1"
+              value={periodoInput}
+              onChange={(event) => setPeriodoInput(event.target.value)}
+              placeholder="Ej. 1"
+            />
+          </label>
+          <label className="space-y-1.5 text-sm font-medium">
+            <span>ID de cierre</span>
+            <Input
+              type="number"
+              inputMode="numeric"
+              min="1"
+              value={closureInput}
+              onChange={(event) => setClosureInput(event.target.value)}
+              placeholder="Opcional"
+            />
+          </label>
+          <div className="flex items-end gap-2">
+            <Button type="submit" className="flex-1">
+              Aplicar filtros
+            </Button>
+            <Button type="button" variant="ghost" onClick={clearFilters} aria-label="Limpiar filtros">
+              <X aria-hidden="true" className="size-4" />
+            </Button>
+          </div>
+        </form>
+
         {error && (
           <div
             role="alert"
             className="m-4 flex items-center justify-between gap-4 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
           >
             <span>{error}</span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => void loadExecutions(filters)}
-            >
+            <Button variant="outline" size="sm" onClick={refresh}>
               Reintentar
             </Button>
           </div>
         )}
+
         <div className="overflow-x-auto">
-          <Table aria-busy={loading}>
+          <Table aria-busy={loading} className="[&_td]:font-sans">
+            <TableCaption className="sr-only">
+              Historial de ejecuciones ETL, {formatNumber(totalElements)} registros
+            </TableCaption>
             <TableHeader>
               <TableRow>
-                <TableHead>Solicitud</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Gestión / periodo</TableHead>
-                <TableHead>Estado</TableHead>
-                <TableHead>Duración</TableHead>
-                <TableHead>Solicitado por</TableHead>
-                <TableHead className="text-right">Detalle</TableHead>
+                <TableHead scope="col">Ejecución</TableHead>
+                <TableHead scope="col">Estado</TableHead>
+                <TableHead scope="col">Gestión / periodo</TableHead>
+                <TableHead scope="col">Inicio</TableHead>
+                <TableHead scope="col">Duración</TableHead>
+                <TableHead scope="col">Solicitado por</TableHead>
+                <TableHead scope="col" className="text-right">
+                  <span className="sr-only">Acciones</span>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {loading && (
                 <TableRow>
-                  <TableCell
-                    colSpan={7}
-                    className="py-10 text-center text-muted-foreground"
-                  >
+                  <TableCell colSpan={7} className="py-10 text-center text-muted-foreground">
                     <Loader text="Cargando ejecuciones…" fullScreen={false} className="min-h-24" />
                   </TableCell>
                 </TableRow>
               )}
               {!loading &&
                 !error &&
-                items.map((execution) => (
-                  <TableRow key={execution.runId}>
-                    <TableCell>
-                      <span
-                        className="font-mono text-xs"
-                        title={execution.runId}
-                      >
-                        {execution.runId.slice(0, 8)}…
-                      </span>
-                      <div className="text-xs text-muted-foreground">
-                        {dateLabel(execution.requestedAt)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {execution.executionKind.replaceAll('_', ' ')}
-                    </TableCell>
-                    <TableCell>
-                      {execution.requestedGestion ?? '—'}
-                      {execution.requestedPeriodo
-                        ? ` · P${execution.requestedPeriodo}`
-                        : ''}
-                      {execution.closureId ? (
-                        <div className="text-xs text-muted-foreground">
-                          Cierre #{execution.closureId}
+                items.map((execution) => {
+                  const meta = STATUS_META[execution.status];
+                  const href = `/etl-executions/${encodeURIComponent(execution.runId)}`;
+                  return (
+                    <TableRow key={execution.runId} className="group">
+                      <TableCell>
+                        <div className="font-medium">
+                          {KIND_LABEL[execution.executionKind]}
                         </div>
-                      ) : null}
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={statusVariant(execution.status)}>
-                        {execution.status.replaceAll('_', ' ')}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      {durationLabel(execution.startedAt, execution.endedAt)}
-                    </TableCell>
-                    <TableCell
-                      className="max-w-48 truncate"
-                      title={execution.requestedBy}
-                    >
-                      {execution.requestedBy}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => void openDetail(execution.runId)}
-                      >
-                        Ver detalle
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                          <span className="font-mono" title={execution.runId}>
+                            {execution.runId.slice(0, 8)}…
+                          </span>
+                          <CopyButton
+                            value={execution.runId}
+                            label={`Copiar ID de ejecución ${execution.runId}`}
+                            className="opacity-70 group-hover:opacity-100"
+                          />
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <StatusPill tone={meta.tone} label={meta.label} size="sm" />
+                      </TableCell>
+                      <TableCell>
+                        <span className="tabular-nums">
+                          {execution.requestedGestion ?? '—'}
+                          {execution.requestedPeriodo
+                            ? ` · P${execution.requestedPeriodo}`
+                            : ''}
+                        </span>
+                        {execution.closureId ? (
+                          <div className="text-xs text-muted-foreground">
+                            Cierre #{execution.closureId}
+                          </div>
+                        ) : null}
+                      </TableCell>
+                      <TableCell>
+                        <time
+                          dateTime={execution.startedAt ?? execution.requestedAt}
+                          title={dateLabel(execution.startedAt ?? execution.requestedAt)}
+                        >
+                          {relativeLabel(execution.startedAt ?? execution.requestedAt, now)}
+                        </time>
+                        <div className="text-xs text-muted-foreground">
+                          {dateLabel(execution.startedAt ?? execution.requestedAt)}
+                        </div>
+                      </TableCell>
+                      <TableCell className="tabular-nums">
+                        {durationLabel(execution.startedAt, execution.endedAt, now)}
+                        {ACTIVE_STATUSES.includes(execution.status) && execution.startedAt && (
+                          <div className="text-xs text-muted-foreground">y contando</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="max-w-48 truncate" title={execution.requestedBy}>
+                        {execution.requestedBy}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild variant="outline" size="sm">
+                          <Link
+                            href={href}
+                            aria-label={`Ver detalle de la ejecución ${execution.runId.slice(0, 8)}`}
+                          >
+                            Ver detalle
+                            <ChevronRight aria-hidden="true" className="ml-1 size-3.5" />
+                          </Link>
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               {!loading && !error && items.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={7} className="py-12 text-center">
-                    <p className="font-medium">
-                      No hay ejecuciones para mostrar
-                    </p>
+                    <p className="font-medium">No hay ejecuciones para mostrar</p>
                     <p className="mt-1 text-sm text-muted-foreground">
                       Ajusta los filtros o vuelve a consultar más tarde.
                     </p>
@@ -432,11 +607,11 @@ export function AdminEtlExecutionsPage() {
           </Table>
         </div>
         <footer className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3 text-sm text-muted-foreground">
-          <span>
-            Mostrando {firstRecord}–{lastRecord} de {totalElements}
+          <span aria-live="polite">
+            Mostrando {firstRecord}–{lastRecord} de {formatNumber(totalElements)}
             {updatedAt ? ` · Actualizado ${dateLabel(updatedAt)}` : ''}
           </span>
-          <div className="flex items-center gap-2">
+          <nav aria-label="Paginación" className="flex items-center gap-2">
             <span>
               Página {totalPages === 0 ? 0 : page + 1} de {totalPages}
             </span>
@@ -445,7 +620,7 @@ export function AdminEtlExecutionsPage() {
               variant="outline"
               size="sm"
               disabled={loading || page <= 0}
-              onClick={() => goToPage(page - 1)}
+              onClick={() => setFilters({ ...filters, page: page - 1 })}
             >
               <ChevronLeft aria-hidden="true" className="size-4" />
             </Button>
@@ -454,214 +629,13 @@ export function AdminEtlExecutionsPage() {
               variant="outline"
               size="sm"
               disabled={loading || page + 1 >= totalPages}
-              onClick={() => goToPage(page + 1)}
+              onClick={() => setFilters({ ...filters, page: page + 1 })}
             >
               <ChevronRight aria-hidden="true" className="size-4" />
             </Button>
-          </div>
+          </nav>
         </footer>
       </div>
-
-      <Sheet
-        open={detailLoading || detailError !== null || selected !== null}
-        onOpenChange={(open) => {
-          if (!open) {
-            setSelected(null);
-            setDetailError(null);
-          }
-        }}
-      >
-        <SheetContent
-          side="right"
-          className="w-full overflow-y-auto sm:max-w-2xl"
-        >
-          <SheetHeader className="border-b border-border">
-            <SheetTitle>Detalle de ejecución ETL</SheetTitle>
-            <SheetDescription>
-              {selected
-                ? `Run ${selected.runId}`
-                : 'Estado, pasos y resultados de la ejecución.'}
-            </SheetDescription>
-          </SheetHeader>
-          {detailLoading && (
-            <Loader text="Cargando detalle…" fullScreen={false} className="m-6" />
-          )}
-          {detailError && (
-            <p
-              role="alert"
-              className="m-6 rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-            >
-              {detailError}
-            </p>
-          )}
-          {selected && (
-            <div className="space-y-6 p-6">
-              <section className="grid gap-3 sm:grid-cols-2">
-                <Info label="Estado">
-                  <Badge variant={statusVariant(selected.status)}>
-                    {selected.status.replaceAll('_', ' ')}
-                  </Badge>
-                </Info>
-                <Info label="Tipo">
-                  {selected.executionKind.replaceAll('_', ' ')}
-                </Info>
-                <Info label="Gestión / periodo">
-                  {selected.requestedGestion ?? '—'}
-                  {selected.requestedPeriodo
-                    ? ` · P${selected.requestedPeriodo}`
-                    : ''}
-                </Info>
-                <Info label="Cierre asociado">
-                  {selected.closureId
-                    ? `Cierre #${selected.closureId}`
-                    : 'No aplica'}
-                </Info>
-                <Info label="Solicitado por">{selected.requestedBy}</Info>
-                <Info label="Solicitado">
-                  {dateLabel(selected.requestedAt)}
-                </Info>
-                <Info label="Inicio">{dateLabel(selected.startedAt)}</Info>
-                <Info label="Fin">{dateLabel(selected.endedAt)}</Info>
-                <Info label="Duración">
-                  {durationLabel(selected.startedAt, selected.endedAt)}
-                </Info>
-              </section>
-              <section>
-                <h3 className="mb-2 font-semibold">Pasos</h3>
-                {selected.steps.length ? (
-                  <ol className="space-y-2">
-                    {[...selected.steps]
-                      .sort((a, b) => a.stepOrder - b.stepOrder)
-                      .map((step) => (
-                        <li
-                          key={`${step.stepOrder}-${step.stepCode}`}
-                          className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border p-3"
-                        >
-                          <div>
-                            <p className="font-medium">
-                              {step.stepCode.replaceAll('_', ' ')}
-                            </p>
-                            <p className="text-xs text-muted-foreground">
-                              {step.phase.replaceAll('_', ' ')} ·{' '}
-                              {dateLabel(step.startedAt)} –{' '}
-                              {dateLabel(step.endedAt)}
-                            </p>
-                          </div>
-                          <Badge
-                            variant={
-                              step.status === 'FALLIDO'
-                                ? 'destructive'
-                                : step.status === 'EXITOSO'
-                                  ? 'secondary'
-                                  : 'outline'
-                            }
-                          >
-                            {step.status.replaceAll('_', ' ')}
-                          </Badge>
-                        </li>
-                      ))}
-                  </ol>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No hay pasos registrados.
-                  </p>
-                )}
-              </section>
-              <section>
-                <h3 className="mb-2 font-semibold">Métricas</h3>
-                {selected.metrics.length ? (
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {selected.metrics.map((metric) => (
-                      <Info
-                        key={`${metric.name}-${metric.measuredAt}`}
-                        label={metric.name}
-                      >
-                        {metric.value} {metric.unit}
-                      </Info>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No hay métricas disponibles.
-                  </p>
-                )}
-              </section>
-              <section>
-                <h3 className="mb-2 font-semibold">Incidencias</h3>
-                {selected.errors.length ? (
-                  <ul className="space-y-2">
-                    {selected.errors.map((entry, index) => (
-                      <li
-                        key={`${entry.code}-${entry.occurredAt}-${index}`}
-                        className="rounded-md border border-border p-3"
-                      >
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Badge
-                            variant={
-                              entry.severity === 'ERROR' ||
-                              entry.severity === 'CRITICAL'
-                                ? 'destructive'
-                                : 'outline'
-                            }
-                          >
-                            {entry.severity}
-                          </Badge>
-                          <span className="font-mono text-xs">
-                            {entry.code}
-                          </span>
-                          {entry.stepCode && (
-                            <span className="text-xs text-muted-foreground">
-                              · {entry.stepCode}
-                            </span>
-                          )}
-                        </div>
-                        <p className="mt-2 text-sm">{entry.message}</p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          {dateLabel(entry.occurredAt)}
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-sm text-muted-foreground">
-                    No se registraron incidencias.
-                  </p>
-                )}
-              </section>
-              <p className="rounded-md bg-muted/40 p-3 text-xs text-muted-foreground">
-                Los mensajes de incidencia son los textos sanitizados publicados
-                por el servicio de control.
-              </p>
-            </div>
-          )}
-          <SheetFooter className="border-t border-border">
-            <Button
-              variant="outline"
-              onClick={() => {
-                setSelected(null);
-                setDetailError(null);
-              }}
-            >
-              Cerrar
-            </Button>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
     </section>
-  );
-}
-
-function Info({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="min-w-0 rounded-md border border-border p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <div className="mt-1 break-words text-sm font-medium">{children}</div>
-    </div>
   );
 }

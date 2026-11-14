@@ -124,6 +124,62 @@ describe('dw-control-service server connector', () => {
     });
   });
 
+  it('exposes the metric source and step, dropping unsafe or missing values', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        Response.json({
+          runId: '248c6e1c-ff2e-45ab-9ddc-dcf501220b9a',
+          executionKind: 'HISTORICA',
+          status: 'EXITOSA',
+          closureId: null,
+          requestedGestion: 2026,
+          requestedPeriodo: 1,
+          requestedBy: 'subject',
+          requestedAt: '2026-01-15T09:00:00Z',
+          startedAt: '2026-01-15T09:01:00Z',
+          endedAt: '2026-01-15T09:05:00Z',
+          steps: [],
+          metrics: [
+            {
+              name: 'source_rows_observed',
+              value: 107560,
+              unit: 'ROWS',
+              measuredAt: '2026-01-15T09:02:00Z',
+              source: 'academico.alumnos',
+              stepCode: 'source_alumnos',
+            },
+            {
+              name: 'source_rows_observed',
+              value: 23,
+              unit: 'ROWS',
+              measuredAt: '2026-01-15T09:03:00Z',
+              source: '<script>',
+              stepCode: null,
+            },
+            {
+              name: 'student_snapshot_rows',
+              value: 10,
+              unit: 'ROWS',
+              measuredAt: '2026-01-15T09:04:00Z',
+            },
+          ],
+          errors: [],
+        }),
+      ),
+    );
+
+    const detail = await getEtlExecution(
+      config,
+      '248c6e1c-ff2e-45ab-9ddc-dcf501220b9a',
+    );
+    expect(detail.metrics.map(({ source, stepCode }) => ({ source, stepCode }))).toEqual([
+      { source: 'academico.alumnos', stepCode: 'source_alumnos' },
+      { source: null, stepCode: null },
+      { source: null, stepCode: null },
+    ]);
+  });
+
   it('maps network failures to a safe unavailable error', async () => {
     vi.stubGlobal(
       'fetch',

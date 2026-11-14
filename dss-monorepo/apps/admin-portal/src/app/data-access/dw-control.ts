@@ -87,6 +87,10 @@ export interface EtlExecutionMetric {
   value: number;
   unit: string;
   measuredAt: string;
+  /** Contrato de origen que produjo la métrica (p. ej. `academico.alumnos`). */
+  source?: string | null;
+  /** Paso asociado a la métrica, si existe. */
+  stepCode?: string | null;
 }
 export interface SanitizedExecutionError {
   severity: 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL';

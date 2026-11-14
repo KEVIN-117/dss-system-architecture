@@ -99,6 +99,10 @@ export interface EtlExecutionMetric {
   value: number;
   unit: string;
   measuredAt: string;
+  /** Contrato de origen que produjo la métrica (p. ej. `academico.alumnos`). */
+  source: string | null;
+  /** Paso asociado a la métrica, si existe. */
+  stepCode: string | null;
 }
 export interface SanitizedExecutionError {
   severity: 'INFO' | 'WARN' | 'ERROR' | 'CRITICAL';
@@ -611,6 +615,8 @@ function parseExecutionDetail(value: unknown): EtlExecutionDetail {
       value: item.value,
       unit: item.unit,
       measuredAt: item.measuredAt,
+      source: optionalIdentifier(item.source),
+      stepCode: optionalIdentifier(item.stepCode),
     };
   });
   const errors = v.errors.map((error): SanitizedExecutionError => {
@@ -643,6 +649,16 @@ function record(value: unknown): Record<string, unknown> {
 function string(value: unknown): value is string {
   return typeof value === 'string';
 }
+/**
+ * Identificador opcional: los servicios anteriores no envían el campo y un
+ * valor con formato inesperado se descarta en lugar de mostrarse.
+ */
+function optionalIdentifier(value: unknown): string | null {
+  return typeof value === 'string' && /^[A-Za-z][A-Za-z0-9_.-]{0,99}$/.test(value)
+    ? value
+    : null;
+}
+
 function nullableString(value: unknown): value is string | null {
   return value === null || string(value);
 }
