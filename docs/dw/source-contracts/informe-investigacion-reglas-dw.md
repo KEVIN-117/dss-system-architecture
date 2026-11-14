@@ -177,7 +177,10 @@ Para pruebas históricas se acordó asumir que los ciclos incluidos en el CSV ya
 ### 5.5 PPA, arrastres y repetición
 
 - La fórmula institucional de PPA, la definición de materia arrastrada y la forma de medir repetición siguen **sin respuesta**.
-- En consecuencia, `ppa_acumulado` y `materias_arrastradas` permanecen `NULL` hasta que se aprueben fórmulas y dominios. No se calculan aproximaciones con la consulta exploratoria de notas.
+- Regla MVP adoptada por el responsable del proyecto (migración 0046), pendiente de ratificación de DSA. Usa la nota efectiva y el resultado de la 0044 (`GREATEST(nota, nota_2da, nota_ex_mesa)`; ≥ 51 aprobado, > 0 reprobado, 0 o sin nota desconocido):
+  - `ppa_acumulado`: promedio simple de la nota efectiva de los intentos con resultado conocido del alumno en el programa, hasta el corte inclusive. No se pondera por créditos, porque solo 130 de 7.647 materias los informan.
+  - `materias_arrastradas`: materias distintas que el alumno reprobó y que todavía no aprobó en el programa, al corte.
+  - Las dos quedan `NULL` si no hay ningún intento con resultado conocido. Si DSA aprueba otra fórmula, se reemplaza la regla y se recalcula con `etl_control.refresh_hop_retention_performance`.
 
 ### 5.6 Filtro de programas
 

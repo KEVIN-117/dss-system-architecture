@@ -51,7 +51,7 @@ BEGIN
        OR (SELECT count(*) FROM dw.dim_materia) <> 2
        OR (SELECT count(*) FROM dw.dim_periodo_academico) <> 2
        OR (SELECT count(*) FROM dw.dim_admision) <> 2
-       OR (SELECT count(*) FROM etl_control.schema_migration) <> 45 THEN
+       OR (SELECT count(*) FROM etl_control.schema_migration) <> 46 THEN
         RAISE EXCEPTION 'Reset incompleto: revise miembros técnicos y registro de migraciones';
     END IF;
 END;

@@ -53,8 +53,8 @@ PROGRAM_DROPOUT_FEATURES: dict[str, FeatureSpec] = {
         FeatureSpec("materias_cursadas", "f.materias_cursadas", "integer", True, "dw.fact_retencion_desercion.materias_cursadas"),
         FeatureSpec("materias_aprobadas", "f.materias_aprobadas", "integer", True, "dw.fact_retencion_desercion.materias_aprobadas"),
         FeatureSpec("materias_reprobadas", "f.materias_reprobadas", "integer", True, "dw.fact_retencion_desercion.materias_reprobadas"),
-        FeatureSpec("materias_arrastradas", "f.materias_arrastradas", "integer", True, "dw.fact_retencion_desercion.materias_arrastradas"),
-        FeatureSpec("ppa_acumulado", "f.ppa_acumulado", "number", True, "dw.fact_retencion_desercion.ppa_acumulado"),
+        FeatureSpec("materias_arrastradas", "f.materias_arrastradas", "integer", True, "dw.fact_retencion_desercion.materias_arrastradas (DW 0046: failed and not yet passed in the program up to the cut)"),
+        FeatureSpec("ppa_acumulado", "f.ppa_acumulado", "number", True, "dw.fact_retencion_desercion.ppa_acumulado (DW 0046: mean effective grade of evaluated attempts up to the cut)"),
     )
 }
 
