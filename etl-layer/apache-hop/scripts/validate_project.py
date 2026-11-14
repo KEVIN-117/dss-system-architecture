@@ -450,10 +450,11 @@ def validate() -> list[str]:
     fact_pipelines = {
         "pl_fact_admision_mvp.hpl": (
             "etl_control.stage_hop_fact_admission", "public.postulantes",
-            ("id_alumno", "P_REQUESTED_GESTION", "P_REQUESTED_PERIODO"), "FACT_ADMISION",
+            ("id_alumno", "a.id_postulante", "alumno_link_count", "alumno_fec_inscripcion",
+             "P_REQUESTED_GESTION", "P_REQUESTED_PERIODO"), "FACT_ADMISION",
         ),
         "pl_fact_cursado_mvp.hpl": (
-            "etl_control.stage_hop_fact_coursework", "academico.notas_planilla",
+            "etl_control.stage_hop_fact_coursework_batch", "academico.notas_planilla",
             ("id_matricula", "P_REQUESTED_GESTION", "P_REQUESTED_PERIODO"), "FACT_CURSADO",
         ),
         "pl_fact_retencion_desercion_mvp.hpl": (

@@ -38,8 +38,13 @@
         'Hop: publicación atómica del conjunto validado'::text
     )).run_id AS run_id
     FROM publishing
+), matured AS MATERIALIZED (
+    -- Same transaction: label the cadence predecessor with this publication.
+    SELECT published.run_id,
+           etl_control.mature_hop_retention_labels(published.run_id) AS matured_rows
+    FROM published
 )
-SELECT run_id FROM published;</sql>
+SELECT run_id FROM matured;</sql>
     <limit>0</limit><lookup>Get run ID</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>432</xloc><yloc>160</yloc></GUI>
   </transform>
   <transform><name>Published</name><type>Dummy</type><description>Solo se alcanza después del commit de publicación EXITOSA</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><attributes/><GUI><xloc>752</xloc><yloc>160</yloc></GUI></transform>
