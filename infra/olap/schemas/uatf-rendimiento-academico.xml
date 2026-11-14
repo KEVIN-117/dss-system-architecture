@@ -1,132 +1,102 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-  UATF academic performance cube for the Mondrian 4 engine used by Saiku.
-  The datasource must set PostgreSQL currentSchema=dw.
+  Catálogo OLAP académico de la UATF (Mondrian 4 / Saiku).
+  El datasource debe fijar currentSchema=dw. Todos los nombres visibles están en
+  español y salen de vistas vw_*_olap del DW (migraciones 0035, 0043 y 0047).
 
-  The fact grain is one row per enrollment attempt (dw.fact_cursado).
-  Academic Program is the analytical hierarchy; the two additional scope
-  dimensions let the BFF apply faculty/career authorization without colliding
-  with a user's requested Academic Program rows or columns.
+  Cubos:
+    * Admisión ................ una fila por postulación (postulantes).
+    * Matrícula ............... una fila por estudiante, carrera y periodo con cursado.
+    * Rendimiento académico ... una fila por inscripción de un estudiante en una materia.
+    * Permanencia y deserción . una fila por estudiante, carrera y periodo, con su
+                                resultado en el periodo siguiente de su régimen.
+
+  Elementos internos (visible="false"):
+    * "Ámbito de facultad" y "Ámbito de carrera": el BFF filtra con ellos el
+      alcance autorizado del usuario (OLAP_ACADEMIC_SCOPE_FILTERS).
+    * "Conteo de privacidad": el BFF lo usa para ocultar celdas con menos de 5
+      personas (k-anonimato).
+    * Denominadores de las tasas.
 -->
 <Schema name="UATF_DW" metamodelVersion="4.0">
   <PhysicalSchema>
-    <Table name="vw_fact_cursado_olap" />
     <Table name="vw_fact_admision_olap" />
+    <Table name="vw_fact_matricula_olap" />
+    <Table name="vw_fact_cursado_olap" />
     <Table name="vw_fact_retencion_olap" />
-    <Table name="dim_estudiante">
-      <Key><Column name="estudiante_sk" /></Key>
-    </Table>
-    <Table name="dim_programa">
-      <Key>
-        <Column name="programa_sk" />
-      </Key>
-    </Table>
-    <Table name="dim_periodo_academico">
-      <Key>
-        <Column name="periodo_academico_sk" />
-      </Key>
-    </Table>
-    <Table name="dim_materia">
-      <Key><Column name="materia_sk" /></Key>
-    </Table>
-    <Table name="dim_admision">
-      <Key><Column name="admision_sk" /></Key>
-    </Table>
-    <Link source="dim_programa" target="vw_fact_cursado_olap">
-      <ForeignKey>
-        <Column name="programa_sk" />
-      </ForeignKey>
-    </Link>
-    <Link source="dim_periodo_academico" target="vw_fact_cursado_olap">
-      <ForeignKey>
-        <Column name="periodo_academico_sk" />
-      </ForeignKey>
-    </Link>
-    <Link source="dim_estudiante" target="vw_fact_cursado_olap">
-      <ForeignKey><Column name="estudiante_sk" /></ForeignKey>
-    </Link>
-    <Link source="dim_materia" target="vw_fact_cursado_olap">
-      <ForeignKey><Column name="materia_sk" /></ForeignKey>
-    </Link>
-    <Link source="dim_programa" target="vw_fact_admision_olap">
-      <ForeignKey><Column name="programa_sk" /></ForeignKey>
-    </Link>
-    <Link source="dim_periodo_academico" target="vw_fact_admision_olap">
-      <ForeignKey><Column name="periodo_academico_sk" /></ForeignKey>
-    </Link>
-    <Link source="dim_estudiante" target="vw_fact_admision_olap">
-      <ForeignKey><Column name="estudiante_sk" /></ForeignKey>
-    </Link>
-    <Link source="dim_admision" target="vw_fact_admision_olap">
-      <ForeignKey><Column name="admision_sk" /></ForeignKey>
-    </Link>
-    <Link source="dim_programa" target="vw_fact_retencion_olap">
-      <ForeignKey><Column name="programa_sk" /></ForeignKey>
-    </Link>
-    <Link source="dim_periodo_academico" target="vw_fact_retencion_olap">
-      <ForeignKey><Column name="periodo_academico_sk" /></ForeignKey>
-    </Link>
-    <Link source="dim_estudiante" target="vw_fact_retencion_olap">
-      <ForeignKey><Column name="estudiante_sk" /></ForeignKey>
-    </Link>
+    <Table name="vw_dim_programa_olap"><Key><Column name="programa_sk" /></Key></Table>
+    <Table name="vw_dim_periodo_olap"><Key><Column name="periodo_academico_sk" /></Key></Table>
+    <Table name="vw_dim_estudiante_olap"><Key><Column name="estudiante_sk" /></Key></Table>
+    <Table name="vw_dim_admision_olap"><Key><Column name="admision_sk" /></Key></Table>
+    <Table name="vw_dim_tipo_estudiante_olap"><Key><Column name="codigo" /></Key></Table>
+    <Table name="vw_dim_cohorte_olap"><Key><Column name="cohorte" /></Key></Table>
+    <Table name="dim_materia"><Key><Column name="materia_sk" /></Key></Table>
   </PhysicalSchema>
 
-  <Dimension name="Academic Program" table="dim_programa" key="Program SK">
+  <!-- ===================================================== dimensiones -->
+  <Dimension name="Programa" table="vw_dim_programa_olap" key="Clave programa"
+      description="Facultad, carrera y régimen (anual o semestral) del programa académico.">
     <Attributes>
-      <Attribute name="Program SK" keyColumn="programa_sk" hasHierarchy="false" />
-      <Attribute name="Faculty" keyColumn="id_facultad" nameColumn="facultad" />
-      <Attribute name="Career" keyColumn="id_programa" nameColumn="programa" />
+      <Attribute name="Clave programa" keyColumn="programa_sk" hasHierarchy="false" />
+      <Attribute name="Facultad" keyColumn="facultad_codigo" nameColumn="facultad" orderByColumn="facultad" hasHierarchy="false" />
+      <Attribute name="Carrera" keyColumn="carrera_codigo" nameColumn="carrera" orderByColumn="carrera" hasHierarchy="false" />
+      <Attribute name="Régimen" keyColumn="regimen_codigo" nameColumn="regimen" orderByColumn="regimen" hasHierarchy="false" />
     </Attributes>
     <Hierarchies>
-      <Hierarchy name="Program">
-        <Level attribute="Faculty" />
-        <Level attribute="Career" />
+      <Hierarchy name="Facultad y carrera" allMemberName="Todas las facultades">
+        <Level attribute="Facultad" />
+        <Level attribute="Carrera" />
+      </Hierarchy>
+      <Hierarchy name="Régimen y carrera" allMemberName="Todos los regímenes">
+        <Level attribute="Régimen" />
+        <Level attribute="Carrera" />
       </Hierarchy>
     </Hierarchies>
   </Dimension>
 
-  <Dimension name="Academic Faculty Scope" table="dim_programa" key="Program SK">
+  <Dimension name="Sede" table="vw_dim_programa_olap" key="Clave programa"
+      description="Sede universitaria donde se dicta la carrera (Central, Uncía, Tupiza, Uyuni, Villazón).">
     <Attributes>
-      <Attribute name="Program SK" keyColumn="programa_sk" hasHierarchy="false" />
-      <Attribute name="Faculty" keyColumn="id_facultad" nameColumn="facultad" />
+      <Attribute name="Clave programa" keyColumn="programa_sk" hasHierarchy="false" />
+      <Attribute name="Sede" keyColumn="sede_codigo" nameColumn="sede" orderByColumn="sede" hasHierarchy="false" />
+      <Attribute name="Carrera" keyColumn="carrera_codigo" nameColumn="carrera" orderByColumn="carrera" hasHierarchy="false" />
     </Attributes>
     <Hierarchies>
-      <Hierarchy name="Faculty Scope">
-        <Level attribute="Faculty" />
+      <Hierarchy name="Sede y carrera" allMemberName="Todas las sedes">
+        <Level attribute="Sede" />
+        <Level attribute="Carrera" />
       </Hierarchy>
     </Hierarchies>
   </Dimension>
 
-  <Dimension name="Academic Career Scope" table="dim_programa" key="Program SK">
+  <!-- Filtros de seguridad del BFF; ocultos en cada cubo. -->
+  <Dimension name="Ámbito de facultad" table="vw_dim_programa_olap" key="Clave programa">
     <Attributes>
-      <Attribute name="Program SK" keyColumn="programa_sk" hasHierarchy="false" />
-      <Attribute name="Career" keyColumn="id_programa" nameColumn="programa" />
+      <Attribute name="Clave programa" keyColumn="programa_sk" hasHierarchy="false" />
+      <Attribute name="Facultad" keyColumn="facultad_codigo" nameColumn="facultad" hasHierarchy="false" />
     </Attributes>
     <Hierarchies>
-      <Hierarchy name="Career Scope">
-        <Level attribute="Career" />
-      </Hierarchy>
+      <Hierarchy name="Facultad"><Level attribute="Facultad" /></Hierarchy>
     </Hierarchies>
   </Dimension>
 
-  <!-- Campus codes come from the governed UATF sede catalog (C = central; 2-8 = regional branches). -->
-  <Dimension name="Academic Campus" table="dim_programa" key="Program SK">
+  <Dimension name="Ámbito de carrera" table="vw_dim_programa_olap" key="Clave programa">
     <Attributes>
-      <Attribute name="Program SK" keyColumn="programa_sk" hasHierarchy="false" />
-      <Attribute name="Campus Code" keyColumn="sede" nameColumn="sede" />
+      <Attribute name="Clave programa" keyColumn="programa_sk" hasHierarchy="false" />
+      <Attribute name="Carrera" keyColumn="carrera_codigo" nameColumn="carrera" hasHierarchy="false" />
     </Attributes>
     <Hierarchies>
-      <Hierarchy name="Academic Campus"><Level attribute="Campus Code" /></Hierarchy>
+      <Hierarchy name="Carrera"><Level attribute="Carrera" /></Hierarchy>
     </Hierarchies>
   </Dimension>
 
-  <Dimension name="Academic Period" table="dim_periodo_academico" key="Period SK">
+  <Dimension name="Periodo" table="vw_dim_periodo_olap" key="Clave periodo"
+      description="Gestión (año) y periodo académico del cierre. En carreras anuales el año completo se registra en el periodo 1.">
     <Attributes>
-      <Attribute name="Period SK" keyColumn="periodo_academico_sk" hasHierarchy="false" />
-      <Attribute name="Academic Year" keyColumn="gestion" nameColumn="gestion" />
-      <!-- periodo repeats every year: the key must include gestion or Mondrian
-           collapses all semesters of all years into two members. -->
-      <Attribute name="Period Number" nameColumn="periodo" orderByColumn="periodo">
+      <Attribute name="Clave periodo" keyColumn="periodo_academico_sk" hasHierarchy="false" />
+      <Attribute name="Gestión" keyColumn="gestion" nameColumn="gestion_nombre" orderByColumn="gestion" hasHierarchy="false" />
+      <!-- El periodo se repite cada año: la clave incluye la gestión. -->
+      <Attribute name="Periodo" nameColumn="periodo_nombre" orderByColumn="periodo" hasHierarchy="false">
         <Key>
           <Column name="gestion" />
           <Column name="periodo" />
@@ -134,219 +104,362 @@
       </Attribute>
     </Attributes>
     <Hierarchies>
-      <Hierarchy name="Academic Period">
-        <Level attribute="Academic Year" />
-        <Level attribute="Period Number" />
+      <Hierarchy name="Gestión y periodo" allMemberName="Todas las gestiones">
+        <Level attribute="Gestión" />
+        <Level attribute="Periodo" />
       </Hierarchy>
     </Hierarchies>
   </Dimension>
 
-  <!-- Only aggregate-safe profile attributes are published; student identifiers stay out of Mondrian. -->
-  <Dimension name="Applicant Profile" table="dim_estudiante" key="Student SK">
+  <!-- Solo atributos agregables; ningún identificador personal llega a Mondrian. -->
+  <Dimension name="Perfil del estudiante" table="vw_dim_estudiante_olap" key="Clave estudiante"
+      description="Sexo, tipo de colegio y año de egreso del colegio del estudiante.">
     <Attributes>
-      <Attribute name="Student SK" keyColumn="estudiante_sk" hasHierarchy="false" />
-      <Attribute name="Gender" keyColumn="id_sexo" nameColumn="id_sexo" />
-      <Attribute name="School Type" keyColumn="tipo_colegio" nameColumn="tipo_colegio" />
-      <Attribute name="School" keyColumn="id_colegio" nameColumn="colegio" />
-      <Attribute name="Educational Location" keyColumn="cod_localidad" nameColumn="localidad" />
+      <Attribute name="Clave estudiante" keyColumn="estudiante_sk" hasHierarchy="false" />
+      <Attribute name="Sexo" keyColumn="sexo_codigo" nameColumn="sexo" orderByColumn="sexo" hasHierarchy="false" />
+      <Attribute name="Tipo de colegio" keyColumn="tipo_colegio_codigo" nameColumn="tipo_colegio" orderByColumn="tipo_colegio" hasHierarchy="false" />
+      <Attribute name="Año de egreso del colegio" keyColumn="egreso_colegio" nameColumn="egreso_colegio_nombre" orderByColumn="egreso_colegio" hasHierarchy="false" />
     </Attributes>
     <Hierarchies>
-      <Hierarchy name="By Gender"><Level attribute="Gender" /></Hierarchy>
-      <Hierarchy name="By School Type"><Level attribute="School Type" /></Hierarchy>
-      <Hierarchy name="By School"><Level attribute="School" /></Hierarchy>
-      <Hierarchy name="By Educational Location"><Level attribute="Educational Location" /></Hierarchy>
+      <Hierarchy name="Sexo" allMemberName="Todos los sexos"><Level attribute="Sexo" /></Hierarchy>
+      <Hierarchy name="Tipo de colegio" allMemberName="Todos los tipos de colegio"><Level attribute="Tipo de colegio" /></Hierarchy>
+      <Hierarchy name="Año de egreso del colegio" allMemberName="Todos los años"><Level attribute="Año de egreso del colegio" /></Hierarchy>
     </Hierarchies>
   </Dimension>
 
-  <Dimension name="Admission Mode" table="dim_admision" key="Admission SK">
+  <Dimension name="Procedencia" table="vw_dim_estudiante_olap" key="Clave estudiante"
+      description="Departamento, provincia y localidad del colegio de egreso del estudiante.">
     <Attributes>
-      <Attribute name="Admission SK" keyColumn="admision_sk" hasHierarchy="false" />
-      <Attribute name="Admission Code" keyColumn="id_acceso" nameColumn="id_acceso" />
+      <Attribute name="Clave estudiante" keyColumn="estudiante_sk" hasHierarchy="false" />
+      <Attribute name="Departamento" keyColumn="departamento_codigo" nameColumn="departamento" orderByColumn="departamento" hasHierarchy="false" />
+      <Attribute name="Provincia" nameColumn="provincia" orderByColumn="provincia" hasHierarchy="false">
+        <Key>
+          <Column name="departamento_codigo" />
+          <Column name="provincia_codigo" />
+        </Key>
+      </Attribute>
+      <Attribute name="Localidad" nameColumn="localidad" orderByColumn="localidad" hasHierarchy="false">
+        <Key>
+          <Column name="departamento_codigo" />
+          <Column name="provincia_codigo" />
+          <Column name="localidad_codigo" />
+        </Key>
+      </Attribute>
     </Attributes>
     <Hierarchies>
-      <Hierarchy name="Admission Mode"><Level attribute="Admission Code" /></Hierarchy>
-    </Hierarchies>
-  </Dimension>
-
-  <Dimension name="Academic Subject" table="dim_materia" key="Subject SK">
-    <Attributes>
-      <Attribute name="Subject SK" keyColumn="materia_sk" hasHierarchy="false" />
-      <Attribute name="Subject" keyColumn="id_materia" nameColumn="materia" />
-      <Attribute name="Course Cycle" keyColumn="ciclo" nameColumn="ciclo" />
-      <Attribute name="Course Code" keyColumn="sigla" nameColumn="sigla" />
-    </Attributes>
-    <Hierarchies>
-      <Hierarchy name="Academic Subject">
-        <Level attribute="Course Cycle" />
-        <Level attribute="Subject" />
+      <Hierarchy name="Departamento, provincia y localidad" allMemberName="Todas las procedencias">
+        <Level attribute="Departamento" />
+        <Level attribute="Provincia" />
+        <Level attribute="Localidad" />
       </Hierarchy>
-      <Hierarchy name="By Course Code"><Level attribute="Course Code" /></Hierarchy>
     </Hierarchies>
   </Dimension>
 
-  <Cube name="Academic Performance" defaultMeasure="Enrollment Attempts">
+  <Dimension name="Modalidad de admisión" table="vw_dim_admision_olap" key="Clave admisión"
+      description="Vía por la que el postulante ingresa (Examen P.S.A., cursos preuniversitarios, ingreso directo, convenios, etc.).">
+    <Attributes>
+      <Attribute name="Clave admisión" keyColumn="admision_sk" hasHierarchy="false" />
+      <Attribute name="Grupo de modalidad" keyColumn="grupo" nameColumn="grupo" orderByColumn="grupo" hasHierarchy="false" />
+      <Attribute name="Modalidad" keyColumn="modalidad_codigo" nameColumn="modalidad" orderByColumn="modalidad" hasHierarchy="false" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Grupo y modalidad" allMemberName="Todas las modalidades">
+        <Level attribute="Grupo de modalidad" />
+        <Level attribute="Modalidad" />
+      </Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
+  <Dimension name="Materia" table="dim_materia" key="Clave materia"
+      description="Materia cursada, con su nivel en el plan de estudios y su sigla.">
+    <Attributes>
+      <Attribute name="Clave materia" keyColumn="materia_sk" hasHierarchy="false" />
+      <Attribute name="Nivel" keyColumn="nivel_academico" nameColumn="nivel_academico" hasHierarchy="false" />
+      <Attribute name="Materia" keyColumn="id_materia" nameColumn="materia" orderByColumn="materia" hasHierarchy="false" />
+      <Attribute name="Sigla" keyColumn="sigla" nameColumn="sigla" hasHierarchy="false" />
+    </Attributes>
+    <Hierarchies>
+      <Hierarchy name="Nivel y materia" allMemberName="Todas las materias">
+        <Level attribute="Nivel" />
+        <Level attribute="Materia" />
+      </Hierarchy>
+      <Hierarchy name="Sigla" allMemberName="Todas las siglas"><Level attribute="Sigla" /></Hierarchy>
+    </Hierarchies>
+  </Dimension>
+
+  <Dimension name="Tipo de estudiante" table="vw_dim_tipo_estudiante_olap" key="Tipo de estudiante"
+      description="Nuevo: primer periodo con cursado en la carrera. Antiguo: ya había cursado antes. Sin historial previo: estudiantes del primer periodo cargado en el DW (2015-1), cuyo ingreso real se desconoce.">
+    <Attributes>
+      <Attribute name="Tipo de estudiante" keyColumn="codigo" nameColumn="nombre" orderByColumn="orden" />
+    </Attributes>
+  </Dimension>
+
+  <Dimension name="Cohorte" table="vw_dim_cohorte_olap" key="Gestión de ingreso"
+      description="Gestión en que el estudiante cursó por primera vez en la carrera.">
+    <Attributes>
+      <Attribute name="Gestión de ingreso" keyColumn="cohorte" nameColumn="cohorte_nombre" orderByColumn="cohorte" />
+    </Attributes>
+  </Dimension>
+
+  <!-- ========================================================== cubos -->
+  <Cube name="Admisión" defaultMeasure="Postulaciones"
+      description="Postulaciones y admisiones por carrera, sede, modalidad y gestión.">
     <Dimensions>
-      <Dimension source="Academic Program" />
-      <Dimension source="Academic Faculty Scope" />
-      <Dimension source="Academic Career Scope" />
-      <Dimension source="Academic Campus" />
-      <Dimension source="Academic Period" />
-      <Dimension source="Applicant Profile" />
-      <Dimension source="Academic Subject" />
+      <Dimension source="Programa" />
+      <Dimension source="Sede" />
+      <Dimension source="Periodo" />
+      <Dimension source="Modalidad de admisión" />
+      <Dimension source="Perfil del estudiante" />
+      <Dimension source="Procedencia" />
+      <Dimension source="Ámbito de facultad" visible="false" />
+      <Dimension source="Ámbito de carrera" visible="false" />
     </Dimensions>
     <MeasureGroups>
-      <MeasureGroup name="Coursework" table="vw_fact_cursado_olap">
+      <MeasureGroup name="Postulaciones" table="vw_fact_admision_olap">
         <Measures>
-          <Measure name="Enrollment Attempts" column="conteo_intento" aggregator="sum" formatString="#,##0" />
-          <!-- Used internally by the BFF to apply Saiku's k-anonymity mask to every aggregate. -->
-          <Measure name="Attempt Count" column="estudiante_sk" aggregator="distinct-count" formatString="#,##0" />
-          <Measure name="Average Final Grade" column="nota_final" aggregator="avg" formatString="#,##0.00" />
-          <Measure name="Graded Attempts" column="conteo_calificado" aggregator="sum" formatString="#,##0" />
-          <Measure name="Passed Attempts" column="conteo_aprobado" aggregator="sum" formatString="#,##0" />
-          <Measure name="Failed Attempts" column="conteo_reprobado" aggregator="sum" formatString="#,##0" />
-          <Measure name="Repeated Attempts" column="conteo_repeticion" aggregator="sum" formatString="#,##0" />
-          <Measure name="Abandoned Attempts" column="conteo_abandono" aggregator="sum" formatString="#,##0" />
-          <Measure name="Attempts With Known Repetition" column="conteo_repeticion_conocida" aggregator="sum" formatString="#,##0" />
-          <Measure name="Attempts With Known Abandonment" column="conteo_abandono_conocido" aggregator="sum" formatString="#,##0" />
+          <Measure name="Postulaciones" column="conteo_postulacion" aggregator="sum" formatString="#,##0"
+              description="Cantidad de postulaciones registradas (cada registro de postulante a una carrera)." />
+          <Measure name="Admitidos" column="conteo_admitido" aggregator="sum" formatString="#,##0"
+              description="Postulaciones con resultado aprobado (admitidas a la carrera)." />
+          <Measure name="No admitidos" column="conteo_no_admitido" aggregator="sum" formatString="#,##0"
+              description="Postulaciones con resultado reprobado." />
+          <Measure name="Postulaciones con resultado" column="conteo_resultado_conocido" aggregator="sum" formatString="#,##0"
+              description="Postulaciones con resultado conocido (admitido o no admitido); base de la tasa de admisión." />
+          <Measure name="Puntaje promedio de admisión" column="puntaje_examen" aggregator="avg" formatString="#,##0.00"
+              description="Promedio de la nota de admisión de las postulaciones que la tienen." />
+          <Measure name="Conteo de privacidad" column="postulante_ref" aggregator="distinct-count" formatString="#,##0"
+              description="Uso interno: personas distintas por celda para el control de privacidad." />
         </Measures>
         <DimensionLinks>
-          <ForeignKeyLink dimension="Academic Program" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Faculty Scope" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Career Scope" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Campus" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Period" foreignKeyColumn="periodo_academico_sk" />
-          <ForeignKeyLink dimension="Applicant Profile" foreignKeyColumn="estudiante_sk" />
-          <ForeignKeyLink dimension="Academic Subject" foreignKeyColumn="materia_sk" />
+          <ForeignKeyLink dimension="Programa" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Sede" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Periodo" foreignKeyColumn="periodo_academico_sk" />
+          <ForeignKeyLink dimension="Modalidad de admisión" foreignKeyColumn="admision_sk" />
+          <ForeignKeyLink dimension="Perfil del estudiante" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Procedencia" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Ámbito de facultad" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Ámbito de carrera" foreignKeyColumn="programa_sk" />
         </DimensionLinks>
       </MeasureGroup>
     </MeasureGroups>
     <!--
-      Rates use explicit denominators and return empty (never 0%) when the
-      denominator is empty, so missing outcome flags are not shown as results.
-      Each rate divides only by attempts whose outcome flag is known.
+      El crecimiento compara con el mismo miembro de la gestión anterior; queda
+      vacío en el nivel "Todas", sin gestión previa o si la gestión previa tiene
+      menos de 5 casos (para no revelar una celda oculta por privacidad).
     -->
     <CalculatedMembers>
-      <CalculatedMember name="Pass Rate" dimension="Measures"
-          formula="IIf(([Measures].[Passed Attempts] + [Measures].[Failed Attempts]) = 0, NULL, [Measures].[Passed Attempts] / ([Measures].[Passed Attempts] + [Measures].[Failed Attempts]))">
+      <CalculatedMember name="Tasa de admisión" dimension="Measures"
+          formula="IIf([Measures].[Postulaciones con resultado] = 0, NULL, [Measures].[Admitidos] / [Measures].[Postulaciones con resultado])">
         <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Admitidos sobre postulaciones con resultado conocido." />
       </CalculatedMember>
-      <CalculatedMember name="Failure Rate" dimension="Measures"
-          formula="IIf(([Measures].[Passed Attempts] + [Measures].[Failed Attempts]) = 0, NULL, [Measures].[Failed Attempts] / ([Measures].[Passed Attempts] + [Measures].[Failed Attempts]))">
-        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+      <CalculatedMember name="Crecimiento de postulaciones" dimension="Measures"
+          formula="IIf([Periodo].[Gestión y periodo].CurrentMember.Level.Ordinal = 0, NULL, IIf(IsEmpty(([Measures].[Postulaciones], ParallelPeriod([Periodo].[Gestión y periodo].[Gestión], 1, [Periodo].[Gestión y periodo].CurrentMember))) OR ([Measures].[Postulaciones], ParallelPeriod([Periodo].[Gestión y periodo].[Gestión], 1, [Periodo].[Gestión y periodo].CurrentMember)) &lt; 5, NULL, ([Measures].[Postulaciones] - ([Measures].[Postulaciones], ParallelPeriod([Periodo].[Gestión y periodo].[Gestión], 1, [Periodo].[Gestión y periodo].CurrentMember))) / ([Measures].[Postulaciones], ParallelPeriod([Periodo].[Gestión y periodo].[Gestión], 1, [Periodo].[Gestión y periodo].CurrentMember))))">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="+0.0%;-0.0%;0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Variación de postulaciones respecto de la gestión anterior." />
       </CalculatedMember>
-      <CalculatedMember name="Repetition Rate" dimension="Measures"
-          formula="IIf([Measures].[Attempts With Known Repetition] = 0, NULL, [Measures].[Repeated Attempts] / [Measures].[Attempts With Known Repetition])">
-        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
-      </CalculatedMember>
-      <CalculatedMember name="Abandonment Rate" dimension="Measures"
-          formula="IIf([Measures].[Attempts With Known Abandonment] = 0, NULL, [Measures].[Abandoned Attempts] / [Measures].[Attempts With Known Abandonment])">
-        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+      <CalculatedMember name="Crecimiento de admitidos" dimension="Measures"
+          formula="IIf([Periodo].[Gestión y periodo].CurrentMember.Level.Ordinal = 0, NULL, IIf(IsEmpty(([Measures].[Admitidos], ParallelPeriod([Periodo].[Gestión y periodo].[Gestión], 1, [Periodo].[Gestión y periodo].CurrentMember))) OR ([Measures].[Admitidos], ParallelPeriod([Periodo].[Gestión y periodo].[Gestión], 1, [Periodo].[Gestión y periodo].CurrentMember)) &lt; 5, NULL, ([Measures].[Admitidos] - ([Measures].[Admitidos], ParallelPeriod([Periodo].[Gestión y periodo].[Gestión], 1, [Periodo].[Gestión y periodo].CurrentMember))) / ([Measures].[Admitidos], ParallelPeriod([Periodo].[Gestión y periodo].[Gestión], 1, [Periodo].[Gestión y periodo].CurrentMember))))">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="+0.0%;-0.0%;0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Variación de admitidos respecto de la gestión anterior." />
       </CalculatedMember>
     </CalculatedMembers>
   </Cube>
 
-  <Cube name="Academic Admission" defaultMeasure="Applicants">
+  <Cube name="Matrícula" defaultMeasure="Estudiantes matriculados"
+      description="Estudiantes con cursado en cada periodo: nuevos, antiguos, perfil y procedencia.">
     <Dimensions>
-      <Dimension source="Academic Program" />
-      <Dimension source="Academic Faculty Scope" />
-      <Dimension source="Academic Career Scope" />
-      <Dimension source="Academic Campus" />
-      <Dimension source="Academic Period" />
-      <Dimension source="Applicant Profile" />
-      <Dimension source="Admission Mode" />
+      <Dimension source="Programa" />
+      <Dimension source="Sede" />
+      <Dimension source="Periodo" />
+      <Dimension source="Tipo de estudiante" />
+      <Dimension source="Cohorte" />
+      <Dimension source="Perfil del estudiante" />
+      <Dimension source="Procedencia" />
+      <Dimension source="Ámbito de facultad" visible="false" />
+      <Dimension source="Ámbito de carrera" visible="false" />
     </Dimensions>
     <MeasureGroups>
-      <MeasureGroup name="Admissions" table="vw_fact_admision_olap">
+      <MeasureGroup name="Matrícula" table="vw_fact_matricula_olap">
         <Measures>
-          <Measure name="Applicants" column="applicant_person_sk" aggregator="distinct-count" formatString="#,##0" />
-          <Measure name="Admitted Applicants" column="admitted_person_sk" aggregator="distinct-count" formatString="#,##0" />
-          <Measure name="Known Admission Outcomes" column="known_outcome_person_sk" aggregator="distinct-count" formatString="#,##0" />
-          <Measure name="Applications" column="conteo_postulacion" aggregator="sum" formatString="#,##0" />
-          <Measure name="Admitted Applications" column="conteo_admitido" aggregator="sum" formatString="#,##0" />
-          <Measure name="Applications With Known Outcome" column="conteo_resultado_conocido" aggregator="sum" formatString="#,##0" />
-          <Measure name="Average Admission Score" column="puntaje_examen" aggregator="avg" formatString="#,##0.00" />
-          <Measure name="Attempt Count" column="applicant_person_sk" aggregator="distinct-count" formatString="#,##0" />
+          <Measure name="Estudiantes matriculados" column="conteo_matricula" aggregator="sum" formatString="#,##0"
+              description="Estudiantes con al menos una materia cursada en la carrera y el periodo (un estudiante en dos carreras cuenta en ambas)." />
+          <Measure name="Estudiantes nuevos" column="conteo_nuevo" aggregator="sum" formatString="#,##0"
+              description="Estudiantes que cursan por primera vez en la carrera en ese periodo." />
+          <Measure name="Estudiantes antiguos" column="conteo_antiguo" aggregator="sum" formatString="#,##0"
+              description="Estudiantes que ya habían cursado la carrera en un periodo anterior." />
+          <Measure name="Sin historial previo" column="conteo_sin_historial" aggregator="sum" formatString="#,##0"
+              description="Estudiantes cuyo primer cursado registrado es el primer periodo cargado en el DW; no se sabe si son nuevos." />
+          <Measure name="Materias inscritas promedio" column="materias_cursadas" aggregator="avg" formatString="#,##0.00"
+              description="Promedio de materias inscritas por estudiante en el periodo." />
+          <Measure name="Conteo de privacidad" column="estudiante_sk" aggregator="distinct-count" formatString="#,##0"
+              description="Uso interno: estudiantes distintos por celda para el control de privacidad." />
         </Measures>
         <DimensionLinks>
-          <ForeignKeyLink dimension="Academic Program" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Faculty Scope" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Career Scope" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Campus" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Period" foreignKeyColumn="periodo_academico_sk" />
-          <ForeignKeyLink dimension="Applicant Profile" foreignKeyColumn="estudiante_sk" />
-          <ForeignKeyLink dimension="Admission Mode" foreignKeyColumn="admision_sk" />
+          <ForeignKeyLink dimension="Programa" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Sede" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Periodo" foreignKeyColumn="periodo_academico_sk" />
+          <ForeignKeyLink dimension="Tipo de estudiante" foreignKeyColumn="tipo_estudiante" />
+          <ForeignKeyLink dimension="Cohorte" foreignKeyColumn="cohorte" />
+          <ForeignKeyLink dimension="Perfil del estudiante" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Procedencia" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Ámbito de facultad" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Ámbito de carrera" foreignKeyColumn="programa_sk" />
         </DimensionLinks>
       </MeasureGroup>
     </MeasureGroups>
-    <!--
-      Admission rates use people (or applications) with a known outcome as the
-      denominator. Year-over-year growth compares against the same member of the
-      previous academic year on the Academic Period hierarchy; it is empty at the
-      All level, without a previous year, or when the previous-year count is below
-      the k-anonymity threshold (5), so a growth value cannot reveal a masked cell.
-    -->
     <CalculatedMembers>
-      <CalculatedMember name="Admission Rate" dimension="Measures"
-          formula="IIf([Measures].[Known Admission Outcomes] = 0, NULL, [Measures].[Admitted Applicants] / [Measures].[Known Admission Outcomes])">
+      <CalculatedMember name="Porcentaje de nuevos" dimension="Measures"
+          formula="IIf(([Measures].[Estudiantes nuevos] + [Measures].[Estudiantes antiguos]) = 0, NULL, [Measures].[Estudiantes nuevos] / ([Measures].[Estudiantes nuevos] + [Measures].[Estudiantes antiguos]))">
         <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
-      </CalculatedMember>
-      <CalculatedMember name="Application Admission Rate" dimension="Measures"
-          formula="IIf([Measures].[Applications With Known Outcome] = 0, NULL, [Measures].[Admitted Applications] / [Measures].[Applications With Known Outcome])">
-        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
-      </CalculatedMember>
-      <CalculatedMember name="Applicants YoY Growth" dimension="Measures"
-          formula="IIf([Academic Period].[Academic Period].CurrentMember.Level.Ordinal = 0, NULL, IIf(IsEmpty(([Measures].[Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))) OR ([Measures].[Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember)) &lt; 5, NULL, ([Measures].[Applicants] - ([Measures].[Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))) / ([Measures].[Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))))">
-        <CalculatedMemberProperty name="FORMAT_STRING" value="+0.0%;-0.0%;0.0%" />
-      </CalculatedMember>
-      <CalculatedMember name="Admitted Applicants YoY Growth" dimension="Measures"
-          formula="IIf([Academic Period].[Academic Period].CurrentMember.Level.Ordinal = 0, NULL, IIf(IsEmpty(([Measures].[Admitted Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))) OR ([Measures].[Admitted Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember)) &lt; 5, NULL, ([Measures].[Admitted Applicants] - ([Measures].[Admitted Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))) / ([Measures].[Admitted Applicants], ParallelPeriod([Academic Period].[Academic Period].[Academic Year], 1, [Academic Period].[Academic Period].CurrentMember))))">
-        <CalculatedMemberProperty name="FORMAT_STRING" value="+0.0%;-0.0%;0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Nuevos sobre nuevos más antiguos (excluye estudiantes sin historial previo)." />
       </CalculatedMember>
     </CalculatedMembers>
   </Cube>
 
-  <Cube name="Academic Retention" defaultMeasure="Student Snapshots">
+  <Cube name="Rendimiento académico" defaultMeasure="Inscripciones en materias"
+      description="Inscripciones en materias y sus resultados: aprobación, reprobación, repitencia, abandono y nota.">
     <Dimensions>
-      <Dimension source="Academic Program" />
-      <Dimension source="Academic Faculty Scope" />
-      <Dimension source="Academic Career Scope" />
-      <Dimension source="Academic Campus" />
-      <Dimension source="Academic Period" />
-      <Dimension source="Applicant Profile" />
+      <Dimension source="Programa" />
+      <Dimension source="Sede" />
+      <Dimension source="Periodo" />
+      <Dimension source="Materia" />
+      <Dimension source="Perfil del estudiante" />
+      <Dimension source="Procedencia" />
+      <Dimension source="Ámbito de facultad" visible="false" />
+      <Dimension source="Ámbito de carrera" visible="false" />
     </Dimensions>
     <MeasureGroups>
-      <MeasureGroup name="Retention" table="vw_fact_retencion_olap">
+      <MeasureGroup name="Cursado" table="vw_fact_cursado_olap">
         <Measures>
-          <Measure name="Student Snapshots" column="conteo_snapshot" aggregator="sum" formatString="#,##0" />
-          <Measure name="Evaluable Retention Outcomes" column="conteo_evaluable" aggregator="sum" formatString="#,##0" />
-          <Measure name="Retained Students" column="conteo_retenido" aggregator="sum" formatString="#,##0" />
-          <Measure name="Observed Dropouts" column="conteo_desercion" aggregator="sum" formatString="#,##0" />
-          <Measure name="Average Courses Taken" column="materias_cursadas" aggregator="avg" formatString="#,##0.00" />
-          <Measure name="Average Courses Passed" column="materias_aprobadas" aggregator="avg" formatString="#,##0.00" />
-          <Measure name="Average Courses Failed" column="materias_reprobadas" aggregator="avg" formatString="#,##0.00" />
-          <Measure name="Average Failed Course Backlog" column="materias_arrastradas" aggregator="avg" formatString="#,##0.00" />
-          <Measure name="Average Cumulative Score" column="ppa_acumulado" aggregator="avg" formatString="#,##0.00" />
-          <Measure name="Attempt Count" column="estudiante_sk" aggregator="distinct-count" formatString="#,##0" />
+          <Measure name="Inscripciones en materias" column="conteo_intento" aggregator="sum" formatString="#,##0"
+              description="Cantidad de veces que estudiantes se inscribieron en materias (un estudiante con 5 materias suma 5)." />
+          <Measure name="Inscripciones con resultado" column="conteo_con_resultado" aggregator="sum" formatString="#,##0"
+              description="Inscripciones con nota que permite saber si se aprobó o reprobó (nota mayor a 0)." />
+          <Measure name="Materias aprobadas" column="conteo_aprobado" aggregator="sum" formatString="#,##0"
+              description="Inscripciones con nota efectiva de 51 o más (mejor nota entre ordinaria, segundo turno y mesa)." />
+          <Measure name="Materias reprobadas" column="conteo_reprobado" aggregator="sum" formatString="#,##0"
+              description="Inscripciones con nota efectiva entre 1 y 50." />
+          <Measure name="Inscripciones repetidas" column="conteo_repeticion" aggregator="sum" formatString="#,##0"
+              description="Inscripciones en una materia que el estudiante ya había cursado en un periodo anterior." />
+          <Measure name="Inscripciones abandonadas" column="conteo_abandono" aggregator="sum" formatString="#,##0"
+              description="Inscripciones registradas en la fuente como abandono (estados X o I)." />
+          <Measure name="Nota promedio" column="nota_efectiva" aggregator="avg" formatString="#,##0.00"
+              description="Promedio de la nota efectiva de las inscripciones con resultado (no incluye notas en 0 ni vacías)." />
+          <Measure name="Estudiantes" column="estudiante_sk" aggregator="distinct-count" formatString="#,##0"
+              description="Estudiantes distintos con al menos una inscripción." />
+          <Measure name="Inscripciones con repetición conocida" column="conteo_repeticion_conocida" aggregator="sum" formatString="#,##0" visible="false"
+              description="Denominador de la tasa de repitencia." />
+          <Measure name="Inscripciones con abandono conocido" column="conteo_abandono_conocido" aggregator="sum" formatString="#,##0" visible="false"
+              description="Denominador de la tasa de abandono." />
+          <Measure name="Conteo de privacidad" column="estudiante_sk" aggregator="distinct-count" formatString="#,##0"
+              description="Uso interno: estudiantes distintos por celda para el control de privacidad." />
         </Measures>
         <DimensionLinks>
-          <ForeignKeyLink dimension="Academic Program" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Faculty Scope" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Career Scope" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Campus" foreignKeyColumn="programa_sk" />
-          <ForeignKeyLink dimension="Academic Period" foreignKeyColumn="periodo_academico_sk" />
-          <ForeignKeyLink dimension="Applicant Profile" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Programa" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Sede" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Periodo" foreignKeyColumn="periodo_academico_sk" />
+          <ForeignKeyLink dimension="Materia" foreignKeyColumn="materia_sk" />
+          <ForeignKeyLink dimension="Perfil del estudiante" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Procedencia" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Ámbito de facultad" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Ámbito de carrera" foreignKeyColumn="programa_sk" />
         </DimensionLinks>
       </MeasureGroup>
     </MeasureGroups>
-    <!-- NO_EVALUABLE snapshots stay out of both rates (see dw.vw_fact_retencion_olap). -->
+    <!-- Las tasas dividen solo por inscripciones con dato conocido y quedan vacías (nunca 0 %) sin denominador. -->
     <CalculatedMembers>
-      <CalculatedMember name="Dropout Rate" dimension="Measures"
-          formula="IIf([Measures].[Evaluable Retention Outcomes] = 0, NULL, [Measures].[Observed Dropouts] / [Measures].[Evaluable Retention Outcomes])">
+      <CalculatedMember name="Tasa de aprobación" dimension="Measures"
+          formula="IIf(([Measures].[Materias aprobadas] + [Measures].[Materias reprobadas]) = 0, NULL, [Measures].[Materias aprobadas] / ([Measures].[Materias aprobadas] + [Measures].[Materias reprobadas]))">
         <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Materias aprobadas sobre inscripciones con resultado." />
       </CalculatedMember>
-      <CalculatedMember name="Retention Rate" dimension="Measures"
-          formula="IIf([Measures].[Evaluable Retention Outcomes] = 0, NULL, [Measures].[Retained Students] / [Measures].[Evaluable Retention Outcomes])">
+      <CalculatedMember name="Tasa de reprobación" dimension="Measures"
+          formula="IIf(([Measures].[Materias aprobadas] + [Measures].[Materias reprobadas]) = 0, NULL, [Measures].[Materias reprobadas] / ([Measures].[Materias aprobadas] + [Measures].[Materias reprobadas]))">
         <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Materias reprobadas sobre inscripciones con resultado." />
+      </CalculatedMember>
+      <CalculatedMember name="Tasa de repitencia" dimension="Measures"
+          formula="IIf([Measures].[Inscripciones con repetición conocida] = 0, NULL, [Measures].[Inscripciones repetidas] / [Measures].[Inscripciones con repetición conocida])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Inscripciones en materias ya cursadas sobre el total de inscripciones." />
+      </CalculatedMember>
+      <CalculatedMember name="Tasa de abandono de materias" dimension="Measures"
+          formula="IIf([Measures].[Inscripciones con abandono conocido] = 0, NULL, [Measures].[Inscripciones abandonadas] / [Measures].[Inscripciones con abandono conocido])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Inscripciones abandonadas sobre inscripciones con estado conocido." />
+      </CalculatedMember>
+      <CalculatedMember name="Materias por estudiante" dimension="Measures"
+          formula="IIf([Measures].[Estudiantes] = 0, NULL, [Measures].[Inscripciones en materias] / [Measures].[Estudiantes])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="#,##0.00" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Inscripciones en materias por estudiante distinto." />
+      </CalculatedMember>
+    </CalculatedMembers>
+  </Cube>
+
+  <Cube name="Permanencia y deserción" defaultMeasure="Estudiantes evaluados"
+      description="Si los estudiantes de un periodo siguen cursando en el periodo siguiente de su carrera.">
+    <Dimensions>
+      <Dimension source="Programa" />
+      <Dimension source="Sede" />
+      <Dimension source="Periodo" />
+      <Dimension source="Tipo de estudiante" />
+      <Dimension source="Cohorte" />
+      <Dimension source="Perfil del estudiante" />
+      <Dimension source="Procedencia" />
+      <Dimension source="Ámbito de facultad" visible="false" />
+      <Dimension source="Ámbito de carrera" visible="false" />
+    </Dimensions>
+    <MeasureGroups>
+      <MeasureGroup name="Permanencia" table="vw_fact_retencion_olap">
+        <Measures>
+          <Measure name="Estudiantes en el periodo" column="conteo_snapshot" aggregator="sum" formatString="#,##0"
+              description="Estudiantes con cursado en la carrera y el periodo." />
+          <Measure name="Estudiantes evaluados" column="conteo_evaluable" aggregator="sum" formatString="#,##0"
+              description="Estudiantes cuyo resultado ya se conoce porque el periodo siguiente de su régimen está procesado." />
+          <Measure name="Permanecen" column="conteo_retenido" aggregator="sum" formatString="#,##0"
+              description="Estudiantes que cursan la misma carrera en el periodo siguiente (semestral: siguiente semestre; anual: siguiente gestión)." />
+          <Measure name="Desertan" column="conteo_desercion" aggregator="sum" formatString="#,##0"
+              description="Estudiantes que no cursan en el periodo siguiente y rindieron menos de 2 parciales." />
+          <Measure name="Sin evaluación" column="conteo_no_evaluable" aggregator="sum" formatString="#,##0"
+              description="Estudiantes sin resultado: el periodo siguiente aún no se procesó o no hay evidencia suficiente." />
+          <Measure name="Promedio acumulado" column="ppa_acumulado" aggregator="avg" formatString="#,##0.00"
+              description="Promedio de la nota efectiva de todas las materias con resultado del estudiante en la carrera hasta el periodo." />
+          <Measure name="Materias arrastradas promedio" column="materias_arrastradas" aggregator="avg" formatString="#,##0.00"
+              description="Materias reprobadas y aún no aprobadas por estudiante, al cierre del periodo." />
+          <Measure name="Materias cursadas promedio" column="materias_cursadas" aggregator="avg" formatString="#,##0.00"
+              description="Materias inscritas por estudiante en el periodo." />
+          <Measure name="Materias aprobadas promedio" column="materias_aprobadas" aggregator="avg" formatString="#,##0.00"
+              description="Materias aprobadas por estudiante en el periodo." />
+          <Measure name="Materias reprobadas promedio" column="materias_reprobadas" aggregator="avg" formatString="#,##0.00"
+              description="Materias reprobadas por estudiante en el periodo." />
+          <Measure name="Conteo de privacidad" column="estudiante_sk" aggregator="distinct-count" formatString="#,##0"
+              description="Uso interno: estudiantes distintos por celda para el control de privacidad." />
+        </Measures>
+        <DimensionLinks>
+          <ForeignKeyLink dimension="Programa" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Sede" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Periodo" foreignKeyColumn="periodo_academico_sk" />
+          <ForeignKeyLink dimension="Tipo de estudiante" foreignKeyColumn="tipo_estudiante" />
+          <ForeignKeyLink dimension="Cohorte" foreignKeyColumn="cohorte" />
+          <ForeignKeyLink dimension="Perfil del estudiante" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Procedencia" foreignKeyColumn="estudiante_sk" />
+          <ForeignKeyLink dimension="Ámbito de facultad" foreignKeyColumn="programa_sk" />
+          <ForeignKeyLink dimension="Ámbito de carrera" foreignKeyColumn="programa_sk" />
+        </DimensionLinks>
+      </MeasureGroup>
+    </MeasureGroups>
+    <!-- "Sin evaluación" queda fuera de ambas tasas. -->
+    <CalculatedMembers>
+      <CalculatedMember name="Tasa de deserción" dimension="Measures"
+          formula="IIf([Measures].[Estudiantes evaluados] = 0, NULL, [Measures].[Desertan] / [Measures].[Estudiantes evaluados])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Desertan sobre estudiantes evaluados." />
+      </CalculatedMember>
+      <CalculatedMember name="Tasa de permanencia" dimension="Measures"
+          formula="IIf([Measures].[Estudiantes evaluados] = 0, NULL, [Measures].[Permanecen] / [Measures].[Estudiantes evaluados])">
+        <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
+        <CalculatedMemberProperty name="DESCRIPTION" value="Permanecen sobre estudiantes evaluados." />
       </CalculatedMember>
     </CalculatedMembers>
   </Cube>

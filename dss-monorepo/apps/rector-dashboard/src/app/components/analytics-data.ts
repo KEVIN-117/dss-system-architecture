@@ -78,13 +78,13 @@ export function resolveAdmissionPaths(schema: unknown) {
         }
       : null;
   };
-  const year = axis('Academic Period', 'Academic Period', 'Academic Year');
-  const faculty = axis('Academic Program', 'Program', 'Faculty');
-  const applications = measure('Applications');
-  const applicants = measure('Applicants');
-  const admitted = measure('Admitted Applicants');
-  const admittedApplications = measure('Admitted Applications');
-  const knownApplications = measure('Applications With Known Outcome');
+  const year = axis('Periodo', 'Gestión y periodo', 'Gestión');
+  const faculty = axis('Programa', 'Facultad y carrera', 'Facultad');
+  const applications = measure('Postulaciones');
+  const applicants = measure('Postulaciones');
+  const admitted = measure('Admitidos');
+  const admittedApplications = measure('Admitidos');
+  const knownApplications = measure('Postulaciones con resultado');
   if (
     !year ||
     !faculty ||
@@ -108,20 +108,20 @@ export function resolveAdmissionPaths(schema: unknown) {
 
 export function resolveRetentionPaths(schema: unknown) {
   if (!isRecord(schema)) return null;
-  const dimension = findByName(schema.dimensions, 'Academic Period');
+  const dimension = findByName(schema.dimensions, 'Periodo');
   const hierarchy =
-    dimension && findByName(dimension.hierarchies, 'Academic Period');
-  const level = hierarchy && findByName(hierarchy.levels, 'Academic Year');
+    dimension && findByName(dimension.hierarchies, 'Periodo');
+  const level = hierarchy && findByName(hierarchy.levels, 'Gestión');
   const measures = values(schema.measures).filter(
     (item): item is RecordValue =>
       isRecord(item) && item.visible !== false && item.pii !== true,
   );
   const retained = measures.find(
-    (item) => displayName(item)?.toLocaleLowerCase() === 'retained students',
+    (item) => displayName(item)?.toLocaleLowerCase() === 'permanecen',
   )?.name;
   const evaluable = measures.find(
     (item) =>
-      displayName(item)?.toLocaleLowerCase() === 'evaluable retention outcomes',
+      displayName(item)?.toLocaleLowerCase() === 'estudiantes evaluados',
   )?.name;
   if (
     !dimension ||
@@ -155,8 +155,8 @@ export function resolveAcademicCubePaths(
       (measure) =>
         displayName(measure)?.toLocaleLowerCase() === name.toLocaleLowerCase(),
     );
-  const enrollmentMeasure = findMeasure('Enrollment Attempts');
-  const gradeMeasure = findMeasure('Average Final Grade');
+  const enrollmentMeasure = findMeasure('Inscripciones en materias');
+  const gradeMeasure = findMeasure('Nota promedio');
   const enrollmentAttempts = enrollmentMeasure?.name;
   const averageFinalGrade = gradeMeasure?.name;
   const dimensions = schema.dimensions;
@@ -185,16 +185,16 @@ export function resolveAcademicCubePaths(
   };
 
   const academicYear = findPath(
-    'Academic Period',
-    'Academic Period',
-    'Academic Year',
+    'Periodo',
+    'Gestión y periodo',
+    'Gestión',
   );
   const academicPeriod = findPath(
-    'Academic Period',
-    'Academic Period',
-    'Period Number',
+    'Periodo',
+    'Gestión y periodo',
+    'Periodo',
   );
-  const faculty = findPath('Academic Program', 'Program', 'Faculty');
+  const faculty = findPath('Programa', 'Facultad y carrera', 'Facultad');
   if (!academicYear || !academicPeriod || !faculty) return null;
   return {
     enrollmentAttempts,
@@ -202,7 +202,7 @@ export function resolveAcademicCubePaths(
     enrollmentUnit:
       typeof enrollmentMeasure?.unit === 'string'
         ? enrollmentMeasure.unit
-        : 'intentos',
+        : 'inscripciones',
     gradeUnit:
       typeof gradeMeasure?.unit === 'string'
         ? gradeMeasure.unit

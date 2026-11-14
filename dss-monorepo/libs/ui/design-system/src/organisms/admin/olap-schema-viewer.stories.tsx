@@ -3,7 +3,7 @@ import { OlapSchemaViewer } from './olap-schema-viewer';
 
 const schema = {
   schemaName: 'UATF_DW',
-  cubeName: 'Academic Performance',
+  cubeName: 'Rendimiento académico',
   tables: [
     {
       id: 'fact_cursado',
@@ -58,29 +58,29 @@ const schema = {
   ],
   dimensions: [
     {
-      name: 'Academic Program',
+      name: 'Programa',
       hierarchy: 'Program',
       levels: ['Faculty', 'Career'],
     },
     {
-      name: 'Academic Period',
-      hierarchy: 'Academic Period',
-      levels: ['Academic Year', 'Period Number'],
+      name: 'Periodo',
+      hierarchy: 'Periodo',
+      levels: ['Gestión', 'Periodo'],
     },
   ],
   measures: [
     {
-      name: 'Enrollment Attempts',
+      name: 'Inscripciones en materias',
       column: 'conteo_intento',
       aggregator: 'sum',
     },
-    { name: 'Average Final Grade', column: 'nota_final', aggregator: 'avg' },
+    { name: 'Nota promedio', column: 'nota_final', aggregator: 'avg' },
   ],
 };
 
 const xml = `<?xml version="1.0"?>
 <Schema name="UATF_DW">
-  <Cube name="Academic Performance" defaultMeasure="Enrollment Attempts" />
+  <Cube name="Rendimiento académico" defaultMeasure="Inscripciones en materias" />
 </Schema>`;
 
 const meta: Meta<typeof OlapSchemaViewer> = {

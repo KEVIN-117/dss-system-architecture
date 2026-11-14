@@ -2,17 +2,17 @@
 
 ## Alcance de esta ampliación
 
-Las analíticas descriptivas se sirven desde los cubos OLAP `Academic Admission`, `Academic Performance` y `Academic Retention`. Las vistas `dw.vw_fact_*_olap` estabilizan el grano de cada hecho y publican conteos agregables para que las tasas se calculen sobre denominadores explícitos.
+Las analíticas descriptivas se sirven desde los cubos OLAP `Admisión`, `Rendimiento académico` y `Permanencia y deserción`. Las vistas `dw.vw_fact_*_olap` estabilizan el grano de cada hecho y publican conteos agregables para que las tasas se calculen sobre denominadores explícitos.
 
 | Pregunta | Fuente / medidas | Estado de datos |
 | --- | --- | --- |
-| Postulantes, admitidos, variación anual y tasa por sexo | `fact_admision`; `Applicants`, `Admitted Applicants`, `Known Admission Outcomes` | Conteos de personas distintas con estudiante identificado; solicitudes se cuentan por fila del hecho. La tasa usa personas con resultado conocido como denominador. |
-| Distribución por facultad/carrera | `dim_programa`; `Academic Program` | Disponible según el alcance académico del usuario. |
-| Sede central y subsedes | `dim_programa.sede`; `Academic Campus` | Se publica el código institucional de sede. |
-| Colegio de origen y tipo de colegio | `dim_estudiante`; `Applicant Profile` | Solo agregados; sujetos a supresión por k-anonimidad. |
-| Modalidad de ingreso | `dim_admision.id_acceso`; `Admission Mode` | Se publica el código de origen. El modelo DW aún no guarda una descripción institucional en la dimensión. |
-| Promedio, aprobaciones, reprobaciones, repeticiones y abandonos | `fact_cursado`; medidas de `Academic Performance` | Cubo y medidas agregadas publicados. |
-| Retención y deserción observada | `fact_retencion_desercion`; `Academic Retention` | Solo snapshots de periodos cerrados y evaluables entran en las tasas. |
+| Postulantes, admitidos, variación anual y tasa por sexo | `fact_admision`; `Postulaciones`, `Admitidos`, `Postulaciones con resultado` | Conteos de personas distintas con estudiante identificado; solicitudes se cuentan por fila del hecho. La tasa usa personas con resultado conocido como denominador. |
+| Distribución por facultad/carrera | `dim_programa`; `Programa` | Disponible según el alcance académico del usuario. |
+| Sede central y subsedes | `dim_programa.sede`; `Sede` | Se publica el código institucional de sede. |
+| Colegio de origen y tipo de colegio | `dim_estudiante`; `Perfil del estudiante` | Solo agregados; sujetos a supresión por k-anonimidad. |
+| Modalidad de ingreso | `dim_admision.id_acceso`; `Modalidad de admisión` | Se publica el código de origen. El modelo DW aún no guarda una descripción institucional en la dimensión. |
+| Promedio, aprobaciones, reprobaciones, repeticiones y abandonos | `fact_cursado`; medidas de `Rendimiento académico` | Cubo y medidas agregadas publicados. |
+| Retención y deserción observada | `fact_retencion_desercion`; `Permanencia y deserción` | Solo snapshots de periodos cerrados y evaluables entran en las tasas. |
 
 ## Tasas publicadas como miembros calculados
 
@@ -20,20 +20,19 @@ Las tasas se definen una sola vez en el esquema Mondrian (`infra/olap/schemas/ua
 
 | Cubo | Miembro calculado | Fórmula |
 | --- | --- | --- |
-| Academic Admission | `Admission Rate` | `Admitted Applicants / Known Admission Outcomes` (personas) |
-| Academic Admission | `Application Admission Rate` | `Admitted Applications / Applications With Known Outcome` (postulaciones) |
-| Academic Admission | `Applicants YoY Growth`, `Admitted Applicants YoY Growth` | Variación contra el mismo miembro de la gestión anterior (`ParallelPeriod` sobre `Academic Year`) |
-| Academic Performance | `Pass Rate`, `Failure Rate` | Aprobados o reprobados / (aprobados + reprobados) |
-| Academic Performance | `Repetition Rate`, `Abandonment Rate` | Intentos con la bandera verdadera / intentos con la bandera conocida (`Attempts With Known Repetition`, `Attempts With Known Abandonment`) |
-| Academic Retention | `Dropout Rate`, `Retention Rate` | Desertores o retenidos / `Evaluable Retention Outcomes` |
+| Admisión | `Tasa de admisión` | `Admitidos / Postulaciones con resultado` |
+| Admisión | `Crecimiento de postulaciones`, `Crecimiento de admitidos` | Variación contra el mismo miembro de la gestión anterior (`ParallelPeriod` sobre `Gestión`) |
+| Rendimiento académico | `Tasa de aprobación`, `Tasa de reprobación` | Aprobados o reprobados / (aprobados + reprobados) |
+| Rendimiento académico | `Tasa de repitencia`, `Tasa de abandono de materias` | Inscripciones con la bandera verdadera / inscripciones con la bandera conocida (`Inscripciones con repetición conocida`, `Inscripciones con abandono conocido`) |
+| Permanencia y deserción | `Tasa de deserción`, `Tasa de permanencia` | Desertores o retenidos / `Estudiantes evaluados` |
 
-- El crecimiento interanual solo se calcula sobre la jerarquía `Academic Period` (gestión o gestión-periodo). Queda vacío en el nivel `All`, sin gestión anterior o cuando el valor de la gestión anterior es menor que 5, para que la variación no revele una celda que la k-anonimidad enmascara.
+- El crecimiento interanual solo se calcula sobre la jerarquía `Periodo` (gestión o gestión-periodo). Queda vacío en el nivel `All`, sin gestión anterior o cuando el valor de la gestión anterior es menor que 5, para que la variación no revele una celda que la k-anonimidad enmascara.
 - La tasa por persona y la tasa por postulación responden preguntas distintas: una persona con varias postulaciones cuenta como admitida si al menos una fue admitida.
 - Desde la migración 0044, `fact_cursado` deriva las banderas con reglas MVP: un intento se aprueba si `GREATEST(nota, nota_2da, nota_ex_mesa) >= 51`, se reprueba si esa nota es mayor que 0 y menor que 51, y queda sin resultado si es 0 o nula. Es repetición cuando la misma persona (`id_alumno`) ya cursó la misma materia (`id_materia`) en un cierre académico anterior. `notas_planilla.estado` no se usa para aprobar.
 
 No existe actualmente un atributo de área de conocimiento en el contrato `dim_programa` ni en su ETL. Por ello, el cubo no inventa una clasificación derivada de facultades o carreras. Para cubrir esa dimensión se necesita aprobar y cargar un catálogo institucional con su relación carrera-área.
 
-Las postulaciones que no pudieron vincularse con una persona identificada no incrementan las medidas de personas distintas; sí permanecen en `Applications`. Esto evita presentar registros repetidos o claves técnicas como si fueran personas únicas.
+Las postulaciones que no pudieron vincularse con una persona identificada no incrementan las medidas de personas distintas; sí permanecen en `Postulaciones`. Esto evita presentar registros repetidos o claves técnicas como si fueran personas únicas.
 
 ## RBAC y privacidad
 
@@ -41,7 +40,7 @@ Las postulaciones que no pudieron vincularse con una persona identificada no inc
 - El BFF resuelve `analytics:read` y el permiso de alcance (`analytics:career`, `analytics:faculty` o `analytics:global`) usando los roles verificados.
 - El contexto académico procede de Auth Service. El cliente no puede proporcionar ni reemplazar la facultad o carrera autorizada.
 - Cada consulta con alcance restringido falla cerrada si el cubo no publica la dimensión, jerarquía y nivel de autorización configurados.
-- La medida interna `Attempt Count` cuenta personas distintas (no filas de hechos) y se añade solo en el servidor para aplicar k-anonimidad. No aparece en el esquema ni en los resultados públicos.
+- La medida interna `Conteo de privacidad` cuenta personas distintas (no filas de hechos) y se añade solo en el servidor para aplicar k-anonimidad. No aparece en el esquema ni en los resultados públicos.
 - Los reportes solo agregan resultados. No exponen identificadores o filas individuales de estudiantes.
 
 ## Analítica predictiva y de grafos

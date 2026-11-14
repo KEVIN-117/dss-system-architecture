@@ -133,18 +133,18 @@ describe('OLAP BFF proxy route', () => {
       'uatf-dw',
       'UATF_DW',
       'UATF_DW',
-      'Academic Admission',
+      'Admisión',
       'metadata',
     ];
     await GET(
       new Request(
-        'http://bff/api/olap/rest/saiku/director/discover/uatf-dw/UATF_DW/UATF_DW/Academic%20Admission/metadata/',
+        'http://bff/api/olap/rest/saiku/director/discover/uatf-dw/UATF_DW/UATF_DW/Admisi%C3%B3n/metadata/',
       ),
       { params: Promise.resolve({ path }) },
     );
 
     expect(String(fetchMock.mock.calls[0][0])).toBe(
-      'http://olap-service:8080/rest/saiku/director/discover/uatf-dw/UATF_DW/UATF_DW/Academic%20Admission/metadata/',
+      'http://olap-service:8080/rest/saiku/director/discover/uatf-dw/UATF_DW/UATF_DW/Admisi%C3%B3n/metadata/',
     );
   });
 
@@ -237,10 +237,10 @@ describe('OLAP BFF proxy route', () => {
     authenticateRequest.mockResolvedValue(authentication);
     vi.stubEnv('OLAP_ACADEMIC_SCOPE_FILTERS', JSON.stringify({
       career: {
-        dimension: 'Academic Career Scope',
-        hierarchy: 'Career Scope',
-        level: 'Career',
-        memberTemplate: '[Academic Career Scope].[Career Scope].[Career].&[{id}]',
+        dimension: 'Ámbito de carrera',
+        hierarchy: 'Carrera',
+        level: 'Carrera',
+        memberTemplate: '[Ámbito de carrera].[Carrera].[Carrera].&[{id}]',
       },
     }));
     vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080');
@@ -285,8 +285,8 @@ describe('OLAP BFF proxy route', () => {
           FILTER: {
             hierarchies: [
               {
-                name: '[Academic Career Scope].[Career Scope]',
-                dimension: 'Academic Career Scope',
+                name: '[Ámbito de carrera].[Carrera]',
+                dimension: 'Ámbito de carrera',
               },
             ],
           },

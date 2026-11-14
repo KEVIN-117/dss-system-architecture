@@ -39,20 +39,20 @@ import { DirectorAnalyticsDashboard } from './director-analytics-dashboard';
 const cubeId = 'academic/UATF/UATF/Academic Performance';
 const schema = {
   measures: {
-    attempts: { name: 'Enrollment Attempts', unit: 'intentos' },
-    average: { name: 'Average Final Grade', unit: 'puntos' },
-    graded: { name: 'Graded Attempts', unit: 'calificaciones' },
-    privateCount: { name: 'Attempt Count', visible: false },
+    attempts: { name: 'Inscripciones en materias', unit: 'intentos' },
+    average: { name: 'Nota promedio', unit: 'puntos' },
+    graded: { name: 'Inscripciones con resultado', unit: 'calificaciones' },
+    privateCount: { name: 'Conteo de privacidad', visible: false },
   },
   dimensions: {
     period: {
-      name: 'Academic Period',
+      name: 'Periodo',
       hierarchies: {
         period: {
-          name: 'Academic Period',
+          name: 'Gestión y periodo',
           levels: {
-            year: { name: 'Academic Year' },
-            number: { name: 'Period Number' },
+            year: { name: 'Gestión' },
+            number: { name: 'Periodo' },
           },
         },
       },
@@ -104,7 +104,7 @@ function setupFetch(options?: {
           data: {
             olapCubes: options?.emptyCube
               ? []
-              : [{ cubeId, cubeName: 'Academic Performance' }],
+              : [{ cubeId, cubeName: 'Rendimiento académico' }],
           },
         });
       }
@@ -118,13 +118,13 @@ function setupFetch(options?: {
                 name: '2025',
                 caption: '2025',
                 uniqueName:
-                  '[Academic Period].[Academic Period].[Academic Year].&[2025]',
+                  '[Periodo].[Gestión y periodo].[Gestión].&[2025]',
               },
               {
                 name: '2026',
                 caption: '2026',
                 uniqueName:
-                  '[Academic Period].[Academic Period].[Academic Year].&[2026]',
+                  '[Periodo].[Gestión y periodo].[Gestión].&[2026]',
               },
             ],
           },
@@ -148,9 +148,9 @@ function setupFetch(options?: {
                 ? []
                 : [
                     {
-                      'Enrollment Attempts': { value: 125 },
-                      'Average Final Grade': { value: 68.4 },
-                      'Graded Attempts': { value: 113 },
+                      'Inscripciones en materias': { value: 125 },
+                      'Nota promedio': { value: 68.4 },
+                      'Inscripciones con resultado': { value: 113 },
                     },
                   ],
             },
@@ -165,38 +165,38 @@ function setupFetch(options?: {
                 ? []
                 : [
                     {
-                      'Academic Year': '2025',
-                      'Period Number': 1,
-                      'Enrollment Attempts': { value: 60 },
-                      'Average Final Grade': { value: 66.2 },
+                      'Gestión': '2025',
+                      'Periodo': 1,
+                      'Inscripciones en materias': { value: 60 },
+                      'Nota promedio': { value: 66.2 },
                     },
                     ...(options?.duplicatePeriod
                       ? [
                           {
-                            'Academic Year': '2025',
-                            'Period Number': 1,
-                            'Enrollment Attempts': { value: 61 },
-                            'Average Final Grade': { value: 66.3 },
+                            'Gestión': '2025',
+                            'Periodo': 1,
+                            'Inscripciones en materias': { value: 61 },
+                            'Nota promedio': { value: 66.3 },
                           },
                         ]
                       : []),
                     {
-                      'Academic Year': '2025',
-                      'Period Number': 2,
-                      'Enrollment Attempts': { value: 65 },
-                      'Average Final Grade': { value: 70.1 },
+                      'Gestión': '2025',
+                      'Periodo': 2,
+                      'Inscripciones en materias': { value: 65 },
+                      'Nota promedio': { value: 70.1 },
                     },
                     {
-                      'Academic Year': '2026',
-                      'Period Number': 1,
-                      'Enrollment Attempts': { value: 72 },
-                      'Average Final Grade': { value: 71.3 },
+                      'Gestión': '2026',
+                      'Periodo': 1,
+                      'Inscripciones en materias': { value: 72 },
+                      'Nota promedio': { value: 71.3 },
                     },
                     {
-                      'Academic Year': '2026',
-                      'Period Number': 2,
-                      'Enrollment Attempts': { value: 53 },
-                      'Average Final Grade': { value: 69.8 },
+                      'Gestión': '2026',
+                      'Periodo': 2,
+                      'Inscripciones en materias': { value: 53 },
+                      'Nota promedio': { value: 69.8 },
                     },
                   ],
             },
@@ -317,7 +317,7 @@ describe('DirectorAnalyticsDashboard', () => {
       filteredInputs.some((input) =>
         input.filters?.some(
           (filter) =>
-            filter.dimension === 'Academic Period' &&
+            filter.dimension === 'Periodo' &&
             filter.members[0].endsWith('&[2026]'),
         ),
       ),

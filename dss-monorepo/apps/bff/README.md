@@ -51,21 +51,21 @@ BFF_DEFAULT_POST_LOGIN_REDIRECT_URI=http://localhost:3000/auth/callback
 BFF_SESSION_SECRET=<al-menos-32-caracteres-no-versionados>
 ```
 
-Las consultas con ámbito de facultad o carrera requieren configurar `OLAP_ACADEMIC_SCOPE_FILTERS` como JSON en el runtime privado del BFF. El mapa local corresponde al cubo UATF versionado en [`infra/olap/schemas/uatf-rendimiento-academico.xml`](../../../infra/olap/schemas/uatf-rendimiento-academico.xml). `faculty` usa el identificador `facultyId` de Auth Service contra el nivel Facultad; `career` usa `careerId` contra el nivel Carrera. Las dimensiones de alcance son separadas de `Academic Program` para que el filtro impuesto por el BFF no choque con los niveles que el usuario consulta en filas o columnas.
+Las consultas con ámbito de facultad o carrera requieren configurar `OLAP_ACADEMIC_SCOPE_FILTERS` como JSON en el runtime privado del BFF. El mapa local corresponde al cubo UATF versionado en [`infra/olap/schemas/uatf-rendimiento-academico.xml`](../../../infra/olap/schemas/uatf-rendimiento-academico.xml). `faculty` usa el identificador `facultyId` de Auth Service contra el nivel Facultad; `career` usa `careerId` contra el nivel Carrera. Las dimensiones de alcance son separadas de `Programa` para que el filtro impuesto por el BFF no choque con los niveles que el usuario consulta en filas o columnas.
 
 ```json
 {
   "faculty": {
-    "dimension": "Academic Faculty Scope",
-    "hierarchy": "Faculty Scope",
-    "level": "Faculty",
-    "memberTemplate": "[Academic Faculty Scope].[Faculty Scope].[Faculty].&[{id}]"
+    "dimension": "Ámbito de facultad",
+    "hierarchy": "Facultad",
+    "level": "Facultad",
+    "memberTemplate": "[Ámbito de facultad].[Facultad].[Facultad].&[{id}]"
   },
   "career": {
-    "dimension": "Academic Career Scope",
-    "hierarchy": "Career Scope",
-    "level": "Career",
-    "memberTemplate": "[Academic Career Scope].[Career Scope].[Career].&[{id}]"
+    "dimension": "Ámbito de carrera",
+    "hierarchy": "Carrera",
+    "level": "Carrera",
+    "memberTemplate": "[Ámbito de carrera].[Carrera].[Carrera].&[{id}]"
   }
 }
 ```
@@ -74,7 +74,7 @@ El esquema Mondrian usa la tabla de hechos `dw.fact_cursado` y las dimensiones `
 
 El BFF deriva el alcance desde los roles y `academicContexts` validados, agrega el filtro de seguridad al servidor y rechaza argumentos que pretendan seleccionar la jerarquía protegida. Rector usa alcance institucional. No se declaran nombres de indicadores ni medidas ficticios: el catálogo y el schema se obtienen del OLAP activo y la consulta solo admite las medidas/campos que el propio servicio valida. Predicciones y ML siguen fuera de esta integración.
 
-El proxy de Saiku aplica la misma política al OLAP Workspace: Rector consulta globalmente; Decano queda limitado a sus facultades y Director a sus carreras, siempre desde el perfil de Auth Service. Los perfiles académicos solo pueden leer el descubrimiento y metadatos de sus cubos y ejecutar consultas estructuradas; el BFF incorpora el miembro de alcance en el eje `FILTER`, rechaza MDX libre, filtros que intenten reemplazar ese alcance y operaciones alternas de consulta/dashboard. La medida interna `Attempt Count` se oculta y no puede solicitarse desde portales. Sin contexto o con una configuración de alcance inválida, el BFF deniega la consulta. `SUPERADMIN` conserva acceso administrativo a Saiku.
+El proxy de Saiku aplica la misma política al OLAP Workspace: Rector consulta globalmente; Decano queda limitado a sus facultades y Director a sus carreras, siempre desde el perfil de Auth Service. Los perfiles académicos solo pueden leer el descubrimiento y metadatos de sus cubos y ejecutar consultas estructuradas; el BFF incorpora el miembro de alcance en el eje `FILTER`, rechaza MDX libre, filtros que intenten reemplazar ese alcance y operaciones alternas de consulta/dashboard. La medida interna `Conteo de privacidad` se oculta y no puede solicitarse desde portales. Sin contexto o con una configuración de alcance inválida, el BFF deniega la consulta. `SUPERADMIN` conserva acceso administrativo a Saiku.
 
 Para enlazar el explorador desde los sidebars de Rectoría, Decanato y Dirección, configura `NEXT_PUBLIC_OLAP_WORKSPACE_URL` con la URL completa y la ruta `/analysis` (local: `http://localhost:3007/analysis`). En la publicación de contenedores, el workflow exige la variable de repositorio homónima y la incorpora como argumento de build.
 

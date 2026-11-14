@@ -39,24 +39,24 @@ import { RectorAnalyticsDashboard } from './rector-analytics-dashboard';
 const cubeId = 'academic/UATF/UATF/Academic Performance';
 const schema = {
   measures: {
-    enrolled: { name: 'Enrollment Attempts', unit: 'intentos' },
-    average: { name: 'Average Final Grade', unit: 'puntos' },
+    enrolled: { name: 'Inscripciones en materias', unit: 'intentos' },
+    average: { name: 'Nota promedio', unit: 'puntos' },
   },
   dimensions: {
     program: {
-      name: 'Academic Program',
+      name: 'Programa',
       hierarchies: {
-        program: { name: 'Program', levels: { faculty: { name: 'Faculty' } } },
+        program: { name: 'Facultad y carrera', levels: { faculty: { name: 'Facultad' } } },
       },
     },
     period: {
-      name: 'Academic Period',
+      name: 'Periodo',
       hierarchies: {
         period: {
-          name: 'Academic Period',
+          name: 'Gestión y periodo',
           levels: {
-            year: { name: 'Academic Year' },
-            number: { name: 'Period Number' },
+            year: { name: 'Gestión' },
+            number: { name: 'Periodo' },
           },
         },
       },
@@ -87,7 +87,7 @@ function setupFetch(options?: { failCubes?: boolean; emptyCubes?: boolean }) {
             data: {
               olapCubes: options?.emptyCubes
                 ? []
-                : [{ cubeId, cubeName: 'Academic Performance' }],
+                : [{ cubeId, cubeName: 'Rendimiento académico' }],
             },
           }),
           { status: 200 },
@@ -106,13 +106,13 @@ function setupFetch(options?: { failCubes?: boolean; emptyCubes?: boolean }) {
                 {
                   name: '2025',
                   uniqueName:
-                    '[Academic Period].[Academic Period].[Academic Year].&[2025]',
+                    '[Periodo].[Gestión y periodo].[Gestión].&[2025]',
                   caption: '2025',
                 },
                 {
                   name: '2026',
                   uniqueName:
-                    '[Academic Period].[Academic Period].[Academic Year].&[2026]',
+                    '[Periodo].[Gestión y periodo].[Gestión].&[2026]',
                   caption: '2026',
                 },
               ],
@@ -133,8 +133,8 @@ function setupFetch(options?: { failCubes?: boolean; emptyCubes?: boolean }) {
               analyticQuery: {
                 data: [
                   {
-                    'Enrollment Attempts': { value: 1280 },
-                    'Average Final Grade': { value: 72.5 },
+                    'Inscripciones en materias': { value: 1280 },
+                    'Nota promedio': { value: 72.5 },
                   },
                 ],
                 totalRows: 1,
@@ -150,14 +150,14 @@ function setupFetch(options?: { failCubes?: boolean; emptyCubes?: boolean }) {
               analyticQuery: {
                 data: [
                   {
-                    'Academic Year': '2025',
-                    'Period Number': 1,
-                    'Enrollment Attempts': { value: 120 },
+                    'Gestión': '2025',
+                    'Periodo': 1,
+                    'Inscripciones en materias': { value: 120 },
                   },
                   {
-                    'Academic Year': '2025',
-                    'Period Number': 2,
-                    'Enrollment Attempts': { value: 140 },
+                    'Gestión': '2025',
+                    'Periodo': 2,
+                    'Inscripciones en materias': { value: 140 },
                   },
                 ],
                 totalRows: 2,
@@ -173,11 +173,11 @@ function setupFetch(options?: { failCubes?: boolean; emptyCubes?: boolean }) {
               data: [
                 {
                   Faculty: 'Ingeniería',
-                  'Enrollment Attempts': { value: 700 },
+                  'Inscripciones en materias': { value: 700 },
                 },
                 {
                   Faculty: 'Ciencias Puras',
-                  'Enrollment Attempts': { value: 580 },
+                  'Inscripciones en materias': { value: 580 },
                 },
               ],
               totalRows: 2,
@@ -263,7 +263,7 @@ describe('RectorAnalyticsDashboard', () => {
       );
     expect(
       filteredInputs.every(
-        (input) => input.filters?.[0]?.dimension === 'Academic Period',
+        (input) => input.filters?.[0]?.dimension === 'Periodo',
       ),
     ).toBe(true);
     expect(

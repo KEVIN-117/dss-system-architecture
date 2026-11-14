@@ -74,7 +74,7 @@ describe('server-only OLAP transport', () => {
 
     const error = await executeServerOlapQuery(config, {
       cube: 'academic/UATF/UATF/Academic Performance',
-      measures: [{ name: 'Enrollment Attempts' }],
+      measures: [{ name: 'Inscripciones en materias' }],
     }).catch((caught: unknown) => caught);
 
     expect(error).toBeInstanceOf(OlapServerClientError);

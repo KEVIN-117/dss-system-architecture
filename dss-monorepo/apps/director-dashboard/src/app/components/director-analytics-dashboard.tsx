@@ -214,8 +214,8 @@ export function DirectorAnalyticsDashboard() {
       );
       const cube = (cubesResponse.olapCubes ?? []).find(
         (candidate) =>
-          candidate.cubeName.toLocaleLowerCase() === 'academic performance' ||
-          candidate.cubeCaption?.toLocaleLowerCase() === 'academic performance',
+          candidate.cubeName.toLocaleLowerCase() === 'rendimiento académico' ||
+          candidate.cubeCaption?.toLocaleLowerCase() === 'rendimiento académico',
       );
       if (!cube) {
         setEmptyMessage(

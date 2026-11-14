@@ -179,7 +179,7 @@ export function RectorAnalyticsDashboard() {
         );
         const findCube = (name: string) =>
           olapCubes.find((cube) => cube.cubeName.toLowerCase() === name);
-        const admissionCube = findCube('academic admission');
+        const admissionCube = findCube('admisión');
         if (!admissionCube)
           throw new Error('El cubo de admisión no está disponible.');
         const admissionSchema = await graphql<{ olapCubeSchema: unknown }>(
@@ -217,7 +217,7 @@ export function RectorAnalyticsDashboard() {
               '');
         setSelectedYear(selected);
         setAdmission({ id: admissionCube.cubeId, paths, members });
-        const retentionCube = findCube('academic retention');
+        const retentionCube = findCube('permanencia y deserción');
         if (!retentionCube) {
           setRetentionError(true);
           return;
@@ -600,7 +600,7 @@ export function RectorAnalyticsDashboard() {
         </Card>
         <Card className={CARD_CLASS}>
           <CardHeader>
-            <CardTitle>Postulantes por gestión</CardTitle>
+            <CardTitle>Postulaciones por gestión</CardTitle>
             <CardDescription>
               Personas identificadas que postularon en cada gestión; la
               tendencia muestra todo el histórico disponible.
@@ -612,9 +612,9 @@ export function RectorAnalyticsDashboard() {
             ) : (
               <TrendLineChart
                 data={data.trend}
-                title="Evolución de postulantes"
-                ariaLabel="Personas postulantes identificadas por gestión"
-                emptyMessage="No hay postulantes disponibles para graficar."
+                title="Evolución de postulaciones"
+                ariaLabel="Postulaciones registradas por gestión"
+                emptyMessage="No hay postulaciones disponibles para graficar."
                 height={320}
               />
             )}

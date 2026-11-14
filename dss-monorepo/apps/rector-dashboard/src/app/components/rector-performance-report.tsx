@@ -24,27 +24,27 @@ import {
 type Cube = { cubeId: string; cubeName: string };
 type Result = { analyticQuery: { data: unknown[]; totalRows: number } };
 type Metric =
-  | 'Enrollment Attempts'
-  | 'Graded Attempts'
-  | 'Passed Attempts'
-  | 'Failed Attempts'
-  | 'Average Final Grade';
+  | 'Inscripciones en materias'
+  | 'Inscripciones con resultado'
+  | 'Materias aprobadas'
+  | 'Materias reprobadas'
+  | 'Nota promedio';
 const metrics: Metric[] = [
-  'Enrollment Attempts',
-  'Graded Attempts',
-  'Passed Attempts',
-  'Failed Attempts',
-  'Average Final Grade',
+  'Inscripciones en materias',
+  'Inscripciones con resultado',
+  'Materias aprobadas',
+  'Materias reprobadas',
+  'Nota promedio',
 ];
 const careerAxis: CubeAxisPath = {
-  dimension: 'Academic Program',
-  hierarchy: 'Program',
-  level: 'Career',
+  dimension: 'Programa',
+  hierarchy: 'Facultad y carrera',
+  level: 'Carrera',
 };
 const facultyFilterAxis: CubeAxisPath = {
-  dimension: 'Academic Faculty Scope',
-  hierarchy: 'Faculty Scope',
-  level: 'Faculty',
+  dimension: 'Ámbito de facultad',
+  hierarchy: 'Facultad',
+  level: 'Facultad',
 };
 const CUBES = `query PerformanceCubes { olapCubes { cubeId cubeName } }`;
 const SCHEMA = `query PerformanceSchema($cubeId: ID!) { olapCubeSchema(cubeId: $cubeId) }`;
@@ -156,7 +156,7 @@ export function RectorPerformanceReport() {
       try {
         const cubes = await request<{ olapCubes: Cube[] }>(CUBES);
         const cube = cubes.olapCubes.find(
-          (item) => item.cubeName.toLowerCase() === 'academic performance',
+          (item) => item.cubeName.toLowerCase() === 'rendimiento académico',
         );
         if (!cube)
           throw new Error(
@@ -246,7 +246,7 @@ export function RectorPerformanceReport() {
             const item = readDimensionSeries(
               [row],
               axis.level,
-              'Enrollment Attempts',
+              'Inscripciones en materias',
             )[0];
             return item ? [{ label: item.label, ...readValues(row) }] : [];
           }),
@@ -285,7 +285,7 @@ export function RectorPerformanceReport() {
       input: {
         cubeId: setup.cube,
         limit: 500,
-        measures: [{ name: 'Average Final Grade' }],
+        measures: [{ name: 'Nota promedio' }],
         rows: [setup.year],
         filters,
       },
@@ -297,7 +297,7 @@ export function RectorPerformanceReport() {
               readDimensionSeries(
                 result.analyticQuery.data,
                 setup.year.level,
-                'Average Final Grade',
+                'Nota promedio',
               ),
             ),
           );
