@@ -32,9 +32,9 @@ def _connection(rows: list[tuple], columns: list[str] | None = None) -> Mock:
 def _program_row(subject: str, *, cut_period: int = 1, start_year: int = 2025, start_period: int = 1,
                  cadence_count: int = 1, values: tuple = (5, 4, 3.2)) -> tuple[list[str], tuple]:
     columns = ["subject_ref", *PROGRAM_FEATURES, "cut_id", "cut_year", "cut_period", "start_year", "start_period",
-               "enrollment_date", "cadence_count", "source_run_id", "resultado_retencion", "es_desercion",
+               "enrollment_date", "cadence_count", "program_regime", "source_run_id", "resultado_retencion", "es_desercion",
                "conteo_snapshot", "conteo_evaluable", "conteo_desercion"]
-    row = (subject, *values, "42", 2026, cut_period, start_year, start_period, "2025-02-01", cadence_count,
+    row = (subject, *values, "42", 2026, cut_period, start_year, start_period, "2025-02-01", cadence_count, "S",
            "8ef1a80e-a16a-4e89-88e2-45d2d5fab02a", "NO_EVALUABLE", None, 1, 0, 0)
     return columns, row
 

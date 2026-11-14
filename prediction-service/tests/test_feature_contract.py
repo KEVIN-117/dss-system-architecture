@@ -13,10 +13,12 @@ from unittest.mock import patch
 from dataset_contract import validate_prepared_dataset
 from feature_contract import (
     COURSE_ABANDONMENT_EVENT,
+    COURSE_ABANDONMENT_FEATURES,
     PROGRAM_DROPOUT_EVENT,
     FeatureContractError,
     contract_digest,
     contract_reference,
+    course_abandonment_query,
     program_dropout_ineligibility,
     program_dropout_query,
     verify_reference,
@@ -37,14 +39,14 @@ CUTS = [
 
 
 def contract_row(subject: int, cut: dict, *, start: tuple[int, int], outcome: str, reprobadas: int,
-                 cadence_count: int = 1) -> dict:
+                 cadence_count: int = 1, regime: str | None = "S") -> dict:
     """A row shaped exactly like program_dropout_query output (plus program_ref)."""
     return {
         "subject_ref": str(subject), "program_ref": "P01",
         "materias_cursadas": 6, "materias_reprobadas": reprobadas, "ppa_acumulado": 70.0 - 5 * reprobadas,
         "cut_id": cut["closure_id"], "cut_year": cut["year"], "cut_period": cut["period"],
         "start_year": start[0], "start_period": start[1], "enrollment_date": "2025-02-01",
-        "cadence_count": cadence_count, "source_run_id": RUN_ID, "resultado_retencion": outcome,
+        "cadence_count": cadence_count, "program_regime": regime, "source_run_id": RUN_ID, "resultado_retencion": outcome,
         "es_desercion": outcome == "DESERTOR" if outcome != "NO_EVALUABLE" else None,
         "conteo_snapshot": 1, "conteo_evaluable": 0 if outcome == "NO_EVALUABLE" else 1,
         "conteo_desercion": 1 if outcome == "DESERTOR" else 0,
@@ -94,15 +96,31 @@ class FeatureContractTests(unittest.TestCase):
         self.assertIn("hcut.effective_at <= c.effective_at", sql)
         self.assertIn("e.valid_from <= c.effective_at", sql)
         self.assertNotIn("resultado_retencion AS", sql)
-        # Coverage and program cadence are also bounded by the requested cut.
+        # Coverage is also bounded by the requested cut.
         self.assertIn("cov.effective_at <= r.effective_at", sql)
-        self.assertIn("pcut.effective_at <= r.effective_at", sql)
 
-    def test_inter_semester_period_does_not_make_semester_students_mixed(self) -> None:
+    def test_cadence_comes_from_the_program_regime(self) -> None:
+        for sql in (program_dropout_query(FEATURES), course_abandonment_query(list(COURSE_ABANDONMENT_FEATURES))):
+            # DW 0045: regime from dim_programa; annual cuts are period 1, period 3 is never a cadence cut.
+            self.assertIn("SELECT pp.regimen FROM dw.dim_programa pp", sql)
+            self.assertNotIn("semestral", sql)
+            self.assertNotIn("periodo = 3", sql)
+            self.assertNotIn("periodo=3", sql)
         sql = program_dropout_query(FEATURES)
-        # Period 3 counts as ANUAL only when the program has no semester closures.
-        self.assertIn("WHEN pa.periodo = 3 AND NOT pcad.semestral THEN 'ANUAL'", sql)
-        self.assertIn("CASE WHEN pcad.semestral THEN first_cut.periodo IN (1, 2) ELSE first_cut.periodo = 3 END", sql)
+        self.assertIn("WHEN 'A' THEN first_cut.periodo = 1", sql)
+        self.assertIn("pcad.regimen AS program_regime", sql)
+
+    def test_annual_program_window_counts_years(self) -> None:
+        annual = {"closure_id": "91", "year": 2021, "period": 1}
+        row = contract_row(960, annual, start=(2019, 1), outcome="RETENIDO", reprobadas=0, regime="A")
+        self.assertIsNone(program_dropout_ineligibility(row))  # third annual cut
+        self.assertEqual(program_dropout_ineligibility({**row, "start_year": 2018}), "OUTSIDE_WINDOW")
+        # An annual program has no period-2 cadence cut.
+        self.assertEqual(program_dropout_ineligibility({**row, "cut_period": 2}), "OUTSIDE_WINDOW")
+        semester = contract_row(961, annual, start=(2019, 1), outcome="RETENIDO", reprobadas=0)
+        self.assertIsNone(program_dropout_ineligibility(semester))  # fifth semester cut
+        self.assertEqual(program_dropout_ineligibility({**row, "program_regime": None}), "UNKNOWN_REGIME")
+        self.assertEqual(program_dropout_ineligibility({**row, "program_regime": "P"}), "UNKNOWN_REGIME")
 
     def test_left_censored_and_missing_start_are_ineligible(self) -> None:
         cut = CUTS[3]

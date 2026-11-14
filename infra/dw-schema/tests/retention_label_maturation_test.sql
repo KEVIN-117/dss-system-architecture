@@ -24,8 +24,8 @@ SELECT etl_control.transition_academic_period_closure(2094::smallint, 2::smallin
     'dsa:test'::varchar(255), 'Cierre C', clock_timestamp() - interval '1 minute');
 
 -- Published dimensions (fixture, inserted by the test owner).
-INSERT INTO dw.dim_programa (programa_sk, member_type, id_programa, programa)
-VALUES (950000001, 'STANDARD', 'MT1', 'Programa maduración');
+INSERT INTO dw.dim_programa (programa_sk, member_type, id_programa, programa, regimen)
+VALUES (950000001, 'STANDARD', 'MT1', 'Programa maduración', 'S');
 INSERT INTO dw.dim_materia (materia_sk, member_type, id_materia, sigla, materia)
 VALUES (950000001, 'STANDARD', 950001, 'MAT950', 'Materia maduración');
 INSERT INTO dw.dim_periodo_academico (periodo_academico_sk, member_type, closure_id, gestion, periodo, effective_at)
