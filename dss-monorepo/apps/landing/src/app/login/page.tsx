@@ -40,7 +40,7 @@ function LoginContent() {
   };
 
   return (
-    <main className="flex min-h-screen bg-dss-navy-950 items-center justify-center p-4 md:p-8 font-sans relative overflow-hidden">
+    <main className="dark flex min-h-screen bg-dss-navy-950 items-center justify-center p-4 md:p-8 font-sans relative overflow-hidden">
       <div className="absolute inset-0 z-0" aria-hidden="true">
         <motion.div
           animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}

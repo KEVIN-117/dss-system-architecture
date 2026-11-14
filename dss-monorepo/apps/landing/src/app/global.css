@@ -1,8 +1,47 @@
 @import '@dss-monorepo/design-system/styles/globals.css';
 
+/*
+ * Paleta del escudo DSA: azul real (anillo), celeste (campo central) y el
+ * rojo de la cinta, reservado para riesgo y alertas. Prefijo --uatf- para no
+ * tocar los tokens del Design System.
+ */
+:root {
+  --uatf-accent: #1f2fb4;
+  --uatf-accent-strong: #151f86;
+  --uatf-accent-text: #1f2fb4;
+  --uatf-sky: #00a6e6;
+  --uatf-sky-text: #006f9e;
+  --uatf-ribbon: #d21f2b;
+  --uatf-ribbon-text: #b3141f;
+  --uatf-panel: color-mix(in srgb, #ffffff 78%, transparent);
+}
+
+.dark {
+  --background: #050817;
+  --card: #0b1130;
+  --border: #1d2a5c;
+  --uatf-accent: #3a4ff0;
+  --uatf-accent-strong: #2a3bd0;
+  --uatf-accent-text: #93a3ff;
+  --uatf-sky: #2ec2f7;
+  --uatf-sky-text: #7fd8fa;
+  --uatf-ribbon: #f0414c;
+  --uatf-ribbon-text: #ff8a92;
+  --uatf-panel: color-mix(in srgb, #0d1438 72%, transparent);
+}
+
 @theme inline {
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --color-uatf-accent: var(--uatf-accent);
+  --color-uatf-accent-strong: var(--uatf-accent-strong);
+  --color-uatf-accent-text: var(--uatf-accent-text);
+  --color-uatf-sky: var(--uatf-sky);
+  --color-uatf-sky-text: var(--uatf-sky-text);
+  --color-uatf-ribbon: var(--uatf-ribbon);
+  --color-uatf-ribbon-text: var(--uatf-ribbon-text);
+  --color-uatf-panel: var(--uatf-panel);
 
   --animate-marquee: marquee 30s linear infinite;
 
@@ -12,6 +51,27 @@
     }
     100% {
       transform: translateX(-33.33%);
+    }
+  }
+
+  @keyframes float-y {
+    0%,
+    100% {
+      transform: translateY(0);
+    }
+    50% {
+      transform: translateY(-10px);
+    }
+  }
+
+  @keyframes pulse-ring {
+    0% {
+      transform: scale(0.85);
+      opacity: 0.7;
+    }
+    100% {
+      transform: scale(1.35);
+      opacity: 0;
     }
   }
 
@@ -33,7 +93,22 @@ body {
 }
 
 html {
+  color-scheme: light;
+  scroll-behavior: smooth;
+}
+
+html.dark {
   color-scheme: dark;
+}
+
+::selection {
+  background: var(--uatf-accent);
+  color: #ffffff;
+}
+
+:focus-visible {
+  outline: 2px solid var(--uatf-sky);
+  outline-offset: 3px;
 }
 
 @media (prefers-reduced-motion: reduce) {

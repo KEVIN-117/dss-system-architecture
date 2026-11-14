@@ -19,10 +19,17 @@ con `GET /api/auth/me`.
 
 ## Tema y paleta
 
-La landing pública usa exclusivamente el tema oscuro institucional DSS. El
-`html` raíz conserva `dark` y `data-theme="dsa"` como identidad neutra antes de
-conocer el rol. Los colores proceden de los tokens de
-`@dss-monorepo/design-system`; la landing no declara una paleta paralela.
+La landing pública admite modo claro y oscuro: sigue la preferencia del sistema
+y el visitante puede cambiarla con el botón de la barra (se guarda en
+`localStorage` con la clave `uatf-landing-theme`). Un script en `<head>` aplica
+la clase `dark` antes de pintar para evitar el destello. El `html` raíz conserva
+`data-theme="dsa"` como identidad neutra antes de conocer el rol; `/login`
+fuerza `dark` en su `<main>` y no depende de la preferencia.
+
+La base de color procede de los tokens de `@dss-monorepo/design-system`. Encima,
+`src/app/global.css` define acentos institucionales de la UATF con prefijo
+`--uatf-` (rojo del escudo, azul universitario y panel translúcido), con valores
+propios para cada modo; no modifican los tokens del Design System.
 
 Los temas por rol (`superadmin`, `rector`, `decano` y `director`) siguen siendo
 responsabilidad del Design System y de los portales autenticados. La landing no
