@@ -32,6 +32,8 @@ from uuid import uuid4
 
 from dataset_contract import compute_snapshot_digest, validate_prepared_dataset
 from feature_contract import (
+    CADENCE_BY_REGIME,
+    CADENCE_PERIODS,
     PROGRAM_DROPOUT_EVENT,
     PROGRAM_DROPOUT_FEATURES,
     contract_reference,
@@ -42,7 +44,8 @@ from feature_contract import (
 
 POSITIVE_CLASS = "RISK"
 NEGATIVE_CLASS = "NO_RISK"
-_CADENCE_PERIODS = {"ANUAL": (3,), "SEMESTRAL": (1, 2)}
+_CADENCE_PERIODS = CADENCE_PERIODS
+_REGIME_BY_CADENCE = {cadence: regime for regime, cadence in CADENCE_BY_REGIME.items()}
 _EVALUABLE = {"RETENIDO", "DESERTOR"}
 
 _CLOSURES_SQL = """
@@ -52,8 +55,14 @@ JOIN etl_control.academic_period_closure c ON c.closure_id = f.closure_id
   AND c.status = 'PROCESADO' AND c.processed_at IS NOT NULL AND c.effective_at <= clock_timestamp()
 JOIN dw.dim_programa p ON p.programa_sk = f.programa_sk
   AND p.member_type = 'STANDARD' AND p.id_programa = %(program)s
+  AND p.regimen = %(regime)s
 WHERE c.periodo = ANY(%(periods)s)
 ORDER BY c.effective_at, closure_id
+"""
+
+_PROGRAM_REGIME_SQL = """
+SELECT DISTINCT p.regimen FROM dw.dim_programa p
+WHERE p.member_type = 'STANDARD' AND p.id_programa = %(program)s
 """
 
 _IDENTIFIER_AND_AUDIT_FIELDS = [
@@ -106,6 +115,9 @@ def build_program_dropout_snapshot(
     for source in contract_rows:
         if int(source["cut_period"]) not in _CADENCE_PERIODS[cadence]:
             exclusions["OTHER_CADENCE_CUT"] += 1
+            continue
+        if source.get("program_regime") != _REGIME_BY_CADENCE[cadence]:
+            exclusions["OTHER_CADENCE_PROGRAM"] += 1
             continue
         reason = program_dropout_ineligibility(source)
         if reason is not None:
@@ -196,7 +208,12 @@ def extract_from_dw(dsn: str, programs: list[str], cadence: str, feature_names: 
     cuts: dict[str, dict[str, Any]] = {}
     with psycopg.connect(dsn, connect_timeout=5, options="-c default_transaction_read_only=on") as connection:
         for program in programs:
-            closures = connection.execute(_CLOSURES_SQL, {"program": program, "periods": list(_CADENCE_PERIODS[cadence])}).fetchall()
+            regimes = [row[0] for row in connection.execute(_PROGRAM_REGIME_SQL, {"program": program}).fetchall()]
+            if regimes != [_REGIME_BY_CADENCE[cadence]]:
+                # DW 0045: the cadence is the program regime; never mix them.
+                raise ValueError(f"Program {program} regime {regimes or 'unknown'} does not match cadence {cadence}.")
+            closures = connection.execute(_CLOSURES_SQL, {"program": program, "regime": _REGIME_BY_CADENCE[cadence],
+                                                          "periods": list(_CADENCE_PERIODS[cadence])}).fetchall()
             for closure_id, effective_at in closures:
                 cuts[closure_id] = {"closure_id": closure_id, "effective_at": effective_at}
                 cursor = connection.execute(sql, {"program": program, "closure": int(closure_id), "subject": None, "limit": row_limit + 1})

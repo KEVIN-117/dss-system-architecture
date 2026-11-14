@@ -161,6 +161,33 @@ class ExtractionParityTests(unittest.TestCase):
         report = validate_prepared_dataset(approved, approved_rows)
         self.assertEqual(report.status, "READY_FOR_PREPARATION", [i.code for i in report.issues])
 
+    def test_cadence_follows_program_regime(self) -> None:
+        from feature_contract import cadence_for
+        self.assertEqual(cadence_for("A", 1), "ANUAL")
+        self.assertEqual(cadence_for("S", 1), "SEMESTRAL")
+        self.assertEqual(cadence_for("S", 2), "SEMESTRAL")
+        # An annual program has no period-2 cut and period 3 is never a cadence cut.
+        self.assertEqual(cadence_for("A", 2), "OTRO")
+        self.assertEqual(cadence_for("A", 3), "OTRO")
+        self.assertEqual(cadence_for("S", 3), "OTRO")
+        self.assertEqual(cadence_for(None, 1), "OTRO")
+
+    def test_snapshot_keeps_only_rows_of_the_requested_regime(self) -> None:
+        annual_cut = {"closure_id": "91", "year": 2021, "period": 1, "effective_at": "2021-07-01T03:59:59+00:00"}
+        rows = [
+            {**contract_row(970, annual_cut, start=(2020, 1), outcome="DESERTOR", reprobadas=2, regime="A"),
+             "program_ref": "MED"},
+            {**contract_row(971, annual_cut, start=(2020, 1), outcome="RETENIDO", reprobadas=0, regime="S"),
+             "program_ref": "MED"},
+        ]
+        manifest, prepared = build_program_dropout_snapshot(
+            rows, program_ref="MED", cadence="ANUAL", feature_names=FEATURES, cuts=[annual_cut],
+            pseudonym_key=b"k" * 32,
+        )
+        self.assertEqual(len(prepared), 1)
+        self.assertEqual(prepared[0]["academic_period"], 1)
+        self.assertEqual(manifest["exclusions"], {"OTHER_CADENCE_PROGRAM": 1})
+
     def test_extracted_dataset_trains_a_bundle_the_service_accepts(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

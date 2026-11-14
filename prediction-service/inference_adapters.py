@@ -19,6 +19,7 @@ from feature_contract import (
     PROGRAM_DROPOUT_EVENT,
     FeatureContractError,
     course_abandonment_query,
+    cadence_for,
     program_dropout_ineligibility,
     program_dropout_query,
     verify_reference,
@@ -118,7 +119,7 @@ class DwPredictionDataProvider:
             raise InferenceFailure("INVALID_REQUEST", 400, "academic_cut.cut_id must identify a numeric DW closure.")
         sql = """
             SELECT p.id_programa, p.id_facultad, c.closure_id::text, c.gestion,
-                   c.periodo, c.effective_at
+                   c.periodo, c.effective_at, p.regimen
             FROM dw.dim_programa p
             CROSS JOIN etl_control.academic_period_closure c
             WHERE p.member_type = 'STANDARD' AND p.activo = 'A'
@@ -145,7 +146,7 @@ class DwPredictionDataProvider:
             raise InferenceFailure("DATA_UNAVAILABLE", 503, "The requested DW cut is unavailable.") from exc
         if len(rows) != 1 or rows[0][1] is None:
             raise InferenceFailure("RESOURCE_NOT_FOUND", 404, "The requested program or academic cut is unavailable.")
-        program_code, faculty_id, closure, year, period, effective_at = rows[0]
+        program_code, faculty_id, closure, year, period, effective_at, regime = rows[0]
         return ProgramContext(
             program_ref=program_ref,
             program_code=program_code,
@@ -154,7 +155,7 @@ class DwPredictionDataProvider:
             academic_year=int(year),
             academic_period=int(period),
             effective_at=effective_at.astimezone(timezone.utc).isoformat(),
-            cadence="ANUAL" if int(period) == 3 else "SEMESTRAL" if int(period) in (1, 2) else "OTRO",
+            cadence=cadence_for(regime, int(period)),
         )
 
     def list_available_contexts(self) -> list[tuple[ProgramContext, str]]:
@@ -163,7 +164,7 @@ class DwPredictionDataProvider:
             raise InferenceFailure("DATA_UNAVAILABLE", 503, "The read-only prediction DW connection is not configured.")
         sql = """
             SELECT DISTINCT p.id_programa, p.id_facultad, p.programa,
-                   c.closure_id::text, c.gestion, c.periodo, c.effective_at
+                   c.closure_id::text, c.gestion, c.periodo, c.effective_at, p.regimen
             FROM dw.dim_programa p
             JOIN dw.fact_retencion_desercion f ON f.programa_sk=p.programa_sk
             JOIN etl_control.academic_period_closure c ON c.closure_id=f.closure_id
@@ -180,7 +181,7 @@ class DwPredictionDataProvider:
         except Exception as exc:
             raise InferenceFailure("DATA_UNAVAILABLE", 503, "Available academic programs and cuts could not be loaded.") from exc
         contexts: list[tuple[ProgramContext, str]] = []
-        for program_code, faculty_id, program_name, closure, year, period, effective_at in rows:
+        for program_code, faculty_id, program_name, closure, year, period, effective_at, regime in rows:
             if faculty_id is None:
                 continue
             academic_period = int(period)
@@ -192,7 +193,7 @@ class DwPredictionDataProvider:
                 academic_year=int(year),
                 academic_period=academic_period,
                 effective_at=effective_at.astimezone(timezone.utc).isoformat(),
-                cadence="ANUAL" if academic_period == 3 else "SEMESTRAL" if academic_period in (1, 2) else "OTRO",
+                cadence=cadence_for(regime, academic_period),
             ), program_name or program_code))
         return contexts
 
@@ -211,7 +212,7 @@ class DwPredictionDataProvider:
               AND c.status='PROCESADO' AND c.processed_at IS NOT NULL AND c.effective_at<=clock_timestamp()
             JOIN dw.dim_estudiante e ON e.estudiante_sk=f.estudiante_sk AND e.member_type='STANDARD'
               AND e.valid_from<=c.effective_at AND (e.valid_to IS NULL OR e.valid_to>c.effective_at)
-              AND e.fec_inscripcion<=c.effective_at::date
+              -- No fec_inscripcion bound (DW 0041): the SCD2 version valid at the cut proves presence.
             JOIN dw.dim_programa p ON p.programa_sk=f.programa_sk AND p.member_type='STANDARD'
               AND p.id_programa=%s AND p.activo='A'
             WHERE f.closure_id=%s::bigint

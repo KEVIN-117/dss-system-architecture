@@ -26,6 +26,18 @@ COURSE_ABANDONMENT_EVENT = "COURSE_ABANDONMENT"
 # Bump when the Python eligibility rule below changes.
 ELIGIBILITY_RULE_VERSION = "first-three-academic-years-v3"
 
+# Model cadence by program regime (DW 0045, academico.alm_programas.tipo).
+# Annual programs record their single yearly cut in period 1; period 3 is an
+# inter-semester term and never a cadence cut.
+CADENCE_BY_REGIME = {"A": "ANUAL", "S": "SEMESTRAL"}
+CADENCE_PERIODS = {"ANUAL": (1,), "SEMESTRAL": (1, 2)}
+
+
+def cadence_for(regime: str | None, period: int) -> str:
+    """Model cadence of a program cut, or "OTRO" when no model cadence applies."""
+    cadence = CADENCE_BY_REGIME.get((regime or "").strip().upper())
+    return cadence if cadence and int(period) in CADENCE_PERIODS[cadence] else "OTRO"
+
 
 @dataclass(frozen=True)
 class FeatureSpec:
