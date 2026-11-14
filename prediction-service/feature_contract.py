@@ -143,8 +143,12 @@ JOIN LATERAL (
     SELECT count(DISTINCT CASE WHEN pcad.regimen = 'A' AND pa.periodo = 1 THEN 'ANUAL'
                                WHEN pa.periodo IN (1, 2) THEN 'SEMESTRAL' END) AS n
     FROM dw.fact_cursado hc
-    JOIN dw.dim_estudiante he ON he.estudiante_sk = hc.estudiante_sk AND he.id_alumno = e.id_alumno
-    JOIN dw.dim_programa hp ON hp.programa_sk = hc.programa_sk AND hp.id_programa = p.id_programa
+    -- member_type filters let the partial id_alumno index serve this lookup;
+    -- non-standard members carry NULL natural keys, so rows are unchanged.
+    JOIN dw.dim_estudiante he ON he.estudiante_sk = hc.estudiante_sk AND he.member_type = 'STANDARD'
+      AND he.id_alumno = e.id_alumno
+    JOIN dw.dim_programa hp ON hp.programa_sk = hc.programa_sk AND hp.member_type = 'STANDARD'
+      AND hp.id_programa = p.id_programa
     JOIN dw.dim_periodo_academico pa ON pa.periodo_academico_sk = hc.periodo_academico_sk
     JOIN etl_control.academic_period_closure hcut ON hcut.closure_id = pa.closure_id
       AND hcut.status = 'PROCESADO'
