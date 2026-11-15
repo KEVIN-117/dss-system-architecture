@@ -64,7 +64,7 @@ BEGIN
              AND d.member_type='UNKNOWN' AND f.es_admitido IS FALSE) <> 1
        OR (SELECT count(*) FROM dw.fact_cursado
            WHERE id_matricula_origen IN (9003,9004,9005) AND conteo_intento=1
-             AND es_aprobado IS NULL) <> 3
+             AND es_aprobado IS TRUE) <> 3
        OR (SELECT count(*) FROM dw.fact_retencion_desercion
            WHERE closure_id=(SELECT closure_id FROM etl_control.academic_period_closure
                              WHERE gestion=2025 AND periodo=2)
