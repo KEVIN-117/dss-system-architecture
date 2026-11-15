@@ -26,7 +26,7 @@ files:
   source/alm_programas_facultades.sql:
     sha256: 5994f8097179bdc92a8bcf4a034a5767d97373a55881cb0c3bb1ff0002149197
   source/alumnos.sql:
-    sha256: 1a6d5dfea45e2a1d7b01e55275879506b61f62639521f7c8620c65d81796ee9f
+    sha256: a9cfbb63aa00ec2668580029be7ed675bcac3b480f7869222a48fe3cf1ea2b82
   source/lugar_localidad.sql:
     sha256: e48302f047217cc1b02ee720678ab97fc65d3f212d11405fe0e95639addd322f
   source/notas_planilla.sql:
@@ -34,11 +34,11 @@ files:
   source/pln_materias.sql:
     sha256: 58b71982f1ef9ad495a22c23422da9958d3576f84f5af75b2e46f3be2f307efd
   source/postulantes.sql:
-    sha256: f9cba446015f59e3bda6c506e1d0066ac2aba8a831cbea0aeba1b5c4c8dfda54
+    sha256: ba21833d51efedd014ab36b76b7f869145adea52635dc753b58f0faec0fa03da
   source/prs_colegios.sql:
-    sha256: b7d9b8a0f208bd3cc28180bbe07e9441b1aee6e702170032f06c1f60d16ed1ea
+    sha256: aca98e12a95aa3a1595fcf8ebcedbce631cebcb1e24789b4c8ed0adec2413e13
   source/uatf_datos.sql:
-    sha256: cbecc161b0f98b314fb166bbb856afc54fbe1596663473fed83398ee33ca1028
+    sha256: 28c29706dec71a8d92ad47d257533b77622b60ce3f8491e64f5e9fbf0e3dc7a5
   expected/scd2-cases.yml:
     sha256: 0efe7aec63e30d22c137cac05949a142dcde543ebee60f02f98170ebeb910a85
   expected/closure-cases.yml:

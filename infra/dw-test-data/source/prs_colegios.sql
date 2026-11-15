@@ -4,6 +4,9 @@ CREATE TABLE public.prs_colegios (
     tipo CHAR(1) NOT NULL,
     turno CHAR(1) NOT NULL,
     area CHAR(1) NOT NULL,
+    id_pais SMALLINT,
+    cod_dep SMALLINT,
+    cod_prov SMALLINT,
     cod_loc SMALLINT NOT NULL,
     _estado CHAR(1) NOT NULL
 );
