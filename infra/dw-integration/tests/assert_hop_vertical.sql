@@ -89,6 +89,11 @@ BEGIN
         RAISE EXCEPTION 'The atomic publisher did not expose the expected conformed dimensions';
     END IF;
 
+    IF NOT EXISTS (SELECT 1 FROM dw.dim_programa WHERE id_programa='P01' AND regimen='A')
+       OR NOT EXISTS (SELECT 1 FROM dw.dim_programa WHERE id_programa='P02' AND regimen='S') THEN
+        RAISE EXCEPTION 'The program cadence was not propagated from the source fixture';
+    END IF;
+
     IF (SELECT count(*) FROM etl_control.academic_period_closure
         WHERE gestion=2025 AND periodo=1 AND status='CERRADO') <> 1
        OR (SELECT count(*) FROM etl_control.academic_period_closure
