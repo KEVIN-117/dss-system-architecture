@@ -22,7 +22,7 @@ expected_cases:
   quality-cases.yml: 3
 files:
   source/alm_programas.sql:
-    sha256: 2f8460b6ac83f402dd417b3280298850d76912946473bdf2ae50aaa3ef9f4688
+    sha256: 313e73a41e5d6f1aa18aa981e2e9c18316f9adfad0ed5ed632e198d76bc8490e
   source/alm_programas_facultades.sql:
     sha256: 5994f8097179bdc92a8bcf4a034a5767d97373a55881cb0c3bb1ff0002149197
   source/alumnos.sql:
