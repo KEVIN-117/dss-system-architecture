@@ -1160,6 +1160,116 @@ def _dispatch_pending_prediction_batches(store: Any | None = None) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Model registry for the admin portal — validation, activation, deactivation
+# ---------------------------------------------------------------------------
+
+_MODEL_ID_PATTERN = r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$"
+
+
+class ModelActivationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    model_id: str = Field(pattern=_MODEL_ID_PATTERN)
+    version: str = Field(pattern=_MODEL_ID_PATTERN)
+    reason: str = Field(min_length=3, max_length=500)
+
+
+class ModelDeactivationRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    event_code: str = Field(pattern=r"^(COURSE_ABANDONMENT|PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE)$")
+    cadence: str = Field(pattern=r"^(ANUAL|SEMESTRAL)$")
+    reason: str = Field(min_length=3, max_length=500)
+
+
+def _admin_registry() -> ModelRegistry:
+    return _model_registry(os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"))
+
+
+@app.get(
+    "/v1/models",
+    summary="Listar modelos candidatos con sus métricas",
+    description="Requiere rol de operador ML. Devuelve cada candidato con métricas de prueba y validación, "
+                "matriz de confusión, datos de entrenamiento y si puede activarse.",
+    responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 503: COMMON_ERROR_RESPONSES[503]},
+)
+def list_models(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Model request rejected")
+    try:
+        registry = _admin_registry()
+        return JSONResponse({"models": registry.list_models(), **registry.registry_state()},
+                            headers={"Cache-Control": "no-store"})
+    except (InvalidModelArtifact, OSError, json.JSONDecodeError):
+        logger.exception("Model registry listing failed request_id=%s", request_id)
+        return _make_problem(503, "Registro de modelos no disponible", "MODEL_REGISTRY_UNAVAILABLE", request_id)
+
+
+@app.post(
+    "/v1/models/activate",
+    summary="Activar un modelo candidato",
+    description="Requiere rol de operador ML. Activa el candidato para su tipo de evento y cadencia. "
+                "Solo se aceptan candidatos entrenados con datos aprobados; queda auditado con el operador y el motivo.",
+    responses={400: COMMON_ERROR_RESPONSES[400], 401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403],
+               409: COMMON_ERROR_RESPONSES[409], 503: COMMON_ERROR_RESPONSES[503]},
+)
+def activate_model(
+    body: ModelActivationRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        principal = _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Model activation rejected")
+    try:
+        pointer = _admin_registry().activate(body.model_id, body.version, principal.subject, body.reason)
+    except InvalidModelArtifact as exc:
+        return _make_problem(409, "El modelo no se puede activar", "MODEL_NOT_ACTIVATABLE", request_id, detail=str(exc))
+    except ValueError as exc:
+        return _make_problem(400, "Solicitud inválida", "INVALID_REQUEST", request_id, detail=str(exc))
+    except OSError:
+        logger.exception("Model activation failed request_id=%s", request_id)
+        return _make_problem(503, "Registro de modelos no disponible", "MODEL_REGISTRY_UNAVAILABLE", request_id)
+    logger.info("Model %s/%s activated by %s request_id=%s", body.model_id, body.version, principal.subject, request_id)
+    return JSONResponse({"active": pointer}, headers={"Cache-Control": "no-store"})
+
+
+@app.post(
+    "/v1/models/deactivate",
+    summary="Desactivar el modelo activo de un tipo de evento y cadencia",
+    description="Requiere rol de operador ML. Deja el alcance sin modelo activo; las predicciones de ese alcance "
+                "responden que no hay modelo disponible. Queda auditado con el operador y el motivo.",
+    responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 409: COMMON_ERROR_RESPONSES[409],
+               503: COMMON_ERROR_RESPONSES[503]},
+)
+def deactivate_model(
+    body: ModelDeactivationRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        principal = _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Model deactivation rejected")
+    try:
+        event = _admin_registry().deactivate(body.event_code, body.cadence, principal.subject, body.reason)
+    except NoActiveModel as exc:
+        return _make_problem(409, "No hay modelo activo", "NO_ACTIVE_MODEL", request_id, detail=str(exc))
+    except (InvalidModelArtifact, OSError, json.JSONDecodeError):
+        logger.exception("Model deactivation failed request_id=%s", request_id)
+        return _make_problem(503, "Registro de modelos no disponible", "MODEL_REGISTRY_UNAVAILABLE", request_id)
+    logger.info("Scope %s|%s deactivated by %s request_id=%s", body.event_code, body.cadence, principal.subject, request_id)
+    return JSONResponse({"event": event}, headers={"Cache-Control": "no-store"})
+
+
+# ---------------------------------------------------------------------------
 # Run with uvicorn
 # ---------------------------------------------------------------------------
 

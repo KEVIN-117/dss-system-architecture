@@ -50,6 +50,53 @@ class LoadedModel:
 
 _thread_lock = threading.RLock()
 
+# Activation performed by an ML administrator from the admin portal, without a
+# PRED-004 report. Only candidates trained on approved (non-exploratory,
+# non-synthetic) data are eligible; the operator and reason are audited.
+ADMIN_ACTIVATION = "ADMIN_ACTIVATION"
+_UNAPPROVED_EVIDENCE = {"synthetic_fixture", "exploratory_unapproved"}
+
+
+def _read_json(path: Path) -> Any:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return None
+
+
+def candidate_evidence(folder: Path) -> dict[str, Any]:
+    """Classify the data a candidate was trained on, from its own bundle files."""
+    dataset = _read_json(folder / "dataset_ref.json") or {}
+    report = _read_json(folder / "evaluation_report.json") or {}
+    split = ((report.get("protocol") or {}).get("split") or {}) if isinstance(report, dict) else {}
+    evidence_kind = split.get("evidence_kind")
+    if dataset.get("fixture_only") is True:
+        evidence_kind = "synthetic_fixture"
+    elif dataset.get("exploratory_only") is True:
+        evidence_kind = "exploratory_unapproved"
+    target_ref = dataset.get("target_definition_ref")
+    population_ref = dataset.get("population_definition_ref")
+    refs_ok = all(isinstance(ref, str) and ref.startswith("dsa:") for ref in (target_ref, population_ref))
+    if evidence_kind == "synthetic_fixture":
+        reason = "Entrenado con datos sintéticos de prueba."
+    elif evidence_kind == "exploratory_unapproved":
+        reason = "Entrenado con datos exploratorios sin aprobación del objetivo y la población."
+    elif not refs_ok:
+        reason = "El dataset no tiene referencias aprobadas de objetivo y población."
+    else:
+        reason = None
+    return {
+        "evidence_kind": evidence_kind,
+        "dataset_id": dataset.get("dataset_id"),
+        "dataset_ref": dataset.get("dataset_ref"),
+        "dataset_digest": dataset.get("dataset_digest"),
+        "target_definition_ref": target_ref,
+        "population_definition_ref": population_ref,
+        "target_definition": dataset.get("target_definition"),
+        "activatable": reason is None,
+        "not_activatable_reason": reason,
+    }
+
 
 @contextmanager
 def _registry_lock(path: Path) -> Iterator[None]:
@@ -208,6 +255,16 @@ class ModelRegistry:
             report = json.loads(report_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError) as exc:
             raise InvalidModelArtifact("Approved evaluation report cannot be read.") from exc
+        if pointer.get("activation_kind") == ADMIN_ACTIVATION:
+            # Activated by an ML administrator from the admin portal: the record
+            # pins the exact bundle and keeps the data-approval guard.
+            if (report.get("kind") != ADMIN_ACTIVATION
+                    or report.get("model_id") != pointer.get("model_id")
+                    or report.get("version") != pointer.get("version")
+                    or report.get("artifact_digest") != pointer.get("artifact_digest")
+                    or report.get("evidence_kind") in {"synthetic_fixture", "exploratory_unapproved"}):
+                raise InvalidModelArtifact("Administrative activation record no longer authorizes this model.")
+            return
         exact_candidate = any(
             item.get("model_id") == pointer.get("model_id")
             and item.get("version") == pointer.get("version")
@@ -216,7 +273,8 @@ class ModelRegistry:
         )
         if (report.get("decision_status") != "APTO"
                 or report.get("crisp_dm_next_step", {}).get("deployment_allowed") is not True
-                or report.get("evidence_kind") == "synthetic_fixture"
+                or report.get("evidence_kind") in {"synthetic_fixture", "exploratory_unapproved"}
+                or report.get("dataset", {}).get("exploratory_only") is True
                 or not exact_candidate):
             raise InvalidModelArtifact("Approved evaluation evidence no longer authorizes this model.")
 
@@ -305,6 +363,8 @@ class ModelRegistry:
             raise InvalidModelArtifact("Evaluation evidence does not authorize deployment.")
         if report.get("evidence_kind") == "synthetic_fixture" or report.get("dataset", {}).get("fixture_only") is True:
             raise InvalidModelArtifact("Synthetic evidence cannot approve institutional deployment.")
+        if report.get("evidence_kind") == "exploratory_unapproved" or report.get("dataset", {}).get("exploratory_only") is True:
+            raise InvalidModelArtifact("Exploratory evidence without DSA approval cannot approve deployment.")
         matched = any(item.get("model_id") == model_id and item.get("version") == version and item.get("artifact_digest") == manifest["artifact_digest"] for item in report.get("models", []))
         if not matched:
             raise InvalidModelArtifact("Approval report does not identify this exact candidate digest.")
@@ -373,6 +433,187 @@ class ModelRegistry:
                 active_by_scope[scope_key] = pointer
             _atomic_json(self.active_path, {"active": pointer, "active_by_scope": active_by_scope, "events": history})
             return pointer
+
+    # ------------------------------------------------------------------
+    # Admin portal: inspect candidates, activate and deactivate per scope.
+
+    def _read_state(self) -> dict[str, Any]:
+        if not self.active_path.exists():
+            return {"active": None, "active_by_scope": {}, "events": []}
+        state = json.loads(self.active_path.read_text(encoding="utf-8"))
+        if not isinstance(state, dict):
+            raise InvalidModelArtifact("Active model registry state is malformed.")
+        if "active" not in state:  # tolerate the earlier pointer-only format
+            state = {"active": state, "events": []}
+        state.setdefault("active_by_scope", {})
+        state.setdefault("events", [])
+        return state
+
+    def registry_state(self) -> dict[str, Any]:
+        """Active pointer per event/cadence scope and the audited event history."""
+        state = self._read_state()
+        return {"active_by_scope": state.get("active_by_scope") or {}, "events": list(state.get("events") or [])}
+
+    def list_models(self) -> list[dict[str, Any]]:
+        """Summaries of every trusted candidate bundle, newest first.
+
+        Reads only the bundle's own JSON files; full integrity is verified on
+        activation and on every load.
+        """
+        active_by_scope = self.registry_state()["active_by_scope"]
+        active_keys = {(p.get("model_id"), p.get("version")): key for key, p in active_by_scope.items() if isinstance(p, dict)}
+        models = []
+        for manifest_path in self.root.glob("*/manifest.json"):
+            if manifest_path.is_symlink() or not manifest_path.resolve().is_relative_to(self.root):
+                continue
+            folder = manifest_path.parent
+            manifest = _read_json(manifest_path)
+            if not isinstance(manifest, dict) or not manifest.get("model_id") or not manifest.get("version"):
+                continue
+            metrics = _read_json(folder / "metrics.json") or {}
+            config = _read_json(folder / "training_config.json") or {}
+            tuning = config.get("tuning") or {}
+            classes = manifest.get("classes") or {}
+            scope = manifest.get("serving_scope") or {}
+            scope_key = (f"{classes.get('event_code')}|{scope.get('cadence')}"
+                         if classes.get("event_code") and scope.get("cadence") else None)
+            evidence = candidate_evidence(folder)
+            per_class = metrics.get("per_class") or {}
+            positive = per_class.get("1") or {}
+            models.append({
+                "model_id": manifest["model_id"],
+                "version": manifest["version"],
+                "algorithm": manifest.get("algorithm"),
+                "created_at": manifest.get("created_at"),
+                "lifecycle_state": manifest.get("lifecycle_state"),
+                "event_code": classes.get("event_code"),
+                "cadence": scope.get("cadence"),
+                "scope_key": scope_key,
+                "is_active": active_keys.get((manifest["model_id"], manifest["version"])) == scope_key and scope_key is not None,
+                "decision_threshold": metrics.get("decision_threshold", manifest.get("decision_threshold")),
+                "dataset": {k: evidence[k] for k in ("dataset_id", "dataset_ref", "evidence_kind", "target_definition_ref",
+                                                     "population_definition_ref", "target_definition")},
+                "activatable": evidence["activatable"] and scope_key is not None,
+                "not_activatable_reason": evidence["not_activatable_reason"]
+                if scope_key is not None else "El candidato no declara tipo de evento y cadencia.",
+                "test_metrics": {
+                    "recall": metrics.get("recall"),
+                    "precision": metrics.get("precision"),
+                    "f1_score": metrics.get("f1_score"),
+                    "accuracy": metrics.get("accuracy"),
+                    "roc_auc": metrics.get("roc_auc"),
+                    "pr_auc": metrics.get("pr_auc"),
+                    "alert_rate": metrics.get("holdout_alert_rate"),
+                    "macro_f1": (metrics.get("macro_average") or {}).get("f1_score"),
+                    "test_row_count": metrics.get("test_row_count"),
+                    "positive_support": positive.get("support"),
+                    "threshold_origin": metrics.get("threshold_origin"),
+                },
+                "per_class": [
+                    {"class_name": item.get("class_name"), "precision": item.get("precision"), "recall": item.get("recall"),
+                     "f1_score": item.get("f1_score"), "support": item.get("support")}
+                    for _, item in sorted(per_class.items())
+                ],
+                "confusion_matrix": metrics.get("confusion_matrix"),
+                "validation": {
+                    "mean_recall": tuning.get("best_mean_recall"),
+                    "mean_f1": tuning.get("best_mean_f1"),
+                    "method": tuning.get("method"),
+                    "n_splits": tuning.get("n_splits"),
+                    "candidate_count": tuning.get("candidate_count"),
+                },
+                "hyperparameters": config.get("hyperparameters"),
+            })
+        models.sort(key=lambda item: item.get("created_at") or "", reverse=True)
+        return models
+
+    def activate(self, model_id: str, version: str, activated_by: str, reason: str) -> dict[str, Any]:
+        """Activate a candidate for its event/cadence scope from the admin portal."""
+        if not activated_by.strip():
+            raise ValueError("An operator identity is required for activation.")
+        if not reason.strip():
+            raise ValueError("An activation reason is required.")
+        folder, manifest = self._find(model_id, version)
+        if manifest.get("lifecycle_state") not in {"CANDIDATE", "APPROVED"}:
+            raise InvalidModelArtifact("Only a candidate can be activated.")
+        evidence = candidate_evidence(folder)
+        if not evidence["activatable"]:
+            raise InvalidModelArtifact(evidence["not_activatable_reason"])
+        event_code = (manifest.get("classes") or {}).get("event_code")
+        cadence = (manifest.get("serving_scope") or {}).get("cadence")
+        if not event_code or not cadence:
+            raise InvalidModelArtifact("El candidato no declara tipo de evento y cadencia.")
+        scope_key = self._scope_key(event_code, cadence)
+        self._validate(folder, manifest)
+        # Both serialized objects must load before any state changes.
+        self._load(model_id, version, manifest["artifact_digest"], False)
+        metrics = _read_json(folder / "metrics.json") or {}
+        now = datetime.now(timezone.utc).isoformat()
+        record = {
+            "kind": ADMIN_ACTIVATION,
+            "model_id": model_id,
+            "version": version,
+            "artifact_digest": manifest["artifact_digest"],
+            "algorithm": manifest.get("algorithm"),
+            "scope_key": scope_key,
+            "evidence_kind": evidence["evidence_kind"],
+            "dataset_digest": evidence["dataset_digest"],
+            "target_definition_ref": evidence["target_definition_ref"],
+            "population_definition_ref": evidence["population_definition_ref"],
+            "test_metrics": {key: metrics.get(key) for key in ("recall", "precision", "f1_score", "roc_auc", "pr_auc", "holdout_alert_rate")},
+            "activated_by": activated_by,
+            "reason": reason.strip(),
+            "activated_at": now,
+        }
+        record_key = hashlib.sha256(f"{model_id}|{version}|{manifest['artifact_digest']}|{now}".encode("utf-8")).hexdigest()
+        record_path = self.state_dir / "approvals" / f"admin-{record_key}.json"
+        with _registry_lock(self.lock_path):
+            _atomic_json(record_path, record)
+            record_ref = str(record_path.relative_to(self.root).as_posix())
+            state = self._read_state()
+            manifest["lifecycle_state"] = "APPROVED"
+            manifest["approved_at"] = now
+            manifest["approved_by"] = activated_by
+            manifest["approval_evaluation_ref"] = record_ref
+            _atomic_json(folder / "manifest.json", manifest)
+            pointer = {
+                "model_id": model_id, "version": version, "artifact_digest": manifest["artifact_digest"],
+                "manifest_digest": _sha256(folder / "manifest.json"), "approval_report_ref": record_ref,
+                "approval_report_digest": _sha256(record_path), "activation_kind": ADMIN_ACTIVATION,
+                "activated_at": now, "approved_by": activated_by,
+            }
+            active_by_scope = dict(state.get("active_by_scope") or {})
+            previous = active_by_scope.get(scope_key)
+            active_by_scope[scope_key] = pointer
+            history = list(state.get("events") or [])
+            history.append({"action": "ACTIVATE", "scope_key": scope_key, "previous": previous, "active": pointer,
+                            "approved_by": activated_by, "reason": reason.strip(), "at": now})
+            _atomic_json(self.active_path, {"active": pointer, "active_by_scope": active_by_scope, "events": history})
+        return pointer
+
+    def deactivate(self, event_code: str, cadence: str, deactivated_by: str, reason: str) -> dict[str, Any]:
+        """Leave a scope without an active model; serving then answers 'no active model'."""
+        if not deactivated_by.strip():
+            raise ValueError("An operator identity is required for deactivation.")
+        if not reason.strip():
+            raise ValueError("A deactivation reason is required.")
+        scope_key = self._scope_key(event_code, cadence)
+        now = datetime.now(timezone.utc).isoformat()
+        with _registry_lock(self.lock_path):
+            state = self._read_state()
+            active_by_scope = dict(state.get("active_by_scope") or {})
+            current = active_by_scope.pop(scope_key, None)
+            if not current:
+                raise NoActiveModel("No active model exists for the requested event and cadence.")
+            legacy = state.get("active")
+            if isinstance(legacy, dict) and (legacy.get("model_id"), legacy.get("version")) == (current.get("model_id"), current.get("version")):
+                legacy = None
+            history = list(state.get("events") or [])
+            event = {"action": "DEACTIVATE", "scope_key": scope_key, "previous": current, "active": None,
+                     "approved_by": deactivated_by, "reason": reason.strip(), "at": now}
+            history.append(event)
+            _atomic_json(self.active_path, {"active": legacy, "active_by_scope": active_by_scope, "events": history})
+        return event
 
 
 def main() -> None:

@@ -26,6 +26,7 @@ _NON_NEGATIVE_INTEGER_FIELDS = {
     "materias_aprobadas",
     "materias_reprobadas",
     "materias_arrastradas",
+    "cortes_previos",
     "conteo_snapshot",
     "conteo_evaluable",
     "conteo_desercion",
@@ -135,6 +136,7 @@ def adapt_dw_retention_row(row: Mapping[str, Any]) -> dict[str, Any]:
         "materias_reprobadas",
         "materias_arrastradas",
         "ppa_acumulado",
+        "cortes_previos",
     ):
         adapted[field] = row.get(field)
     return adapted

@@ -67,7 +67,7 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
             raise ValueError("Artifacts do not share the same dataset, target definition, and evaluation partition.")
     dataset_identity_fields = (
         "dataset_ref", "manifest_ref", "dataset_id", "dataset_digest", "snapshot_ref",
-        "target_definition_ref", "population_definition_ref", "partition_id", "fixture_only",
+        "target_definition_ref", "population_definition_ref", "partition_id", "fixture_only", "exploratory_only",
         "source", "academic_cut",
     )
     dataset_identity = {key: entries[0]["dataset"].get(key) for key in dataset_identity_fields}
@@ -84,7 +84,8 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
         if entry["validation"]["mean_recall"] is None or entry["validation"]["mean_f1"] is None:
             raise ValueError("Artifacts must include validation metrics for candidate selection.")
 
-    if identity["decision_policy"] is None:
+    cost_policy = identity["decision_policy"] is not None and identity["decision_policy"].get("kind", "cost") == "cost"
+    if not cost_policy:
         ranked = sorted(entries, key=lambda e: (-e["validation"]["mean_recall"], -e["validation"]["mean_f1"]))
         best_key = (-ranked[0]["validation"]["mean_recall"], -ranked[0]["validation"]["mean_f1"])
         selection_rule = (
@@ -100,22 +101,25 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
             "Approved validation cost, then validation out-of-fold recall and F1. "
             "If all tie, no unique candidate is selected. Outer test does not participate."
         )
-    if identity["decision_policy"] is None:
+    if not cost_policy:
         tied = [entry for entry in ranked if (-entry["validation"]["mean_recall"], -entry["validation"]["mean_f1"]) == best_key]
     else:
         tied = [entry for entry in ranked if (entry["validation"]["validation_cost"], -entry["validation"]["mean_recall"], -entry["validation"]["mean_f1"]) == best_key]
     selected = tied[0] if len(tied) == 1 else None
     is_synthetic = all(e["dataset"].get("fixture_only") is True for e in entries)
-    evidence_kind = "synthetic_fixture" if is_synthetic else "institutional_unverified"
+    is_exploratory = not is_synthetic and all(e["dataset"].get("exploratory_only") is True for e in entries)
+    evidence_kind = "synthetic_fixture" if is_synthetic else "exploratory_unapproved" if is_exploratory else "institutional_unverified"
     decision_reason = (
         "La evidencia corresponde a un fixture sintético y solo valida el software; no permite inferir utilidad institucional."
         if is_synthetic else
+        "Entrenamiento exploratorio con datos reales sin aprobación DSA del objetivo, la población ni la política de costos; sirve para analizar el comportamiento del modelo y no autoriza su uso."
+        if is_exploratory else
         "No se ha vinculado evidencia institucional autorizada ni criterios DSA de utilidad para emitir una decisión institucional."
     )
     report = {
         "report_version": "pred004-comparison-v1",
         "created_at": datetime.now(timezone.utc).isoformat(),
-        "report_scope": "software_validation_only" if is_synthetic else "institutional_evaluation_incomplete",
+        "report_scope": "software_validation_only" if is_synthetic else "exploratory_analysis_only" if is_exploratory else "institutional_evaluation_incomplete",
         "evidence_kind": evidence_kind,
         "decision_status": "EVIDENCIA_INSUFICIENTE",
         "decision_reason": decision_reason,

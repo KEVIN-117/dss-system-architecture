@@ -48,6 +48,36 @@ _CADENCE_PERIODS = CADENCE_PERIODS
 _REGIME_BY_CADENCE = {cadence: regime for regime, cadence in CADENCE_BY_REGIME.items()}
 _EVALUABLE = {"RETENIDO", "DESERTOR"}
 
+
+def _cut_index(year: int, period: int, cadence: str) -> int:
+    """Consecutive index of a cadence cut: semesters 2/year, annual 1/year."""
+    return int(year) * 2 + int(period) - 1 if cadence == "SEMESTRAL" else int(year)
+
+
+def _no_return_labels(contract_rows: list[Mapping[str, Any]], cadence: str, horizon_years: int,
+                      last_index: int) -> dict[tuple[str, str, int], str | None]:
+    """Label each enrolled student-program-cut by return within the horizon.
+
+    DESERTOR when the student takes no course in the program in any cadence cut
+    of the next ``horizon_years`` years; RETENIDO otherwise. ``None`` when the
+    horizon reaches past the last processed cut (censored).
+    """
+    span = horizon_years * len(_CADENCE_PERIODS[cadence])
+    present: dict[tuple[str, str], set[int]] = {}
+    for row in contract_rows:
+        if int(row["cut_period"]) in _CADENCE_PERIODS[cadence] and (row.get("cut_course_count") or 0) > 0:
+            present.setdefault((str(row["program_ref"]), str(row["subject_ref"])), set()).add(
+                _cut_index(row["cut_year"], row["cut_period"], cadence))
+    labels: dict[tuple[str, str, int], str | None] = {}
+    for (program, subject), indices in present.items():
+        for index in indices:
+            if index + span > last_index:
+                labels[(program, subject, index)] = None
+            else:
+                returned = any(index < other <= index + span for other in indices)
+                labels[(program, subject, index)] = "RETENIDO" if returned else "DESERTOR"
+    return labels
+
 _CLOSURES_SQL = """
 SELECT DISTINCT c.closure_id::text AS closure_id, c.effective_at
 FROM dw.fact_retencion_desercion f
@@ -74,6 +104,7 @@ _IDENTIFIER_AND_AUDIT_FIELDS = [
     {"name": "source_run_id", "logical_type": "uuid", "role": "audit", "nullable": False},
     {"name": "population_status", "logical_type": "category", "role": "audit", "nullable": False},
     {"name": "resultado_retencion", "logical_type": "category", "role": "audit", "nullable": False},
+    {"name": "next_cut_outcome", "logical_type": "category", "role": "audit", "nullable": True},
     {"name": "es_desercion", "logical_type": "boolean", "role": "audit", "nullable": True},
     {"name": "conteo_snapshot", "logical_type": "integer", "role": "audit", "nullable": False},
     {"name": "conteo_evaluable", "logical_type": "integer", "role": "audit", "nullable": False},
@@ -98,6 +129,7 @@ def build_program_dropout_snapshot(
     population_definition_ref: str | None = None,
     dsa_approved: bool = False,
     pseudonym_key: bytes | None = None,
+    dropout_horizon_years: int | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Turn rows returned by ``program_dropout_query`` into a prepared dataset.
 
@@ -112,6 +144,14 @@ def build_program_dropout_snapshot(
     key = pseudonym_key or secrets.token_bytes(32)
     exclusions: Counter[str] = Counter()
     rows: list[dict[str, Any]] = []
+    contract_rows = list(contract_rows)
+    horizon_labels: dict[tuple[str, str, int], str | None] | None = None
+    if dropout_horizon_years is not None:
+        if dropout_horizon_years < 1:
+            raise ValueError("dropout_horizon_years must be >= 1.")
+        last_index = max(_cut_index(r["cut_year"], r["cut_period"], cadence) for r in contract_rows
+                         if int(r["cut_period"]) in _CADENCE_PERIODS[cadence]) if contract_rows else 0
+        horizon_labels = _no_return_labels(contract_rows, cadence, dropout_horizon_years, last_index)
     for source in contract_rows:
         if int(source["cut_period"]) not in _CADENCE_PERIODS[cadence]:
             exclusions["OTHER_CADENCE_CUT"] += 1
@@ -123,10 +163,20 @@ def build_program_dropout_snapshot(
         if reason is not None:
             exclusions[reason] += 1
             continue
-        outcome = source.get("resultado_retencion")
-        if outcome not in _EVALUABLE:
-            exclusions["NO_EVALUABLE_OUTCOME"] += 1
-            continue
+        if horizon_labels is not None:
+            if not (source.get("cut_course_count") or 0) > 0:
+                exclusions["NO_COURSEWORK_AT_CUT"] += 1
+                continue
+            outcome = horizon_labels.get((str(source["program_ref"]), str(source["subject_ref"]),
+                                          _cut_index(source["cut_year"], source["cut_period"], cadence)))
+            if outcome is None:
+                exclusions["HORIZON_NOT_OBSERVED"] += 1
+                continue
+        else:
+            outcome = source.get("resultado_retencion")
+            if outcome not in _EVALUABLE:
+                exclusions["NO_EVALUABLE_OUTCOME"] += 1
+                continue
         # Keyed pseudonym: stable per student within this snapshot, unlinkable
         # to DW identifiers without the (discarded) key.
         student_ref = hashlib.sha256(key + f"{source['program_ref']}:{source['subject_ref']}".encode()).hexdigest()[:32]
@@ -139,10 +189,13 @@ def build_program_dropout_snapshot(
             "source_run_id": str(source["source_run_id"]),
             "population_status": "ELIGIBLE",
             "resultado_retencion": outcome,
-            "es_desercion": source.get("es_desercion"),
+            "next_cut_outcome": source.get("resultado_retencion"),
+            # With a horizon label the DW next-cut flags are replaced by the
+            # horizon outcome; the DW outcome stays in next_cut_outcome.
+            "es_desercion": (outcome == "DESERTOR") if horizon_labels is not None else source.get("es_desercion"),
             "conteo_snapshot": source.get("conteo_snapshot"),
-            "conteo_evaluable": source.get("conteo_evaluable"),
-            "conteo_desercion": source.get("conteo_desercion"),
+            "conteo_evaluable": 1 if horizon_labels is not None else source.get("conteo_evaluable"),
+            "conteo_desercion": int(outcome == "DESERTOR") if horizon_labels is not None else source.get("conteo_desercion"),
             "target_class": POSITIVE_CLASS if outcome == "DESERTOR" else NEGATIVE_CLASS,
         }
         for name in feature_names:
@@ -179,7 +232,11 @@ def build_program_dropout_snapshot(
             "positive_class": POSITIVE_CLASS,
             "negative_class": NEGATIVE_CLASS,
             "event_code": PROGRAM_DROPOUT_EVENT,
-            "label_source": "dw.fact_retencion_desercion.resultado_retencion",
+            "label_source": (
+                f"no coursework in the program in any cadence cut of the next {dropout_horizon_years} years "
+                "(dw.fact_retencion_desercion.materias_cursadas); censored when the horizon is not observed"
+                if dropout_horizon_years is not None else "dw.fact_retencion_desercion.resultado_retencion"),
+            "horizon_years": dropout_horizon_years,
         },
         "target_definition_ref": target_definition_ref,
         "population_definition_ref": population_definition_ref,
@@ -244,6 +301,9 @@ def main() -> None:
     parser.add_argument("--population-definition-ref")
     parser.add_argument("--dsa-approved", action="store_true",
                         help="Assert that both referenced definitions were approved by DSA.")
+    parser.add_argument("--dropout-horizon-years", type=int,
+                        help="Label DESERTOR when the student does not return to the program within N years "
+                             "(default: the DW next-cut retention outcome).")
     parser.add_argument("--dsn", default=os.getenv("PREDICTION_DW_DATABASE_URL", ""))
     args = parser.parse_args()
     if not args.dsn:
@@ -255,7 +315,7 @@ def main() -> None:
     manifest, rows = build_program_dropout_snapshot(
         contract_rows, program_ref=args.program, cadence=args.cadence, feature_names=features, cuts=cuts,
         target_definition_ref=args.target_definition_ref, population_definition_ref=args.population_definition_ref,
-        dsa_approved=args.dsa_approved,
+        dsa_approved=args.dsa_approved, dropout_horizon_years=args.dropout_horizon_years,
     )
     write_snapshot(args.output, manifest, rows)
     report = validate_prepared_dataset(manifest, rows)

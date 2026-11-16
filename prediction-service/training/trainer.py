@@ -150,11 +150,27 @@ def _fold_count(y: pd.Series, groups: pd.Series, requested: int) -> int:
     return min(requested, int(class_counts.min()), *(int(value) for value in groups_per_class))
 
 
-def _validated_decision_policy(config: dict[str, Any]) -> dict[str, Any] | None:
+def _validated_decision_policy(config: dict[str, Any], exploratory: bool = False) -> dict[str, Any] | None:
+    """Approved cost policy, or an alert-rate policy (share of rows flagged).
+
+    An alert-rate policy (``alert_rate`` in (0, 1)) sets the threshold so that
+    that share of validation rows is flagged; it models a fixed intervention
+    capacity. Exploratory runs may use an unapproved alert-rate policy only.
+    """
     policy = config.get("decision_policy")
     if policy is None:
         return None
-    if not isinstance(policy, dict) or policy.get("approved") is not True or not isinstance(policy.get("policy_ref"), str) or not policy["policy_ref"].strip():
+    if not isinstance(policy, dict):
+        raise ValueError("decision_policy must be an object.")
+    if "alert_rate" in policy:
+        rate = policy["alert_rate"]
+        if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not 0 < float(rate) < 1:
+            raise ValueError("decision_policy.alert_rate must be a number between 0 and 1.")
+        approved = policy.get("approved") is True and isinstance(policy.get("policy_ref"), str) and policy["policy_ref"].strip()
+        if not approved and not exploratory:
+            raise ValueError("decision_policy requires approved=true and a non-empty DSA policy_ref.")
+        return {**policy, "kind": "alert_rate", "alert_rate": float(rate), "approved": bool(approved)}
+    if policy.get("approved") is not True or not isinstance(policy.get("policy_ref"), str) or not policy["policy_ref"].strip():
         raise ValueError("decision_policy requires approved=true and a non-empty DSA policy_ref.")
     costs = {}
     for name in ("false_negative_cost", "false_positive_cost"):
@@ -164,12 +180,24 @@ def _validated_decision_policy(config: dict[str, Any]) -> dict[str, Any] | None:
         costs[name] = float(value)
     if not any(costs.values()):
         raise ValueError("At least one decision error cost must be greater than zero.")
-    return {**policy, **costs}
+    return {**policy, **costs, "kind": "cost"}
 
 
 def _select_validation_threshold(y_true: list[int], probabilities: list[float], policy: dict[str, Any]) -> tuple[float, dict[str, float]]:
     truth = np.asarray(y_true, dtype=int)
     scores = np.asarray(probabilities, dtype=float)
+    if policy.get("kind") == "alert_rate":
+        # Smallest threshold that flags at most alert_rate of the rows.
+        ordered = np.sort(scores)[::-1]
+        flagged = max(1, int(np.floor(policy["alert_rate"] * len(ordered))))
+        threshold = float(np.nextafter(ordered[flagged], np.inf)) if flagged < len(ordered) else float(ordered[-1])
+        prediction = (scores >= threshold).astype(int)
+        return threshold, {
+            "validation_cost": None,
+            "false_negatives": int(((truth == 1) & (prediction == 0)).sum()),
+            "false_positives": int(((truth == 0) & (prediction == 1)).sum()),
+            "validation_alert_rate": float(prediction.mean()),
+        }
     candidates = sorted({0.0, 1.0, *(float(value) for value in scores)})
     ranked = []
     for threshold in candidates:
@@ -182,6 +210,14 @@ def _select_validation_threshold(y_true: list[int], probabilities: list[float], 
         ranked.append((cost, -recall, -f1, threshold, false_negative, false_positive))
     cost, _, _, threshold, fn, fp = min(ranked)
     return threshold, {"validation_cost": float(cost), "false_negatives": fn, "false_positives": fp}
+
+
+def _threshold_origin(policy: dict[str, Any] | None) -> str:
+    if policy is None:
+        return "validation_recall_then_f1_descriptive; DSA cost policy pending"
+    if policy["kind"] == "alert_rate":
+        return "approved_validation_alert_rate_policy" if policy["approved"] else "unapproved_exploratory_alert_rate_policy"
+    return "approved_validation_cost_policy"
 
 
 def _select_validation_threshold_by_metrics(y_true: list[int], probabilities: list[float]) -> float:
@@ -247,8 +283,9 @@ def train_model(
         raise ValueError("cpu_limit must be >= 1 and cv_splits must be >= 2.")
 
     y_train, y_test, target_meta = _encode_targets(partition)
-    decision_policy = _validated_decision_policy(config)
-    if partition.partition_metadata.get("evidence_kind") != "synthetic_fixture" and decision_policy is None:
+    decision_policy = _validated_decision_policy(
+        config, exploratory=partition.partition_metadata.get("evidence_kind") == "exploratory_unapproved")
+    if partition.partition_metadata.get("evidence_kind") not in {"synthetic_fixture", "exploratory_unapproved"} and decision_policy is None:
         raise ValueError("Institutional evaluation requires an approved DSA decision_policy before the final test is opened.")
     groups = partition.train_groups.reset_index(drop=True)
     x_train = partition.X_train.reset_index(drop=True)
@@ -332,7 +369,8 @@ def train_model(
                 "folds": fold_balance_reports,
             })
 
-        if decision_policy is None:
+        if decision_policy is None or decision_policy["kind"] == "alert_rate":
+            # At a fixed alert rate, recall at that rate ranks the candidates.
             best = max(cv_results, key=lambda item: (item["mean_recall"], item["mean_f1"]))
         else:
             best = min(cv_results, key=lambda item: (item["validation_cost"], -item["mean_recall"], -item["mean_f1"]))
@@ -355,7 +393,9 @@ def train_model(
         y_pred = (test_probabilities >= decision_threshold).astype(int) if test_probabilities is not None else model.predict(x_test_final)
         metrics = _metrics(y_test, y_pred, test_probabilities, target_meta)
         metrics["decision_threshold"] = decision_threshold
-        metrics["threshold_origin"] = "approved_validation_cost_policy" if decision_policy else "validation_recall_then_f1_descriptive"
+        metrics["threshold_origin"] = _threshold_origin(decision_policy)
+        if test_probabilities is not None:
+            metrics["holdout_alert_rate"] = float(np.mean(y_pred))
 
     balance_report = {
         **final_balance.__dict__,
@@ -406,9 +446,9 @@ def train_model(
             "dataset_digest": partition.partition_metadata.get("dataset_digest"),
             "target_definition_ref": partition.partition_metadata.get("target_definition_ref"),
             "split": partition.partition_metadata,
-            "selection_metric": "validation_cost_then_oof_recall_then_f1" if decision_policy else "validation_oof_recall_then_f1",
+            "selection_metric": "validation_cost_then_oof_recall_then_f1" if decision_policy and decision_policy["kind"] == "cost" else "validation_oof_recall_then_f1",
             "decision_threshold": decision_threshold,
-            "threshold_origin": "approved_validation_cost_policy" if decision_policy else "validation_recall_then_f1_descriptive; DSA cost policy pending",
+            "threshold_origin": _threshold_origin(decision_policy),
             "decision_policy": decision_policy,
             "institutional_decision": "EVIDENCIA_INSUFICIENTE",
         },

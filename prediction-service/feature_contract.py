@@ -23,6 +23,7 @@ from typing import Any, Mapping
 CONTRACT_VERSION = "dw-point-in-time-v1"
 PROGRAM_DROPOUT_EVENT = "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"
 COURSE_ABANDONMENT_EVENT = "COURSE_ABANDONMENT"
+COURSE_FAILURE_EVENT = "COURSE_FAILURE"
 # Bump when the Python eligibility rule below changes.
 ELIGIBILITY_RULE_VERSION = "first-three-academic-years-v3"
 
@@ -49,12 +50,16 @@ class FeatureSpec:
 
 
 PROGRAM_DROPOUT_FEATURES: dict[str, FeatureSpec] = {
+    # Features describe the processed cut being scored. The dropout target
+    # (no return to the program within the horizon) only looks at later cuts,
+    # so the cut's own results are available when the alert is produced.
     spec.name: spec for spec in (
         FeatureSpec("materias_cursadas", "f.materias_cursadas", "integer", True, "dw.fact_retencion_desercion.materias_cursadas"),
         FeatureSpec("materias_aprobadas", "f.materias_aprobadas", "integer", True, "dw.fact_retencion_desercion.materias_aprobadas"),
         FeatureSpec("materias_reprobadas", "f.materias_reprobadas", "integer", True, "dw.fact_retencion_desercion.materias_reprobadas"),
         FeatureSpec("materias_arrastradas", "f.materias_arrastradas", "integer", True, "dw.fact_retencion_desercion.materias_arrastradas (DW 0046: failed and not yet passed in the program up to the cut)"),
         FeatureSpec("ppa_acumulado", "f.ppa_acumulado", "number", True, "dw.fact_retencion_desercion.ppa_acumulado (DW 0046: mean effective grade of evaluated attempts up to the cut)"),
+        FeatureSpec("cortes_previos", "cadence.prior_cuts::integer", "integer", False, "dw.fact_cursado distinct processed cadence cuts of the student in the program before the cut"),
     )
 }
 
@@ -69,9 +74,28 @@ COURSE_ABANDONMENT_FEATURES: dict[str, FeatureSpec] = {
     )
 }
 
+# Course failure (student, course, cut): will the student not pass a course
+# they enrolled in? Every input comes from cuts strictly before the scored cut,
+# except the enrolment load of the cut itself, which is known at enrolment.
+COURSE_FAILURE_FEATURES: dict[str, FeatureSpec] = {
+    spec.name: spec for spec in (
+        FeatureSpec("carga_periodo", "cur.load::integer", "integer", False, "dw.fact_cursado courses of the student in the program at the cut (enrolment load)"),
+        FeatureSpec("cortes_previos", "coalesce(st.prior_cuts, 0)::integer", "integer", False, "dw.fact_cursado distinct processed semester cuts of the student in the program before the cut"),
+        FeatureSpec("ppa_previo", "prev.ppa_acumulado", "number", True, "dw.fact_retencion_desercion.ppa_acumulado at the previous semester cut"),
+        FeatureSpec("arrastradas_previas", "prev.materias_arrastradas", "integer", True, "dw.fact_retencion_desercion.materias_arrastradas at the previous semester cut"),
+        FeatureSpec("reprobadas_previas", "coalesce(st.prior_failed, 0)::integer", "integer", False, "dw.fact_cursado es_reprobado count before the cut"),
+        FeatureSpec("abandonos_previos", "coalesce(st.prior_abandoned, 0)::integer", "integer", False, "dw.fact_cursado es_abandono count before the cut"),
+        FeatureSpec("intentos_previos_materia", "coalesce(ss.prior_attempts, 0)::integer", "integer", False, "dw.fact_cursado attempts of the same course before the cut"),
+        FeatureSpec("no_aprobadas_previas_materia", "coalesce(ss.prior_not_passed, 0)::integer", "integer", False, "dw.fact_cursado failed or abandoned attempts of the same course before the cut"),
+        FeatureSpec("tasa_no_aprobacion_materia", "CASE WHEN rate.graded >= 20 THEN rate.not_passed::numeric / rate.graded END", "number", True, "dw.fact_cursado share of failed or abandoned graded attempts of the course (all students) before the cut; NULL under 20 attempts"),
+        FeatureSpec("nivel_materia", "cur.nivel_academico::integer", "integer", True, "dw.dim_materia.nivel_academico"),
+    )
+}
+
 FEATURES_BY_EVENT: dict[str, dict[str, FeatureSpec]] = {
     PROGRAM_DROPOUT_EVENT: PROGRAM_DROPOUT_FEATURES,
     COURSE_ABANDONMENT_EVENT: COURSE_ABANDONMENT_FEATURES,
+    COURSE_FAILURE_EVENT: COURSE_FAILURE_FEATURES,
 }
 
 
@@ -109,6 +133,7 @@ SELECT e.id_alumno::text AS subject_ref, {columns},
        coverage.gestion AS history_start_year, coverage.periodo AS history_start_period,
        e.fec_inscripcion AS enrollment_date, cadence.n AS cadence_count, pcad.regimen AS program_regime,
        f.run_id::text AS source_run_id, f.resultado_retencion, f.es_desercion,
+       f.materias_cursadas AS cut_course_count,
        f.conteo_snapshot, f.conteo_evaluable, f.conteo_desercion
 FROM dw.fact_retencion_desercion f
 JOIN etl_control.academic_period_closure c ON c.closure_id = f.closure_id
@@ -141,7 +166,11 @@ LEFT JOIN LATERAL (
 JOIN LATERAL (
     -- An annual program with period-2 coursework has a mixed cadence.
     SELECT count(DISTINCT CASE WHEN pcad.regimen = 'A' AND pa.periodo = 1 THEN 'ANUAL'
-                               WHEN pa.periodo IN (1, 2) THEN 'SEMESTRAL' END) AS n
+                               WHEN pa.periodo IN (1, 2) THEN 'SEMESTRAL' END) AS n,
+           count(DISTINCT hcut.closure_id) FILTER (
+               WHERE hcut.effective_at < c.effective_at
+                 AND CASE pcad.regimen WHEN 'S' THEN pa.periodo IN (1, 2)
+                                       WHEN 'A' THEN pa.periodo = 1 ELSE FALSE END) AS prior_cuts
     FROM dw.fact_cursado hc
     -- member_type filters let the partial id_alumno index serve this lookup;
     -- non-standard members carry NULL natural keys, so rows are unchanged.
@@ -237,9 +266,84 @@ WHERE EXISTS (SELECT 1 FROM etl_control.etl_execution run WHERE run.run_id=fc_ta
   AND cd.n=1
 """
 
+# Course failure batch query: every course row of a semester program at one
+# processed closure. Parameters: %(program)s, %(closure)s, %(limit)s. Label
+# columns (es_aprobado/es_reprobado/es_abandono) are audit outputs only.
+_COURSE_FAILURE_QUERY = """
+WITH c AS MATERIALIZED (
+    SELECT closure_id, gestion, periodo, effective_at FROM etl_control.academic_period_closure
+    WHERE closure_id = %(closure)s::bigint AND status = 'PROCESADO' AND processed_at IS NOT NULL
+      AND effective_at <= clock_timestamp()
+), pcad AS MATERIALIZED (
+    SELECT (SELECT pp.regimen FROM dw.dim_programa pp
+            WHERE pp.member_type = 'STANDARD' AND pp.id_programa = %(program)s
+            ORDER BY pp.programa_sk LIMIT 1) AS regimen
+), hist AS MATERIALIZED (
+    -- Every course attempt of the program up to and including the cut.
+    SELECT e.id_alumno, m.id_materia, m.nivel_academico, cut.closure_id, cut.gestion, cut.periodo,
+           cut.effective_at < c.effective_at AS prior, fc.es_aprobado, fc.es_reprobado, fc.es_abandono, fc.run_id
+    FROM dw.fact_cursado fc
+    JOIN dw.dim_programa p ON p.programa_sk = fc.programa_sk AND p.member_type = 'STANDARD' AND p.id_programa = %(program)s
+    JOIN dw.dim_estudiante e ON e.estudiante_sk = fc.estudiante_sk AND e.member_type = 'STANDARD'
+    JOIN dw.dim_materia m ON m.materia_sk = fc.materia_sk AND m.member_type = 'STANDARD'
+    JOIN dw.dim_periodo_academico pa ON pa.periodo_academico_sk = fc.periodo_academico_sk
+    JOIN etl_control.academic_period_closure cut ON cut.closure_id = pa.closure_id AND cut.status = 'PROCESADO'
+    CROSS JOIN c
+    WHERE cut.effective_at <= c.effective_at AND pa.periodo IN (1, 2)
+      AND EXISTS (SELECT 1 FROM etl_control.etl_execution run WHERE run.run_id = fc.run_id AND run.status = 'EXITOSA')
+), coverage AS MATERIALIZED (
+    SELECT min(cov.gestion * 2 + cov.periodo - 1) AS t0
+    FROM etl_control.academic_period_closure cov CROSS JOIN c
+    WHERE cov.status = 'PROCESADO' AND cov.effective_at <= c.effective_at AND cov.periodo IN (1, 2)
+), st AS MATERIALIZED (
+    SELECT id_alumno, min(gestion * 2 + periodo - 1) AS start_t,
+           count(DISTINCT closure_id) FILTER (WHERE prior) AS prior_cuts,
+           count(*) FILTER (WHERE prior AND es_reprobado IS TRUE) AS prior_failed,
+           count(*) FILTER (WHERE prior AND es_abandono IS TRUE) AS prior_abandoned
+    FROM hist GROUP BY id_alumno
+), ss AS MATERIALIZED (
+    SELECT id_alumno, id_materia, count(*) AS prior_attempts,
+           count(*) FILTER (WHERE es_aprobado IS NOT TRUE AND (es_reprobado IS TRUE OR es_abandono IS TRUE)) AS prior_not_passed
+    FROM hist WHERE prior GROUP BY id_alumno, id_materia
+), rate AS MATERIALIZED (
+    SELECT id_materia,
+           count(*) FILTER (WHERE es_aprobado IS TRUE OR es_reprobado IS TRUE OR es_abandono IS TRUE) AS graded,
+           count(*) FILTER (WHERE es_aprobado IS NOT TRUE AND (es_reprobado IS TRUE OR es_abandono IS TRUE)) AS not_passed
+    FROM hist WHERE prior GROUP BY id_materia
+), cur AS MATERIALIZED (
+    SELECT h.*, count(*) OVER (PARTITION BY h.id_alumno) AS load
+    FROM hist h CROSS JOIN c WHERE h.closure_id = c.closure_id
+), prev AS MATERIALIZED (
+    -- Previous semester cut of the program: 1 -> 2 of the year before, 2 -> 1.
+    SELECT pe.id_alumno, pf.ppa_acumulado, pf.materias_arrastradas
+    FROM dw.fact_retencion_desercion pf
+    JOIN etl_control.academic_period_closure pcut ON pcut.closure_id = pf.closure_id AND pcut.status = 'PROCESADO'
+    JOIN dw.dim_estudiante pe ON pe.estudiante_sk = pf.estudiante_sk AND pe.member_type = 'STANDARD'
+    JOIN dw.dim_programa pp ON pp.programa_sk = pf.programa_sk AND pp.member_type = 'STANDARD' AND pp.id_programa = %(program)s
+    CROSS JOIN c
+    WHERE pcut.effective_at < c.effective_at
+      AND ((c.periodo = 2 AND pcut.gestion = c.gestion AND pcut.periodo = 1)
+        OR (c.periodo = 1 AND pcut.gestion = c.gestion - 1 AND pcut.periodo = 2))
+      AND EXISTS (SELECT 1 FROM etl_control.etl_execution prun WHERE prun.run_id = pf.run_id AND prun.status = 'EXITOSA')
+)
+SELECT cur.id_alumno::text AS subject_ref, cur.id_materia::text AS course_ref, {columns},
+       c.closure_id::text AS cut_id, c.gestion AS cut_year, c.periodo AS cut_period,
+       st.start_t, coverage.t0 AS history_start_t, pcad.regimen AS program_regime,
+       cur.run_id::text AS source_run_id, cur.es_aprobado, cur.es_reprobado, cur.es_abandono
+FROM cur
+CROSS JOIN c CROSS JOIN pcad CROSS JOIN coverage
+JOIN st ON st.id_alumno = cur.id_alumno
+LEFT JOIN ss ON ss.id_alumno = cur.id_alumno AND ss.id_materia = cur.id_materia
+LEFT JOIN rate ON rate.id_materia = cur.id_materia
+LEFT JOIN prev ON prev.id_alumno = cur.id_alumno
+ORDER BY cur.id_alumno, cur.id_materia
+LIMIT %(limit)s
+"""
+
 QUERIES_BY_EVENT = {
     PROGRAM_DROPOUT_EVENT: _PROGRAM_DROPOUT_QUERY,
     COURSE_ABANDONMENT_EVENT: _COURSE_ABANDONMENT_QUERY,
+    COURSE_FAILURE_EVENT: _COURSE_FAILURE_QUERY,
 }
 
 
@@ -261,6 +365,10 @@ def program_dropout_query(feature_names: list[str]) -> str:
 
 def course_abandonment_query(feature_names: list[str]) -> str:
     return _COURSE_ABANDONMENT_QUERY.format(columns=_columns(COURSE_ABANDONMENT_EVENT, feature_names))
+
+
+def course_failure_query(feature_names: list[str]) -> str:
+    return _COURSE_FAILURE_QUERY.format(columns=_columns(COURSE_FAILURE_EVENT, feature_names))
 
 
 def contract_digest(event_code: str) -> str:

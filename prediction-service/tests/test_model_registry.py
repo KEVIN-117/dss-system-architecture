@@ -117,6 +117,16 @@ class ModelRegistryTests(unittest.TestCase):
             self.registry.promote("model-1", "v1", "operator", report)
         self.assertFalse(self.registry.active_path.exists())
 
+    def test_exploratory_evidence_cannot_be_activated(self) -> None:
+        _, report = self._candidate("candidate", "model-1")
+        report_data = json.loads(report.read_text(encoding="utf-8"))
+        report_data["evidence_kind"] = "exploratory_unapproved"
+        report_data["dataset"]["exploratory_only"] = True
+        report.write_text(json.dumps(report_data), encoding="utf-8")
+        with self.assertRaisesRegex(InvalidModelArtifact, "Exploratory"):
+            self.registry.promote("model-1", "v1", "operator", report)
+        self.assertFalse(self.registry.active_path.exists())
+
     def test_promotion_rolls_back_to_a_complete_previous_bundle(self) -> None:
         _, first_report = self._candidate("first", "model-1")
         self.registry.promote("model-1", "v1", "operator", first_report)

@@ -65,6 +65,22 @@ class EvaluationComparisonTests(unittest.TestCase):
             self.assertEqual(report["report_scope"], "software_validation_only")
             self.assertFalse(report["crisp_dm_next_step"]["deployment_allowed"])
 
+    def test_exploratory_evidence_is_reported_and_never_deployable(self) -> None:
+        with tempfile.TemporaryDirectory(dir=self.temp_root) as temp:
+            root = Path(temp)
+            rf = self._artifact(root, "rf", "random_forest", 0.8, 0.7, 0.1)
+            xgb = self._artifact(root, "xgb", "xgboost", 0.7, 0.6, 0.2)
+            for artifact in (rf, xgb):
+                path = artifact / "dataset_ref.json"
+                data = json.loads(path.read_text(encoding="utf-8"))
+                data.update(fixture_only=False, exploratory_only=True)
+                path.write_text(json.dumps(data), encoding="utf-8")
+            report = compare_artifacts([rf, xgb])
+            self.assertEqual(report["evidence_kind"], "exploratory_unapproved")
+            self.assertEqual(report["report_scope"], "exploratory_analysis_only")
+            self.assertEqual(report["decision_status"], "EVIDENCIA_INSUFICIENTE")
+            self.assertFalse(report["crisp_dm_next_step"]["deployment_allowed"])
+
     def test_mismatched_partition_is_rejected(self) -> None:
         with tempfile.TemporaryDirectory(dir=self.temp_root) as temp:
             root = Path(temp)

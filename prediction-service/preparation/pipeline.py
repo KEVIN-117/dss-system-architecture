@@ -40,6 +40,22 @@ class PreparedPartition:
     imbalance_threshold: float = 0.4
 
 
+EXPLORATORY_EVIDENCE = "exploratory_unapproved"
+
+
+def is_exploratory(manifest: dict[str, Any]) -> bool:
+    """An exploratory snapshot is flagged and uses an ``exploratory:`` reference."""
+    return manifest.get("exploratory_only") is True and str(manifest.get("snapshot_ref", "")).startswith("exploratory:")
+
+
+def evidence_kind(manifest: dict[str, Any]) -> str:
+    if manifest.get("fixture_only") is True and str(manifest.get("snapshot_ref", "")).startswith(("fixture:", "synthetic:")):
+        return "synthetic_fixture"
+    if is_exploratory(manifest):
+        return EXPLORATORY_EVIDENCE
+    return "institutional_unverified"
+
+
 def _categorical_feature_names(
     feature_names: list[str], fields: list[Mapping[str, Any]],
 ) -> list[str]:
@@ -149,10 +165,13 @@ def _prepare_binary_dataset(
         ].copy()
     if df.empty:
         raise ValueError("No evaluable, eligible rows remain after filtering.")
-    if manifest.get("target_approved") is not True:
-        raise ValueError("A DSA-approved target definition (target_approved: true) is required before preparation.")
-    if manifest.get("eligibility_approved") is not True:
-        raise ValueError("A DSA-approved population rule (eligibility_approved: true) is required before preparation.")
+    # Exploratory runs train on real data before DSA approval to inspect
+    # behaviour. They are marked end to end and can never be promoted.
+    if not is_exploratory(manifest):
+        if manifest.get("target_approved") is not True:
+            raise ValueError("A DSA-approved target definition (target_approved: true) is required before preparation.")
+        if manifest.get("eligibility_approved") is not True:
+            raise ValueError("A DSA-approved population rule (eligibility_approved: true) is required before preparation.")
 
     feature_names: list[str] = manifest.get("feature_fields", [])
     if not feature_names:
@@ -225,7 +244,7 @@ def _prepare_binary_dataset(
         "event_code": (manifest.get("target_definition") or {}).get("event_code"),
         "cv_method": "stratified_group_k_fold",
         "evaluation_unit": manifest.get("evaluation_unit", "student_program_academic_cut"),
-        "evidence_kind": "synthetic_fixture" if manifest.get("fixture_only") is True and str(manifest.get("snapshot_ref", "")).startswith(("fixture:", "synthetic:")) else "institutional_unverified",
+        "evidence_kind": evidence_kind(manifest),
     }
     return PreparedPartition(
         X_train=x_train,

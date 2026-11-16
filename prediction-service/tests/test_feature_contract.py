@@ -14,6 +14,7 @@ from dataset_contract import validate_prepared_dataset
 from feature_contract import (
     COURSE_ABANDONMENT_EVENT,
     COURSE_ABANDONMENT_FEATURES,
+    PROGRAM_DROPOUT_FEATURES,
     PROGRAM_DROPOUT_EVENT,
     FeatureContractError,
     contract_digest,
@@ -99,6 +100,16 @@ class FeatureContractTests(unittest.TestCase):
         # Coverage is also bounded by the requested cut.
         self.assertIn("cov.effective_at <= r.effective_at", sql)
 
+    def test_features_come_from_the_scored_cut(self) -> None:
+        sql = program_dropout_query(list(PROGRAM_DROPOUT_FEATURES))
+        for name in ("materias_cursadas", "materias_aprobadas", "materias_reprobadas", "materias_arrastradas", "ppa_acumulado"):
+            self.assertIn(f'f.{name} AS "{name}"', sql)
+        self.assertNotIn("prev.", sql)
+        # Prior cadence cuts strictly before the scored cut.
+        self.assertIn('cadence.prior_cuts::integer AS "cortes_previos"', sql)
+        self.assertIn("WHERE hcut.effective_at < c.effective_at", sql)
+        self.assertIn("f.materias_cursadas AS cut_course_count", sql)
+
     def test_cadence_comes_from_the_program_regime(self) -> None:
         for sql in (program_dropout_query(FEATURES), course_abandonment_query(list(COURSE_ABANDONMENT_FEATURES))):
             # DW 0045: regime from dim_programa; annual cuts are period 1, period 3 is never a cadence cut.
@@ -135,6 +146,31 @@ class FeatureContractTests(unittest.TestCase):
 
 
 class ExtractionParityTests(unittest.TestCase):
+    def test_horizon_label_counts_any_return_within_the_horizon(self) -> None:
+        def row(subject: int, cut: dict, courses: int = 5) -> dict:
+            item = contract_row(subject, cut, start=(2025, 1), outcome="NO_EVALUABLE", reprobadas=0)
+            item["cut_course_count"] = courses
+            return item
+        rows = [
+            row(1, CUTS[0]),                    # never returns -> DESERTOR
+            row(2, CUTS[0]), row(2, CUTS[2]),   # skips 2025-2, returns 2026-1 -> RETENIDO
+            row(3, CUTS[0]), row(3, CUTS[1]),   # 2025-1 RETENIDO, 2025-2 never returns -> DESERTOR
+            row(4, CUTS[0], courses=0),         # enrolled without courses -> excluded
+            row(5, CUTS[3]),                    # last processed cut: horizon not observed
+        ]
+        # One-year horizon = two semester cuts; cuts after 2025-2 are censored.
+        manifest, prepared = build_program_dropout_snapshot(
+            rows, program_ref="P01", cadence="SEMESTRAL", feature_names=FEATURES, cuts=CUTS,
+            pseudonym_key=b"k" * 32, dropout_horizon_years=1,
+        )
+        by_cut = sorted((r["academic_year"], r["academic_period"], r["target_class"], r["next_cut_outcome"]) for r in prepared)
+        self.assertEqual(by_cut, [(2025, 1, "NO_RISK", "NO_EVALUABLE"), (2025, 1, "NO_RISK", "NO_EVALUABLE"),
+                                  (2025, 1, "RISK", "NO_EVALUABLE"), (2025, 2, "RISK", "NO_EVALUABLE")])
+        self.assertEqual(manifest["exclusions"], {"HORIZON_NOT_OBSERVED": 2, "NO_COURSEWORK_AT_CUT": 1})
+        self.assertEqual(manifest["target_definition"]["horizon_years"], 1)
+        report = validate_prepared_dataset(manifest, prepared)
+        self.assertFalse([i for i in report.issues if i.code == "OUTCOME_INCONSISTENCY"])
+
     def test_snapshot_uses_shared_rule_and_is_ready_only_with_dsa_approval(self) -> None:
         rows = synthetic_contract_rows()
         manifest, prepared = build_program_dropout_snapshot(
