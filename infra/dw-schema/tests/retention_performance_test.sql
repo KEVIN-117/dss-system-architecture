@@ -137,6 +137,12 @@ BEGIN
     IF has_function_privilege('dw_hop_runtime', 'etl_control.refresh_hop_retention_performance(bigint[])', 'EXECUTE') THEN
         RAISE EXCEPTION 'The runtime role must not recompute arbitrary closures';
     END IF;
+    -- 0061: whole-cut recompute must keep its hash-join plan.
+    IF NOT EXISTS (SELECT 1 FROM pg_proc
+                   WHERE oid = 'etl_control.refresh_hop_retention_performance(bigint[])'::regprocedure
+                     AND 'enable_nestloop=off' = ANY (proconfig)) THEN
+        RAISE EXCEPTION 'refresh_hop_retention_performance must run with enable_nestloop = off';
+    END IF;
 END;
 $$;
 

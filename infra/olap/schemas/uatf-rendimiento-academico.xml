@@ -562,8 +562,10 @@
         <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
         <CalculatedMemberProperty name="DESCRIPTION" value="IRETE del Boletín DSA: estudiantes que siguen en la carrera la gestión siguiente sobre los evaluables." />
       </CalculatedMember>
+      <!-- "1 - x" turns an empty cell into 100%: an empty denominator does not
+           compare equal to 0 in MDX, so IsEmpty keeps out-of-scope rows empty. -->
       <CalculatedMember name="Índice de deserción" dimension="Measures"
-          formula="IIf([Measures].[Estudiantes evaluables para retención] = 0, NULL, 1 - [Measures].[Estudiantes retenidos] / [Measures].[Estudiantes evaluables para retención])">
+          formula="IIf(IsEmpty([Measures].[Estudiantes evaluables para retención]) OR [Measures].[Estudiantes evaluables para retención] = 0, NULL, 1 - [Measures].[Estudiantes retenidos] / [Measures].[Estudiantes evaluables para retención])">
         <CalculatedMemberProperty name="FORMAT_STRING" value="0.0%" />
         <CalculatedMemberProperty name="DESCRIPTION" value="IDESE del Boletín DSA: estudiantes que no vuelven a programar en la carrera la gestión siguiente." />
       </CalculatedMember>

@@ -23,7 +23,10 @@ BEGIN
     INTO v_tables
     FROM pg_tables
     WHERE schemaname IN ('dw', 'etl_control', 'etl_work', 'staging', 'ml_workspace')
-      AND NOT (schemaname = 'etl_control' AND tablename = 'schema_migration');
+      AND NOT (schemaname = 'etl_control' AND tablename = 'schema_migration')
+      -- Reference catalogs (sedes, departamentos, provincias, modalidades,
+      -- áreas) are seeded by migrations, not by the ETL: keep them.
+      AND NOT (schemaname = 'dw' AND tablename LIKE 'ref\_%');
 
     IF v_tables IS NULL THEN
         RAISE EXCEPTION 'No se encontraron tablas de datos para limpiar';
@@ -51,7 +54,10 @@ BEGIN
        OR (SELECT count(*) FROM dw.dim_materia) <> 2
        OR (SELECT count(*) FROM dw.dim_periodo_academico) <> 2
        OR (SELECT count(*) FROM dw.dim_admision) <> 2
-       OR (SELECT count(*) FROM etl_control.schema_migration) <> 59 THEN
+       OR (SELECT count(*) FROM etl_control.schema_migration) <> 61
+       OR NOT EXISTS (SELECT 1 FROM dw.ref_sede)
+       OR NOT EXISTS (SELECT 1 FROM dw.ref_modalidad_admision)
+       OR NOT EXISTS (SELECT 1 FROM dw.ref_programa_area) THEN
         RAISE EXCEPTION 'Reset incompleto: revise miembros técnicos y registro de migraciones';
     END IF;
 END;
