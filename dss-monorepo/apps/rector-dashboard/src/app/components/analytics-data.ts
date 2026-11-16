@@ -1,31 +1,4 @@
-export interface PublishedMember {
-  name: string;
-  uniqueName: string;
-  caption?: string | null;
-}
-
-export interface CubeAxisPath {
-  dimension: string;
-  hierarchy: string;
-  level: string;
-}
-
-export interface AcademicCubePaths {
-  enrollmentAttempts: string;
-  averageFinalGrade: string;
-  enrollmentUnit: string;
-  gradeUnit: string;
-  academicYear: CubeAxisPath;
-  academicPeriod: CubeAxisPath;
-  faculty: CubeAxisPath;
-}
-
-export interface ChartPoint {
-  label: string;
-  value: number;
-}
-
-type RecordValue = Record<string, unknown>;
+import { RecordValue, PublishedMember, CubeAxisPath, AcademicCubePaths, ChartPoint, AdmissionPaths } from '../../utils/types'
 
 function isRecord(value: unknown): value is RecordValue {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -108,9 +81,10 @@ export function resolveAdmissionPaths(schema: unknown) {
 
 export function resolveRetentionPaths(schema: unknown) {
   if (!isRecord(schema)) return null;
+  // Same conformed axis as the admission cube: Periodo › Gestión y periodo › Gestión.
   const dimension = findByName(schema.dimensions, 'Periodo');
   const hierarchy =
-    dimension && findByName(dimension.hierarchies, 'Periodo');
+    dimension && findByName(dimension.hierarchies, 'Gestión y periodo');
   const level = hierarchy && findByName(hierarchy.levels, 'Gestión');
   const measures = values(schema.measures).filter(
     (item): item is RecordValue =>
@@ -307,3 +281,72 @@ export function sortAcademicPeriods(points: ChartPoint[]): ChartPoint[] {
     left.label.localeCompare(right.label, undefined, { numeric: true }),
   );
 }
+
+
+
+
+export async function graphql<T>(
+  query: string,
+  variables?: Record<string, unknown>,
+): Promise<T> {
+  const baseUrl = process.env.NEXT_PUBLIC_BFF_URL?.replace(/\/$/, '');
+  if (!baseUrl)
+    throw new Error('El portal no tiene configurada la URL del BFF.');
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/api/graphql`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
+      cache: 'no-store',
+      body: JSON.stringify({ query, variables }),
+    });
+  } catch {
+    throw new Error(
+      'No se pudo conectar con el BFF. Revisa la conexión e inténtalo nuevamente.',
+    );
+  }
+  const payload = (await response.json().catch(() => null)) as {
+    data?: T;
+    errors?: Array<{ message?: string; extensions?: { code?: string } }>;
+  } | null;
+  if (!response.ok || payload?.errors?.length) {
+    const code = payload?.errors?.[0]?.extensions?.code;
+    if (response.status === 401 || code === 'UNAUTHENTICATED')
+      throw new Error(
+        'La sesión expiró. Inicia sesión nuevamente para consultar la analítica.',
+      );
+    if (response.status === 403 || code === 'FORBIDDEN')
+      throw new Error(
+        'La cuenta no tiene permiso para consultar esta analítica.',
+      );
+    throw new Error(
+      payload?.errors?.[0]?.message ??
+        'No se pudo consultar la analítica institucional.',
+    );
+  }
+  if (!payload?.data) throw new Error('El BFF devolvió una respuesta vacía.');
+  return payload.data;
+}
+
+
+
+export function yearFilter(
+  axis: AdmissionPaths['year'],
+  member: PublishedMember | undefined,
+) {
+  return member ? [{ ...axis, op: 'IN', members: [member.uniqueName] }] : [];
+}
+
+export const count = (value: number | null) =>
+  value === null
+    ? '—'
+    : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 0 }).format(
+        value,
+      );
+export const percent = (numerator: number | null, denominator: number | null) =>
+  numerator === null || denominator === null || denominator <= 0
+    ? '—'
+    : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 1 }).format(
+        (numerator / denominator) * 100,
+      ) + ' %';

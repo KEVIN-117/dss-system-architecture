@@ -1,7 +1,7 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useAuth, ProtectedRoute } from '@dss-monorepo/auth';
+import { useAuth, ProtectedRoute, LandingLoginRedirect } from '@dss-monorepo/auth';
 import {
   AccessDenied,
   DashboardTemplate,
@@ -9,14 +9,9 @@ import {
   type NavigationGroup,
 } from '@dss-monorepo/design-system/portal';
 import { OlapSidebarProvider, useOlapSidebar } from '@dss-monorepo/academic-analytics/olap-sidebar';
+import { analyticsNavigation } from '@dss-monorepo/academic-analytics/panel/navigation';
 import { RoleGuard } from '@dss-monorepo/rbac';
-import {
-  LayoutDashboard,
-  ChartColumn,
-  GraduationCap,
-  UsersRound,
-  Database,
-} from 'lucide-react';
+import { LayoutDashboard, Database } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export function PortalFrame({ children }: { children: ReactNode }) {
@@ -34,21 +29,6 @@ function PortalFrameContent({ children }: { children: ReactNode }) {
       href: '/',
       icon: <LayoutDashboard aria-hidden="true" />,
     },
-    {
-      title: 'Rendimiento',
-      href: '/reportes/rendimiento',
-      icon: <ChartColumn aria-hidden="true" />,
-    },
-    {
-      title: 'Admisión',
-      href: '/reportes/admision',
-      icon: <GraduationCap aria-hidden="true" />,
-    },
-    {
-      title: 'Permanencia',
-      href: '/reportes/permanencia',
-      icon: <UsersRound aria-hidden="true" />,
-    },
   ];
   const navGroups: NavigationGroup[] = [
     {
@@ -58,6 +38,7 @@ function PortalFrameContent({ children }: { children: ReactNode }) {
         isActive: pathname === item.href,
       })),
     },
+    ...analyticsNavigation(pathname, 'career'),
     {
       title: 'Exploración OLAP',
       expanded,
@@ -77,16 +58,7 @@ function PortalFrameContent({ children }: { children: ReactNode }) {
     <ProtectedRoute
       loadingFallback={<Loader />}
       unauthenticatedFallback={
-        <main className="grid min-h-screen place-content-center gap-4 bg-background p-8 text-foreground">
-          <h1 className="text-2xl font-semibold">Sesión requerida</h1>
-          <p>Inicia sesión para consultar los indicadores académicos.</p>
-          <a
-            className="text-primary underline underline-offset-4"
-            href="/login"
-          >
-            Iniciar sesión
-          </a>
-        </main>
+        <LandingLoginRedirect landingUrl={process.env.NEXT_PUBLIC_LANDING_URL} />
       }
     >
       <RoleGuard

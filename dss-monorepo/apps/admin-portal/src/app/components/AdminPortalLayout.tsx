@@ -4,14 +4,16 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   Activity,
+  BarChart3,
   BrainCircuit,
   Cable,
   CalendarClock,
   Database,
   LayoutDashboard,
+  ServerCog,
   Users,
 } from 'lucide-react';
-import { ProtectedRoute, useAuth } from '@dss-monorepo/auth';
+import { LandingLoginRedirect, ProtectedRoute, useAuth } from '@dss-monorepo/auth';
 import {
   AccessDenied,
   DashboardTemplate,
@@ -112,6 +114,16 @@ export function AdminPortalLayout({
                 '/ml-operations',
                 <BrainCircuit aria-hidden="true" />,
               ),
+              navigationItem(
+                'Validación de modelos',
+                '/ml-models',
+                <BarChart3 aria-hidden="true" />,
+              ),
+              navigationItem(
+                'Modelos activos',
+                '/ml-registry',
+                <ServerCog aria-hidden="true" />,
+              ),
             ],
           },
         ]
@@ -134,7 +146,9 @@ export function AdminPortalLayout({
     >
       <ProtectedRoute
         loadingFallback={<Loader text="Verificando sesión…" fullScreen={false} className="min-h-[60vh]" />}
-        unauthenticatedFallback={<LoginRequired />}
+        unauthenticatedFallback={
+          <LandingLoginRedirect landingUrl={process.env.NEXT_PUBLIC_LANDING_URL} />
+        }
       >
         {access === 'authenticated' ? (
           children
@@ -157,16 +171,3 @@ export function AdminPortalLayout({
   return portal;
 }
 
-function LoginRequired() {
-  return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 p-8 text-center">
-      <h1 className="text-2xl font-bold">Sesión requerida</h1>
-      <p className="text-muted-foreground">
-        Inicia sesión para acceder al portal de administración.
-      </p>
-      <a className="text-primary underline underline-offset-4" href="/login">
-        Iniciar sesión
-      </a>
-    </main>
-  );
-}

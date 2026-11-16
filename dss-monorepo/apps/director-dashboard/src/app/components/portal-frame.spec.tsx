@@ -13,6 +13,7 @@ vi.mock('@dss-monorepo/auth', () => ({
     logout: vi.fn(),
   }),
   ProtectedRoute: ({ children, loadingFallback }: { children: ReactNode; loadingFallback: ReactNode }) => <>{nav.loading ? loadingFallback : children}</>,
+  LandingLoginRedirect: () => null,
 }));
 vi.mock('@dss-monorepo/rbac', () => ({
   RoleGuard: ({ children }: { children: ReactNode }) => <>{children}</>,

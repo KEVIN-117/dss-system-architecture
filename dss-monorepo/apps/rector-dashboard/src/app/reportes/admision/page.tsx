@@ -1,5 +1,5 @@
-import { RendimientoViewPanel } from '../../components/rendimiento/rendimiento-view';
-import { findAdmisionView } from '../../components/rendimiento/admision-views';
+import { RendimientoViewPanel } from '@dss-monorepo/academic-analytics/panel';
+import { findAdmisionView } from '@dss-monorepo/academic-analytics/panel';
 
 export default function AdmisionResumenPage() {
   const view = findAdmisionView('resumen');

@@ -12,7 +12,9 @@
     "./package.json": "./package.json",
     "./academic-labels": "./src/academic-labels.ts",
     "./olap-sidebar": "./src/olap-sidebar.tsx",
-    "./olap-portal": "./src/olap-portal.tsx"
+    "./olap-portal": "./src/olap-portal.tsx",
+    "./panel": "./src/panel/index.ts",
+    "./panel/navigation": "./src/panel/navigation.tsx"
   },
   "nx": {
     "name": "academic-analytics",

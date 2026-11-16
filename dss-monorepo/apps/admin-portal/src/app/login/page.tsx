@@ -1,31 +1,16 @@
 'use client';
 
-import { useAuth } from '@dss-monorepo/auth';
-import { AuthLanding } from '@dss-monorepo/design-system';
-import { useEffect, useState } from 'react';
+import { LandingLoginRedirect } from '@dss-monorepo/auth';
 
+/**
+ * Sign-in lives in the landing. This route stays so the BFF's failed-callback
+ * redirect (`/login?error=…`) and old links still reach the shared login.
+ */
 export default function LoginPage() {
-  const { error, isAuthenticated, isLoading, login } = useAuth();
-
-  const [callbackError, setCallbackError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (
-      new URLSearchParams(window.location.search).get('error') ===
-      'authentication_failed'
-    ) {
-      setCallbackError(
-        'No fue posible iniciar sesión. Verifica tus credenciales e inténtalo nuevamente.',
-      );
-    }
-    if (isAuthenticated) window.location.replace('/');
-  }, [isAuthenticated]);
-
   return (
-    <AuthLanding
-      onLogin={() => login()}
-      isLoading={isLoading}
-      error={error ?? callbackError}
+    <LandingLoginRedirect
+      landingUrl={process.env.NEXT_PUBLIC_LANDING_URL}
+      source="login-route"
     />
   );
 }

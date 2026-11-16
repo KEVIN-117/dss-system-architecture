@@ -146,4 +146,58 @@ describe('Prediction BFF route', () => {
     expect(url.toString()).toBe('http://prediction-service:8000/v1/prediction-publications?program_ref=P01&cut_id=42');
     expect(new Headers(options.headers).get('authorization')).toBe('Bearer verified-access-token');
   });
+
+  it('keeps the model registry behind the SUPERADMIN role', async () => {
+    process.env.PREDICTION_SERVICE_URL = 'http://prediction-service:8000';
+    authenticateRequest.mockResolvedValue(authentication);
+    requireRoles.mockReturnValueOnce(NextResponse.json({ error: 'Forbidden' }, { status: 403 }) as never);
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const response = await GET(new Request('http://localhost:3006/api/prediction/v1/models'), {
+      params: Promise.resolve({ path: ['v1', 'models'] }),
+    });
+    expect(response.status).toBe(403);
+    expect(requireRoles).toHaveBeenCalledWith(authentication.value, ['SUPERADMIN']);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
+  it('forwards model listing, activation and deactivation with the verified token', async () => {
+    process.env.PREDICTION_SERVICE_URL = 'http://prediction-service:8000';
+    authenticateRequest.mockResolvedValue(authentication);
+    const upstream = vi.fn().mockImplementation(async () => new Response(JSON.stringify({ ok: true }), { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+
+    expect((await GET(new Request('http://localhost:3006/api/prediction/v1/models'), {
+      params: Promise.resolve({ path: ['v1', 'models'] }),
+    })).status).toBe(200);
+    for (const action of ['activate', 'deactivate']) {
+      const body = JSON.stringify({ reason: 'Revisión de métricas' });
+      const response = await POST(new Request(`http://localhost:3006/api/prediction/v1/models/${action}`, {
+        method: 'POST', headers: { 'content-type': 'application/json' }, body,
+      }), { params: Promise.resolve({ path: ['v1', 'models', action] }) });
+      expect(response.status).toBe(200);
+    }
+    const urls = upstream.mock.calls.map(([url]) => (url as URL).toString());
+    expect(urls).toEqual([
+      'http://prediction-service:8000/v1/models',
+      'http://prediction-service:8000/v1/models/activate',
+      'http://prediction-service:8000/v1/models/deactivate',
+    ]);
+    const [, activateOptions] = upstream.mock.calls[1] as [URL, RequestInit];
+    expect(activateOptions.method).toBe('POST');
+    expect(activateOptions.body).toBe(JSON.stringify({ reason: 'Revisión de métricas' }));
+    expect(new Headers(activateOptions.headers).get('authorization')).toBe('Bearer verified-access-token');
+  });
+
+  it('rejects other model paths and methods', async () => {
+    authenticateRequest.mockResolvedValue(authentication);
+    const deleteModels = await POST(new Request('http://localhost:3006/api/prediction/v1/models/delete', { method: 'POST', body: '{}' }), {
+      params: Promise.resolve({ path: ['v1', 'models', 'delete'] }),
+    });
+    expect(deleteModels.status).toBe(404);
+    const activateViaGet = await GET(new Request('http://localhost:3006/api/prediction/v1/models/activate'), {
+      params: Promise.resolve({ path: ['v1', 'models', 'activate'] }),
+    });
+    expect(activateViaGet.status).toBe(404);
+  });
 });

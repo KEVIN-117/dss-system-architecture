@@ -3,7 +3,7 @@
 import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { usePathname, useRouter } from 'next/navigation';
-import { useAuth, ProtectedRoute } from '@dss-monorepo/auth';
+import { useAuth, ProtectedRoute, LandingLoginRedirect } from '@dss-monorepo/auth';
 import {
   AccessDenied,
   DashboardTemplate,
@@ -11,16 +11,9 @@ import {
   type NavigationGroup,
 } from '@dss-monorepo/design-system/portal';
 import { OlapSidebarProvider, useOlapSidebar } from '@dss-monorepo/academic-analytics/olap-sidebar';
+import { analyticsNavigation } from '@dss-monorepo/academic-analytics/panel/navigation';
 import { RoleGuard } from '@dss-monorepo/rbac';
-import {
-  ArrowDownUp,
-  ChartColumn,
-  GraduationCap,
-  LayoutDashboard,
-  ListFilter,
-  UsersRound,
-  Database,
-} from 'lucide-react';
+import { LayoutDashboard, Database } from 'lucide-react';
 
 export function PortalFrame({ children }: { children: ReactNode }) {
   return <OlapSidebarProvider><PortalFrameContent>{children}</PortalFrameContent></OlapSidebarProvider>;
@@ -43,51 +36,7 @@ function PortalFrameContent({ children }: { children: ReactNode }) {
         },
       ],
     },
-    {
-      title: 'Rendimiento',
-      items: [
-        {
-          title: 'Resultados por gestión',
-          href: '/reportes/rendimiento',
-          icon: <ChartColumn aria-hidden="true" />,
-          isActive: pathname === '/reportes/rendimiento',
-        },
-        {
-          title: 'Regularidad y continuidad',
-          href: '/reportes/rendimiento/regularidad',
-          icon: <ArrowDownUp aria-hidden="true" />,
-          isActive: pathname === '/reportes/rendimiento/regularidad',
-        },
-      ],
-    },
-    {
-      title: 'Admisión',
-      items: [
-        {
-          title: 'Postulantes y resultados',
-          href: '/reportes/admision',
-          icon: <GraduationCap aria-hidden="true" />,
-          isActive: pathname === '/reportes/admision',
-        },
-        {
-          title: 'Distribución',
-          href: '/reportes/admision/distribucion',
-          icon: <ListFilter aria-hidden="true" />,
-          isActive: pathname === '/reportes/admision/distribucion',
-        },
-      ],
-    },
-    {
-      title: 'Permanencia',
-      items: [
-        {
-          title: 'Retención y deserción',
-          href: '/reportes/permanencia',
-          icon: <UsersRound aria-hidden="true" />,
-          isActive: pathname === '/reportes/permanencia',
-        },
-      ],
-    },
+    ...analyticsNavigation(pathname, 'faculty'),
     {
       title: 'Exploración OLAP',
       expanded,
@@ -108,16 +57,7 @@ function PortalFrameContent({ children }: { children: ReactNode }) {
     <ProtectedRoute
       loadingFallback={<Loader />}
       unauthenticatedFallback={
-        <main className="grid min-h-screen place-content-center gap-4 bg-background p-8 text-foreground">
-          <h1 className="text-2xl font-semibold">Sesión requerida</h1>
-          <p>Inicia sesión para consultar los indicadores de tu facultad.</p>
-          <a
-            className="text-primary underline underline-offset-4"
-            href="/login"
-          >
-            Iniciar sesión
-          </a>
-        </main>
+        <LandingLoginRedirect landingUrl={process.env.NEXT_PUBLIC_LANDING_URL} />
       }
     >
       <RoleGuard

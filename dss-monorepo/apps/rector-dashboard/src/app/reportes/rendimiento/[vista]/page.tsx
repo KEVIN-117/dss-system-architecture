@@ -1,6 +1,6 @@
 import { notFound } from 'next/navigation';
-import { RendimientoViewPanel } from '../../../components/rendimiento/rendimiento-view';
-import { RENDIMIENTO_VIEWS, findView } from '../../../components/rendimiento/rendimiento-views';
+import { RendimientoViewPanel } from '@dss-monorepo/academic-analytics/panel';
+import { RENDIMIENTO_VIEWS, findView } from '@dss-monorepo/academic-analytics/panel';
 
 export function generateStaticParams() {
   return RENDIMIENTO_VIEWS.filter((view) => view.slug !== 'resumen').map((view) => ({ vista: view.slug }));

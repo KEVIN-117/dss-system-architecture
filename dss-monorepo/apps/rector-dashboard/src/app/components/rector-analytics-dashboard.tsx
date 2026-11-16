@@ -11,7 +11,6 @@ import {
   CardTitle,
 } from '@dss-monorepo/design-system';
 import { TrendLineChart } from '@dss-monorepo/charts';
-import { AcademicSparkline } from '@dss-monorepo/academic-analytics';
 import { useEffect, useState } from 'react';
 import {
   BookOpenCheck,
@@ -20,111 +19,37 @@ import {
   UsersRound,
 } from 'lucide-react';
 import {
+  count,
+  graphql,
+  percent,
   readDimensionSeries,
   readMetric,
   readPublishedMembers,
   resolveAdmissionPaths,
   resolveRetentionPaths,
   sortAcademicPeriods,
-  type ChartPoint,
-  type PublishedMember,
+  yearFilter,
 } from './analytics-data';
 
-interface CubeSummary {
-  cubeId: string;
-  cubeName: string;
-  cubeCaption?: string | null;
-}
+import { ChartSkeleton } from './core/chart-skeleton';
+import { MetricCard } from './core/metric-card';
 
-const CUBES_QUERY = `query RectorCubes {
-  olapCubes { cubeId cubeName cubeCaption }
-}`;
-const SCHEMA_QUERY = `query RectorCubeSchema($cubeId: ID!) {
-  olapCubeSchema(cubeId: $cubeId)
-}`;
-const MEMBERS_QUERY = `query RectorCubeMembers($cubeId: ID!, $dimension: String!, $hierarchy: String!, $level: String!, $limit: Int) {
-  olapCubeMembers(cubeId: $cubeId, dimension: $dimension, hierarchy: $hierarchy, level: $level, limit: $limit) { name uniqueName caption }
-}`;
-const ANALYTIC_QUERY = `query RectorAnalyticQuery($input: AnalyticQueryInput!) {
-  analyticQuery(input: $input) { status data totalRows runtimeMs }
-}`;
-const CARD_CLASS =
-  'border border-border bg-card shadow-none ring-0 backdrop-blur-none';
-
-async function graphql<T>(
-  query: string,
-  variables?: Record<string, unknown>,
-): Promise<T> {
-  const baseUrl = process.env.NEXT_PUBLIC_BFF_URL?.replace(/\/$/, '');
-  if (!baseUrl)
-    throw new Error('El portal no tiene configurada la URL del BFF.');
-  let response: Response;
-  try {
-    response = await fetch(`${baseUrl}/api/graphql`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
-      cache: 'no-store',
-      body: JSON.stringify({ query, variables }),
-    });
-  } catch {
-    throw new Error(
-      'No se pudo conectar con el BFF. Revisa la conexión e inténtalo nuevamente.',
-    );
-  }
-  const payload = (await response.json().catch(() => null)) as {
-    data?: T;
-    errors?: Array<{ message?: string; extensions?: { code?: string } }>;
-  } | null;
-  if (!response.ok || payload?.errors?.length) {
-    const code = payload?.errors?.[0]?.extensions?.code;
-    if (response.status === 401 || code === 'UNAUTHENTICATED')
-      throw new Error(
-        'La sesión expiró. Inicia sesión nuevamente para consultar la analítica.',
-      );
-    if (response.status === 403 || code === 'FORBIDDEN')
-      throw new Error(
-        'La cuenta no tiene permiso para consultar esta analítica.',
-      );
-    throw new Error(
-      payload?.errors?.[0]?.message ??
-        'No se pudo consultar la analítica institucional.',
-    );
-  }
-  if (!payload?.data) throw new Error('El BFF devolvió una respuesta vacía.');
-  return payload.data;
-}
-
-type AdmissionPaths = NonNullable<ReturnType<typeof resolveAdmissionPaths>>;
-type RetentionPaths = NonNullable<ReturnType<typeof resolveRetentionPaths>>;
-type FacultyRow = {
-  label: string;
-  applications: number;
-  admitted: number | null;
-  admittedApplications: number | null;
-  known: number | null;
-};
-type QueryResponse = { analyticQuery: { data: unknown[]; totalRows: number } };
-
-function yearFilter(
-  axis: AdmissionPaths['year'],
-  member: PublishedMember | undefined,
-) {
-  return member ? [{ ...axis, op: 'IN', members: [member.uniqueName] }] : [];
-}
-
-const count = (value: number | null) =>
-  value === null
-    ? '—'
-    : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 0 }).format(
-        value,
-      );
-const percent = (numerator: number | null, denominator: number | null) =>
-  numerator === null || denominator === null || denominator <= 0
-    ? '—'
-    : new Intl.NumberFormat('es-BO', { maximumFractionDigits: 1 }).format(
-        (numerator / denominator) * 100,
-      ) + ' %';
+import {
+  ANALYTIC_QUERY,
+  CARD_CLASS,
+  CUBES_QUERY,
+  MEMBERS_QUERY,
+  SCHEMA_QUERY,
+} from '../../utils/constants';
+import type {
+  AdmissionPaths,
+  ChartPoint,
+  CubeSummary,
+  FacultyRow,
+  PublishedMember,
+  QueryResponse,
+  RetentionPaths,
+} from '../../utils/types';
 
 export function RectorAnalyticsDashboard() {
   const [admission, setAdmission] = useState<{
@@ -529,7 +454,7 @@ export function RectorAnalyticsDashboard() {
           icon={<CalendarDays aria-hidden="true" />}
           label="Permanencia observada"
           formattedValue={percent(data.retained, data.evaluable)}
-          unit="registros retenidos entre resultados evaluables"
+          unit={`registros retenidos entre resultados evaluables ${data.retained} / ${data.evaluable}`}
           loading={busy}
         />
       </section>
@@ -643,7 +568,7 @@ export function RectorAnalyticsDashboard() {
           />
         </label>
         <div className="overflow-x-auto">
-          <table className="mt-4 w-full min-w-[40rem] text-left text-sm">
+          <table className="mt-4 w-full min-w-160 text-left text-sm">
             <thead>
               <tr>
                 <th className="p-3">Facultad</th>
@@ -696,78 +621,6 @@ export function RectorAnalyticsDashboard() {
         sumarse entre facultades o gestiones. La permanencia se calcula sobre
         registros evaluables de periodos cerrados.
       </footer>
-    </div>
-  );
-}
-
-function MetricCard({
-  icon,
-  label,
-  formattedValue,
-  unit,
-  series = [],
-  loading,
-}: {
-  icon: React.ReactNode;
-  label: string;
-  formattedValue: string;
-  unit: string;
-  series?: ChartPoint[];
-  loading: boolean;
-}) {
-  return (
-    <Card className={CARD_CLASS}>
-      <CardContent className="grid min-h-40 grid-cols-[minmax(0,1fr)_auto] gap-x-4 gap-y-3 px-5 py-5 sm:px-6">
-        <div className="min-w-0">
-          <p className="text-sm font-medium text-muted-foreground">{label}</p>
-          {loading ? (
-            <div
-              className="mt-3 h-9 w-28 animate-pulse rounded bg-muted"
-              aria-label="Cargando indicador"
-            />
-          ) : (
-            <p className="mt-2 text-3xl font-semibold tabular-nums tracking-tight text-foreground">
-              {formattedValue}
-            </p>
-          )}
-          <p className="mt-1 text-xs text-muted-foreground">{unit}</p>
-        </div>
-        <div className="flex size-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-          {icon}
-        </div>
-        {series.length > 0 && !loading ? (
-          <div className="col-span-2 flex items-center justify-between gap-4 border-t border-border pt-3">
-            <span className="text-xs text-muted-foreground">
-              Tendencia · {series.length} periodos
-            </span>
-            <AcademicSparkline
-              label={label}
-              data={series}
-              className="h-8 w-28 shrink-0 text-[color:var(--role-accent,var(--primary))]"
-            />
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
-  );
-}
-
-function ChartSkeleton() {
-  return (
-    <div
-      className="grid h-80 animate-pulse place-items-center rounded-md bg-muted/30"
-      role="status"
-      aria-label="Cargando visualización"
-    >
-      <div
-        className="flex h-40 w-3/4 items-end justify-center gap-4"
-        aria-hidden="true"
-      >
-        <span className="h-16 w-8 rounded-t bg-muted" />
-        <span className="h-28 w-8 rounded-t bg-muted" />
-        <span className="h-24 w-8 rounded-t bg-muted" />
-        <span className="h-36 w-8 rounded-t bg-muted" />
-      </div>
     </div>
   );
 }

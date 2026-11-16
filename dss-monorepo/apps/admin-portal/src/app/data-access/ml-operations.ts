@@ -101,6 +101,139 @@ export async function getMlTrainingJob(jobId: string): Promise<TrainingJob> {
   return (await response.json()) as TrainingJob;
 }
 
+// ---------------------------------------------------------------------------
+// Model registry: validation metrics, activation and deactivation.
+
+const MODELS_URL = `${BFF_BASE_URL}/api/prediction/v1/models`;
+
+export type ModelEventCode =
+  | 'PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE'
+  | 'COURSE_ABANDONMENT';
+export type ModelCadence = 'SEMESTRAL' | 'ANUAL';
+
+export interface ModelTestMetrics {
+  recall: number | null;
+  precision: number | null;
+  f1_score: number | null;
+  accuracy: number | null;
+  roc_auc: number | null;
+  pr_auc: number | null;
+  alert_rate: number | null;
+  macro_f1: number | null;
+  test_row_count: number | null;
+  positive_support: number | null;
+  threshold_origin: string | null;
+}
+
+export interface ModelClassMetrics {
+  class_name: string;
+  precision: number | null;
+  recall: number | null;
+  f1_score: number | null;
+  support: number | null;
+}
+
+export interface ModelSummary {
+  model_id: string;
+  version: string;
+  algorithm: MlAlgorithm;
+  created_at: string | null;
+  lifecycle_state: string | null;
+  event_code: ModelEventCode | null;
+  cadence: ModelCadence | null;
+  scope_key: string | null;
+  is_active: boolean;
+  decision_threshold: number | null;
+  dataset: {
+    dataset_id: string | null;
+    dataset_ref: string | null;
+    evidence_kind: string | null;
+    target_definition_ref: string | null;
+    population_definition_ref: string | null;
+    target_definition: { horizon_years?: number } | null;
+  };
+  activatable: boolean;
+  not_activatable_reason: string | null;
+  test_metrics: ModelTestMetrics;
+  per_class: ModelClassMetrics[];
+  confusion_matrix: { label_names: string[]; values: number[][] } | null;
+  validation: {
+    mean_recall: number | null;
+    mean_f1: number | null;
+    method: string | null;
+    n_splits: number | null;
+    candidate_count: number | null;
+  };
+  hyperparameters: Record<string, unknown> | null;
+}
+
+export interface ModelPointer {
+  model_id: string;
+  version: string;
+  artifact_digest: string;
+  activated_at: string;
+  approved_by: string;
+  activation_kind?: string;
+}
+
+export interface ModelRegistryEvent {
+  action: 'PROMOTE' | 'ROLLBACK' | 'ACTIVATE' | 'DEACTIVATE';
+  scope_key: string | null;
+  previous: ModelPointer | null;
+  active: ModelPointer | null;
+  approved_by?: string;
+  reason?: string;
+  at?: string;
+}
+
+export interface ModelRegistrySnapshot {
+  models: ModelSummary[];
+  active_by_scope: Record<string, ModelPointer>;
+  events: ModelRegistryEvent[];
+}
+
+export async function getModelRegistry(): Promise<ModelRegistrySnapshot> {
+  const response = await fetch(MODELS_URL, {
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+  if (!response.ok) throw await responseError(response);
+  return (await response.json()) as ModelRegistrySnapshot;
+}
+
+export async function activateModel(input: {
+  model_id: string;
+  version: string;
+  reason: string;
+}): Promise<ModelPointer> {
+  const response = await fetch(`${MODELS_URL}/activate`, {
+    method: 'POST',
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw await responseError(response);
+  return ((await response.json()) as { active: ModelPointer }).active;
+}
+
+export async function deactivateModel(input: {
+  event_code: ModelEventCode;
+  cadence: ModelCadence;
+  reason: string;
+}): Promise<ModelRegistryEvent> {
+  const response = await fetch(`${MODELS_URL}/deactivate`, {
+    method: 'POST',
+    credentials: 'include',
+    cache: 'no-store',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  if (!response.ok) throw await responseError(response);
+  return ((await response.json()) as { event: ModelRegistryEvent }).event;
+}
+
 export function isMlAlgorithm(value: string): value is MlAlgorithm {
   return value === 'random_forest' || value === 'xgboost';
 }

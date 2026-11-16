@@ -23,6 +23,7 @@ jobs:
       RECTOR_DASHBOARD_PORT: 3004
       BFF_PORT: 3006
       NEXT_PUBLIC_BFF_URL: http://localhost:3006
+      NEXT_PUBLIC_LANDING_URL: http://localhost:3000
       NEXT_PUBLIC_ADMIN_PORTAL_URL: http://localhost:3001
       NEXT_PUBLIC_RECTOR_DASHBOARD_URL: http://localhost:3004
       NEXT_PUBLIC_DECANO_DASHBOARD_URL: http://localhost:3002

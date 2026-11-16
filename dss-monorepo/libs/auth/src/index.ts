@@ -2,6 +2,15 @@
 export { AuthProvider, useAuth, useSessionTimeout } from './lib/AuthProvider';
 export type { AuthProviderProps } from './lib/AuthProvider';
 export { ProtectedRoute } from './lib/ProtectedRoute';
+export {
+  LandingLoginRedirect,
+  landingLoginUrl,
+  portalReturnTo,
+} from './lib/LandingLoginRedirect';
+export type {
+  LandingLoginRedirectProps,
+  LandingLoginTarget,
+} from './lib/LandingLoginRedirect';
 export type { ProtectedRouteProps } from './lib/ProtectedRoute';
 export {
   AuthProfileError,

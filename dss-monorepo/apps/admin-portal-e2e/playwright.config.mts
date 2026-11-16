@@ -9,6 +9,8 @@ const configuredPort = Number(env['ADMIN_PORTAL_PORT_E2E']);
 const port = Number.isInteger(configuredPort) && configuredPort > 0 ? configuredPort : 3001;
 process.env['ADMIN_PORTAL_PORT'] ??= String(port);
 process.env.PORT = String(port);
+// Unauthenticated visits redirect to the landing login; tests assert that hop.
+process.env['NEXT_PUBLIC_LANDING_URL'] ??= env['NEXT_PUBLIC_LANDING_URL'] ?? 'http://localhost:3000';
 const baseURL = resolveBaseURL(env['ADMIN_PORTAL_BASE_URL'], port);
 
 /**

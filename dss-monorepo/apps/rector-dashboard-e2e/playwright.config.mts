@@ -25,6 +25,8 @@ env['KEYCLOAK_BFF_REDIRECT_URI'] = `${bffBaseURL}/api/auth/callback`;
 process.env['BFF_PORT'] = String(bffPort);
 process.env['NEXT_PUBLIC_BFF_URL'] = bffBaseURL;
 process.env['RECTOR_DASHBOARD_PORT'] = String(port);
+// Unauthenticated visits redirect to the landing login; tests assert that hop.
+process.env['NEXT_PUBLIC_LANDING_URL'] ??= env['NEXT_PUBLIC_LANDING_URL'] ?? 'http://localhost:3000';
 process.env.PORT = String(port);
 const baseURL = resolveBaseURL(
   env['RECTOR_DASHBOARD_BASE_URL'] ?? env['RECTOR_DASHBOARD_URL'],
@@ -84,6 +86,7 @@ export default defineConfig({
       stdout: 'pipe',
       reuseExistingServer: !process.env.CI && process.env['PREDICTION_E2E_FORCE_SERVER'] !== '1',
       env: {
+        NEXT_PUBLIC_LANDING_URL: env['NEXT_PUBLIC_LANDING_URL'] ?? 'http://localhost:3000',
         NEXT_PUBLIC_BFF_URL: bffBaseURL,
       },
       cwd: resolve(workspaceRoot, 'apps/rector-dashboard'),

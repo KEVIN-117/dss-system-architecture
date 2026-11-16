@@ -4,7 +4,8 @@ type Credentials = { username: string; password: string };
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim();
-  if (!value) test.skip(true, `Set ${name} in apps/rector-dashboard-e2e/.env.e2e.`);
+  if (!value)
+    test.skip(true, `Set ${name} in apps/rector-dashboard-e2e/.env.e2e.`);
   return value!;
 }
 
@@ -24,20 +25,34 @@ function testData() {
 }
 
 async function signIn(page: Page, credentials: Credentials) {
-  await page.goto('/login?returnTo=%2Fpredictions');
-  const dashboardOrigin = new URL(page.url()).origin;
-  await page.getByRole('button', { name: 'Iniciar sesión' }).click();
+  // Portals no longer host a sign-in screen. Start the BFF login directly
+  // with the same returnTo the portal used to send, so this run stays
+  // independent of the landing app.
+  const dashboardOrigin = new URL(
+    test.info().project.use.baseURL ?? 'http://localhost:3004',
+  ).origin;
+  const bffUrl = process.env.NEXT_PUBLIC_BFF_URL ?? 'http://localhost:3006';
+  await page.goto(
+    `${bffUrl}/api/auth/login?returnTo=${encodeURIComponent(`${dashboardOrigin}/predictions`)}`,
+  );
   await page.locator('#username').fill(credentials.username);
   await page.locator('#password').fill(credentials.password);
   await page.locator('#kc-login').click();
   const outcome = await Promise.race([
-    page.waitForURL((url) => url.origin === dashboardOrigin && (
-      url.pathname === '/predictions' || url.searchParams.get('error') === 'authentication_failed'
-    ), {
-      waitUntil: 'domcontentloaded',
-      timeout: 20_000,
-    }).then(() => 'callback' as const),
-    page.getByRole('heading', { name: /update password/i })
+    page
+      .waitForURL(
+        (url) =>
+          url.origin === dashboardOrigin &&
+          (url.pathname === '/predictions' ||
+            url.searchParams.get('error') === 'authentication_failed'),
+        {
+          waitUntil: 'domcontentloaded',
+          timeout: 20_000,
+        },
+      )
+      .then(() => 'callback' as const),
+    page
+      .getByRole('heading', { name: /update password/i })
       .waitFor({ state: 'visible', timeout: 20_000 })
       .then(() => 'password_update_required' as const),
   ]);
@@ -55,12 +70,16 @@ async function signIn(page: Page, credentials: Credentials) {
 }
 
 test.describe('PRED-007 · Keycloak → BFF → Prediction Service → Rector UI', () => {
-  test('Rector publica la población Faker, la consulta por GraphQL y ve el lote completo', async ({ page }) => {
+  test('Rector publica la población Faker, la consulta por GraphQL y ve el lote completo', async ({
+    page,
+  }) => {
     test.setTimeout(300_000);
     const { programRef, cutId, rector } = testData();
     await signIn(page, rector);
 
-    await expect(page.getByRole('heading', { name: 'Riesgo de abandono del programa' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Riesgo de abandono del programa' }),
+    ).toBeVisible();
     const programSelect = page.getByLabel('Programa');
     const cutSelect = page.getByLabel('Cierre académico');
     await expect(programSelect).toBeEnabled();
@@ -68,52 +87,96 @@ test.describe('PRED-007 · Keycloak → BFF → Prediction Service → Rector UI
     await cutSelect.selectOption(cutId);
 
     await page.getByRole('button', { name: 'Calcular y publicar' }).click();
-    await expect(page.getByText('Lote completo y publicado.')).toBeVisible({ timeout: 240_000 });
-    await expect(page.getByRole('heading', { name: 'Resultados del lote' })).toBeVisible();
+    await expect(page.getByText('Lote completo y publicado.')).toBeVisible({
+      timeout: 240_000,
+    });
+    await expect(
+      page.getByRole('heading', { name: 'Resultados del lote' }),
+    ).toBeVisible();
     await expect(page.getByText('PUBLISHED', { exact: true })).toBeVisible();
     await expect(page.locator('tbody tr').first()).toBeVisible();
 
-    const graphQlResponse = page.waitForResponse((response) =>
-      response.url().endsWith('/api/graphql') && response.request().method() === 'POST',
+    const graphQlResponse = page.waitForResponse(
+      (response) =>
+        response.url().endsWith('/api/graphql') &&
+        response.request().method() === 'POST',
     );
     await page.getByRole('button', { name: 'Consultar' }).click();
     const response = await graphQlResponse;
     expect(response.status()).toBe(200);
     const payload = await response.json();
     expect(payload.errors).toBeUndefined();
-    expect(payload.data.predictionPublication.publication.status).toBe('PUBLISHED');
-    expect(payload.data.predictionPublication.publication.result_count).toBeGreaterThan(0);
-    expect(payload.data.predictionPublication.publication.results.length).toBeGreaterThan(0);
+    expect(payload.data.predictionPublication.publication.status).toBe(
+      'PUBLISHED',
+    );
+    expect(
+      payload.data.predictionPublication.publication.result_count,
+    ).toBeGreaterThan(0);
+    expect(
+      payload.data.predictionPublication.publication.results.length,
+    ).toBeGreaterThan(0);
 
-    const activeVersion = payload.data.predictionPublication.publication.model_version;
-    const rows = payload.data.predictionPublication.publication.results as Array<{ model_version: string }>;
+    const activeVersion =
+      payload.data.predictionPublication.publication.model_version;
+    const rows = payload.data.predictionPublication.publication
+      .results as Array<{ model_version: string }>;
     expect(rows.every((row) => row.model_version === activeVersion)).toBe(true);
   });
 
-  test('la publicación exige sesión y rechaza por BFF una cuenta válida fuera del ámbito', async ({ page }) => {
+  test('la publicación exige sesión y rechaza por BFF una cuenta válida fuera del ámbito', async ({
+    page,
+  }) => {
     const { programRef, cutId, outOfScope } = testData();
     const bffUrl = process.env.NEXT_PUBLIC_BFF_URL ?? 'http://localhost:3006';
 
+    const landingUrl =
+      process.env.NEXT_PUBLIC_LANDING_URL ?? 'http://localhost:3000';
+    await page.route(`${landingUrl}/**`, (route) =>
+      route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<h1>Landing login</h1>',
+      }),
+    );
     await page.goto('/predictions');
-    await expect(page.getByRole('heading', { name: 'Sesión requerida' })).toBeVisible();
-    const anonymousStatus = await page.evaluate(async ({ base, programRef, cutId }) => {
-      const query = new URLSearchParams({ program_ref: programRef, cut_id: cutId });
-      const response = await fetch(`${base}/api/prediction/v1/prediction-publications?${query}`, {
-        credentials: 'include',
-      });
-      return response.status;
-    }, { base: bffUrl, programRef, cutId });
+    await expect(page).toHaveURL(
+      (url) =>
+        `${url.origin}${url.pathname}` === `${landingUrl}/login` &&
+        url.searchParams.get('returnTo')?.endsWith('/predictions') === true,
+    );
+    // The page now sits on the landing stub, outside the BFF's CORS
+    // allowlist, so probe the API with the context's own (cookie-less) client.
+    const anonymousQuery = new URLSearchParams({
+      program_ref: programRef,
+      cut_id: cutId,
+    });
+    const anonymousStatus = (
+      await page.request.get(
+        `${bffUrl}/api/prediction/v1/prediction-publications?${anonymousQuery}`,
+      )
+    ).status();
     expect(anonymousStatus).toBe(401);
 
     await signIn(page, outOfScope);
-    await expect(page.getByRole('heading', { name: 'Acceso no autorizado' })).toBeVisible();
-    const outOfScopeStatus = await page.evaluate(async ({ base, programRef, cutId }) => {
-      const query = new URLSearchParams({ program_ref: programRef, cut_id: cutId });
-      const response = await fetch(`${base}/api/prediction/v1/prediction-publications?${query}`, {
-        credentials: 'include',
-      });
-      return response.status;
-    }, { base: bffUrl, programRef, cutId });
+    await expect(
+      page.getByRole('heading', { name: 'Acceso no autorizado' }),
+    ).toBeVisible();
+    const outOfScopeStatus = await page.evaluate(
+      async ({ base, programRef, cutId }) => {
+        const query = new URLSearchParams({
+          program_ref: programRef,
+          cut_id: cutId,
+        });
+        const response = await fetch(
+          `${base}/api/prediction/v1/prediction-publications?${query}`,
+          {
+            credentials: 'include',
+          },
+        );
+        return response.status;
+      },
+      { base: bffUrl, programRef, cutId },
+    );
     expect(outOfScopeStatus).toBe(403);
   });
 });

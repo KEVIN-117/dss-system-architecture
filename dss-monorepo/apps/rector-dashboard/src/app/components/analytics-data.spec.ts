@@ -5,6 +5,7 @@ import {
   readMetric,
   readPublishedMembers,
   resolveAcademicCubePaths,
+  resolveRetentionPaths,
   sortAcademicPeriods,
 } from './analytics-data';
 
@@ -42,6 +43,23 @@ describe('Rector cube data mapping', () => {
       faculty: { dimension: 'Programa', hierarchy: 'Facultad y carrera', level: 'Facultad' },
     });
     expect(resolveAcademicCubePaths({ ...schema, dimensions: {} })).toBeNull();
+  });
+
+  it('resolves the permanence cube on the published Gestión y periodo hierarchy', () => {
+    const retentionSchema = {
+      ...schema,
+      measures: {
+        evaluated: { name: 'Estudiantes evaluados' },
+        retained: { name: 'Permanecen' },
+        privacy: { name: 'Conteo de privacidad', visible: false },
+      },
+    };
+    expect(resolveRetentionPaths(retentionSchema)).toEqual({
+      year: { dimension: 'Periodo', hierarchy: 'Gestión y periodo', level: 'Gestión' },
+      retained: 'Permanecen',
+      evaluable: 'Estudiantes evaluados',
+    });
+    expect(resolveRetentionPaths({ ...retentionSchema, measures: {} })).toBeNull();
   });
 
   it('maps aggregate OLAP cells and published member options without inventing values', () => {

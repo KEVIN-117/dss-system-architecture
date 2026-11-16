@@ -141,3 +141,30 @@ html.dark {
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
+
+/* Auth traffic router — portal gateway scene. */
+@keyframes gateway-drift {
+  from { transform: scale(1.04) translate3d(0, 0, 0); }
+  to { transform: scale(1.1) translate3d(-1.5%, -1%, 0); }
+}
+@keyframes gateway-rise {
+  from { opacity: 0; transform: translateY(16px) scale(0.985); filter: blur(6px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes gateway-spin { to { transform: rotate(360deg); } }
+@keyframes gateway-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+@keyframes gateway-fade {
+  from { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+  to { opacity: 1; transform: none; filter: none; }
+}
+@keyframes gateway-glow { 50% { opacity: 0.45; } }
+
+.gateway-drift { animation: gateway-drift 24s ease-in-out infinite alternate; }
+.gateway-rise { animation: gateway-rise 0.7s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.gateway-spin { animation: gateway-spin 1.4s linear infinite; }
+.gateway-sweep { animation: gateway-sweep 1.6s cubic-bezier(0.65, 0, 0.35, 1) infinite; }
+.gateway-fade { animation: gateway-fade 0.6s cubic-bezier(0.22, 1, 0.36, 1) both; }
+.gateway-glow { animation: gateway-glow 2.4s ease-in-out infinite; }
