@@ -113,6 +113,10 @@ jobs:
       - name: Run Hop atomic publication regression
         run: docker compose -p dss-dw-publish -f infra/dw-integration/dw-integration-test.yml --profile dw-publish run --rm hop-publish-assert
 
+      - name: Show Hop publication logs on failure
+        if: failure()
+        run: docker compose -p dss-dw-publish -f infra/dw-integration/dw-integration-test.yml logs --no-color hop-publish-fixture hop-publish-integration-test
+
       - name: Stop Hop regression containers
         if: always()
         run: |
