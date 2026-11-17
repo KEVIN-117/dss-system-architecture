@@ -364,5 +364,7 @@ export interface EntityGraduado {
   modalidad_graduacion: string;
   nota_defensa: number;
   nro_acta: string;
+  /** Documento del titulado (actas_graduacion.graduados.nro_dip). */
+  nro_dip: string;
   _registrado: string;
 }

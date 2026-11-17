@@ -9,6 +9,7 @@ import { AcademicGenerator } from '../dist/generators/academic.js';
 import { LongitudinalCohortSimulator } from '../dist/generators/cohorts.js';
 import { SqlEmitter } from '../dist/db/sql-emitter.js';
 import { validateSafeEnvironment, createSeedMetadata } from '../dist/config/security.js';
+import { InstitutionalScenario } from '../dist/scenarios/institutional-trend.js';
 
 describe('Suite de Pruebas Unitarias y de Integración — DATA-001', () => {
   const catalogDir = resolveCatalogDirectory();
@@ -134,18 +135,47 @@ describe('Suite de Pruebas Unitarias y de Integración — DATA-001', () => {
     const sim = new LongitudinalCohortSimulator(demo, school, academic, catalogs.lookups);
     const res = sim.simulate(100, 2020, 2020);
     const regimeByProgram = new Map(academic.programs.map((program) => [program.id_programa, program.regime]));
-    const firstSemesterIntake = res.postulantes.filter((applicant) => applicant.id_periodo === 1);
+    const firstIntake = res.postulantes.filter((applicant) => applicant.id_periodo === 1);
     const secondSemesterIntake = res.postulantes.filter((applicant) => applicant.id_periodo === 2);
-    const annualIntake = res.postulantes.filter((applicant) => applicant.id_periodo === 3);
 
-    assert.equal(firstSemesterIntake.length, 100);
-    assert.equal(secondSemesterIntake.length, 100);
-    assert.equal(annualIntake.length, 100);
+    // Convención Jachasun / DW 0045: los anuales usan el periodo 1 (gestión completa).
+    assert.equal(firstIntake.length, 100);
+    assert.equal(secondSemesterIntake.length, 30);
+    assert.ok(res.postulantes.every((applicant) => applicant.id_periodo === 1 || applicant.id_periodo === 2));
+    assert.ok(firstIntake.some((applicant) => regimeByProgram.get(applicant.id_programa) === 'A'));
+    assert.ok(firstIntake.some((applicant) => regimeByProgram.get(applicant.id_programa) === 'S'));
     assert.equal(new Set(res.uatfDatos.map((person) => person.nro_dip)).size, res.uatfDatos.length);
-    assert.ok([...firstSemesterIntake, ...secondSemesterIntake].every((applicant) => regimeByProgram.get(applicant.id_programa) === 'S'));
-    assert.ok(annualIntake.every((applicant) => regimeByProgram.get(applicant.id_programa) === 'A'));
+    assert.ok(secondSemesterIntake.every((applicant) => regimeByProgram.get(applicant.id_programa) === 'S'));
     assert.ok(secondSemesterIntake.every((applicant) => applicant.fec_inscripcion.startsWith('2020-07-')));
-    assert.ok(annualIntake.every((applicant) => applicant.fec_inscripcion.startsWith('2020-01-')));
+    assert.ok(firstIntake.every((applicant) => applicant.fec_inscripcion.startsWith('2020-01-')));
+
+    const alumnoRegime = new Map(res.alumnos.map((a) => [a.id_alumno, regimeByProgram.get(a.id_programa)]));
+    assert.ok(res.notasPlanilla.every((n) => alumnoRegime.get(n.id_alumno) === 'S' || n.id_periodo === 1));
+  });
+
+  it('5b. Escenario decline-growth: declive 2010-2015 y crecimiento desde 2016', () => {
+    initializeFaker(2026);
+    const demo = new DemographicGenerator(catalogs.demographic, catalogs.geographic);
+    const school = new SchoolGenerator(catalogs.schools);
+    const academic = new AcademicGenerator(catalogs.facultiesAndCareers, catalogs.studyPlansAndCourses, 'test');
+    const sim = new LongitudinalCohortSimulator(
+      demo, school, academic, catalogs.lookups, InstitutionalScenario.parse('decline-growth')
+    );
+    const res = sim.simulate(120, 2005, 2026);
+    const year = (g: number) => res.yearly.find((y) => y.gestion === g)!;
+    const passRate = (g: number) => year(g).aprobados / (year(g).aprobados + year(g).reprobados);
+
+    assert.equal(res.yearly.length, 22);
+    assert.ok(year(2015).postulantes < 0.7 * year(2009).postulantes, 'La demanda debe caer hacia 2015');
+    assert.ok(year(2026).postulantes > 2 * year(2015).postulantes, 'La demanda debe crecer desde 2016');
+    assert.ok(passRate(2015) < passRate(2009), 'El rendimiento debe caer en el declive');
+    assert.ok(passRate(2024) > passRate(2015), 'El rendimiento debe recuperarse');
+    assert.ok(res.graduados.length > 0, 'Debe haber titulados');
+    assert.ok(res.graduados.every((g) => g.nro_dip.length > 0));
+  });
+
+  it('5c. Escenario desconocido se rechaza', () => {
+    assert.throws(() => InstitutionalScenario.parse('boom'), /Escenario desconocido/);
   });
 
   it('6. Integridad Topológica: Materias Ciclo 1 no tienen padre y Ciclo 2+ tienen padre', () => {

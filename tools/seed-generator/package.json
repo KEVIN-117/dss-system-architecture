@@ -13,7 +13,11 @@
     "seed": "node dist/cli.js",
     "seed:dry-run": "node dist/cli.js --dry-run",
     "seed:sql": "node dist/cli.js --profile test --output-sql ./out/seed_sample.sql",
-    "test": "node --experimental-strip-types --test tests/suite.test.ts"
+    "test": "node --experimental-strip-types --test tests/suite.test.ts",
+    "seed:scenario": "node dist/cli.js --scenario decline-growth --start-year 2005 --end-year 2026 --export-dir ./out/dataset/local",
+    "seed:docker": "docker compose -f docker-compose.yml run --rm --build seeder",
+    "seed:docker:down": "docker compose -f docker-compose.yml down",
+    "seed:docker:reset": "docker compose -f docker-compose.yml down --volumes"
   },
   "dependencies": {
     "@faker-js/faker": "^10.6.0",
