@@ -38,6 +38,7 @@
   ],
   "exclude": ["node_modules", "dist", ".next"],
   "references": [
+    { "path": "../../libs/ui/academic-analytics" },
     {
       "path": "../../libs/rbac"
     },

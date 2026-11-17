@@ -15,11 +15,10 @@
     <field><currency/><decimal/><format/><group/><length>4</length><name>gestion</name><precision>0</precision><trim_type>both</trim_type><type>Integer</type><variable>${P_REQUESTED_GESTION}</variable></field>
     <field><currency/><decimal/><format/><group/><length>2</length><name>periodo</name><precision>0</precision><trim_type>both</trim_type><type>Integer</type><variable>${P_REQUESTED_PERIODO}</variable></field>
   </fields><attributes/><GUI><xloc>128</xloc><yloc>128</yloc></GUI></transform>
-  <transform><name>Read coursework source rows</name><type>TableInput</type><description>Une matrícula con alumno/programa/materia; conserva solo el cierre, ordenado por PK id_matricula</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>WITH params AS MATERIALIZED (
+  <transform><name>Read coursework source rows</name><type>TableInput</type><description>Une matrícula con alumno/programa/materia; conserva solo el cierre, ordenado por PK id_matricula y agrupado en bloques de 5000 filas</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>WITH params AS MATERIALIZED (
     SELECT ?::uuid AS run_id, ?::smallint AS gestion, ?::smallint AS periodo
-)
-SELECT params.run_id, params.run_id AS staging_run_id,
-       row_number() OVER (ORDER BY n.id_matricula)::bigint AS row_ordinal,
+), source_rows AS (
+SELECT row_number() OVER (ORDER BY n.id_matricula)::bigint AS row_ordinal,
        jsonb_build_object(
            'id_matricula', n.id_matricula, 'id_gestion', n.id_gestion,
            'id_periodo', n.id_periodo, 'id_alumno', n.id_alumno,
@@ -37,8 +36,19 @@ JOIN academico.pln_materias materia ON materia.id_materia=n.id_materia
 WHERE n.id_gestion=params.gestion AND n.id_periodo=params.periodo
   AND upper(btrim(programa._tipo_academico)) IN ('CAR','PRO','TES','TEM')
   AND upper(btrim(coalesce(programa.activo,''))) = 'A'
-ORDER BY n.id_matricula</sql><limit>0</limit><lookup>Get request parameters</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>448</xloc><yloc>128</yloc></GUI></transform>
-  <transform><name>Stage FACT_CURSADO row</name><type>TableInput</type><description>Valida integridad, rango de notas, periodo y versión SCD2; prepara en staging privado</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection><sql>SELECT ?::uuid AS run_id,
-       etl_control.stage_hop_fact_coursework(?::uuid, ?::bigint, ?::jsonb) AS staged_row_id</sql><limit>0</limit><lookup>Read coursework source rows</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>800</xloc><yloc>128</yloc></GUI></transform>
+)
+-- One row per chunk; FACT_CURSADO is staged set-based, one DW call per chunk.
+SELECT chunk.run_id, chunk.staging_run_id, chunk.chunk_rows
+FROM (
+    SELECT params.run_id, params.run_id AS staging_run_id,
+           (s.row_ordinal - 1) / 5000 AS chunk_no,
+           jsonb_agg(jsonb_build_object('row_ordinal', s.row_ordinal, 'source_data', s.source_data)
+                     ORDER BY s.row_ordinal) AS chunk_rows
+    FROM source_rows s CROSS JOIN params
+    GROUP BY params.run_id, (s.row_ordinal - 1) / 5000
+) chunk
+ORDER BY chunk.chunk_no</sql><limit>0</limit><lookup>Get request parameters</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>448</xloc><yloc>128</yloc></GUI></transform>
+  <transform><name>Stage FACT_CURSADO row</name><type>TableInput</type><description>Valida integridad, rango de notas, periodo y versión SCD2 por bloque; prepara en staging privado</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>DSS DW</connection><sql>SELECT ?::uuid AS run_id,
+       etl_control.stage_hop_fact_coursework_batch(?::uuid, ?::jsonb) AS staged_rows</sql><limit>0</limit><lookup>Read coursework source rows</lookup><execute_each_row>Y</execute_each_row><variables_active>N</variables_active><attributes/><GUI><xloc>800</xloc><yloc>128</yloc></GUI></transform>
   <transform_error_handling/><attributes/>
 </pipeline>

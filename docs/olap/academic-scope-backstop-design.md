@@ -38,7 +38,7 @@ k-anonymity).
 | Unresolved/rejected role already fails closed | `SecurityAwareConnectionManager.applySecurity`, `enforceRoleResolvedOrAdmin`, `setRole` | New resolution mode can reuse this path unchanged. |
 | Connections are cached per user | `resolveConnectionKey` | Per-user role on a cached connection is already safe. |
 | **Query cache key uses Spring authorities, not Mondrian roles** | `ThinQueryService.currentRolesForCacheKey()` (≈L270) | Two deans of different faculties both have `{ROLE_DECANO}` → **same cache key → cross-faculty leak**. Must be fixed as part of this work. |
-| Scope members are keyed by id | BFF `OLAP_ACADEMIC_SCOPE_FILTERS`: `[Academic Faculty Scope].[Faculty Scope].[Faculty].&[{id}]`, career `…[Career].&[{id}]` | Mondrian grants use the same member unique names, so BFF and backstop stay consistent. |
+| Scope members are keyed by id | BFF `OLAP_ACADEMIC_SCOPE_FILTERS`: `[Ámbito de facultad].[Facultad].[Facultad].&[{id}]`, career `…[Career].&[{id}]` | Mondrian grants use the same member unique names, so BFF and backstop stay consistent. |
 
 ## 3. Options considered
 
@@ -88,18 +88,18 @@ active catalog (`dim_programa`: `id_facultad`, `id_programa`) and emits a roles 
 ```xml
 <Role name="Faculty_3">
   <SchemaGrant access="none">
-    <CubeGrant cube="Academic Performance" access="all">
-      <HierarchyGrant hierarchy="[Academic Faculty Scope].[Faculty Scope]" access="custom" rollupPolicy="partial">
-        <MemberGrant member="[Academic Faculty Scope].[Faculty Scope].[Faculty].&amp;[3]" access="all"/>
+    <CubeGrant cube="Rendimiento académico" access="all">
+      <HierarchyGrant hierarchy="[Ámbito de facultad].[Facultad]" access="custom" rollupPolicy="partial">
+        <MemberGrant member="[Ámbito de facultad].[Facultad].[Facultad].&amp;[3]" access="all"/>
       </HierarchyGrant>
-      <HierarchyGrant hierarchy="[Academic Program].[Program]" access="custom" rollupPolicy="partial">
-        <MemberGrant member="[Academic Program].[Program].[Faculty].&amp;[3]" access="all"/>
+      <HierarchyGrant hierarchy="[Programa].[Facultad y carrera]" access="custom" rollupPolicy="partial">
+        <MemberGrant member="[Programa].[Facultad y carrera].[Facultad].&amp;[3]" access="all"/>
       </HierarchyGrant>
-      <HierarchyGrant hierarchy="[Academic Career Scope].[Career Scope]" access="custom" rollupPolicy="partial">
+      <HierarchyGrant hierarchy="[Ámbito de carrera].[Carrera]" access="custom" rollupPolicy="partial">
         <!-- one MemberGrant per career of faculty 3 -->
       </HierarchyGrant>
     </CubeGrant>
-    <!-- same CubeGrant for Academic Admission and Academic Retention -->
+    <!-- same CubeGrant for Matrícula, Admisión and Permanencia y deserción -->
   </SchemaGrant>
 </Role>
 
@@ -110,11 +110,11 @@ active catalog (`dim_programa`: `id_facultad`, `id_programa`) and emits a roles 
 </Role>
 ```
 
-Why grant all three program-based hierarchies: `Academic Program`, `Academic Faculty Scope` and
-`Academic Career Scope` are separate dimensions over the same `dim_programa` rows. Restricting only
-the scope dimension would still let a query put `[Academic Program]` on rows and list (and, under
+Why grant all three program-based hierarchies: `Programa`, `Ámbito de facultad` and
+`Ámbito de carrera` are separate dimensions over the same `dim_programa` rows. Restricting only
+the scope dimension would still let a query put `[Programa]` on rows and list (and, under
 `rollupPolicy="full"`, total) other faculties. `rollupPolicy="partial"` makes `All` totals sum only
-granted members. `Academic Campus` needs no grant: its cells already roll up through the restricted
+granted members. `Sede` needs no grant: its cells already roll up through the restricted
 dimensions.
 
 Drift handling: a new faculty/career without a regenerated schema has no role → `setRole` throws →

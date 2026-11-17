@@ -6,11 +6,11 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: {
-    default: 'OLAP Workspace | DSS',
-    template: '%s | OLAP Workspace',
+    default: 'Espacio de análisis OLAP | DSS',
+    template: '%s | Espacio de análisis OLAP',
   },
   description:
-    'Espacio de análisis OLAP para explorar cubos, dashboards y aplicaciones.',
+    'Espacio de análisis OLAP para explorar cubos, tableros y aplicaciones.',
 };
 
 const bffBaseUrl = getBffBaseUrl();

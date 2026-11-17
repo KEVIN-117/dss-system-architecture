@@ -3,10 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { AcademicReports } from '@dss-monorepo/academic-analytics';
 
 vi.mock('@dss-monorepo/charts', () => ({ AcademicBarChart: () => null, TrendLineChart: () => null }));
-const names = ['Enrollment Attempts', 'Graded Attempts', 'Passed Attempts', 'Failed Attempts', 'Repeated Attempts', 'Abandoned Attempts', 'Average Final Grade'];
+const names = ['Inscripciones en materias', 'Inscripciones con resultado', 'Materias aprobadas', 'Materias reprobadas', 'Inscripciones repetidas', 'Inscripciones abandonadas', 'Nota promedio'];
 const schema = { measures: Object.fromEntries(names.map((name) => [name, { name }])), dimensions: {
-  period: { name: 'Academic Period', hierarchies: { period: { name: 'Academic Period', levels: { year: { name: 'Academic Year' } } } } },
-  program: { name: 'Academic Program', hierarchies: { program: { name: 'Program', levels: { career: { name: 'Career' } } } } },
+  period: { name: 'Periodo', hierarchies: { period: { name: 'Gestión y periodo', levels: { year: { name: 'Gestión' } } } } },
+  program: { name: 'Programa', hierarchies: { program: { name: 'Facultad y carrera', levels: { career: { name: 'Carrera' } } } } },
 } };
 let requests: Array<{query: string; variables?: Record<string, unknown>}>;
 let kind = 'career';
@@ -15,9 +15,9 @@ beforeEach(() => {
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init: RequestInit) => {
     const body = JSON.parse(String(init.body)); requests.push(body);
     if (body.query.includes('DirectorAnalyticsViewer')) return Response.json({ data: { viewer: { academicScope: { kind, careerIds: kind === 'career' ? ['AGR'] : [], facultyIds: kind === 'faculty' ? ['FAC-1'] : [] } } } });
-    if (body.query.includes('DirectorAnalyticsCubes')) return Response.json({ data: { olapCubes: [{ cubeId: 'dw/catalog/schema/Academic Performance', cubeName: 'Academic Performance' }] } });
+    if (body.query.includes('DirectorAnalyticsCubes')) return Response.json({ data: { olapCubes: [{ cubeId: 'dw/catalog/schema/Rendimiento académico', cubeName: 'Rendimiento académico' }] } });
     if (body.query.includes('DirectorAnalyticsSchema')) return Response.json({ data: { olapCubeSchema: schema } });
-    return Response.json({ data: { analyticQuery: { data: [{ 'Academic Year': '2024', Career: 'Agronomía', 'Enrollment Attempts': 45 }, { 'Academic Year': '2023', Career: 'Medicina', 'Enrollment Attempts': 30 }] } } });
+    return Response.json({ data: { analyticQuery: { data: [{ 'Gestión': '2024', Carrera: 'Agronomía', 'Inscripciones en materias': 45 }, { 'Gestión': '2023', Carrera: 'Medicina', 'Inscripciones en materias': 30 }] } } });
   }));
 });
 afterEach(() => { cleanup(); vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
@@ -31,7 +31,7 @@ describe('academic reports', () => {
     const calls = requests.filter((r) => r.query.includes('DirectorAnalyticsReport'));
     expect(calls).toHaveLength(1);
     const input = calls[0].variables?.input as { cubeId: string; filters?: unknown };
-    expect(input.cubeId).toContain('Academic Performance');
+    expect(input.cubeId).toContain('Rendimiento académico');
     expect(input.filters).toBeUndefined();
   });
   it('fails closed when the session scope differs', async () => {

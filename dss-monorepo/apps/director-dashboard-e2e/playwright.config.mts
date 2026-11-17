@@ -9,6 +9,8 @@ const configuredPort = Number(env['DIRECTOR_DASHBOARD_PORT_E2E']);
 const port = Number.isInteger(configuredPort) && configuredPort > 0 ? configuredPort : 3003;
 process.env['DIRECTOR_DASHBOARD_PORT'] ??= String(port);
 process.env.PORT = String(port);
+// Unauthenticated visits redirect to the landing login; tests assert that hop.
+process.env['NEXT_PUBLIC_LANDING_URL'] ??= env['NEXT_PUBLIC_LANDING_URL'] ?? 'http://localhost:3000';
 const baseURL = resolveBaseURL(env['DIRECTOR_DASHBOARD_BASE_URL'], port);
 
 /**

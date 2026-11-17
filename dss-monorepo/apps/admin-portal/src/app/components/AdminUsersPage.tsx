@@ -246,7 +246,7 @@ export function AdminUsersPage() {
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
           <p className="text-sm font-medium text-muted-foreground">
-            Administración · Auth Service
+            Administración · servicio de autenticación
           </p>
           <h1
             id="admin-users-title"
@@ -335,7 +335,7 @@ export function AdminUsersPage() {
               : `${totalElements} ${totalElements === 1 ? 'usuario encontrado' : 'usuarios encontrados'}`}
           </p>
           <p className="text-sm text-muted-foreground">
-            Los datos provienen de Auth Service
+            Los datos provienen del servicio de autenticación
           </p>
         </div>
 
@@ -529,7 +529,7 @@ export function AdminUsersPage() {
                     Este rol no utiliza contexto académico.
                   </p>
                   <p className="mt-1 text-muted-foreground">
-                    Auth Service requiere que Rector y Superadministrador no
+                    El servicio de autenticación requiere que Rector y Superadministrador no
                     tengan contextos asignados.
                   </p>
                 </div>
@@ -608,7 +608,7 @@ export function AdminUsersPage() {
                       className="text-xs text-muted-foreground"
                     >
                       Se muestran las facultades activas del catálogo
-                      académico de Auth Service.
+                      académico del servicio de autenticación.
                     </p>
                   </div>
                   {selectedRole === 'DIRECTOR' && (

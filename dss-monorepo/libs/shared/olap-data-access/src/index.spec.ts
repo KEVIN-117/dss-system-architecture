@@ -76,8 +76,8 @@ describe('OLAP data access', () => {
         ],
         measures: [
           {
-            name: 'Applicants',
-            caption: 'Applicants',
+            name: 'Postulaciones',
+            caption: 'Postulaciones',
             uniqueName: '[Measures].[Applicants]',
             visible: true,
           },
@@ -97,9 +97,9 @@ describe('OLAP data access', () => {
         connection: 'uatf-dw',
         catalog: 'UATF_DW',
         schema: 'UATF_DW',
-        name: 'Academic Admission',
-        caption: 'Academic Admission',
-        uniqueName: '[Academic Admission]',
+        name: 'Admisión',
+        caption: 'Admisión',
+        uniqueName: '[Admisión]',
         visible: true,
       }),
     ).resolves.toEqual({
@@ -113,15 +113,15 @@ describe('OLAP data access', () => {
       ],
       measures: [
         {
-          name: 'Applicants',
-          caption: 'Applicants',
+          name: 'Postulaciones',
+          caption: 'Postulaciones',
           uniqueName: '[Measures].[Applicants]',
           visible: true,
         },
       ],
     });
     expect(olapFetch).toHaveBeenCalledWith(
-      '/rest/saiku/rector/discover/uatf-dw/UATF_DW/UATF_DW/Academic%20Admission/metadata',
+      '/rest/saiku/rector/discover/uatf-dw/UATF_DW/UATF_DW/Admisi%C3%B3n/metadata',
       { headers: { Accept: 'application/json' } },
     );
   });

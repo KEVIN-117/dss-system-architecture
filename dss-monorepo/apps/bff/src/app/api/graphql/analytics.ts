@@ -29,7 +29,7 @@ const JSONScalar = new GraphQLScalarType({
 
 // Every published academic cube must expose this internal measure so Saiku can
 // apply its k-anonymity policy. It must never be queryable or visible to clients.
-const PRIVACY_COUNT_MEASURE = 'Attempt Count';
+const PRIVACY_COUNT_MEASURE = 'Conteo de privacidad';
 
 export const analyticsTypeDefs = `#graphql
   scalar JSON
@@ -219,7 +219,15 @@ export function createAnalyticsResolvers() {
         if (args.input.measures.some(isPrivacyCountMeasure)) {
           throw authorizationError('The requested measure is reserved for server-side privacy enforcement', 'FORBIDDEN');
         }
-        const measures = [...args.input.measures, { name: PRIVACY_COUNT_MEASURE }];
+        // Saiku rejects a measure listed twice; clients may resolve two report
+        // roles (e.g. applicants and applications) to the same published measure.
+        const seenMeasures = new Set<string>();
+        const measures = [...args.input.measures, { name: PRIVACY_COUNT_MEASURE }].filter((measure) => {
+          const key = normalizeMeasureName(measure.name);
+          if (seenMeasures.has(key)) return false;
+          seenMeasures.add(key);
+          return true;
+        });
         const request: OlapQueryRequest = {
           cube: args.input.cubeId,
           measures,

@@ -7,20 +7,20 @@ import {
 
 const schema = {
   measures: {
-    attempts: { name: 'Enrollment Attempts', unit: 'intentos de cursado' },
-    average: { name: 'Average Final Grade', unit: 'puntos' },
-    graded: { name: 'Graded Attempts', unit: 'calificaciones' },
-    privacy: { name: 'Attempt Count', visible: false },
+    attempts: { name: 'Inscripciones en materias', unit: 'intentos de cursado' },
+    average: { name: 'Nota promedio', unit: 'puntos' },
+    graded: { name: 'Inscripciones con resultado', unit: 'calificaciones' },
+    privacy: { name: 'Conteo de privacidad', visible: false },
   },
   dimensions: {
     period: {
-      name: 'Academic Period',
+      name: 'Periodo',
       hierarchies: {
         period: {
-          name: 'Academic Period',
+          name: 'Gestión y periodo',
           levels: {
-            year: { name: 'Academic Year' },
-            number: { name: 'Period Number' },
+            year: { name: 'Gestión' },
+            number: { name: 'Periodo' },
           },
         },
       },
@@ -31,20 +31,20 @@ const schema = {
 describe('director analytics mapping', () => {
   it('resolves only the published measures and period levels needed by the dashboard', () => {
     expect(resolveDirectorCubePaths(schema)).toEqual({
-      enrollmentAttempts: 'Enrollment Attempts',
-      averageFinalGrade: 'Average Final Grade',
-      gradedAttempts: 'Graded Attempts',
+      enrollmentAttempts: 'Inscripciones en materias',
+      averageFinalGrade: 'Nota promedio',
+      gradedAttempts: 'Inscripciones con resultado',
       enrollmentUnit: 'intentos de cursado',
       gradeUnit: 'puntos',
       academicYear: {
-        dimension: 'Academic Period',
-        hierarchy: 'Academic Period',
-        level: 'Academic Year',
+        dimension: 'Periodo',
+        hierarchy: 'Gestión y periodo',
+        level: 'Gestión',
       },
       academicPeriod: {
-        dimension: 'Academic Period',
-        hierarchy: 'Academic Period',
-        level: 'Period Number',
+        dimension: 'Periodo',
+        hierarchy: 'Gestión y periodo',
+        level: 'Periodo',
       },
     });
     expect(resolveDirectorCubePaths({ ...schema, dimensions: {} })).toBeNull();
@@ -53,33 +53,33 @@ describe('director analytics mapping', () => {
   it('maps aggregate cells and sorts period series chronologically', () => {
     expect(
       readMetric(
-        [{ 'Enrollment Attempts': { value: '125' } }],
-        'Enrollment Attempts',
+        [{ 'Inscripciones en materias': { value: '125' } }],
+        'Inscripciones en materias',
       ),
     ).toBe(125);
     expect(
       readPeriodSeries(
         [
           {
-            'Academic Year': '2025',
-            'Period Number': 2,
-            'Enrollment Attempts': { value: 9 },
+            'Gestión': '2025',
+            'Periodo': 2,
+            'Inscripciones en materias': { value: 9 },
           },
           {
-            'Academic Year': '2025',
-            'Period Number': 1,
-            'Enrollment Attempts': { value: 5 },
+            'Gestión': '2025',
+            'Periodo': 1,
+            'Inscripciones en materias': { value: 5 },
           },
         ],
-        'Academic Year',
-        'Period Number',
-        'Enrollment Attempts',
+        'Gestión',
+        'Periodo',
+        'Inscripciones en materias',
       ),
     ).toEqual([
       { label: '2025 · Periodo 1', value: 5 },
       { label: '2025 · Periodo 2', value: 9 },
     ]);
-    expect(readMetric([], 'Enrollment Attempts')).toBeNull();
+    expect(readMetric([], 'Inscripciones en materias')).toBeNull();
   });
 
   it('filters a selected year from the scoped result without adding an OLAP hierarchy filter', () => {
@@ -87,19 +87,19 @@ describe('director analytics mapping', () => {
       readPeriodSeries(
         [
           {
-            'Academic Year': '2025',
-            'Period Number': 1,
-            'Enrollment Attempts': { value: 5 },
+            'Gestión': '2025',
+            'Periodo': 1,
+            'Inscripciones en materias': { value: 5 },
           },
           {
-            'Academic Year': '2026',
-            'Period Number': 1,
-            'Enrollment Attempts': { value: 8 },
+            'Gestión': '2026',
+            'Periodo': 1,
+            'Inscripciones en materias': { value: 8 },
           },
         ],
-        'Academic Year',
-        'Period Number',
-        'Enrollment Attempts',
+        'Gestión',
+        'Periodo',
+        'Inscripciones en materias',
         '2026',
       ),
     ).toEqual([{ label: '2026 · Periodo 1', value: 8 }]);

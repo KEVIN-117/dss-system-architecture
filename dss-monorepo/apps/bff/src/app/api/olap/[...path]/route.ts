@@ -31,7 +31,7 @@ const RESPONSE_HEADERS = [
   'last-modified',
 ];
 const OLAP_UPSTREAM_TIMEOUT_MS = 30_000;
-const PRIVACY_COUNT_MEASURE = 'attempt count';
+const PRIVACY_COUNT_MEASURE = 'conteo de privacidad';
 
 async function proxy(
   request: Request,

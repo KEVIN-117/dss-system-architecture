@@ -61,7 +61,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           icon: <LayoutDashboard aria-hidden="true" className="size-4" />,
         },
         {
-          title: 'Dashboards',
+          title: 'Tableros',
           href: '/dashboards',
           icon: <Database aria-hidden="true" className="size-4" />,
         },
@@ -71,12 +71,12 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           icon: <Search aria-hidden="true" className="size-4" />,
         },
         {
-          title: 'MDX Workbench',
+          title: 'Editor de MDX',
           href: '/workbench',
           icon: <Code2 aria-hidden="true" className="size-4" />,
         },
         {
-          title: 'Apps',
+          title: 'Aplicaciones',
           href: '/apps',
           icon: <AppWindow aria-hidden="true" className="size-4" />,
         },
@@ -88,7 +88,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
         rolesAllowed={['RECTOR', 'DECANO', 'DIRECTOR', 'SUPERADMIN']}
         fallback={
           <AccessDenied
-            portalName="OLAP Workspace"
+            portalName="Espacio de análisis OLAP"
             logoutHref={`${getBffBaseUrl()}/api/auth/logout`}
           />
         }
@@ -164,8 +164,8 @@ function LoginRequired({ onLogin }: { onLogin: () => void }) {
       <Database aria-hidden="true" className="size-8 text-primary" />
       <h1 className="text-2xl font-semibold">Inicia sesión para continuar</h1>
       <p className="max-w-md text-sm text-muted-foreground">
-        El OLAP Workspace usa la sesión segura del BFF para cargar tus cubos,
-        dashboards y aplicaciones.
+        El Espacio de análisis OLAP usa la sesión segura del BFF para cargar tus cubos,
+        tableros y aplicaciones.
       </p>
       <Button onClick={onLogin}>Iniciar sesión</Button>
     </main>

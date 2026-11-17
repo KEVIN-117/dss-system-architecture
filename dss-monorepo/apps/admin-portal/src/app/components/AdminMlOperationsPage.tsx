@@ -43,9 +43,9 @@ const DEFAULT_DATASETS: DatasetOption[] = [
   {
     dataset_ref: FIXTURE_DATASET,
     dataset_id: 'pred003-synthetic',
-    label: 'Fixture sintético PRED-003 (retención)',
+    label: 'Conjunto de prueba sintético PRED-003 (retención)',
     description:
-      'Dataset sintético incluido en el servicio para validar preparación y entrenamiento; no representa datos institucionales.',
+      'Conjunto de datos sintético incluido en el servicio para validar preparación y entrenamiento; no representa datos institucionales.',
     is_custom: false,
     row_count: 40,
     target_field: 'target_class',
@@ -169,7 +169,7 @@ export function AdminMlOperationsPage() {
         failed?.status === 'rejected'
           ? failed.reason instanceof Error
             ? failed.reason.message
-            : 'No se pudo consultar uno o más jobs.'
+            : 'No se pudo consultar uno o más procesos.'
           : null,
       );
     } catch (cause) {
@@ -200,7 +200,7 @@ export function AdminMlOperationsPage() {
     if (!file) return;
     if (!file.name.toLowerCase().endsWith('.zip')) {
       setUploadFile(null);
-      setUploadError('Selecciona un archivo .zip con el dataset preparado.');
+      setUploadError('Selecciona un archivo .zip con el conjunto de datos preparado.');
       setUploadSuccess(null);
       if (uploadInputRef.current) uploadInputRef.current.value = '';
       return;
@@ -219,14 +219,14 @@ export function AdminMlOperationsPage() {
     try {
       const result = await uploadCustomDataset(uploadFile);
       setUploadSuccess(
-        `Dataset subido y validado exitosamente (${result.row_count} filas). ID: ${result.dataset_ref}`,
+        `Conjunto de datos subido y validado exitosamente (${result.row_count} filas). ID: ${result.dataset_ref}`,
       );
       await refreshDatasets();
       setDatasetRef(result.dataset_ref);
       setUploadFile(null);
     } catch (cause) {
       setUploadError(
-        cause instanceof Error ? cause.message : 'Error al subir el dataset.',
+        cause instanceof Error ? cause.message : 'Error al subir el conjunto de datos.',
       );
     } finally {
       setUploading(false);
@@ -303,7 +303,7 @@ export function AdminMlOperationsPage() {
           disabled={loadingJobs}
         >
           <RefreshCw aria-hidden="true" className="mr-2 size-4" /> Actualizar
-          jobs
+          procesos
         </Button>
       </header>
 
@@ -319,7 +319,7 @@ export function AdminMlOperationsPage() {
             <div>
               <h2 className="text-lg font-semibold">Nuevo entrenamiento</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                El worker ejecutará el algoritmo en segundo plano con el dataset
+                El servicio ejecutará el algoritmo en segundo plano con el conjunto de datos
                 indicado.
               </p>
             </div>
@@ -343,7 +343,7 @@ export function AdminMlOperationsPage() {
             </label>
             <label className="space-y-2 text-sm font-medium">
               <div className="flex items-center justify-between">
-                <span>Dataset de entrenamiento</span>
+                <span>Conjunto de datos de entrenamiento</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -353,12 +353,12 @@ export function AdminMlOperationsPage() {
                   }}
                   className="inline-flex items-center gap-1 text-xs text-primary underline hover:text-primary/80"
                 >
-                  <Upload aria-hidden="true" className="size-3.5" /> Subir dataset
+                  <Upload aria-hidden="true" className="size-3.5" /> Subir conjunto de datos
                 </button>
               </div>
               <select
                 required
-                aria-label="Dataset de entrenamiento"
+                aria-label="Conjunto de datos de entrenamiento"
                 value={datasetRef}
                 onChange={(event) => setDatasetRef(event.target.value)}
                 aria-describedby="dataset-ref-help"
@@ -375,7 +375,7 @@ export function AdminMlOperationsPage() {
                 className="block text-xs font-normal text-muted-foreground"
               >
                 {selectedDataset?.description ||
-                  `Dataset de ${selectedDataset?.row_count} filas preparado bajo el contrato PRED-002.`}
+                  `Conjunto de datos de ${selectedDataset?.row_count} filas preparado bajo el contrato PRED-002.`}
               </span>
             </label>
             <label className="space-y-2 text-sm font-medium sm:col-span-2">
@@ -420,13 +420,13 @@ export function AdminMlOperationsPage() {
             <div className="flex items-center gap-3">
               <Cpu aria-hidden="true" className="size-5 text-primary" />
               <h2 id="resource-controls-title" className="font-semibold">
-                Límites efectivos del worker
+                Límites efectivos del proceso de trabajo
               </h2>
             </div>
             <dl className="mt-5 divide-y divide-border text-sm">
               <div className="flex items-center justify-between py-3">
                 <dt className="text-muted-foreground">Concurrencia máxima</dt>
-                <dd className="font-mono">1 job</dd>
+                <dd className="font-mono">1 proceso</dd>
               </div>
               <div className="flex items-center justify-between py-3">
                 <dt className="text-muted-foreground">CPU configurada</dt>
@@ -437,12 +437,12 @@ export function AdminMlOperationsPage() {
                 <dd className="font-mono">WORKER_MEMORY_LIMIT_MB</dd>
               </div>
               <div className="flex items-center justify-between py-3">
-                <dt className="text-muted-foreground">Timeout por job</dt>
+                <dt className="text-muted-foreground">Tiempo límite por proceso</dt>
                 <dd className="font-mono">WORKER_JOB_TIMEOUT_SECONDS</dd>
               </div>
             </dl>
             <p className="mt-3 text-xs leading-5 text-muted-foreground">
-              Los valores se aplican en Compose/worker. Esta pantalla no los
+              Los valores se aplican en la configuración del servicio. Esta pantalla no los
               cambia ni reinicia contenedores.
             </p>
           </section>
@@ -462,13 +462,13 @@ export function AdminMlOperationsPage() {
                 </h2>
                 <p className="mt-2 text-sm leading-6 text-muted-foreground">
                   Las pruebas de latencia, métricas Docker y caída controlada
-                  del worker siguen siendo una operación de desarrollo aislada.
-                  No se habilitan desde el portal hasta disponer de un runner
+                  del proceso de trabajo siguen siendo una operación de desarrollo aislada.
+                  No se habilitan desde el portal hasta disponer de un ejecutor
                   dedicado, auditable y con límites propios.
                 </p>
                 <p className="mt-3 flex items-center gap-2 text-xs font-medium text-amber-700 dark:text-amber-300">
                   <CircleHelp aria-hidden="true" className="size-4" /> No afecta
-                  el worker compartido desde esta pantalla
+                  el proceso de trabajo compartido desde esta pantalla
                 </p>
               </div>
             </div>
@@ -483,7 +483,7 @@ export function AdminMlOperationsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-5 py-4 sm:px-6">
           <div>
             <h2 id="training-history-title" className="font-semibold">
-              Jobs iniciados en esta sesión
+              Procesos iniciados en esta sesión
             </h2>
             <p className="mt-1 text-xs text-muted-foreground">
               El estado se actualiza automáticamente mientras haya trabajos
@@ -509,7 +509,7 @@ export function AdminMlOperationsPage() {
               <tr>
                 <th className="px-5 py-3">Solicitud</th>
                 <th className="px-5 py-3">Algoritmo</th>
-                <th className="px-5 py-3">Dataset</th>
+                <th className="px-5 py-3">Conjunto de datos</th>
                 <th className="px-5 py-3">Estado</th>
                 <th className="px-5 py-3">Candidato</th>
               </tr>
@@ -521,7 +521,7 @@ export function AdminMlOperationsPage() {
                     colSpan={5}
                     className="px-5 py-8 text-center text-muted-foreground"
                   >
-                    Consultando jobs…
+                    Consultando procesos…
                   </td>
                 </tr>
               )}
@@ -536,7 +536,7 @@ export function AdminMlOperationsPage() {
                       Todavía no hay entrenamientos en esta sesión
                     </span>
                     <span className="mt-1 block text-xs text-muted-foreground">
-                      Inicia un job para seguir su estado y candidato.
+                      Inicia un proceso para seguir su estado y candidato.
                     </span>
                   </td>
                 </tr>
@@ -560,7 +560,7 @@ export function AdminMlOperationsPage() {
                   </td>
                   <td className="px-5 py-4">
                     <Badge variant={jobStatusVariant(job.status)}>
-                      {job.status}
+                      {({ QUEUED: 'En espera', RUNNING: 'En ejecución', SUCCEEDED: 'Finalizado', FAILED: 'Fallido', CANCELLED: 'Cancelado' } as Record<string, string>)[job.status] ?? 'Estado desconocido'}
                     </Badge>
                   </td>
                   <td className="px-5 py-4">
@@ -585,7 +585,7 @@ export function AdminMlOperationsPage() {
           <DialogHeader>
             <DialogTitle>Confirmar entrenamiento candidato</DialogTitle>
             <DialogDescription>
-              Se creará un job asíncrono. El resultado quedará como candidato y
+              Se creará un proceso asíncrono. El resultado quedará como candidato y
               no sustituirá un modelo activo.
             </DialogDescription>
           </DialogHeader>
@@ -595,7 +595,7 @@ export function AdminMlOperationsPage() {
               <dd className="font-medium">{algorithmLabel(algorithm)}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">Dataset</dt>
+              <dt className="text-muted-foreground">Conjunto de datos</dt>
               <dd className="max-w-[18rem] break-all text-right font-mono text-xs">
                 {datasetRef}
               </dd>
@@ -615,7 +615,7 @@ export function AdminMlOperationsPage() {
               onChange={(event) => setConfirmed(event.target.checked)}
             />
             <span>
-              Confirmo que el dataset y la configuración están autorizados para
+              Confirmo que el conjunto de datos y la configuración están autorizados para
               este entrenamiento. Si uso datos institucionales, cuentan con
               aprobación DSA vigente.
             </span>
@@ -634,7 +634,7 @@ export function AdminMlOperationsPage() {
               disabled={!confirmed || submitting}
               onClick={() => void confirmSubmission()}
             >
-              {submitting ? 'Enviando job…' : 'Iniciar entrenamiento'}
+              {submitting ? 'Enviando proceso…' : 'Iniciar entrenamiento'}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -659,7 +659,7 @@ export function AdminMlOperationsPage() {
                 <FileArchive aria-hidden="true" className="size-5" />
               </span>
               <div className="space-y-1">
-                <DialogTitle>Agregar dataset de entrenamiento</DialogTitle>
+                <DialogTitle>Agregar conjunto de datos de entrenamiento</DialogTitle>
                 <DialogDescription>
                   Selecciona el paquete ZIP preparado para el contrato PRED-002.
                   El servicio validará su estructura antes de registrarlo.
@@ -745,7 +745,7 @@ export function AdminMlOperationsPage() {
                   type="button"
                   variant="ghost"
                   size="icon-sm"
-                  aria-label="Quitar dataset seleccionado"
+                  aria-label="Quitar conjunto de datos seleccionado"
                   disabled={uploading}
                   onClick={() => {
                     setUploadFile(null);
@@ -785,7 +785,7 @@ export function AdminMlOperationsPage() {
                 Cerrar
               </Button>
               <Button type="submit" disabled={!uploadFile || uploading}>
-                {uploading ? 'Validando y subiendo…' : 'Subir y validar dataset'}
+                {uploading ? 'Validando y subiendo…' : 'Subir y validar conjunto de datos'}
               </Button>
             </DialogFooter>
           </form>

@@ -223,11 +223,11 @@ export function NewDashboardModal({ defaultName, defaultFolder, folders, templat
   const normalized = normalizeFolder(folder);
   const path = `${normalized ? `${normalized}/` : ''}${slug}.saikudash`;
   return (
-    <OlapModal open={open} onOpenChange={closeOnRequest(onCancel)} title="Crear dashboard" size="lg" footer={<OlapModalActions onCancel={onCancel} onApply={() => onCreate(path, name.trim(), templateId)} applyLabel="Crear dashboard" disabled={!name.trim()} />}>
+    <OlapModal open={open} onOpenChange={closeOnRequest(onCancel)} title="Crear tablero" size="lg" footer={<OlapModalActions onCancel={onCancel} onApply={() => onCreate(path, name.trim(), templateId)} applyLabel="Crear tablero" disabled={!name.trim()} />}>
       <div className="space-y-4">
         <fieldset className="space-y-2"><legend className="mb-2 text-sm font-medium">Comenzar desde</legend>
           <div className="grid gap-2 sm:grid-cols-2">
-            {[{ id: null, name: 'En blanco', description: 'Crear un dashboard vacío.' }, ...templates].map((template) => (
+            {[{ id: null, name: 'En blanco', description: 'Crear un tablero vacío.' }, ...templates].map((template) => (
               <button key={template.id ?? 'blank'} type="button" onClick={() => setTemplateId(template.id)} aria-pressed={templateId === template.id} className="rounded-md border border-border bg-background p-3 text-left transition-colors hover:bg-muted aria-pressed:border-primary aria-pressed:bg-primary/5">
                 <span className="block text-sm font-medium">{template.name}</span>
                 {template.description ? <span className="mt-1 block text-xs text-muted-foreground">{template.description}</span> : null}
@@ -262,9 +262,9 @@ export function NewAppModal({ defaultName, defaultFolder, folders, importing = f
   const slug = name.toLowerCase().trim().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 60) || 'app';
   const path = `${normalized ? `${normalized}/` : ''}${slug}.saikuapp`;
   return (
-    <OlapModal open={open} onOpenChange={closeOnRequest(onCancel)} title={importing ? 'Crear app desde dashboard' : 'Crear aplicación'} size="lg" footer={<OlapModalActions onCancel={onCancel} onApply={() => onCreate(path, name.trim())} applyLabel="Crear aplicación" disabled={!name.trim()} />}>
+    <OlapModal open={open} onOpenChange={closeOnRequest(onCancel)} title={importing ? 'Crear aplicación desde tablero' : 'Crear aplicación'} size="lg" footer={<OlapModalActions onCancel={onCancel} onApply={() => onCreate(path, name.trim())} applyLabel="Crear aplicación" disabled={!name.trim()} />}>
       <div className="space-y-4">
-        {importing ? <p className="rounded-md border border-info/30 bg-info/10 p-3 text-sm">La app utilizará el dashboard seleccionado como primera página.</p> : null}
+        {importing ? <p className="rounded-md border border-info/30 bg-info/10 p-3 text-sm">La aplicación utilizará el tablero seleccionado como primera página.</p> : null}
         <OlapModalField id="new-app-name" label="Nombre"><Input id="new-app-name" value={name} onChange={(event) => setName(event.target.value)} placeholder="Nueva aplicación" autoComplete="off" /></OlapModalField>
         {folderPicker ?? <OlapModalField id="new-app-folder" label="Carpeta"><Select id="new-app-folder" value={folder} onChange={(event) => setFolder(event.target.value)}>{folders.map((item) => <option key={item} value={item}>{item || '/'}</option>)}</Select></OlapModalField>}
         <p className="text-sm text-muted-foreground">Ruta: <code className="rounded bg-muted px-1">{path}</code></p>

@@ -8,7 +8,7 @@ const roleEntries = [
   { href: '/docs/guia-rectorado', title: 'Rectorado', text: 'Indicadores institucionales, reportes y predicciones.', Icon: Landmark },
   { href: '/docs/guia-decanato', title: 'Decanato', text: 'Resumen y reportes de tu facultad.', Icon: School },
   { href: '/docs/guia-direccion-de-carrera', title: 'Dirección de carrera', text: 'Indicadores de la carrera asignada.', Icon: GraduationCap },
-  { href: '/docs/guia-olap-workspace', title: 'OLAP Workspace', text: 'Consultas propias, gráficos y exportación.', Icon: BarChart3 },
+  { href: '/docs/guia-olap-workspace', title: 'Espacio de análisis OLAP', text: 'Consultas propias, gráficos y exportación.', Icon: BarChart3 },
   { href: '/docs/guia-portal-administracion', title: 'Administración', text: 'Usuarios, cierres, ETL y catálogo OLAP.', Icon: ShieldCheck },
 ];
 

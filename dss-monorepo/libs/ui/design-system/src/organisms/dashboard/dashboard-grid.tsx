@@ -192,7 +192,7 @@ export function DashboardGrid({
     <div
       ref={containerRef}
       role="region"
-      aria-label="Distribución del dashboard"
+      aria-label="Distribución del tablero"
       className={cn(
         'dashboard-grid w-full',
         editable &&
@@ -203,7 +203,7 @@ export function DashboardGrid({
       {!mounted ? (
         <div
           className="grid grid-cols-1 gap-4 sm:grid-cols-2"
-          aria-label="Cargando distribución del dashboard"
+          aria-label="Cargando distribución del tablero"
         >
           {tiles.map((tile) => (
             <div key={tile.id} className="min-h-40">

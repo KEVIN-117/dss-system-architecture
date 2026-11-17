@@ -17,8 +17,10 @@
       }
     },
     "dev": {
+      "command": "next dev --webpack",
       "options": {
-        "port": 3004
+        "port": 3004,
+        "cwd": "apps/rector-dashboard"
       }
     },
     "serve": {

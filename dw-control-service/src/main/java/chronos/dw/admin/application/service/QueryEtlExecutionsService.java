@@ -70,7 +70,9 @@ public class QueryEtlExecutionsService implements ListEtlExecutionsUseCase, GetE
                 safeIdentifier(metric.name(), "ETL_METRIC"),
                 metric.value(),
                 safeIdentifier(metric.unit(), "UNIDAD"),
-                metric.measuredAt());
+                metric.measuredAt(),
+                optionalIdentifier(metric.source()),
+                optionalIdentifier(metric.stepCode()));
     }
 
     private static SanitizedEtlExecutionError sanitizeError(EtlExecutionError error) {
@@ -79,6 +81,11 @@ public class QueryEtlExecutionsService implements ListEtlExecutionsUseCase, GetE
         String safeStepCode = error.stepCode() == null ? null : safeIdentifier(error.stepCode(), "STEP");
         return new SanitizedEtlExecutionError(
                 error.severity(), safeCode, safeMessage(error.severity()), safeStepCode, error.occurredAt());
+    }
+
+    /** Devuelve el identificador si es seguro; si falta o no lo es, lo omite en lugar de inventarlo. */
+    private static String optionalIdentifier(String value) {
+        return value != null && SAFE_IDENTIFIER.matcher(value).matches() ? value : null;
     }
 
     private static String safeIdentifier(String value, String fallback) {

@@ -173,8 +173,7 @@ def score_loaded_model(bundle: Any, features: Mapping[str, Any]) -> tuple[str, f
         }
         frame = pd.DataFrame([row], columns=names).copy(deep=True)
         transformed = bundle.pipeline.transform(frame)
-        raw_prediction = bundle.model.predict(transformed)[0]
-        predicted_class = _class_label(raw_prediction, positive, negative)
+        threshold = _decision_threshold(manifest)
         probability: float | None = None
         if callable(getattr(bundle.model, "predict_proba", None)):
             class_order = list(getattr(bundle.model, "classes_", []))
@@ -188,11 +187,29 @@ def score_loaded_model(bundle: Any, features: Mapping[str, Any]) -> tuple[str, f
             probability = float(values[positive_index])
             if not math.isfinite(probability) or not 0 <= probability <= 1:
                 raise InferenceFailure("INTERNAL_ERROR", 500, "The model produced an invalid event probability.")
+        if threshold is not None:
+            # The bundle was evaluated with this validation-selected threshold,
+            # so serving must apply it instead of the estimator's implicit 0.5.
+            if probability is None:
+                raise InferenceFailure("INCOMPATIBLE_SCHEMA", 503, "The model declares a decision threshold but exposes no probabilities.")
+            predicted_class = "POSITIVE_EVENT" if probability >= threshold else "NEGATIVE_EVENT"
+        else:
+            # Legacy bundles without a stored threshold keep estimator semantics.
+            predicted_class = _class_label(bundle.model.predict(transformed)[0], positive, negative)
         return predicted_class, probability, event_code
     except InferenceFailure:
         raise
     except Exception as exc:
         raise InferenceFailure("INTERNAL_ERROR", 500, "The active model could not score the trusted feature row.") from exc
+
+
+def _decision_threshold(manifest: Mapping[str, Any]) -> float | None:
+    if "decision_threshold" not in manifest:
+        return None
+    value = manifest["decision_threshold"]
+    if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or not 0 <= value <= 1:
+        raise InferenceFailure("INCOMPATIBLE_SCHEMA", 503, "The active model decision threshold is invalid.")
+    return float(value)
 
 
 def _is_positive(value: Any, positive_label: str) -> bool:

@@ -13,10 +13,13 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: 'Dirección de Servicios Académicos | UATF',
+  title: 'DSS Académico | Universidad Autónoma Tomás Frías',
   description:
-    'Plataforma de inteligencia académica de la Universidad Autónoma Tomás Frías.',
+    'Sistema de Apoyo a la Decisión de la UATF: Data Warehouse, cubos OLAP, machine learning e IA para anticipar el rendimiento y la deserción estudiantil.',
 };
+
+/** Aplica el tema guardado (o el del sistema) antes de pintar. */
+const themeInit = `(function(){try{var d=document.documentElement;var s=localStorage.getItem('uatf-landing-theme');var m=window.matchMedia('(prefers-color-scheme: dark)').matches;d.classList.toggle('dark',s?s==='dark':m);}catch(e){document.documentElement.classList.add('dark');}})();`;
 
 export default function RootLayout({
   children,
@@ -27,10 +30,13 @@ export default function RootLayout({
     <html
       lang="es"
       data-theme="dsa"
-      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased dark`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
       suppressHydrationWarning
     >
-      <body className="min-h-full flex flex-col selection:bg-dss-blue-500/30 selection:text-primary-foreground">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: themeInit }} />
+      </head>
+      <body className="min-h-full flex flex-col">
         {children}
       </body>
     </html>

@@ -13,6 +13,8 @@ import { AcademicGenerator } from './generators/academic.js';
 import { LongitudinalCohortSimulator } from './generators/cohorts.js';
 import { SqlEmitter } from './db/sql-emitter.js';
 import { DatabaseClient } from './db/client.js';
+import { InstitutionalScenario } from './scenarios/institutional-trend.js';
+import { DatasetExporter } from './export/dataset-exporter.js';
 import {
   getSafeDatabaseConfig,
   createSeedMetadata,
@@ -37,6 +39,8 @@ program
   .option('--clean', 'Incluir truncado controlado previo en orden inverso de dependencias', false)
   .option('--execute', 'Ejecutar inserción en la base de datos PostgreSQL local', false)
   .option('--catalogs-dir <path>', 'Ruta personalizada al directorio de catálogos JSON')
+  .option('--scenario <name>', 'Escenario institucional (stable | decline-growth)', 'stable')
+  .option('--export-dir <path>', 'Directorio del paquete de dataset (SQL + KPIs del escenario + manifiesto)')
   .action(async (options) => {
     const startTime = Date.now();
 
@@ -44,6 +48,7 @@ program
     const profile = options.profile as 'test' | 'medium' | 'full';
     const startYear = parseInt(options.startYear, 10);
     const endYear = parseInt(options.endYear, 10);
+    const scenario = InstitutionalScenario.parse(options.scenario);
 
     let cohortSize = options.cohortSize ? parseInt(options.cohortSize, 10) : undefined;
     if (!cohortSize) {
@@ -56,6 +61,7 @@ program
     console.log(pc.gray(`• Semilla determinista : `) + pc.yellow(seed.toString()));
     console.log(pc.gray(`• Perfil seleccionado  : `) + pc.green(profile));
     console.log(pc.gray(`• Cohorte por ingreso  : `) + pc.white(`${cohortSize} postulantes`));
+    console.log(pc.gray(`• Escenario            : `) + pc.white(scenario.name));
     console.log(pc.gray(`• Rango temporal       : `) + pc.white(`${startYear} a ${endYear} (${endYear - startYear + 1} gestiones)`));
     console.log(pc.gray(`• Modo de ejecución    : `) + (options.dryRun ? pc.magenta('DRY-RUN (Simulación)') : options.execute ? pc.red('EXECUTE (PostgreSQL)') : pc.blue('SQL GENERATION')));
 
@@ -79,7 +85,7 @@ program
 
       // 3. Simulación longitudinal de cohortes (horizonte predeterminado 2000–2026)
       console.log(pc.blue(`\n[3/5] Simulando cohortes longitudinales (${startYear} - ${endYear})...`));
-      const simulator = new LongitudinalCohortSimulator(demoGen, schoolGen, academicGen, catalogs.lookups);
+      const simulator = new LongitudinalCohortSimulator(demoGen, schoolGen, academicGen, catalogs.lookups, scenario);
       const simResult = simulator.simulate(cohortSize, startYear, endYear);
       console.log(pc.green(`      ✓ Postulaciones procesadas: ${simResult.postulantes.length}`));
       console.log(pc.green(`      ✓ Estudiantes admitidos matriculados: ${simResult.alumnos.length}`));
@@ -105,13 +111,22 @@ program
       };
 
       const metadata = createSeedMetadata(seed, profile, cohortSize, startYear, endYear, counts);
+      metadata.scenario = scenario.name;
       const sqlContent = SqlEmitter.generateSql(simResult, academicGen, schoolGen, metadata, options.clean);
 
       // Guardar a archivo si se solicitó o por defecto en out/
-      const outputSqlPath = options.outputSql || (options.dryRun ? null : path.resolve(process.cwd(), 'seed_uatf_repro.sql'));
+      const exportDir = options.exportDir ? path.resolve(options.exportDir) : null;
+      const outputSqlPath = options.outputSql
+        || (exportDir ? path.join(exportDir, 'sql', 'seed_oltp.sql') : null)
+        || (options.dryRun ? null : path.resolve(process.cwd(), 'seed_uatf_repro.sql'));
       if (outputSqlPath) {
         SqlEmitter.saveToFile(outputSqlPath, sqlContent);
         console.log(pc.green(`      ✓ Script SQL determinista emitido en: ${outputSqlPath} (${(Buffer.byteLength(sqlContent) / 1024 / 1024).toFixed(2)} MB)`));
+      }
+
+      if (exportDir) {
+        DatasetExporter.writeScenarioArtifacts(exportDir, simResult, scenario, metadata, startYear, endYear);
+        console.log(pc.green(`      ✓ Artefactos del escenario y manifiesto preliminar en: ${exportDir}`));
       }
 
       // 5. Inserción en Base de Datos (si se especificó --execute)
@@ -147,6 +162,16 @@ program
         console.log(`│ ${table.padEnd(36)} │ ${count.toString().padStart(25)} │`);
       }
       console.log('└──────────────────────────────────────┴───────────────────────────┘');
+
+      console.log('\n' + pc.bold(`TENDENCIA ANUAL (${scenario.name}):`));
+      console.log(pc.gray('gestion fase      demanda postul admit  matric  aprob%  abandono desert titul'));
+      for (const y of simResult.yearly) {
+        const graded = y.aprobados + y.reprobados;
+        const passPct = graded > 0 ? ((100 * y.aprobados) / graded).toFixed(1) : '-';
+        console.log(
+          `${y.gestion}    ${y.phase.padEnd(9)} ${y.demand_factor.toFixed(2).padStart(6)} ${String(y.postulantes).padStart(6)} ${String(y.admitidos).padStart(6)} ${String(y.matriculados).padStart(7)} ${passPct.padStart(6)} ${String(y.abandonos).padStart(8)} ${String(y.desertores).padStart(6)} ${String(y.titulados).padStart(5)}`
+        );
+      }
 
       const elapsed = ((Date.now() - startTime) / 1000).toFixed(2);
       console.log(pc.bold(pc.green(`\n✔ GENERACIÓN COMPLETADA EXITOSAMENTE en ${elapsed}s.`)));

@@ -61,6 +61,12 @@ def _compute_bundle_digest(manifest: dict[str, Any]) -> str:
     # into the immutable digest when the field is explicitly present.
     if "serving_scope" in manifest:
         identity["serving_scope"] = manifest["serving_scope"]
+    # Same compatibility rule: bundles written before the serving threshold
+    # existed keep their digest; newer bundles bind the threshold immutably.
+    if "decision_threshold" in manifest:
+        identity["decision_threshold"] = manifest["decision_threshold"]
+    if "feature_contract" in manifest:
+        identity["feature_contract"] = manifest["feature_contract"]
     bundle = {"artifact_files": manifest["artifact_files"], "identity": identity}
     canonical = json.dumps(bundle, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()

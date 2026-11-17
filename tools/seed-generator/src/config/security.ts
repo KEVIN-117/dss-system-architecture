@@ -101,6 +101,7 @@ export interface SeedMetadata {
   start_year: number;
   end_year: number;
   counts: Record<string, number>;
+  scenario?: string;
 }
 
 export function createSeedMetadata(

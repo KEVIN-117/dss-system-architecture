@@ -5,6 +5,7 @@ CREATE TABLE public.postulantes (
     id_gestion SMALLINT,
     id_periodo SMALLINT,
     id_acceso CHAR(2),
+    examen INTEGER,
     nota INTEGER,
     estado CHAR(1),
     fec_inscripcion DATE,

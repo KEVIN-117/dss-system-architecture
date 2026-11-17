@@ -99,7 +99,7 @@ export const docs: DocMeta[] = [
   },
   {
     slug: 'guia-olap-workspace',
-    title: 'OLAP Workspace',
+    title: 'Espacio de análisis OLAP',
     summary: 'Explorar cubos, armar consultas, ver gráficos y exportar a CSV.',
     group: 'guias-de-uso',
     source: 'guia-olap-workspace.mdx',

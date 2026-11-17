@@ -68,9 +68,9 @@ export function resolveDirectorCubePaths(
         named(measure) &&
         measure.name.toLocaleLowerCase() === name.toLocaleLowerCase(),
     );
-  const enrollment = findMeasure('Enrollment Attempts');
-  const averageGrade = findMeasure('Average Final Grade');
-  const gradedAttempts = findMeasure('Graded Attempts');
+  const enrollment = findMeasure('Inscripciones en materias');
+  const averageGrade = findMeasure('Nota promedio');
+  const gradedAttempts = findMeasure('Inscripciones con resultado');
   if (!named(enrollment) || !named(averageGrade) || !named(gradedAttempts))
     return null;
 
@@ -92,14 +92,14 @@ export function resolveDirectorCubePaths(
     };
   };
   const academicYear = findPath(
-    'Academic Period',
-    'Academic Period',
-    'Academic Year',
+    'Periodo',
+    'Gestión y periodo',
+    'Gestión',
   );
   const academicPeriod = findPath(
-    'Academic Period',
-    'Academic Period',
-    'Period Number',
+    'Periodo',
+    'Gestión y periodo',
+    'Periodo',
   );
   if (!academicYear || !academicPeriod) return null;
 

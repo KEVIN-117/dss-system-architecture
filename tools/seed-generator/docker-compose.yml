@@ -1,0 +1,63 @@
+# Pipeline reproducible del dataset sintético OLTP (Jachasun) para el DW.
+#
+#   docker compose -f tools/seed-generator/docker-compose.yml run --rm --build seeder
+#
+# 1. `oltp-seed` crea una OLTP aislada `jachasun_test` con el DDL real de Jachasun.
+# 2. `seeder` genera el escenario, lo carga, valida la narrativa y exporta el
+#    paquete del dataset en tools/seed-generator/out/dataset/.
+# La base queda arriba (puerto local 55433) para que Apache Hop la extraiga con
+# el rol de solo lectura `dw_fixture_reader`. Nunca apunta a la `jachasun` real.
+name: dss-oltp-seed
+
+services:
+  oltp-seed:
+    image: postgres:15-alpine
+    container_name: dss-oltp-seed
+    environment:
+      POSTGRES_DB: jachasun_test
+      POSTGRES_USER: source_test
+      POSTGRES_PASSWORD: source_test
+    ports:
+      - "127.0.0.1:${SEED_OLTP_PORT:-55433}:5432"
+    volumes:
+      - seed-oltp-data:/var/lib/postgresql/data
+      - ../../infra/postgres-tx/schemas/create_schemas.sql:/docker-entrypoint-initdb.d/00-create-schemas.sql:ro
+      - ../../infra/postgres-tx/ddl/ddl_jachasun.sql:/docker-entrypoint-initdb.d/01-ddl-jachasun.sql:ro
+      - ./docker/hop_reader.sql:/docker-entrypoint-initdb.d/02-hop-reader.sql:ro
+    healthcheck:
+      # pg_isready responde durante el arranque temporal del init; exigir la
+      # tabla de hechos garantiza que el DDL terminó.
+      test: ["CMD-SHELL", "psql -U source_test -d jachasun_test -tAc \"select to_regclass('academico.notas_planilla') is not null\" | grep -q t"]
+      interval: 5s
+      timeout: 5s
+      retries: 60
+      start_period: 20s
+    restart: unless-stopped
+
+  seeder:
+    build:
+      context: .
+      additional_contexts:
+        catalogs: ../../docs/seed-data/catalogs
+    image: dss-oltp-seeder:local
+    depends_on:
+      oltp-seed:
+        condition: service_healthy
+    environment:
+      DB_HOST: oltp-seed
+      DB_PORT: "5432"
+      DB_USER: source_test
+      DB_PASSWORD: source_test
+      DB_NAME: jachasun_test
+      SEED: ${SEED:-20260101}
+      PROFILE: ${PROFILE:-full}
+      SCENARIO: ${SCENARIO:-decline-growth}
+      START_YEAR: ${START_YEAR:-2005}
+      END_YEAR: ${END_YEAR:-2026}
+      COHORT_SIZE: ${COHORT_SIZE:-}
+    volumes:
+      - ./out/dataset:/out
+    restart: "no"
+
+volumes:
+  seed-oltp-data:

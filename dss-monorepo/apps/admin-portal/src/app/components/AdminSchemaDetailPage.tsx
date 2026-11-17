@@ -58,7 +58,7 @@ export function AdminSchemaDetailPage({ schemaId }: { schemaId: string }) {
             Could not open schema
           </h1>
           <p className="mt-1 whitespace-pre-wrap">
-            {error ?? 'No schema data is available.'}
+            {error ?? 'No hay datos del esquema disponibles.'}
           </p>
           <Button
             className="mt-3"

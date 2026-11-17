@@ -11,14 +11,15 @@ CREATE TABLE academico.alm_programas (
     nivel VARCHAR(45),
     sede VARCHAR(1),
     _tipo_academico CHAR(3) NOT NULL,
-    activo VARCHAR
+    activo VARCHAR,
+    tipo VARCHAR
 );
 
 INSERT INTO academico.alm_programas (
-    id_programa, programa, id_facultad, id_nivel, nivel, sede, _tipo_academico, activo
+    id_programa, programa, id_facultad, id_nivel, nivel, sede, _tipo_academico, activo, tipo
 ) VALUES
-    ('P01', 'Programa Sintetico Uno', 1, 1, 'Licenciatura', 'P', 'CAR', 'A'),
-    ('P02', 'Programa Sintetico Dos', 2, 1, 'Licenciatura', 'P', 'CAR', 'A');
+    ('P01', 'Programa Sintetico Uno', 1, 1, 'Licenciatura', 'P', 'CAR', 'A', 'A'),
+    ('P02', 'Programa Sintetico Dos', 2, 1, 'Licenciatura', 'P', 'CAR', 'A', 'S');
 
 GRANT USAGE ON SCHEMA academico TO dw_fixture_reader;
 GRANT SELECT ON academico.alm_programas TO dw_fixture_reader;

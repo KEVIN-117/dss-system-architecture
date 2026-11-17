@@ -30,68 +30,68 @@ const SECTION_CLASS =
 const BREAKDOWN_OPTIONS = [
   {
     id: 'gender',
-    label: 'Género',
-    dimension: 'Applicant Profile',
-    hierarchy: 'By Gender',
-    level: 'Gender',
+    label: 'Sexo',
+    dimension: 'Sexo del postulante',
+    hierarchy: 'Sexo',
+    level: 'Sexo',
   },
   {
     id: 'career',
     label: 'Carrera',
-    dimension: 'Academic Program',
-    hierarchy: 'Program',
-    level: 'Career',
+    dimension: 'Programa',
+    hierarchy: 'Facultad y carrera',
+    level: 'Carrera',
   },
   {
     id: 'faculty',
     label: 'Facultad',
-    dimension: 'Academic Program',
-    hierarchy: 'Program',
-    level: 'Faculty',
+    dimension: 'Programa',
+    hierarchy: 'Facultad y carrera',
+    level: 'Facultad',
   },
   {
     id: 'campus',
     label: 'Sede',
-    dimension: 'Academic Campus',
-    hierarchy: 'Academic Campus',
-    level: 'Campus Code',
+    dimension: 'Sede',
+    hierarchy: 'Sede y carrera',
+    level: 'Sede',
   },
   {
     id: 'schoolType',
     label: 'Tipo de colegio',
-    dimension: 'Applicant Profile',
-    hierarchy: 'By School Type',
-    level: 'School Type',
+    dimension: 'Tipo de colegio del postulante',
+    hierarchy: 'Tipo de colegio',
+    level: 'Tipo de colegio',
   },
   {
-    id: 'school',
-    label: 'Colegio de origen',
-    dimension: 'Applicant Profile',
-    hierarchy: 'By School',
-    level: 'School',
+    id: 'origin',
+    label: 'Procedencia educativa',
+    dimension: 'Procedencia educativa',
+    hierarchy: 'Ámbito y departamento',
+    level: 'Ámbito',
   },
   {
     id: 'admissionMode',
     label: 'Modalidad de ingreso',
-    dimension: 'Admission Mode',
-    hierarchy: 'Admission Mode',
-    level: 'Admission Code',
+    dimension: 'Modalidad de admisión',
+    hierarchy: 'Grupo y modalidad',
+    level: 'Grupo de modalidad',
   },
 ] as const;
 
 const RETENTION_METRICS = [
-  'Evaluable Retention Outcomes',
-  'Retained Students',
-  'Observed Dropouts',
+  'Estudiantes evaluados',
+  'Permanecen',
+  'Desertan',
 ] as const;
 const PERFORMANCE_METRICS = [
-  'Enrollment Attempts',
-  'Graded Attempts',
-  'Passed Attempts',
-  'Failed Attempts',
-  'Repeated Attempts',
-  'Abandoned Attempts',
-  'Average Final Grade',
+  'Inscripciones en materias',
+  'Inscripciones con resultado',
+  'Materias aprobadas',
+  'Materias reprobadas',
+  'Inscripciones repetidas',
+  'Inscripciones abandonadas',
+  'Nota promedio',
 ] as const;
 
 function record(value: unknown): value is JsonRecord {
@@ -206,7 +206,7 @@ async function request<T>(query: string, variables?: JsonRecord): Promise<T> {
       );
     if (code === 'ACADEMIC_CONTEXT_REQUIRED')
       throw new Error(
-        'Auth Service no tiene un contexto académico asignado a esta cuenta.',
+        'El servicio de autenticación no tiene un contexto académico asignado a esta cuenta.',
       );
     throw new Error(
       error?.message ?? 'No se pudieron consultar los cubos OLAP.',
@@ -302,10 +302,10 @@ export function AcademicReports({
       const { olapCubes } = await request<{ olapCubes: Cube[] }>(CUBES_QUERY);
       const cubeName =
         section === 'admission'
-          ? 'Academic Admission'
+          ? 'Admisión'
           : section === 'retention'
-            ? 'Academic Retention'
-            : 'Academic Performance';
+            ? 'Permanencia y deserción'
+            : 'Rendimiento académico';
       const cube = (olapCubes ?? []).find(
         (item) => normalize(item.cubeName) === normalize(cubeName),
       );
@@ -318,21 +318,21 @@ export function AcademicReports({
       }>(SCHEMA_QUERY, { cubeId: cube.cubeId });
       const year = findAxis(
         schema,
-        'Academic Period',
-        'Academic Period',
-        'Academic Year',
+        'Periodo',
+        'Gestión y periodo',
+        'Gestión',
       );
       const career =
         section === 'admission'
           ? null
-          : findAxis(schema, 'Academic Program', 'Program', 'Career');
+          : findAxis(schema, 'Programa', 'Facultad y carrera', 'Carrera');
       const requested =
         section === 'admission'
           ? [
-              'Applicants',
-              'Admitted Applicants',
-              'Known Admission Outcomes',
-              'Applications',
+              'Postulaciones',
+              'Admitidos',
+              'Postulaciones con resultado',
+              'Postulaciones',
             ]
           : section === 'retention'
             ? RETENTION_METRICS
@@ -445,18 +445,18 @@ export function AcademicReports({
     () =>
       admissionRows
         .map((row) => ({
-          year: asText(readCell(row, yearAxis?.level ?? 'Academic Year')),
+          year: asText(readCell(row, yearAxis?.level ?? 'Gestión')),
           applicants: asNumber(
-            readCell(row, admissionMeasures[0] ?? 'Applicants'),
+            readCell(row, admissionMeasures[0] ?? 'Postulaciones'),
           ),
           admitted: asNumber(
-            readCell(row, admissionMeasures[1] ?? 'Admitted Applicants'),
+            readCell(row, admissionMeasures[1] ?? 'Admitidos'),
           ),
           known: asNumber(
-            readCell(row, admissionMeasures[2] ?? 'Known Admission Outcomes'),
+            readCell(row, admissionMeasures[2] ?? 'Postulaciones con resultado'),
           ),
           applications: asNumber(
-            readCell(row, admissionMeasures[3] ?? 'Applications'),
+            readCell(row, admissionMeasures[3] ?? 'Postulaciones'),
           ),
         }))
         .sort((a, b) =>
@@ -468,28 +468,28 @@ export function AcademicReports({
   const performanceTableRows = performanceRows
     .map((row) => {
       const attempts = asNumber(
-        readCell(row, performanceMeasures[0] ?? 'Enrollment Attempts'),
+        readCell(row, performanceMeasures[0] ?? 'Inscripciones en materias'),
       );
       const graded = asNumber(
-        readCell(row, performanceMeasures[1] ?? 'Graded Attempts'),
+        readCell(row, performanceMeasures[1] ?? 'Inscripciones con resultado'),
       );
       const passed = asNumber(
-        readCell(row, performanceMeasures[2] ?? 'Passed Attempts'),
+        readCell(row, performanceMeasures[2] ?? 'Materias aprobadas'),
       );
       const failed = asNumber(
-        readCell(row, performanceMeasures[3] ?? 'Failed Attempts'),
+        readCell(row, performanceMeasures[3] ?? 'Materias reprobadas'),
       );
       const repeated = asNumber(
-        readCell(row, performanceMeasures[4] ?? 'Repeated Attempts'),
+        readCell(row, performanceMeasures[4] ?? 'Inscripciones repetidas'),
       );
       const abandoned = asNumber(
-        readCell(row, performanceMeasures[5] ?? 'Abandoned Attempts'),
+        readCell(row, performanceMeasures[5] ?? 'Inscripciones abandonadas'),
       );
       const averageGrade = asNumber(
-        readCell(row, performanceMeasures[6] ?? 'Average Final Grade'),
+        readCell(row, performanceMeasures[6] ?? 'Nota promedio'),
       );
       return {
-        year: asText(readCell(row, yearAxis?.level ?? 'Academic Year')),
+        year: asText(readCell(row, yearAxis?.level ?? 'Gestión')),
         career: asText(readCell(row, performanceCareerAxis?.level ?? 'Career')),
         attempts,
         graded,
@@ -508,7 +508,7 @@ export function AcademicReports({
 
   const retentionTableRows = retentionRows
     .map((row) => {
-      const year = asText(readCell(row, yearAxis?.level ?? 'Academic Year'));
+      const year = asText(readCell(row, yearAxis?.level ?? 'Gestión'));
       const evaluable = asNumber(
         readCell(row, retentionMeasures[0] ?? RETENTION_METRICS[0]),
       );
@@ -551,17 +551,17 @@ export function AcademicReports({
     (option) => option.id === breakdownId,
   );
   const breakdownTableRows = breakdownRows.map((row) => ({
-    year: asText(readCell(row, yearAxis?.level ?? 'Academic Year')),
+    year: asText(readCell(row, yearAxis?.level ?? 'Gestión')),
     category: asText(readCell(row, breakdownAxis?.level ?? '')),
-    applicants: asNumber(readCell(row, admissionMeasures[0] ?? 'Applicants')),
+    applicants: asNumber(readCell(row, admissionMeasures[0] ?? 'Postulaciones')),
     admitted: asNumber(
-      readCell(row, admissionMeasures[1] ?? 'Admitted Applicants'),
+      readCell(row, admissionMeasures[1] ?? 'Admitidos'),
     ),
     known: asNumber(
-      readCell(row, admissionMeasures[2] ?? 'Known Admission Outcomes'),
+      readCell(row, admissionMeasures[2] ?? 'Postulaciones con resultado'),
     ),
     applications: asNumber(
-      readCell(row, admissionMeasures[3] ?? 'Applications'),
+      readCell(row, admissionMeasures[3] ?? 'Postulaciones'),
     ),
   }));
   const performanceHeaders =
@@ -569,7 +569,7 @@ export function AcademicReports({
       ? [
           'Gestión',
           'Carrera',
-          'Intentos',
+          'Inscripciones',
           'Repeticiones',
           'Tasa de repetición',
           'Abandonos',
@@ -578,8 +578,8 @@ export function AcademicReports({
       : [
           'Gestión',
           'Carrera',
-          'Intentos',
-          'Intentos calificados',
+          'Inscripciones',
+          'Inscripciones con resultado',
           'Promedio final',
           'Aprobados',
           'Reprobados',
@@ -640,7 +640,7 @@ export function AcademicReports({
             </CardTitle>
             <CardDescription>
               {view === 'regularity'
-                ? 'Repetición y abandono se expresan como intentos de cursado; no representan estudiantes únicos.'
+                ? 'Repetición y abandono se cuentan por inscripción en materias; no representan estudiantes únicos.'
                 : 'Promedios, aprobación y reprobación por gestión en el ámbito académico autorizado.'}
             </CardDescription>
           </CardHeader>
@@ -660,7 +660,7 @@ export function AcademicReports({
                 }
                 headers={performanceHeaders}
                 rows={performanceDisplayRows}
-                empty="No hay intentos de cursado para las gestiones del contexto asignado."
+                empty="No hay inscripciones en materias para las gestiones del contexto asignado."
               />
             ) : null}
           </CardContent>
@@ -676,12 +676,12 @@ export function AcademicReports({
           <CardHeader className="px-6 pb-1 pt-6 sm:px-8 sm:pt-8">
             <CardTitle id="director-admission-title">
               {view === 'distribution'
-                ? 'Distribución de postulantes'
+                ? 'Distribución de postulaciones'
                 : 'Admisión estudiantil'}
             </CardTitle>
             <CardDescription>
               {view === 'distribution'
-                ? 'Compara postulantes y admitidos por gestión, género, carrera, sede y otras características disponibles.'
+                ? 'Compara postulaciones y admitidos por gestión, sexo, carrera, sede, procedencia y modalidad de ingreso.'
                 : 'Personas identificadas, solicitudes y resultados por gestión. La tasa usa resultados conocidos y la variación compara con la gestión anterior disponible.'}
             </CardDescription>
           </CardHeader>
@@ -705,10 +705,10 @@ export function AcademicReports({
                           id="admission-trends-title"
                           className="text-lg font-semibold"
                         >
-                          Evolución de postulantes y admisión
+                          Evolución de postulaciones y admisión
                         </h3>
                         <p className="text-sm leading-6 text-muted-foreground">
-                          Volumen de postulantes y proporción de resultados de
+                          Volumen de postulaciones y proporción de resultados de
                           ingreso conocidos por gestión.
                         </p>
                       </div>
@@ -716,8 +716,8 @@ export function AcademicReports({
                         <div className="min-w-0 rounded-lg border border-border bg-background/30 p-4 sm:p-5">
                           <AcademicBarChart
                             data={admissionVolumeSeries}
-                            title="Postulantes identificados por gestión"
-                            ariaLabel={`Postulantes identificados por gestión. ${admissionVolumeSeries.length} gestiones.`}
+                            title="Postulaciones por gestión"
+                            ariaLabel={`Postulaciones por gestión. ${admissionVolumeSeries.length} gestiones.`}
                             loading={loading}
                             emptyMessage="No hay registros identificados para graficar."
                             height={280}
@@ -735,15 +735,15 @@ export function AcademicReports({
                         </div>
                       </div>
                       <DataTable
-                        caption="Postulantes y admitidos identificados por gestión académica"
+                        caption="Postulaciones y admitidos por gestión académica"
                         headers={[
                           'Gestión',
-                          'Postulantes identificados',
+                          'Postulaciones',
                           'Admitidos identificados',
                           'Solicitudes',
                           'Resultados conocidos',
                           'Tasa de admisión',
-                          'Variación postulantes',
+                          'Variación de postulaciones',
                           'Variación admitidos',
                         ]}
                         rows={admissionTableRows.map((row, index) => {
@@ -818,11 +818,11 @@ export function AcademicReports({
                         </label>
                       </div>
                       <DataTable
-                        caption={`Postulantes y admitidos por gestión y ${breakdownOption?.label.toLocaleLowerCase() ?? 'categoría'}`}
+                        caption={`Postulaciones y admitidos por gestión y ${breakdownOption?.label.toLocaleLowerCase() ?? 'categoría'}`}
                         headers={[
                           'Gestión',
                           breakdownOption?.label ?? 'Categoría',
-                          'Postulantes identificados',
+                          'Postulaciones',
                           'Admitidos identificados',
                           'Solicitudes',
                           'Tasa de admisión',
@@ -1155,9 +1155,9 @@ export function AcademicOverviewDashboard({
         (olapCubes ?? []).find(
           (cube) => normalize(cube.cubeName) === normalize(name),
         );
-      const performanceCube = cubeByName('Academic Performance');
-      const admissionCube = cubeByName('Academic Admission');
-      const retentionCube = cubeByName('Academic Retention');
+      const performanceCube = cubeByName('Rendimiento académico');
+      const admissionCube = cubeByName('Admisión');
+      const retentionCube = cubeByName('Permanencia y deserción');
       if (!performanceCube || !admissionCube || !retentionCube) {
         throw new Error(
           'Los cubos de rendimiento, admisión y permanencia deben estar publicados para mostrar el resumen académico.',
@@ -1179,55 +1179,55 @@ export function AcademicOverviewDashboard({
 
       const performanceYear = findAxis(
         performanceSchema.olapCubeSchema,
-        'Academic Period',
-        'Academic Period',
-        'Academic Year',
+        'Periodo',
+        'Gestión y periodo',
+        'Gestión',
       );
       const performanceCareer = findAxis(
         performanceSchema.olapCubeSchema,
-        'Academic Program',
-        'Program',
-        'Career',
+        'Programa',
+        'Facultad y carrera',
+        'Carrera',
       );
       const admissionYear = findAxis(
         admissionSchema.olapCubeSchema,
-        'Academic Period',
-        'Academic Period',
-        'Academic Year',
+        'Periodo',
+        'Gestión y periodo',
+        'Gestión',
       );
       const retentionYear = findAxis(
         retentionSchema.olapCubeSchema,
-        'Academic Period',
-        'Academic Period',
-        'Academic Year',
+        'Periodo',
+        'Gestión y periodo',
+        'Gestión',
       );
       const retentionCareer = findAxis(
         retentionSchema.olapCubeSchema,
-        'Academic Program',
-        'Program',
-        'Career',
+        'Programa',
+        'Facultad y carrera',
+        'Carrera',
       );
       const measures = {
         attempts: findMeasure(
           performanceSchema.olapCubeSchema,
-          'Enrollment Attempts',
+          'Inscripciones en materias',
         ),
         graded: findMeasure(
           performanceSchema.olapCubeSchema,
-          'Graded Attempts',
+          'Inscripciones con resultado',
         ),
         averageGrade: findMeasure(
           performanceSchema.olapCubeSchema,
-          'Average Final Grade',
+          'Nota promedio',
         ),
-        applicants: findMeasure(admissionSchema.olapCubeSchema, 'Applicants'),
+        applicants: findMeasure(admissionSchema.olapCubeSchema, 'Postulaciones'),
         admitted: findMeasure(
           admissionSchema.olapCubeSchema,
-          'Admitted Applicants',
+          'Admitidos',
         ),
         knownOutcomes: findMeasure(
           admissionSchema.olapCubeSchema,
-          'Known Admission Outcomes',
+          'Postulaciones con resultado',
         ),
         evaluable: findMeasure(
           retentionSchema.olapCubeSchema,
@@ -1427,7 +1427,7 @@ export function AcademicOverviewDashboard({
   ]);
   const trendViews = {
     attempts: {
-      title: 'Intentos de cursado',
+      title: 'Inscripciones en materias',
       description: 'Registros de cursado agrupados por gestión académica.',
       data: attemptsSeries,
       kind: 'bar',
@@ -1439,8 +1439,8 @@ export function AcademicOverviewDashboard({
       kind: 'line',
     },
     applicants: {
-      title: 'Postulantes',
-      description: 'Personas postulantes identificadas por gestión.',
+      title: 'Postulaciones',
+      description: 'Postulaciones registradas por gestión.',
       data: applicantsSeries,
       kind: 'bar',
     },
@@ -1523,7 +1523,7 @@ export function AcademicOverviewDashboard({
           <section aria-label="Indicadores de la última gestión disponible">
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <OverviewMetric
-                label="Intentos de cursado"
+                label="Inscripciones en materias"
                 period={latestPerformance?.year}
                 value={formatCount(latestPerformance?.attempts ?? null)}
                 icon="book"
@@ -1543,7 +1543,7 @@ export function AcademicOverviewDashboard({
                 series={gradeSeries}
               />
               <OverviewMetric
-                label="Postulantes"
+                label="Postulaciones"
                 period={latestAdmission?.year}
                 value={formatCount(latestAdmission?.applicants ?? null)}
                 icon="admission"
@@ -1583,9 +1583,9 @@ export function AcademicOverviewDashboard({
               >
                 {(
                   [
-                    ['attempts', 'Intentos'],
+                    ['attempts', 'Inscripciones'],
                     ['grade', 'Promedio'],
-                    ['applicants', 'Postulantes'],
+                    ['applicants', 'Postulaciones'],
                     ['dropout', 'Deserción'],
                   ] as const
                 ).map(([key, label]) => (
@@ -1650,9 +1650,9 @@ export function AcademicOverviewDashboard({
                 caption="Síntesis de indicadores por gestión académica"
                 headers={[
                   'Gestión',
-                  'Intentos',
+                  'Inscripciones',
                   'Promedio final',
-                  'Postulantes',
+                  'Postulaciones',
                   'Admitidos',
                   'Deserción observada',
                 ]}

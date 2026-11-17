@@ -6,6 +6,17 @@ import type { SchoolGenerator } from '../generators/schools.js';
 import type { SeedMetadata } from '../config/security.js';
 
 export class SqlEmitter {
+  /** id_sede del catálogo → academico.sedes.id_sede (código de una letra en Jachasun). */
+  private static readonly SEDE_CODE: Record<number, string> = {
+    1: 'C', 2: 'L', 3: 'S', 4: 'T', 5: 'N', 6: 'U', 7: 'V', 8: 'R',
+  };
+
+  private static readonly DEGREE_TITLE: Record<string, string> = {
+    LIC: 'LICENCIATURA',
+    TUS: 'TECNICO UNIVERSITARIO SUPERIOR',
+    TUM: 'TECNICO UNIVERSITARIO MEDIO',
+  };
+
   /**
    * Genera el contenido SQL completo estructurado en 8 niveles topológicos.
    */
@@ -50,7 +61,6 @@ END $$;`);
       lines.push('TRUNCATE TABLE academico.docentes CASCADE;');
       lines.push('TRUNCATE TABLE academico.pln_materias CASCADE;');
       lines.push('TRUNCATE TABLE public.prs_colegios CASCADE;');
-      lines.push('TRUNCATE TABLE public.fac_programas CASCADE;');
       lines.push('TRUNCATE TABLE academico.alm_programas CASCADE;');
       lines.push('');
     }
@@ -62,66 +72,84 @@ END $$;`);
     lines.push('-- NIVEL 0: CATÁLOGOS RAÍZ INDEPENDIENTES');
     lines.push('-- ----------------------------------------------------------------------------');
     lines.push(`
-INSERT INTO public.prs_pais_v2 (id_pais, cod_pais, pais, sigla, nacionalidad, cod_numerico, _registrado, _modificado, _estado)
-VALUES (27, '01', 'BOLIVIA', 'BOL', 'BOLIVIANA', 68, now(), now(), 'A')
+INSERT INTO public.prs_pais_v2 (id_pais, pais, estado)
+VALUES (27, 'BOLIVIA', 'A')
 ON CONFLICT (id_pais) DO NOTHING;
 
-INSERT INTO public._bp_estados_civiles (id_estado_civil, estado_civil, _registrado, _modificado, _estado)
+INSERT INTO public._bp_estados_civiles (id_estado_civil, cod_estado_civil, estado_civil, _registrado, _modificado, _estado)
 VALUES
-  (1, 'SOLTERO/A', now(), now(), 'A'),
-  (2, 'CASADO/A', now(), now(), 'A'),
-  (3, 'DIVORCIADO/A', now(), now(), 'A'),
-  (4, 'VIUDO/A', now(), now(), 'A')
+  (1, 'S', 'SOLTERO/A', now(), now(), 'A'),
+  (2, 'C', 'CASADO/A', now(), now(), 'A'),
+  (3, 'D', 'DIVORCIADO/A', now(), now(), 'A'),
+  (4, 'V', 'VIUDO/A', now(), now(), 'A')
 ON CONFLICT (id_estado_civil) DO NOTHING;
 
-INSERT INTO public.prs_calificacion (id_calificacion, calificacion, _registrado, _modificado, _estado)
+INSERT INTO public.prs_calificacion (id_calificacion, calificacion)
 VALUES
-  ('1', 'FISCAL', now(), now(), 'A'),
-  ('2', 'PARTICULAR', now(), now(), 'A'),
-  ('3', 'CONVENIO', now(), now(), 'A'),
-  ('4', 'INSTITUTO', now(), now(), 'A')
+  ('1', 'Plan Fiscal'),
+  ('2', 'Plan Particular'),
+  ('3', 'Desconocido'),
+  ('Z', 'Otros')
 ON CONFLICT (id_calificacion) DO NOTHING;
 
-INSERT INTO public.prs_examen (id_examen, examen)
+INSERT INTO public.prs_examen (id_examen, examen, abreviacion)
 VALUES
-  (1, 'PRUEBA DE SUFICIENCIA ACADEMICA (PSA)'),
-  (2, 'CURSO PREUNIVERSITARIO'),
-  (3, 'EXCELENCIA ACADEMICA'),
-  (5, 'BECA BACHILLER')
+  (0, 'OTRAS MODALIDADES', 'OM'),
+  (1, 'EXAMEN P.S.A.', 'P.S.A.'),
+  (2, 'CURSO PRE - UNIVERSITARIO', 'CPU'),
+  (5, 'INGRESO DIRECTO', 'ING. DIRECTO'),
+  (6, 'ADMISION POR EXCELENCIA ACADEMICA', 'EXCELENCIA'),
+  (7, 'ADMISION EXTRAORDINARIA DEPORTIVA', 'DEPORTIVA'),
+  (8, 'ADMISION ESPECIAL (PROFESIONALES)', 'PROFESIONAL'),
+  (9, 'CONVENIO C.A.O.P.', 'C.A.O.P.'),
+  (10, 'CARRERA SIMULTANEA', 'SIMULTANEA'),
+  (15, 'CAMBIO DE CARRERA', 'CAMBIO'),
+  (29, 'TRANSFERENCIAS (SUB SEDES)', 'TRANSF. SUBSEDES'),
+  (32, 'ADMISION OLIMPIADAS CIENTIFICAS', 'OLIMP. CIENTIFICAS'),
+  (36, 'TRASPASO DE UNIVERSIDADES', 'TRASPASO'),
+  (42, 'ADMISION ESTUDIANTES INDIGENAS ORIGINARIOS CAMPESINOS', 'INDIGENAS ORIG.'),
+  (43, 'ADMISION PERSONAS CON CAPACIDADES DIFERENTES O DISCAPACIDAD', 'AEPD')
 ON CONFLICT (id_examen) DO NOTHING;
 
-INSERT INTO academico.carreras_tipos (tipo_c, tipo)
-VALUES ('C', 'CARRERA'), ('P', 'PROGRAMA')
-ON CONFLICT (tipo_c) DO NOTHING;
+INSERT INTO academico.carreras_tipos (tipo, descripcion, semanas)
+VALUES ('A', 'Anual', 40), ('S', 'Semestral', 20), ('P', 'Programa', 40)
+ON CONFLICT (tipo) DO NOTHING;
 
-INSERT INTO academico.sedes (id_sede, sede, tipo, nom_sede)
+INSERT INTO academico.sedes (id_sede, sede)
 VALUES
-  ('1', 'POTOSI', 'C', 'POTOSI'),
-  ('2', 'VILLAZON', 'P', 'VILLAZON'),
-  ('3', 'TUPIZA', 'P', 'TUPIZA'),
-  ('4', 'UYUNI', 'P', 'UYUNI'),
-  ('5', 'UNCIA', 'P', 'UNCIA'),
-  ('6', 'BETANZOS', 'P', 'BETANZOS'),
-  ('7', 'COTAGAITA', 'P', 'COTAGAITA'),
-  ('8', 'SAN CRISTOBAL', 'P', 'SAN CRISTOBAL')
+  ('C', 'CENTRAL'),
+  ('L', 'LLICA'),
+  ('S', 'SACACA'),
+  ('T', 'TUPIZA'),
+  ('N', 'UNCIA'),
+  ('U', 'UYUNI'),
+  ('V', 'VILLAZON'),
+  ('R', 'SAN CRISTOBAL')
 ON CONFLICT (id_sede) DO NOTHING;
 
-INSERT INTO academico.alumnos_estados (estado, descripcion, visible, estado_original)
+INSERT INTO academico.alumnos_estados (estado, descripcion)
 VALUES
-  ('P', 'REGULAR/ACTIVO', true, 'REG'),
-  ('A', 'EGRESADO', true, 'EGR'),
-  ('T', 'TITULADO', true, 'TIT'),
-  ('B', 'BLOQUEADO', false, 'BLO'),
-  ('X', 'ANULADO/DESERTOR', false, 'ANU')
+  ('P', 'Profesional'),
+  ('A', 'Activo (Realizo su Acta de Graduacion)'),
+  ('T', 'Titulado'),
+  ('B', 'Bloqueado'),
+  ('X', 'Anulado'),
+  ('S', 'Simultanea')
 ON CONFLICT (estado) DO NOTHING;
 
-INSERT INTO academico.periodos (id_periodo, periodo)
-VALUES
-  (0, 'CURSO DE VERANO'),
-  (1, 'PRIMER SEMESTRE'),
-  (2, 'SEGUNDO SEMESTRE'),
-  (3, 'ANUAL')
-ON CONFLICT (id_periodo) DO NOTHING;
+-- academico.periodos no tiene PK en Jachasun: inserción idempotente explícita.
+INSERT INTO academico.periodos (id_periodo, des_periodo, orden, tipo)
+SELECT v.id_periodo, v.des_periodo, v.orden, v.tipo::varchar[]
+FROM (VALUES
+  (1, 'GESTION', 1, '{A}'),
+  (1, 'SEMESTRE', 2, '{S}'),
+  (2, 'SEMESTRE', 5, '{S}'),
+  (3, 'CURSO DE VERANO', 6, '{A,S}'),
+  (4, 'MESA DE EXAMEN', 1, '{A,S}')
+) AS v(id_periodo, des_periodo, orden, tipo)
+WHERE NOT EXISTS (
+  SELECT 1 FROM academico.periodos p WHERE p.id_periodo = v.id_periodo AND p.des_periodo = v.des_periodo
+);
 
 INSERT INTO academico.docentes_tiempo (tiempo, descripcion)
 VALUES
@@ -150,7 +178,7 @@ ON CONFLICT (id_facultad) DO NOTHING;
     lines.push('-- NIVEL 1: DEPARTAMENTOS, PERIODOS REFLEXIVOS Y PROGRAMAS ACADÉMICOS');
     lines.push('-- ----------------------------------------------------------------------------');
     lines.push(`
-INSERT INTO public.lugar_departamento (cod_dep, departamento, sigla, cod_pais)
+INSERT INTO public.lugar_departamento (cod_dep, departamento, expedido, cod_pais)
 VALUES
   (1, 'CHUQUISACA', 'CH', 27),
   (2, 'LA PAZ', 'LP', 27),
@@ -163,43 +191,37 @@ VALUES
   (9, 'PANDO', 'PA', 27)
 ON CONFLICT (cod_dep) DO NOTHING;
 
-INSERT INTO academico.alm_periodos (id_periodo, periodo, id_periodo_relacion, _unique)
+INSERT INTO academico.alm_periodos (id_periodo, descripcion, id_periodo_relacion)
 VALUES
-  (1, 'PRIMER SEMESTRE', 1, 1),
-  (2, 'SEGUNDO SEMESTRE', 2, 2),
-  (3, 'GESTION ANUAL', 3, 1)
+  (1, 'PRIMERO', 1),
+  (2, 'SEGUNDO', 2),
+  (3, 'VERANO', 3),
+  (4, 'EXAMEN DE MESA', 1),
+  (5, 'EXAMEN DE MESA', 2),
+  (6, 'INVIERNO', 6)
 ON CONFLICT (id_periodo) DO NOTHING;
 `);
 
-    // Carreras / Programas en academico.alm_programas y public.fac_programas
+    // Carreras / Programas en academico.alm_programas (DDL Jachasun)
     const progRowsAlm: string[] = [];
-    const progRowsFac: string[] = [];
     for (const p of academicGen.programs) {
-      const progName = p.name || p.programa;
+      const progName = String(p.name || p.programa).substring(0, 50).replace(/'/g, "''");
       const idFac = p.id_facultad_numeric || 1;
-      const sede = p.id_sede ? p.id_sede.toString() : '1';
-      const regimen = p.regime || 'S';
-
+      const sede = SqlEmitter.SEDE_CODE[p.id_sede || 1] || 'C';
+      const regimen = p.regime === 'A' ? 'A' : 'S';
+      const titulo = SqlEmitter.DEGREE_TITLE[p.degree_level] || 'LICENCIATURA';
       progRowsAlm.push(
-        `('${p.id_programa}', '${progName.replace(/'/g, "''")}', ${idFac}, ${idFac}, 'A', 'CAR', '${sede}', '${p.id_programa}', 4, 51, 40, 1, 2, 'NORMAL', true, 1)`
-      );
-      progRowsFac.push(
-        `('${p.id_programa}', '${progName.replace(/'/g, "''")}', '${idFac}', '${regimen}', ${p.duration_years || 5}, 'A', ${parseInt(sede, 10) || 1})`
+        `('${p.id_programa}', '${progName}', ${idFac}, 0, '${titulo}', 'A', '${regimen}', 'CAR', '${sede}', '${p.id_programa}', 3, 51, 40, 1, 2, 'NORMAL', true, 1, 2018)`
       );
     }
 
     lines.push(`
 INSERT INTO academico.alm_programas (
-  id_programa, programa, facultad, id_facultad, activo, _tipo_academico,
+  id_programa, programa, id_facultad, id_nivel, titulo, activo, tipo, _tipo_academico,
   sede, pabreviacion, num_parc, nota_minima, nota_2do_habilitacion,
-  id_edificio, nro_max_arrastres, tipo_cobro, _tiene_examen_mesa, moodle
+  id_edificio, nro_max_arrastres, tipo_cobro, _tiene_examen_mesa, moodle, id_plan
 ) VALUES
   ${progRowsAlm.join(',\n  ')}
-ON CONFLICT (id_programa) DO NOTHING;
-
-INSERT INTO public.fac_programas (id_programa, programa, id_facultad, tipo_c, tiempo_estudio, activo, id_sede)
-VALUES
-  ${progRowsFac.join(',\n  ')}
 ON CONFLICT (id_programa) DO NOTHING;
 `);
 
@@ -599,22 +621,36 @@ ON CONFLICT (id_dct_asignaciones) DO NOTHING;
     );
 
     if (simulation.graduados.length > 0) {
+      const modalityId: Record<string, number> = {
+        'TESIS DE GRADO': 1, 'PROYECTO DE GRADO': 2, 'TRABAJO DIRIGIDO': 3, 'EXCELENCIA ACADEMICA': 4,
+      };
+      const programs = new Map<string, any>(academicGen.programs.map((p: any) => [p.id_programa, p]));
       SqlEmitter.appendBatchedInserts(
         lines,
         'actas_graduacion.graduados',
         [
-          'id', 'id_alumno', 'id_programa', 'id_gestion',
-          'fecha_graduacion', 'nota_graduacion', '_registrado'
+          'id', 'id_alumno', 'titulo', 'id_modalidad', 'fecha_graduacion', 'id_gestion',
+          'nota_graduacion', '_registrado', '_estado', '_id_usuario', 'nro_dip', 'id_programa'
         ],
-        simulation.graduados.map((g) => [
-          g.id,
-          g.id_alumno,
-          `'${g.id_programa}'`,
-          g.id_gestion,
-          `'${g.fecha_graduacion}'`,
-          g.nota_defensa,
-          `'${g._registrado}'`,
-        ])
+        simulation.graduados.map((g) => {
+          const program = programs.get(g.id_programa);
+          const degree = SqlEmitter.DEGREE_TITLE[program?.degree_level] || 'LICENCIATURA';
+          const titulo = `${degree} EN ${String(program?.name || g.id_programa)}`.replace(/'/g, "''");
+          return [
+            g.id,
+            g.id_alumno,
+            `'${titulo}'`,
+            modalityId[g.modalidad_graduacion] ?? 1,
+            `'${g.fecha_graduacion}'`,
+            g.id_gestion,
+            g.nota_defensa,
+            `'${g._registrado}'`,
+            `'A'`,
+            `'seed_titulacion'`,
+            `'${g.nro_dip}'`,
+            `'${g.id_programa}'`,
+          ];
+        })
       );
     }
 

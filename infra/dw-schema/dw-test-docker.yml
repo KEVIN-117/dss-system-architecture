@@ -53,6 +53,14 @@ services:
         psql -v ON_ERROR_STOP=1 -f /tests/prediction_inference_read_access_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/prediction_publications_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/student_scd2_lock_volume_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/admission_application_link_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/coursework_batch_staging_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/coursework_pass_repetition_flags_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/coursework_partial_grade_out_of_range_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/retention_label_maturation_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/retention_regime_cadence_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/retention_performance_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/student_presence_first_coursework_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/hop_execution_gates_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/hop_atomic_publisher_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/hop_atomic_publisher_rollback_test.sql

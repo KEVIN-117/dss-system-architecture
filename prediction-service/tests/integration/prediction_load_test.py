@@ -34,6 +34,8 @@ BFF_URL = os.getenv("PREDICTION_LOAD_BFF_URL", "").rstrip("/")
 TOKEN = os.getenv("PREDICTION_LOAD_ACCESS_TOKEN", "")
 SESSION_COOKIE = os.getenv("PREDICTION_LOAD_SESSION_COOKIE", "")
 TRAINING_SESSION_COOKIE = os.getenv("PREDICTION_LOAD_TRAINING_SESSION_COOKIE", SESSION_COOKIE)
+# Direct API training calls need an ML-operator token (SUPERADMIN by default).
+TRAINING_ACCESS_TOKEN = os.getenv("PREDICTION_LOAD_TRAINING_ACCESS_TOKEN", TOKEN)
 PROGRAM_REF = os.getenv("PREDICTION_LOAD_PROGRAM_REF", "")
 CUT_ID = os.getenv("PREDICTION_LOAD_CUT_ID", "")
 SUBJECT_REF = os.getenv("PREDICTION_LOAD_SUBJECT_REF", "")
@@ -190,6 +192,8 @@ def wait_job(job_id: str, timeout: float, poll_interval: float) -> str:
         headers = {"Accept": "application/json"}
         if USE_BFF_SESSION:
             headers["Cookie"] = TRAINING_SESSION_COOKIE
+        else:
+            headers["Authorization"] = f"Bearer {TRAINING_ACCESS_TOKEN}"
         req = Request(url, headers=headers)
         try:
             with urlopen(req, timeout=10) as response:
@@ -209,6 +213,9 @@ def submit_training(algorithm: str) -> str:
     headers = {"Content-Type": "application/json", "Idempotency-Key": str(uuid4())}
     if USE_BFF_SESSION:
         headers["Cookie"] = TRAINING_SESSION_COOKIE
+    else:
+        # The API verifies the JWT and the ML-operator role itself.
+        headers["Authorization"] = f"Bearer {TRAINING_ACCESS_TOKEN}"
     req = Request(url, data=json.dumps(body).encode(), headers=headers, method="POST")
     try:
         with urlopen(req, timeout=15) as response:

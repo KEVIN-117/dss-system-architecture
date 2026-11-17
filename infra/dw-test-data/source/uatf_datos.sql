@@ -3,6 +3,8 @@ CREATE TABLE public.uatf_datos (
     id_sexo VARCHAR(1),
     estado_civil SMALLINT NOT NULL,
     nac_pais INTEGER,
+    id_dep SMALLINT,
+    id_prov INTEGER,
     id_colegio SMALLINT,
     id_loc SMALLINT,
     egr_gestion SMALLINT,

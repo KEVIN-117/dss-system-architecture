@@ -58,11 +58,17 @@ async function handle(
     segments.length === 2 && segments[0] === 'v1' && segments[1] === 'datasets';
   const isDatasetUpload =
     segments.length === 3 && segments[0] === 'v1' && segments[1] === 'datasets' && segments[2] === 'upload';
+  const isModelCollection =
+    segments.length === 2 && segments[0] === 'v1' && segments[1] === 'models';
+  const isModelAction =
+    segments.length === 3 && segments[0] === 'v1' && segments[1] === 'models' &&
+    (segments[2] === 'activate' || segments[2] === 'deactivate');
 
   if (
     !(
       (request.method === 'POST' && (isPrediction || isTrainingCollection)) ||
-      (request.method === 'POST' && (isBatchCollection || isDatasetUpload)) ||
+      (request.method === 'POST' && (isBatchCollection || isDatasetUpload || isModelAction)) ||
+      (request.method === 'GET' && isModelCollection) ||
       (request.method === 'GET' && (isTrainingItem || isBatchItem || isPublicationQuery || isAcademicOptions || isDatasetCollection))
     )
   ) {
@@ -78,7 +84,7 @@ async function handle(
   // Model training changes the candidate registry and consumes worker capacity.
   // Keep it behind the technical administrator role; academic roles only read
   // predictions and publications through the separate routes.
-  if (isTrainingCollection || isTrainingItem || isDatasetCollection || isDatasetUpload) {
+  if (isTrainingCollection || isTrainingItem || isDatasetCollection || isDatasetUpload || isModelCollection || isModelAction) {
     const forbidden = requireRoles(authentication.value, ['SUPERADMIN']);
     if (forbidden) return withCors(request, forbidden);
   }
@@ -108,7 +114,7 @@ async function handle(
     requestId: request.headers.get('x-request-id') ?? undefined,
   };
 
-  if (isBatchCollection || isBatchItem || isPublicationQuery || isAcademicOptions || isDatasetCollection || isDatasetUpload) {
+  if (isBatchCollection || isBatchItem || isPublicationQuery || isAcademicOptions || isDatasetCollection || isDatasetUpload || isModelCollection || isModelAction) {
     try {
       const upstream = new URL(`${segments.join('/')}`, `${serviceUrl.replace(/\/+$/, '')}/`);
       if (isPublicationQuery) upstream.search = new URL(request.url).search;

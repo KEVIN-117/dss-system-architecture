@@ -28,7 +28,7 @@ export function DashboardCatalog() {
           setError(
             cause instanceof Error
               ? cause.message
-              : 'No se pudo cargar el catálogo de dashboards.',
+              : 'No se pudo cargar el catálogo de tableros.',
           );
         }
       })
@@ -56,7 +56,7 @@ export function DashboardCatalog() {
             id="dashboards-heading"
             className="text-2xl font-semibold tracking-tight"
           >
-            Dashboards
+            Tableros
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
             Abre una vista guardada y explora su distribución de análisis.
@@ -73,7 +73,7 @@ export function DashboardCatalog() {
       </header>
 
       {loading ? (
-        <Loader text="Cargando dashboards…" fullScreen={false} className="rounded-xl" />
+        <Loader text="Cargando tableros…" fullScreen={false} className="rounded-xl" />
       ) : error ? (
         <div
           role="alert"
@@ -97,7 +97,7 @@ export function DashboardCatalog() {
             className="mx-auto size-8 text-muted-foreground"
           />
           <h2 className="mt-3 font-semibold">
-            Todavía no hay dashboards guardados
+            Todavía no hay tableros guardados
           </h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
             Cuando guardes análisis en el repositorio de Saiku, aparecerán aquí.
@@ -124,7 +124,7 @@ export function DashboardCatalog() {
                   {dashboard.name}
                 </span>
                 <span className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="secondary">Dashboard</Badge>
+                  <Badge variant="secondary">Tablero</Badge>
                   <span className="truncate">{dashboard.path}</span>
                 </span>
               </Link>

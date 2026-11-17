@@ -100,16 +100,16 @@ export function AdminUsers({
         <div>
           <div className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
             <Users className="size-4" />
-            Account directory
+            Directorio de cuentas
           </div>
           <h1
             id="admin-users-title"
             className="text-2xl font-semibold tracking-tight"
           >
-            Users
+            Usuarios
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Manage Saiku directory accounts and their application roles.
+            Administra las cuentas del directorio Saiku y sus roles de aplicación.
           </p>
         </div>
         <div className="flex gap-2">
@@ -119,7 +119,7 @@ export function AdminUsers({
             disabled={!onRefresh || loading}
           >
             <RefreshCw className="size-4" />
-            Refresh
+            Actualizar
           </Button>
           <Button
             onClick={() => {
@@ -134,7 +134,7 @@ export function AdminUsers({
             }}
           >
             <Plus className="size-4" />
-            Add user
+            Agregar usuario
           </Button>
         </div>
       </header>
@@ -144,7 +144,7 @@ export function AdminUsers({
           role="alert"
           className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
         >
-          <p className="font-medium">Users could not be loaded</p>
+          <p className="font-medium">No se pudieron cargar los usuarios</p>
           <p className="mt-1 whitespace-pre-wrap">{error}</p>
           <Button
             className="mt-3"
@@ -152,32 +152,32 @@ export function AdminUsers({
             size="sm"
             onClick={onRefresh}
           >
-            Try again
+            Reintentar
           </Button>
         </div>
       )}
       <div className="rounded-xl border border-border bg-card">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-4">
           <div>
-            <h2 className="font-medium">Account directory</h2>
+            <h2 className="font-medium">Directorio de cuentas</h2>
             <p className="mt-1 text-xs text-muted-foreground">
               {loading
-                ? 'Loading accounts…'
-                : `${filteredUsers.length} ${filteredUsers.length === 1 ? 'account' : 'accounts'}`}
+                ? 'Cargando cuentas…'
+                : `${filteredUsers.length} ${filteredUsers.length === 1 ? 'cuenta' : 'cuentas'}`}
             </p>
           </div>
           <div className="w-full sm:w-72">
             <Input
-              aria-label="Search users"
+              aria-label="Buscar usuarios"
               iconLeft={<Search className="size-4" />}
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search name, email, or role"
+              placeholder="Buscar nombre, correo o rol"
             />
           </div>
         </div>
         {loading ? (
-          <div className="space-y-3 p-4" aria-label="Loading users">
+          <div className="space-y-3 p-4" aria-label="Cargando usuarios">
             {Array.from({ length: 4 }, (_, i) => (
               <Skeleton key={i} className="h-12 w-full" />
             ))}
@@ -186,10 +186,10 @@ export function AdminUsers({
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Username</TableHead>
-                <TableHead>Email</TableHead>
+                <TableHead>Usuario</TableHead>
+                <TableHead>Correo electrónico</TableHead>
                 <TableHead>Roles</TableHead>
-                <TableHead className="w-32 text-right">Actions</TableHead>
+                <TableHead className="w-32 text-right">Acciones</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -216,7 +216,7 @@ export function AdminUsers({
                   <TableCell>
                     <div className="flex justify-end gap-1">
                       <Button
-                        aria-label={`Edit ${user.username}`}
+                        aria-label={`Editar ${user.username}`}
                         variant="ghost"
                         size="icon-sm"
                         onClick={() => {
@@ -227,7 +227,7 @@ export function AdminUsers({
                         <Pencil className="size-4" />
                       </Button>
                       <Button
-                        aria-label={`Delete ${user.username}`}
+                        aria-label={`Eliminar ${user.username}`}
                         variant="ghost"
                         size="icon-sm"
                         className="text-destructive hover:text-destructive"
@@ -249,8 +249,8 @@ export function AdminUsers({
                     className="h-32 text-center font-sans text-muted-foreground"
                   >
                     {users.length === 0
-                      ? 'No Saiku users yet.'
-                      : 'No users match your search.'}
+                      ? 'Aún no hay usuarios de Saiku.'
+                      : 'Ningún usuario coincide con la búsqueda.'}
                   </TableCell>
                 </TableRow>
               )}
@@ -271,12 +271,12 @@ export function AdminUsers({
         <DialogContent className="sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {isNew ? 'Add user' : `Edit ${draft?.username}`}
+              {isNew ? 'Agregar usuario' : `Editar ${draft?.username}`}
             </DialogTitle>
             <DialogDescription>
               {isNew
-                ? 'Create a directory account and choose its Saiku roles.'
-                : 'Update the directory contact and role assignments.'}
+                ? 'Crea una cuenta en el directorio y elige sus roles de Saiku.'
+                : 'Actualiza los datos de contacto y los roles asignados.'}
             </DialogDescription>
           </DialogHeader>
           {draft && (
@@ -286,7 +286,7 @@ export function AdminUsers({
               className="space-y-4"
             >
               <FormField
-                label="Username"
+                label="Usuario"
                 htmlFor="admin-user-username"
                 required
               >
@@ -301,7 +301,7 @@ export function AdminUsers({
                   required
                 />
               </FormField>
-              <FormField label="Email" htmlFor="admin-user-email">
+              <FormField label="Correo electrónico" htmlFor="admin-user-email">
                 <Input
                   id="admin-user-email"
                   type="email"
@@ -314,9 +314,9 @@ export function AdminUsers({
               </FormField>
               {isNew && (
                 <FormField
-                  label="Initial password"
+                  label="Contraseña inicial"
                   htmlFor="admin-user-password"
-                  description="This directory does not provision sign-in credentials. The account must also be configured in the Saiku authentication store before it can sign in."
+                  description="Este directorio no crea credenciales de acceso. La cuenta también debe configurarse en el servicio de autenticación de Saiku para iniciar sesión."
                 >
                   <Input
                     id="admin-user-password"
@@ -365,7 +365,7 @@ export function AdminUsers({
               onClick={() => setDraft(null)}
               disabled={saving}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               type="submit"
@@ -373,7 +373,7 @@ export function AdminUsers({
               loading={saving}
               disabled={!draft?.username.trim()}
             >
-              Save user
+              Guardar usuario
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -390,10 +390,9 @@ export function AdminUsers({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Delete user?</DialogTitle>
+            <DialogTitle>¿Eliminar usuario?</DialogTitle>
             <DialogDescription>
-              This removes <strong>{deleting?.username}</strong> from the Saiku
-              directory. The change cannot be undone.
+              Se eliminará <strong>{deleting?.username}</strong> del directorio Saiku. Esta acción no se puede deshacer.
             </DialogDescription>
           </DialogHeader>
           {mutationError && (
@@ -410,14 +409,14 @@ export function AdminUsers({
               onClick={() => setDeleting(null)}
               disabled={removing}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button
               variant="destructive"
               onClick={() => void remove()}
               loading={removing}
             >
-              Delete user
+              Eliminar usuario
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -18,8 +18,10 @@
     },
     "dev": {
       "dependsOn": ["^build"],
+      "command": "next dev --webpack",
       "options": {
-        "port": 3001
+        "port": 3001,
+        "cwd": "apps/admin-portal"
       }
     },
     "serve": {

@@ -23,7 +23,9 @@ test('presents the SSO login entry point without collecting credentials', async 
   await page.goto('/login');
 
   await expect(
-    page.getByText('Dirección de Servicios Académicos', { exact: true }).first(),
+    page
+      .getByText('Dirección de Servicios Académicos', { exact: true })
+      .first(),
   ).toBeVisible();
   await expect(
     page.getByRole('button', { name: /iniciar sesión/i }),

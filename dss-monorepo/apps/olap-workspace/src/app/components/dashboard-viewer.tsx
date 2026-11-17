@@ -43,7 +43,7 @@ export function DashboardViewer({ dashboardPath }: { dashboardPath: string }) {
           setError(
             cause instanceof Error
               ? cause.message
-              : 'No se pudo abrir el dashboard solicitado.',
+              : 'No se pudo abrir el tablero solicitado.',
           );
         }
       })
@@ -58,7 +58,7 @@ export function DashboardViewer({ dashboardPath }: { dashboardPath: string }) {
   if (loading) {
     return (
       <Loader
-        text="Cargando dashboard…"
+        text="Cargando tablero…"
         fullScreen={false}
         className="rounded-xl"
       />
@@ -76,7 +76,7 @@ export function DashboardViewer({ dashboardPath }: { dashboardPath: string }) {
           className="mx-auto size-7 text-destructive"
         />
         <h1 className="mt-3 text-lg font-semibold">
-          No se pudo abrir el dashboard
+          No se pudo abrir el tablero
         </h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {error ?? 'No encontramos ese archivo en el repositorio.'}
@@ -92,7 +92,7 @@ export function DashboardViewer({ dashboardPath }: { dashboardPath: string }) {
           <Button asChild variant="ghost">
             <Link href="/dashboards">
               <ArrowLeft aria-hidden="true" className="size-4" />
-              Volver a dashboards
+              Volver a tableros
             </Link>
           </Button>
         </div>
@@ -123,18 +123,18 @@ export function DashboardViewer({ dashboardPath }: { dashboardPath: string }) {
         className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <ArrowLeft aria-hidden="true" className="size-4" />
-        Todos los dashboards
+        Todos los tableros
       </Link>
       <DashboardToolbar
         title={dashboard.name}
         description="Vista de análisis guardada en el repositorio."
-        context="Dashboard"
+        context="Tablero"
         periodLabel={`${dashboard.layout.tiles.length} bloques`}
       />
       {dashboard.tags?.length ? (
         <div
           className="flex flex-wrap gap-2"
-          aria-label="Etiquetas del dashboard"
+          aria-label="Etiquetas del tablero"
         >
           {dashboard.tags.map((tag) => (
             <Badge key={tag} variant="outline">
@@ -152,7 +152,7 @@ export function DashboardViewer({ dashboardPath }: { dashboardPath: string }) {
             className="mx-auto size-8 text-muted-foreground"
           />
           <h2 className="mt-3 font-semibold">
-            Este dashboard todavía no tiene bloques
+            Este tablero todavía no tiene bloques
           </h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
             Su distribución está vacía. Puedes volver al catálogo para abrir
@@ -190,7 +190,7 @@ function DashboardTilePreview({
       empty={!isText && !hasQuery}
       emptyMessage={
         tile.type === 'filter'
-          ? 'Los filtros interactivos se habilitan desde el editor del dashboard.'
+          ? 'Los filtros interactivos se habilitan desde el editor del tablero.'
           : 'Este bloque no tiene una consulta asociada.'
       }
     >

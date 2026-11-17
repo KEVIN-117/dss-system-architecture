@@ -1,28 +1,28 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useAuth, ProtectedRoute } from '@dss-monorepo/auth';
+import { useAuth, ProtectedRoute, LandingLoginRedirect } from '@dss-monorepo/auth';
 import {
   AccessDenied,
   DashboardTemplate,
   Loader,
   type NavigationGroup,
-} from '@dss-monorepo/design-system';
+} from '@dss-monorepo/design-system/portal';
 import { RoleGuard } from '@dss-monorepo/rbac';
-import {
-  LayoutDashboard,
-  ChartColumn,
-  GraduationCap,
-  Database,
-  UsersRound,
-  BrainCircuit,
-} from 'lucide-react';
+import { LayoutDashboard, Database, BrainCircuit } from 'lucide-react';
 import type { ReactNode } from 'react';
+import { OlapSidebarProvider, useOlapSidebar } from '@dss-monorepo/academic-analytics/olap-sidebar';
+import { analyticsNavigation } from '@dss-monorepo/academic-analytics/panel/navigation';
 
 export function PortalFrame({ children }: { children: ReactNode }) {
+  return <OlapSidebarProvider><PortalFrameContent>{children}</PortalFrameContent></OlapSidebarProvider>;
+}
+
+function PortalFrameContent({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { setTarget, expanded, setExpanded } = useOlapSidebar();
   const links = [
     {
       title: 'Resumen',
@@ -30,29 +30,11 @@ export function PortalFrame({ children }: { children: ReactNode }) {
       icon: <LayoutDashboard aria-hidden="true" />,
     },
     {
-      title: 'Rendimiento',
-      href: '/reportes/rendimiento',
-      icon: <ChartColumn aria-hidden="true" />,
-    },
-    {
-      title: 'Admisión',
-      href: '/reportes/admision',
-      icon: <GraduationCap aria-hidden="true" />,
-    },
-    {
-      title: 'Permanencia',
-      href: '/reportes/permanencia',
-      icon: <UsersRound aria-hidden="true" />,
-    },
-    {
       title: 'Predicciones',
       href: '/predictions',
       icon: <BrainCircuit aria-hidden="true" />,
     },
   ];
-  const olapWorkspaceUrl =
-    process.env.NEXT_PUBLIC_OLAP_WORKSPACE_URL?.trim() ||
-    'http://localhost:3007/analysis';
   const navGroups: NavigationGroup[] = [
     {
       title: 'Analítica académica',
@@ -61,31 +43,27 @@ export function PortalFrame({ children }: { children: ReactNode }) {
         isActive: pathname === item.href,
       })),
     },
+    ...analyticsNavigation(pathname, 'global'),
     {
       title: 'Exploración OLAP',
+      expanded,
+      onExpandedChange: setExpanded,
       items: [
         {
-          title: 'OLAP Workspace',
-          href: olapWorkspaceUrl,
+          title: 'Espacio de análisis OLAP',
+          href: '/analisis-olap',
           icon: <Database aria-hidden="true" />,
+          isActive: pathname === '/analisis-olap',
         },
       ],
+      content: pathname === '/analisis-olap' ? <div ref={setTarget} /> : undefined,
     },
   ];
   return (
     <ProtectedRoute
       loadingFallback={<Loader />}
       unauthenticatedFallback={
-        <main className="grid min-h-screen place-content-center gap-4 bg-background p-8 text-foreground">
-          <h1 className="text-2xl font-semibold">Sesión requerida</h1>
-          <p>Inicia sesión para consultar los indicadores académicos.</p>
-          <a
-            className="text-primary underline underline-offset-4"
-            href="/login"
-          >
-            Iniciar sesión
-          </a>
-        </main>
+        <LandingLoginRedirect landingUrl={process.env.NEXT_PUBLIC_LANDING_URL} />
       }
     >
       <RoleGuard

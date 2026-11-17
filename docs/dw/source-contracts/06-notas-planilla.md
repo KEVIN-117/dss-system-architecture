@@ -23,6 +23,16 @@ El DDL verificado de Jachasun no contiene una columna `_hash`; el contrato v2 no
 
 No contiene PII directa en la selección. Joins autorizados solo como relaciones de contrato: `id_alumno` con alumnos y `id_materia` con materias; no se ejecutan en la extracción.
 
+## Banderas derivadas en `FACT_CURSADO` (MVP, migración 0044)
+
+| Bandera | Regla | Sin dato |
+| --- | --- | --- |
+| `es_aprobado` / `es_reprobado` | Nota efectiva `GREATEST(nota, nota_2da, nota_ex_mesa)`: `>= 51` aprobado; `> 0` y `< 51` reprobado | Nota efectiva 0 o nula: ambas `NULL` |
+| `es_repeticion` | La persona (`id_alumno`) tiene un intento de la misma `id_materia` en un cierre con `effective_at` anterior | Intentos del mismo cierre no son repetición |
+| `es_abandono` | Sin cambios (0033): `X`/`I` abandono; `A/R/H/C/S/D` no abandono | Otros códigos `NULL` |
+
+Estas reglas se adoptaron para el MVP mientras la DSA no apruebe la precedencia oficial de notas, el umbral 56 de COP/LAT/TSC, ni el tratamiento de homologación, compensación, convalidación y dictamen. `estado` sigue sin usarse para aprobar porque en los datos observados `A` incluye notas menores a 51. Si la DSA fija otra regla, se cambia en `etl_control.coursework_pass_outcome` y `etl_control.coursework_has_prior_attempt`, y se recalculan los hechos.
+
 ## Snapshot y controles
 
 Se extrae histórico hasta `(snapshot_gestion, snapshot_periodo)`, ordenado por `id_gestion, id_periodo, id_matricula`. El DDL local define `PRIMARY KEY (id_matricula)`, FK a alumnos y materias, y unicidad compuesta por gestión/periodo/alumno/materia/grupo/`_unique`. No se usa `_fecha_creacion` para omitir rectificaciones. Hop reportará notas fuera de rango, FKs huérfanas, duplicados y nulos con evidencia saneada, sin corregir el origen ni exigir RAW persistente. Las incidencias bloqueantes impiden la publicación; el tratamiento de otras incidencias requiere reglas aprobadas, no valores sustitutos inventados.

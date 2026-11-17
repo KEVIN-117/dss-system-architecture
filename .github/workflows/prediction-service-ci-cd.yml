@@ -6,8 +6,7 @@ on:
     paths:
       - ".github/workflows/prediction-service-ci-cd.yml"
       - "prediction-service/**"
-      - "infra/dw-schema/migrations/0026_prediction_training_jobs.sql"
-      - "infra/dw-schema/migrations/0027_prediction_outbox_retry_backoff.sql"
+      - "infra/dw-schema/migrations/*prediction*.sql"
       - "docker-compose.yml"
       - ".env.example"
   push:
@@ -15,8 +14,7 @@ on:
     paths:
       - ".github/workflows/prediction-service-ci-cd.yml"
       - "prediction-service/**"
-      - "infra/dw-schema/migrations/0026_prediction_training_jobs.sql"
-      - "infra/dw-schema/migrations/0027_prediction_outbox_retry_backoff.sql"
+      - "infra/dw-schema/migrations/*prediction*.sql"
       - "docker-compose.yml"
       - ".env.example"
   workflow_dispatch:
@@ -66,6 +64,7 @@ jobs:
           KEYCLOAK_BFF_CLIENT_SECRET: ci-validation-only
           KEYCLOAK_OLAP_CLIENT_SECRET: ci-validation-only
           DW_CONTROL_DB_PASSWORD: ci-validation-only
+          BFF_SESSION_SECRET: ci-placeholder-session-secret-32-characters
         run: docker compose --env-file .env.example config --quiet
 
       - name: Validate isolated lifecycle smoke Compose

@@ -9,7 +9,6 @@ describe('BFF session cookie', () => {
 
   it('encrypts and decrypts the access token without exposing plaintext', async () => {
     vi.stubEnv('BFF_SESSION_SECRET', 'a-development-only-secret-that-is-not-committed');
-    vi.stubEnv('BFF_SESSION_TTL_SECONDS', '300');
 
     const session = await sealSession({ accessToken: 'keycloak-access-token' });
 

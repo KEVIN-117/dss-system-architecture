@@ -38,7 +38,8 @@ class PredictionPublicationStore:
                     model_id TEXT NOT NULL, model_version TEXT NOT NULL, submitted_by TEXT NOT NULL,
                     authorized_scope TEXT NOT NULL, status TEXT NOT NULL, result_count INTEGER NOT NULL DEFAULT 0,
                     source_execution_ids TEXT NOT NULL DEFAULT '[]', error TEXT, created_at TEXT NOT NULL,
-                    started_at TEXT, finished_at TEXT, published_at TEXT, UNIQUE(idempotency_scope,idempotency_key));
+                    started_at TEXT, finished_at TEXT, published_at TEXT, lease_until TEXT,
+                    attempt INTEGER NOT NULL DEFAULT 0, UNIQUE(idempotency_scope,idempotency_key));
                     CREATE TABLE IF NOT EXISTS prediction_batch_outbox (
                     batch_id TEXT PRIMARY KEY, published_at TEXT, attempts INTEGER NOT NULL DEFAULT 0,
                     last_error TEXT, next_attempt_at TEXT);
@@ -47,6 +48,12 @@ class PredictionPublicationStore:
                     closure_id TEXT NOT NULL, predicted_class TEXT NOT NULL, event_probability REAL,
                     model_id TEXT NOT NULL, model_version TEXT NOT NULL, generated_at TEXT NOT NULL,
                     PRIMARY KEY(batch_id,subject_ref));""")
+                # Upgrade SQLite files created before leases/attempt fencing.
+                columns = {row["name"] for row in c.execute("PRAGMA table_info(prediction_batches)").fetchall()}
+                if "lease_until" not in columns:
+                    c.execute("ALTER TABLE prediction_batches ADD COLUMN lease_until TEXT")
+                if "attempt" not in columns:
+                    c.execute("ALTER TABLE prediction_batches ADD COLUMN attempt INTEGER NOT NULL DEFAULT 0")
 
     def _connect(self):
         if self._sqlite:
@@ -72,7 +79,9 @@ class PredictionPublicationStore:
                   "QUEUED", 0, "[]", None, batch["created_at"])
         if not self._sqlite:
             from psycopg.types.json import Jsonb
-            values = (*values[:10], Jsonb(batch["authorized_scope"]), *values[11:])
+            # source_execution_ids is UUID[] in PostgreSQL: pass a real (empty) array,
+            # not the SQLite JSON text "[]", which PostgreSQL rejects.
+            values = (*values[:10], Jsonb(batch["authorized_scope"]), *values[11:13], [], *values[14:])
         try:
             with self._connect() as c:
                 c.execute(f"""INSERT INTO {table}
@@ -141,30 +150,74 @@ class PredictionPublicationStore:
         with self._connect() as c:
             c.execute(sql, args)
 
-    def claim(self, batch_id: str, lease_seconds: int = 1800) -> bool:
+    def claim_attempt(self, batch_id: str, lease_seconds: int = 1800, max_attempts: int | None = None) -> int | None:
+        """Claim a QUEUED (or lease-expired RUNNING) batch and return its attempt number."""
         table = "prediction_batches" if self._sqlite else "ml_workspace.prediction_batch"
         if self._sqlite:
-            sql = f"UPDATE {table} SET status='RUNNING',started_at=datetime('now'),finished_at=NULL,error=NULL WHERE batch_id=? AND status='QUEUED'"
-            args = (batch_id,)
+            sql = (f"UPDATE {table} SET status='RUNNING',attempt=attempt+1,started_at=datetime('now'),finished_at=NULL,error=NULL,"
+                   "lease_until=datetime('now',?) WHERE batch_id=? AND (status='QUEUED' OR (status='RUNNING' AND lease_until < datetime('now')))")
+            args: list[Any] = [f"+{lease_seconds} seconds", batch_id]
+            if max_attempts is not None:
+                sql += " AND attempt < ?"
+                args.append(max_attempts)
         else:
-            sql = f"UPDATE {table} SET status='RUNNING',started_at=clock_timestamp(),finished_at=NULL,error=NULL,lease_until=clock_timestamp()+(%s * interval '1 second') WHERE batch_id=%s AND (status='QUEUED' OR (status='RUNNING' AND lease_until < clock_timestamp()))"
-            args = (lease_seconds, batch_id)
+            sql = (f"UPDATE {table} SET status='RUNNING',attempt=attempt+1,started_at=clock_timestamp(),finished_at=NULL,error=NULL,"
+                   "lease_until=clock_timestamp()+(%s * interval '1 second') WHERE batch_id=%s AND (status='QUEUED' OR (status='RUNNING' AND lease_until < clock_timestamp()))")
+            args = [lease_seconds, batch_id]
+            if max_attempts is not None:
+                sql += " AND attempt < %s"
+                args.append(max_attempts)
+        with self._connect() as c:
+            row = c.execute(sql + " RETURNING attempt", args).fetchone()
+        return int(row["attempt"]) if row else None
+
+    def claim(self, batch_id: str, lease_seconds: int = 1800, max_attempts: int | None = None) -> bool:
+        return self.claim_attempt(batch_id, lease_seconds, max_attempts) is not None
+
+    def fail(self, batch_id: str, error: Mapping[str, Any], attempt: int | None = None) -> bool:
+        """Mark FAILED; with ``attempt`` only while that claim still owns the batch."""
+        table = "prediction_batches" if self._sqlite else "ml_workspace.prediction_batch"
+        p = "?" if self._sqlite else "%s"
+        now = "CURRENT_TIMESTAMP" if self._sqlite else "clock_timestamp()"
+        sql = f"UPDATE {table} SET status='FAILED',error={p},finished_at={now},lease_until=NULL WHERE batch_id={p}"
+        args: list[Any] = [self._json(error), batch_id]
+        if attempt is not None:
+            sql += f" AND status='RUNNING' AND attempt={p}"
+            args.append(attempt)
         with self._connect() as c:
             return c.execute(sql, args).rowcount == 1
 
-    def fail(self, batch_id: str, error: Mapping[str, Any]) -> None:
+    def fail_exhausted(self, batch_id: str, max_attempts: int, error: Mapping[str, Any]) -> bool:
+        """Fail a batch whose last allowed attempt died with an expired lease."""
         table = "prediction_batches" if self._sqlite else "ml_workspace.prediction_batch"
-        sql = f"UPDATE {table} SET status='FAILED',error=?,finished_at=CURRENT_TIMESTAMP WHERE batch_id=?" if self._sqlite else f"UPDATE {table} SET status='FAILED',error=%s,finished_at=clock_timestamp(),lease_until=NULL WHERE batch_id=%s"
-        value: Any = json.dumps(error) if self._sqlite else __import__("psycopg.types.json", fromlist=["Jsonb"]).Jsonb(dict(error))
+        if self._sqlite:
+            sql = (f"UPDATE {table} SET status='FAILED',error=?,finished_at=CURRENT_TIMESTAMP,lease_until=NULL "
+                   "WHERE batch_id=? AND status='RUNNING' AND attempt >= ? AND lease_until < datetime('now')")
+        else:
+            sql = (f"UPDATE {table} SET status='FAILED',error=%s,finished_at=clock_timestamp(),lease_until=NULL "
+                   "WHERE batch_id=%s AND status='RUNNING' AND attempt >= %s AND lease_until < clock_timestamp()")
         with self._connect() as c:
-            c.execute(sql, (value, batch_id))
+            return c.execute(sql, (self._json(error), batch_id, max_attempts)).rowcount == 1
 
-    def publish(self, batch_id: str, rows: Sequence[Mapping[str, Any]], source_execution_ids: Sequence[str]) -> None:
-        """Insert all rows and flip status in one transaction; readers only see PUBLISHED."""
+    def _json(self, value: Mapping[str, Any]) -> Any:
+        if self._sqlite:
+            return json.dumps(value)
+        from psycopg.types.json import Jsonb
+        return Jsonb(dict(value))
+
+    def publish(self, batch_id: str, rows: Sequence[Mapping[str, Any]], source_execution_ids: Sequence[str],
+                attempt: int | None = None) -> None:
+        """Insert all rows and flip status in one transaction; readers only see PUBLISHED.
+
+        With ``attempt`` the flip is fenced: a worker whose claim was superseded
+        rolls back instead of publishing over the newer attempt.
+        """
         batches = "prediction_batches" if self._sqlite else "ml_workspace.prediction_batch"
         results = "prediction_results" if self._sqlite else "ml_workspace.prediction_result"
         p = "?" if self._sqlite else "%s"
         now = __import__("datetime").datetime.now(__import__("datetime").timezone.utc).isoformat()
+        fence = f" AND attempt={p}" if attempt is not None else ""
+        fence_args = (attempt,) if attempt is not None else ()
         with self._connect() as c:
             c.execute(f"DELETE FROM {results} WHERE batch_id={p}", (batch_id,))
             for row in rows:
@@ -172,12 +225,12 @@ class PredictionPublicationStore:
                     VALUES ({','.join([p] * 9)})""", (batch_id, row["subject_ref"], row["program_ref"], row["closure_id"],
                     row["predicted_class"], row.get("event_probability"), row["model_id"], row["model_version"], row["generated_at"]))
             if self._sqlite:
-                c.execute(f"UPDATE {batches} SET status='PUBLISHED',result_count={p},source_execution_ids={p},finished_at={p},published_at={p} WHERE batch_id={p} AND status='RUNNING'",
-                          (len(rows), json.dumps(list(source_execution_ids)), now, now, batch_id))
+                c.execute(f"UPDATE {batches} SET status='PUBLISHED',result_count={p},source_execution_ids={p},finished_at={p},published_at={p},lease_until=NULL WHERE batch_id={p} AND status='RUNNING'" + fence,
+                          (len(rows), json.dumps(list(source_execution_ids)), now, now, batch_id, *fence_args))
             else:
                 from uuid import UUID
-                c.execute(f"UPDATE {batches} SET status='PUBLISHED',result_count=%s,source_execution_ids=%s,finished_at=clock_timestamp(),published_at=clock_timestamp(),lease_until=NULL WHERE batch_id=%s AND status='RUNNING'",
-                          (len(rows), [UUID(value) for value in source_execution_ids], batch_id))
+                c.execute(f"UPDATE {batches} SET status='PUBLISHED',result_count=%s,source_execution_ids=%s,finished_at=clock_timestamp(),published_at=clock_timestamp(),lease_until=NULL WHERE batch_id=%s AND status='RUNNING'" + fence,
+                          (len(rows), [UUID(value) for value in source_execution_ids], batch_id, *fence_args))
             if c.execute(f"SELECT status FROM {batches} WHERE batch_id={p}", (batch_id,)).fetchone()["status"] != "PUBLISHED":
                 raise RuntimeError("Batch state changed before atomic publication.")
 

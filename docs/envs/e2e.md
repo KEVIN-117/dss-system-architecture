@@ -11,7 +11,7 @@ Las plantillas `.env.e2e.example` bajo `dss-monorepo/apps/*-e2e` configuran serv
 | `KEYCLOAK_BFF_CLIENT_ID`, `KEYCLOAK_BFF_CLIENT_SECRET`, `KEYCLOAK_BFF_REDIRECT_URI`, `KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI` | Flujo OIDC del BFF E2E. El secreto de ejemplo está marcado expresamente como no usado para autenticación de red. |
 | `AUTH_SERVICE_URL` | Destino del auth-service usado por BFF bajo prueba. |
 | `BFF_ALLOWED_ORIGINS`, `BFF_DEFAULT_POST_LOGIN_REDIRECT_URI` | Allowlist y retorno de login; los origins deben concordar. |
-| `BFF_SESSION_SECRET`, `BFF_SESSION_TTL_SECONDS`, `BFF_SESSION_COOKIE` | Cookies/sesión de test; nunca reutilizar en otro ambiente. |
+| `BFF_SESSION_SECRET`, `BFF_SESSION_IDLE_TIMEOUT_SECONDS`, `BFF_SESSION_MAX_LIFETIME_SECONDS`, `BFF_SESSION_COOKIE` | Cookies/sesión de test; nunca reutilizar en otro ambiente. |
 | `CI` | Bandera estándar del runner; Playwright la usa para decidir si reutiliza servidores existentes. |
 
 Para reproducir, copia el ejemplo correspondiente a `.env.e2e`, conserva puertos coherentes entre portal, URL base y redirect URI, y elimina los archivos locales al terminar si contienen datos propios.

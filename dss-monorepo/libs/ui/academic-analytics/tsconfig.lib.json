@@ -40,6 +40,9 @@
     "src/**/*.tsx"
   ],
   "references": [
+    { "path": "../../auth/tsconfig.lib.json" },
+    { "path": "../../shared/olap-data-access/tsconfig.lib.json" },
+    { "path": "../../shared/olap-models/tsconfig.lib.json" },
     {
       "path": "../design-system/tsconfig.lib.json"
     },

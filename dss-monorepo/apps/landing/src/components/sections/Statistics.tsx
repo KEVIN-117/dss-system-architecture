@@ -1,40 +1,69 @@
 "use client";
 
 import { motion } from "motion/react";
+import { Brain, Database, IdentificationBadge, SquaresFour } from "@phosphor-icons/react";
+
+const stats = [
+  {
+    icon: Database,
+    value: "1",
+    label: "Data Warehouse",
+    detail: "Esquema estrella con el historial académico de todas las facultades.",
+  },
+  {
+    icon: Brain,
+    value: "2",
+    label: "Modelos predictivos",
+    detail: "Bajo rendimiento y deserción, entrenados con scikit-learn y XGBoost.",
+  },
+  {
+    icon: SquaresFour,
+    value: "4",
+    label: "Tableros por rol",
+    detail: "Rectorado, decanatos, direcciones de carrera y administración.",
+  },
+  {
+    icon: IdentificationBadge,
+    value: "100%",
+    label: "Acceso institucional",
+    detail: "Ingreso con cuenta UATF y permisos por facultad y carrera.",
+  },
+];
 
 export function Statistics() {
-  const stats = [
-    { label: "Tiempo de Respuesta", value: "< 50ms", color: "from-dss-blue-500 to-dss-cyan-400" },
-    { label: "Precisión de Predicción", value: "89.2%", color: "from-dss-gold-400 to-dss-gold-600" },
-    { label: "Reducción de Deserción", value: "-14%", color: "from-dss-red-500 to-destructive" },
-    { label: "Registros Analizados", value: "2.4M+", color: "from-foreground to-muted-foreground" }
-  ];
-
   return (
-    <section className="py-24 relative overflow-hidden bg-background my-24">
-      {/* Background radial lines */}
-      <div className="absolute inset-0 opacity-[0.03]" style={{ backgroundImage: 'repeating-radial-gradient(circle at center, var(--foreground), var(--foreground) 1px, transparent 1px, transparent 100%)', backgroundSize: '40px 40px' }} />
-
-      <div className="container mx-auto px-6 relative z-10">
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-8 md:gap-4 divide-x divide-border/40">
+    <section aria-labelledby="stats-title" className="relative bg-background py-20 md:py-28">
+      <div className="mx-auto max-w-7xl px-5 md:px-8">
+        <h2 id="stats-title" className="sr-only">
+          Qué integra el DSS académico
+        </h2>
+        <ul className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {stats.map((stat, i) => (
-            <motion.div
-              key={i}
+            <motion.li
+              key={stat.label}
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: i * 0.1, ease: [0.16, 1, 0.3, 1] }}
-              className="flex flex-col items-center justify-center text-center px-4"
+              viewport={{ once: true, margin: "-60px" }}
+              transition={{ duration: 0.6, delay: i * 0.08, ease: [0.16, 1, 0.3, 1] }}
+              className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card/60 p-6 transition-colors duration-300 hover:border-uatf-accent/50"
             >
-              <h3 className={`text-4xl md:text-5xl lg:text-6xl font-bold tracking-tighter bg-clip-text text-transparent bg-linear-to-r ${stat.color} mb-3`}>
-                {stat.value}
-              </h3>
-              <p className="text-muted-foreground text-sm md:text-base font-medium tracking-wide">
-                {stat.label}
-              </p>
-            </motion.div>
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute -right-10 -top-10 h-32 w-32 rounded-full bg-uatf-sky/10 blur-2xl transition-opacity duration-500 group-hover:opacity-100 md:opacity-60"
+              />
+              <div className="flex items-center justify-between">
+                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-uatf-accent/10 text-uatf-accent-text">
+                  <stat.icon weight="duotone" className="h-5 w-5" aria-hidden="true" />
+                </span>
+                <span className="text-4xl font-bold tracking-tight text-foreground tabular-nums md:text-5xl">
+                  {stat.value}
+                </span>
+              </div>
+              <p className="mt-6 text-base font-semibold text-foreground">{stat.label}</p>
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">{stat.detail}</p>
+            </motion.li>
           ))}
-        </div>
+        </ul>
       </div>
     </section>
   );

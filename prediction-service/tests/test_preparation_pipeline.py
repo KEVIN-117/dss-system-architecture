@@ -87,6 +87,20 @@ class PreparationPipelineTests(unittest.TestCase):
             prepare_dataset(bad_manifest, self.rows)
         self.assertIn("target_approved", str(ctx.exception))
 
+    def test_exploratory_run_prepares_without_approval_and_is_marked(self) -> None:
+        manifest = dict(self.manifest)
+        manifest.update(target_approved=False, eligibility_approved=False, fixture_only=False,
+                        exploratory_only=True, snapshot_ref="exploratory:unapproved:dw:test")
+        partition = prepare_dataset(manifest, self.rows, seed=42, test_ratio=0.25)
+        self.assertEqual(partition.partition_metadata["evidence_kind"], "exploratory_unapproved")
+
+    def test_exploratory_flag_requires_exploratory_reference(self) -> None:
+        manifest = dict(self.manifest)
+        manifest.update(target_approved=False, fixture_only=False, exploratory_only=True,
+                        snapshot_ref="dw:institutional")
+        with self.assertRaisesRegex(ValueError, "target_approved"):
+            prepare_dataset(manifest, self.rows)
+
     def test_reproducible_with_same_seed(self) -> None:
         p1 = prepare_dataset(self.manifest, self.rows, seed=42)
         p2 = prepare_dataset(self.manifest, self.rows, seed=42)

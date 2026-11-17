@@ -31,6 +31,7 @@ const nextConfig = {
   // from bundling the design system's all-components distribution barrel during
   // App Router server rendering.
   transpilePackages: [
+    '@dss-monorepo/academic-analytics',
     '@dss-monorepo/auth',
     '@dss-monorepo/charts',
     '@dss-monorepo/design-system',

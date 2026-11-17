@@ -1,5 +1,9 @@
 DO $$
 BEGIN
+    IF (SELECT requested_by FROM etl_control.etl_execution
+        WHERE run_id='b1300000-0000-0000-0000-000000000001') IS DISTINCT FROM 'hop_vertical_test' THEN
+        RAISE EXCEPTION 'El solicitante del fixture debe coincidir con el usuario de Hop';
+    END IF;
     IF (SELECT status FROM etl_control.etl_execution
         WHERE run_id='b1300000-0000-0000-0000-000000000001') <> 'EXITOSA' THEN
         RAISE EXCEPTION 'El workflow Apache Hop no completó publicación y ejecución';

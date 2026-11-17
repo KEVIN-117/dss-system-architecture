@@ -54,12 +54,12 @@ beforeEach(() => {
   vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080');
   vi.stubEnv('OLAP_ACADEMIC_SCOPE_FILTERS', JSON.stringify({
     career: {
-      dimension: 'Academic Career Scope', hierarchy: 'Career Scope', level: 'Career',
-      memberTemplate: '[Academic Career Scope].[Career Scope].[Career].&[{id}]',
+      dimension: 'Ámbito de carrera', hierarchy: 'Carrera', level: 'Carrera',
+      memberTemplate: '[Ámbito de carrera].[Carrera].[Carrera].&[{id}]',
     },
     faculty: {
-      dimension: 'Academic Faculty Scope', hierarchy: 'Faculty Scope', level: 'Faculty',
-      memberTemplate: '[Academic Faculty Scope].[Faculty Scope].[Faculty].&[{id}]',
+      dimension: 'Ámbito de facultad', hierarchy: 'Facultad', level: 'Facultad',
+      memberTemplate: '[Ámbito de facultad].[Facultad].[Facultad].&[{id}]',
     },
   }));
   listServerOlapCubes.mockResolvedValue([cube]);
@@ -127,29 +127,29 @@ describe('BFF analytic GraphQL resolvers', () => {
     getServerOlapCubeSchema.mockResolvedValueOnce({
       dimensions: {
         'academic period': {
-          name: 'Academic Period',
+          name: 'Periodo',
           hierarchies: {
             'academic period': {
-              name: 'Academic Period',
-              levels: { 'academic year': { name: 'Academic Year' } },
+              name: 'Gestión y periodo',
+              levels: { 'academic year': { name: 'Gestión' } },
             },
           },
         },
       },
     });
     searchServerOlapMembers.mockResolvedValueOnce([
-      { name: '2026', uniqueName: '[Academic Period].[Academic Period].[Academic Year].&[2026]', caption: '2026' },
+      { name: '2026', uniqueName: '[Periodo].[Gestión y periodo].[Gestión].&[2026]', caption: '2026' },
     ]);
     const result = await resolver().olapCubeMembers({}, {
-      cubeId, dimension: 'Academic Period', hierarchy: 'Academic Period', level: 'Academic Year', limit: 50,
+      cubeId, dimension: 'Periodo', hierarchy: 'Gestión y periodo', level: 'Gestión', limit: 50,
     }, ctx());
 
     expect(result).toEqual([
-      { name: '2026', uniqueName: '[Academic Period].[Academic Period].[Academic Year].&[2026]', caption: '2026' },
+      { name: '2026', uniqueName: '[Periodo].[Gestión y periodo].[Gestión].&[2026]', caption: '2026' },
     ]);
     expect(searchServerOlapMembers).toHaveBeenCalledWith(
       { baseUrl: 'http://olap-service:8080', accessToken: auth.token },
-      { cubeId, dimension: 'Academic Period', hierarchy: 'Academic Period', level: 'Academic Year', limit: 50 },
+      { cubeId, dimension: 'Periodo', hierarchy: 'Gestión y periodo', level: 'Gestión', limit: 50 },
     );
   });
 
@@ -175,12 +175,12 @@ describe('BFF analytic GraphQL resolvers', () => {
       { baseUrl: 'http://olap-service:8080', accessToken: auth.token },
       expect.objectContaining({
         cube: cubeId,
-        measures: [{ name: 'Enrolled Students' }, { name: 'Attempt Count' }],
+        measures: [{ name: 'Enrolled Students' }, { name: 'Conteo de privacidad' }],
         filters: expect.arrayContaining([
           expect.objectContaining({ dimension: 'Academic Term', level: 'Term', op: 'in', members: ['2026-1'] }),
           expect.objectContaining({
-            dimension: 'Academic Career Scope', hierarchy: 'Career Scope', level: 'Career', op: 'in',
-            members: ['[Academic Career Scope].[Career Scope].[Career].&[025]'],
+            dimension: 'Ámbito de carrera', hierarchy: 'Carrera', level: 'Carrera', op: 'in',
+            members: ['[Ámbito de carrera].[Carrera].[Carrera].&[025]'],
           }),
         ]),
         order: [{ by: 'Enrolled Students', direction: 'desc' }],
@@ -188,10 +188,23 @@ describe('BFF analytic GraphQL resolvers', () => {
     );
   });
 
+  it('sends each measure once even when report roles resolve to the same published measure', async () => {
+    await resolver().analyticQuery({}, {
+      input: { cubeId, measures: [{ name: 'Postulaciones' }, { name: 'Admitidos' }, { name: 'admitidos ' }, { name: 'Postulaciones' }] },
+    }, ctx());
+
+    expect(executeServerOlapQuery).toHaveBeenLastCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        measures: [{ name: 'Postulaciones' }, { name: 'Admitidos' }, { name: 'Conteo de privacidad' }],
+      }),
+    );
+  });
+
   it('uses the private count measure for k-anonymity but removes it from the GraphQL result', async () => {
     executeServerOlapQuery.mockResolvedValueOnce({
       status: 'SUCCESS',
-      data: [{ Career: '025', Enrolled: { value: 20 }, 'Attempt Count': { value: 3 } }],
+      data: [{ Career: '025', Enrolled: { value: 20 }, 'Conteo de privacidad': { value: 3 } }],
       totalRows: 1,
     });
     const result = await resolver().analyticQuery({}, {
@@ -199,7 +212,7 @@ describe('BFF analytic GraphQL resolvers', () => {
     }, ctx()) as { data: Array<Record<string, unknown>> };
 
     expect(executeServerOlapQuery).toHaveBeenCalledWith(
-      expect.anything(), expect.objectContaining({ measures: [{ name: 'Enrolled Students' }, { name: 'Attempt Count' }] }),
+      expect.anything(), expect.objectContaining({ measures: [{ name: 'Enrolled Students' }, { name: 'Conteo de privacidad' }] }),
     );
     expect(result.data).toEqual([{ Career: '025', Enrolled: { value: 20 } }]);
   });
@@ -208,7 +221,7 @@ describe('BFF analytic GraphQL resolvers', () => {
     const input = {
       cubeId,
       measures: [{ name: 'Enrolled Students' }],
-      filters: [{ dimension: 'Academic Career Scope', hierarchy: 'Career Scope', level: 'Career', op: 'not_in', members: ['[Academic Career Scope].[Career Scope].[Career].&[025]'] }],
+      filters: [{ dimension: 'Ámbito de carrera', hierarchy: 'Carrera', level: 'Carrera', op: 'not_in', members: ['[Ámbito de carrera].[Carrera].[Carrera].&[025]'] }],
     };
     await expect(resolver().analyticQuery({}, { input }, ctx())).rejects.toMatchObject({
       extensions: { code: 'SCOPE_FILTER_IMMUTABLE' },
@@ -218,7 +231,7 @@ describe('BFF analytic GraphQL resolvers', () => {
 
   it('rejects malformed authoritative career IDs before interpolating OLAP members', async () => {
     const maliciousContext = { ...academicContext, careerId: ']&]' };
-    const input = { cubeId, measures: [{ name: 'Enrollment Attempts' }] };
+    const input = { cubeId, measures: [{ name: 'Inscripciones en materias' }] };
     await expect(resolver().analyticQuery({}, { input }, ctx({
       ...auth,
       user: { ...auth.user, academicContexts: [maliciousContext] },
@@ -252,9 +265,9 @@ describe('BFF analytic GraphQL resolvers', () => {
   });
 
   it('normalizes OLAP query statuses returned in a successful HTTP response', async () => {
-    const input = { cubeId, measures: [{ name: 'Enrollment Attempts' }] };
+    const input = { cubeId, measures: [{ name: 'Inscripciones en materias' }] };
     executeServerOlapQuery.mockResolvedValueOnce({
-      status: 'VALIDATION_ERROR', error: 'SQL or internal details', field: 'measures[0].name', available: ['Enrollment Attempts'],
+      status: 'VALIDATION_ERROR', error: 'SQL or internal details', field: 'measures[0].name', available: ['Inscripciones en materias'],
     });
     await expect(resolver().analyticQuery({}, { input }, ctx())).rejects.toMatchObject({
       message: 'OLAP rejected the query definition',
@@ -262,7 +275,7 @@ describe('BFF analytic GraphQL resolvers', () => {
         code: 'OLAP_INVALID_QUERY',
         http: { status: 400 },
         field: 'measures[0].name',
-        available: ['Enrollment Attempts'],
+        available: ['Inscripciones en materias'],
       },
     });
 

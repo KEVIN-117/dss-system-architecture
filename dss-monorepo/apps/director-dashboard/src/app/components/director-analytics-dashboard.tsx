@@ -214,8 +214,8 @@ export function DirectorAnalyticsDashboard() {
       );
       const cube = (cubesResponse.olapCubes ?? []).find(
         (candidate) =>
-          candidate.cubeName.toLocaleLowerCase() === 'academic performance' ||
-          candidate.cubeCaption?.toLocaleLowerCase() === 'academic performance',
+          candidate.cubeName.toLocaleLowerCase() === 'rendimiento académico' ||
+          candidate.cubeCaption?.toLocaleLowerCase() === 'rendimiento académico',
       );
       if (!cube) {
         setEmptyMessage(
@@ -459,7 +459,7 @@ export function DirectorAnalyticsDashboard() {
           className="rounded-xl border border-border bg-card p-4"
         >
           <h2 className="text-sm font-semibold text-foreground">
-            Contexto asignado por Auth Service
+            Contexto asignado por el servicio de autenticación
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">
             {careerLabels} · {facultyLabels}. La consulta se restringe en el
@@ -735,7 +735,7 @@ export function DirectorAnalyticsDashboard() {
 
       <footer className="border-t border-border pt-4 text-xs leading-5 text-muted-foreground">
         El grano del cubo es un registro por intento de cursado. El filtro de
-        carrera proviene de Auth Service y lo aplica el BFF; la interfaz solo
+        carrera proviene del servicio de autenticación y lo aplica el BFF; la interfaz solo
         envía el filtro de gestión.
       </footer>
     </div>

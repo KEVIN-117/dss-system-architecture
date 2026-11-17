@@ -153,6 +153,7 @@ services:
     ports:
       - "127.0.0.1:8080:8080"   # Solo loopback, nunca 0.0.0.0
       - "127.0.0.1:9000:9000"   # Health/metrics (interno)
+      - "127.0.0.1:3006:3006"   # BFF: comparte la red de este contenedor (ver servicio bff)
     depends_on:
       auth-service-db:
         condition: service_healthy
@@ -329,7 +330,10 @@ services:
       PREDICTION_ALLOWED_ROLES: ${PREDICTION_ALLOWED_ROLES:-}
       PREDICTION_BATCH_SUBMITTER_ROLES: ${PREDICTION_BATCH_SUBMITTER_ROLES:-[]}
       PREDICTION_IDEMPOTENCY_SCOPE: ${PREDICTION_IDEMPOTENCY_SCOPE:-development}
-      PREDICTION_DEV_SUBJECT: ${PREDICTION_DEV_SUBJECT:-development-operator}
+      PREDICTION_TRAINING_ROLES: '${PREDICTION_TRAINING_ROLES:-["SUPERADMIN"]}'
+      # Training admission control: running + queued jobs never exceed these.
+      WORKER_MAX_CONCURRENT_JOBS: ${WORKER_MAX_CONCURRENT_JOBS:-1}
+      PREDICTION_MAX_QUEUED_JOBS: ${PREDICTION_MAX_QUEUED_JOBS:-4}
       PREDICTION_OUTBOX_POLL_SECONDS: ${PREDICTION_OUTBOX_POLL_SECONDS:-5}
       RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
       RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
@@ -338,8 +342,11 @@ services:
       RABBITMQ_VHOST: ${PREDICTION_RABBITMQ_VHOST:-${RABBITMQ_VHOST:-/}}
       WORKER_ARTIFACTS_DIR: /app/artifacts
       PREDICTION_DATASET_ROOT: ${PREDICTION_DATASET_ROOT:-/app/snapshots}
+      PREDICTION_CUSTOM_DATASET_ROOT: /app/custom-datasets
     volumes:
       - prediction_artifacts:/app/artifacts
+      # Uploaded datasets: written by the API, read-only for the worker.
+      - prediction_custom_datasets:/app/custom-datasets
     depends_on:
       postgres-dw:
         condition: service_healthy
@@ -356,6 +363,9 @@ services:
       context: ./prediction-service
       dockerfile: Dockerfile.worker
     restart: on-failure
+    # Training only: long jobs must not block population publication.
+    command: ["celery", "-A", "training.tasks.celery_app", "worker", "--loglevel=info", "-c", "1",
+              "-Q", "prediction.train_model", "--without-mingle", "--without-gossip", "--without-heartbeat"]
     environment:
       PREDICTION_ENV: ${PREDICTION_ENV:-development}
       PREDICTION_DATABASE_URL: ${PREDICTION_WORKER_DATABASE_URL:-${PREDICTION_DATABASE_URL:-postgresql://${POSTGRES_DW_USER}:${POSTGRES_DW_PASSWORD}@postgres-dw:5432/${POSTGRES_DW_NAME}}}
@@ -366,18 +376,58 @@ services:
       RABBITMQ_PASSWORD: ${PREDICTION_RABBITMQ_PASSWORD:-${RABBITMQ_DEFAULT_PASS}}
       RABBITMQ_VHOST: ${PREDICTION_RABBITMQ_VHOST:-${RABBITMQ_VHOST:-/}}
       WORKER_MAX_CONCURRENT_JOBS: ${WORKER_MAX_CONCURRENT_JOBS:-1}
+      WORKER_MAX_JOB_ATTEMPTS: ${WORKER_MAX_JOB_ATTEMPTS:-3}
       WORKER_JOB_TIMEOUT_SECONDS: ${WORKER_JOB_TIMEOUT_SECONDS:-1800}
       WORKER_CPU_LIMIT: ${WORKER_CPU_LIMIT:-2}
       WORKER_MEMORY_LIMIT_MB: ${WORKER_MEMORY_LIMIT_MB:-2048}
       WORKER_ARTIFACTS_DIR: /app/artifacts
       PREDICTION_DATASET_ROOT: ${PREDICTION_DATASET_ROOT:-/app/snapshots}
       PREDICTION_CONFIG_ROOT: /app/configurations
+      PREDICTION_CUSTOM_DATASET_ROOT: /app/custom-datasets
     volumes:
       - prediction_artifacts:/app/artifacts
+      - prediction_custom_datasets:/app/custom-datasets:ro
       - ${PREDICTION_SNAPSHOT_DIR:-./infra/prediction-snapshots}:/app/snapshots:ro
       - ${PREDICTION_CONFIG_DIR:-./infra/prediction-configurations}:/app/configurations:ro
     cpus: ${WORKER_CPU_LIMIT:-2}
     mem_limit: ${WORKER_MEMORY_LIMIT_MB:-2048}m
+    depends_on:
+      postgres-dw:
+        condition: service_healthy
+      dw-migrator:
+        condition: service_completed_successfully
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - dss-net
+
+  prediction-publisher:
+    # Same worker image, dedicated to population scoring/publication so it is
+    # never queued behind a long training job. Artifacts are read-only here.
+    image: ghcr.io/kevin-117/prediction-service-worker:${PREDICTION_IMAGE_TAG:-local}
+    build:
+      context: ./prediction-service
+      dockerfile: Dockerfile.worker
+    restart: on-failure
+    command: ["celery", "-A", "training.tasks.celery_app", "worker", "--loglevel=info", "-c", "1",
+              "-Q", "prediction.publish_population", "--without-mingle", "--without-gossip", "--without-heartbeat"]
+    environment:
+      PREDICTION_ENV: ${PREDICTION_ENV:-development}
+      PREDICTION_DATABASE_URL: ${PREDICTION_WORKER_DATABASE_URL:-${PREDICTION_DATABASE_URL:-postgresql://${POSTGRES_DW_USER}:${POSTGRES_DW_PASSWORD}@postgres-dw:5432/${POSTGRES_DW_NAME}}}
+      PREDICTION_DW_DATABASE_URL: ${PREDICTION_DW_DATABASE_URL:-}
+      RABBITMQ_HOST: ${RABBITMQ_HOST:-rabbitmq}
+      RABBITMQ_PORT: ${RABBITMQ_PORT:-5672}
+      RABBITMQ_USERNAME: ${PREDICTION_RABBITMQ_USER:-${RABBITMQ_DEFAULT_USER}}
+      RABBITMQ_PASSWORD: ${PREDICTION_RABBITMQ_PASSWORD:-${RABBITMQ_DEFAULT_PASS}}
+      RABBITMQ_VHOST: ${PREDICTION_RABBITMQ_VHOST:-${RABBITMQ_VHOST:-/}}
+      WORKER_MAX_CONCURRENT_JOBS: "1"
+      WORKER_MAX_JOB_ATTEMPTS: ${WORKER_MAX_JOB_ATTEMPTS:-3}
+      WORKER_JOB_TIMEOUT_SECONDS: ${PREDICTION_PUBLISH_TIMEOUT_SECONDS:-1800}
+      WORKER_ARTIFACTS_DIR: /app/artifacts
+    volumes:
+      - prediction_artifacts:/app/artifacts:ro
+    cpus: ${PREDICTION_PUBLISHER_CPU_LIMIT:-1}
+    mem_limit: ${PREDICTION_PUBLISHER_MEMORY_LIMIT_MB:-1024}m
     depends_on:
       postgres-dw:
         condition: service_healthy
@@ -394,32 +444,132 @@ services:
   #     - dss-net
 
   # ==========================================
-  # GATEWAY, BFF Y FRONTEND
+  # BFF Y FRONTENDS (Next.js, imagen dss-monorepo/Dockerfile)
   # ==========================================
-  # graphql-bff:
-  #   build: ./gateway/graphql-bff
-  #   depends_on:
-  #     - auth-service
-  #     - olap-service
-  #     - prediction-service
-  #     - etl-service
-  #   networks:
-  #     - dss-net
+  # Todas las apps se sirven en localhost con los mismos puertos que en
+  # desarrollo; las URL NEXT_PUBLIC_* se fijan al construir la imagen porque
+  # el navegador las usa directamente.
+  #
+  # El BFF comparte la red del contenedor de Keycloak (network_mode). Así
+  # http://localhost:8080 es Keycloak tanto para el navegador como para el BFF
+  # (autorización, intercambio de tokens y JWKS), y los tokens salen con el
+  # emisor http://localhost:8080 que validan auth-service, olap-service y
+  # prediction-service. Por eso el puerto 3006 se publica en keycloak. Si se
+  # recrea keycloak, hay que recrear también el BFF.
+  bff:
+    image: ${DOCKERHUB_USERNAME:-local}/dss-bff:${FRONTEND_IMAGE_TAG:-local}
+    build: &next-app-build
+      context: ./dss-monorepo
+      dockerfile: Dockerfile
+      args:
+        APP_NAME: bff
+        NEXT_PUBLIC_BFF_URL: http://localhost:3006
+        NEXT_PUBLIC_LANDING_URL: http://localhost:3000
+        NEXT_PUBLIC_ADMIN_PORTAL_URL: http://localhost:3001
+        NEXT_PUBLIC_DECANO_DASHBOARD_URL: http://localhost:3002
+        NEXT_PUBLIC_DIRECTOR_DASHBOARD_URL: http://localhost:3003
+        NEXT_PUBLIC_RECTOR_DASHBOARD_URL: http://localhost:3004
+    network_mode: "service:keycloak"
+    environment:
+      PORT: 3006
+      KEYCLOAK_URL: http://localhost:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM:-uatf-dss-realm}
+      KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-uatf-auth-service}
+      KEYCLOAK_ROLE_CLIENT_ID: ${KEYCLOAK_ROLE_CLIENT_ID:-uatf-auth-service}
+      KEYCLOAK_BFF_CLIENT_ID: dss-bff
+      KEYCLOAK_BFF_CLIENT_SECRET: ${KEYCLOAK_BFF_CLIENT_SECRET:?KEYCLOAK_BFF_CLIENT_SECRET must be set}
+      KEYCLOAK_BFF_REDIRECT_URI: http://localhost:3006/api/auth/callback
+      KEYCLOAK_BFF_POST_LOGOUT_REDIRECT_URI: http://localhost:3000/login
+      AUTH_SERVICE_URL: http://auth-service:${AUTH_SERVER_PORT:-8000}
+      DW_CONTROL_SERVICE_URL: http://dw-control-service:8090
+      OLAP_SERVICE_URL: http://olap-service:8080
+      OLAP_ACADEMIC_SCOPE_FILTERS: '{"faculty":{"dimension":"Ámbito de facultad","hierarchy":"Facultad","level":"Facultad","memberTemplate":"[Ámbito de facultad].[Facultad].[Facultad].&[{id}]"},"career":{"dimension":"Ámbito de carrera","hierarchy":"Carrera","level":"Carrera","memberTemplate":"[Ámbito de carrera].[Carrera].[Carrera].&[{id}]"}}'
+      PREDICTION_SERVICE_URL: http://prediction-service:8000
+      BFF_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004
+      BFF_DEFAULT_POST_LOGIN_REDIRECT_URI: http://localhost:3000/auth/callback
+      BFF_SESSION_SECRET: ${BFF_SESSION_SECRET:?BFF_SESSION_SECRET must be set (32+ characters)}
+    depends_on:
+      keycloak:
+        condition: service_healthy
+      auth-service:
+        condition: service_started
+      dw-control-service:
+        condition: service_started
+      olap-service:
+        condition: service_started
+      prediction-service:
+        condition: service_started
+    restart: unless-stopped
 
-  # gateway:
-  #   build: ./gateway/traefik
-  #   ports:
-  #     - "80:80"
-  #     - "443:443"
-  #   networks:
-  #     - dss-net
+  landing:
+    image: ${DOCKERHUB_USERNAME:-local}/dss-landing:${FRONTEND_IMAGE_TAG:-local}
+    build:
+      <<: *next-app-build
+      args: &next-public-urls
+        APP_NAME: landing
+        NEXT_PUBLIC_BFF_URL: http://localhost:3006
+        NEXT_PUBLIC_LANDING_URL: http://localhost:3000
+        NEXT_PUBLIC_ADMIN_PORTAL_URL: http://localhost:3001
+        NEXT_PUBLIC_DECANO_DASHBOARD_URL: http://localhost:3002
+        NEXT_PUBLIC_DIRECTOR_DASHBOARD_URL: http://localhost:3003
+        NEXT_PUBLIC_RECTOR_DASHBOARD_URL: http://localhost:3004
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on: [bff]
+    networks: [dss-net]
+    restart: unless-stopped
 
-  # frontend:
-  #   build: ./frontend/nextjs-spa
-  #   ports:
-  #     - "3000:3000"
-  #   networks:
-  #     - dss-net
+  admin-portal:
+    image: ${DOCKERHUB_USERNAME:-local}/dss-admin-portal:${FRONTEND_IMAGE_TAG:-local}
+    build:
+      <<: *next-app-build
+      args:
+        <<: *next-public-urls
+        APP_NAME: admin-portal
+    ports:
+      - "127.0.0.1:3001:3000"
+    depends_on: [bff]
+    networks: [dss-net]
+    restart: unless-stopped
+
+  decano-dashboard:
+    image: ${DOCKERHUB_USERNAME:-local}/dss-decano-dashboard:${FRONTEND_IMAGE_TAG:-local}
+    build:
+      <<: *next-app-build
+      args:
+        <<: *next-public-urls
+        APP_NAME: decano-dashboard
+    ports:
+      - "127.0.0.1:3002:3000"
+    depends_on: [bff]
+    networks: [dss-net]
+    restart: unless-stopped
+
+  director-dashboard:
+    image: ${DOCKERHUB_USERNAME:-local}/dss-director-dashboard:${FRONTEND_IMAGE_TAG:-local}
+    build:
+      <<: *next-app-build
+      args:
+        <<: *next-public-urls
+        APP_NAME: director-dashboard
+    ports:
+      - "127.0.0.1:3003:3000"
+    depends_on: [bff]
+    networks: [dss-net]
+    restart: unless-stopped
+
+  rector-dashboard:
+    image: ${DOCKERHUB_USERNAME:-local}/dss-rector-dashboard:${FRONTEND_IMAGE_TAG:-local}
+    build:
+      <<: *next-app-build
+      args:
+        <<: *next-public-urls
+        APP_NAME: rector-dashboard
+    ports:
+      - "127.0.0.1:3004:3000"
+    depends_on: [bff]
+    networks: [dss-net]
+    restart: unless-stopped
 
 networks:
   dss-net:
@@ -429,3 +579,4 @@ volumes:
   postgres_data:
   olap_home_empty:
   prediction_artifacts:
+  prediction_custom_datasets:

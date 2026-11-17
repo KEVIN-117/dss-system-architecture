@@ -68,7 +68,7 @@ export class DemographicGenerator {
    * @param gender 'M' o 'F'
    * @param admissionYear Año de postulación para calcular fecha de nacimiento coherente (17 a 25 años)
    */
-  public generatePerson(gender: 'M' | 'F', admissionYear = 2020): GeneratedPerson {
+  public generatePerson(gender: 'M' | 'F', admissionYear = 2020, ageAtAdmission?: number): GeneratedPerson {
     const nameConfig =
       gender === 'M'
         ? this.demographicCatalog.first_names.male
@@ -104,7 +104,7 @@ export class DemographicGenerator {
     const tipoNroDip = sampleWeighted(this.extensionWeights); // ~70% 'PT'
 
     // 4. Fecha de nacimiento coherente (edad entre 17 y 25 años al postular)
-    const age = randomInt(17, 24);
+    const age = ageAtAdmission ?? randomInt(17, 24);
     const birthYear = admissionYear - age;
     const birthMonth = randomInt(1, 12).toString().padStart(2, '0');
     const birthDay = randomInt(1, 28).toString().padStart(2, '0');

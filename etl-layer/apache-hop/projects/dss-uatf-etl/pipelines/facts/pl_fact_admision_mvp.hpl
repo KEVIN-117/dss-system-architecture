@@ -15,27 +15,53 @@
     <field><currency/><decimal/><format/><group/><length>4</length><name>gestion</name><precision>0</precision><trim_type>both</trim_type><type>Integer</type><variable>${P_REQUESTED_GESTION}</variable></field>
     <field><currency/><decimal/><format/><group/><length>2</length><name>periodo</name><precision>0</precision><trim_type>both</trim_type><type>Integer</type><variable>${P_REQUESTED_PERIODO}</variable></field>
   </fields><attributes/><GUI><xloc>128</xloc><yloc>128</yloc></GUI></transform>
-  <transform><name>Read admission source rows</name><type>TableInput</type><description>Filtra postulaciones del corte, resuelve alumno por id_ra y detecta vínculos ambiguos</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>WITH params AS MATERIALIZED (
+  <transform><name>Read admission source rows</name><type>TableInput</type><description>Filtra postulaciones del corte y resuelve el alumno por alumnos.id_postulante en el programa postulado</description><distribute>Y</distribute><custom_distribution/><copies>1</copies><partitioning><method>none</method><schema_name/></partitioning><connection>OLTP db</connection><sql>WITH params AS MATERIALIZED (
     SELECT ?::uuid AS run_id, ?::smallint AS gestion, ?::smallint AS periodo
+), application_link AS MATERIALIZED (
+    -- An application may be reused by later re-enrolments in the same program;
+    -- the earliest enrolment is the one originated by the application.
+    SELECT DISTINCT ON (a.id_postulante, a.id_programa)
+           a.id_postulante, a.id_programa, a.id_alumno, a.fec_inscripcion,
+           count(*) OVER (PARTITION BY a.id_postulante, a.id_programa)::integer AS link_count
+    FROM academico.alumnos a
+    WHERE a.id_postulante IS NOT NULL
+    ORDER BY a.id_postulante, a.id_programa, a.fec_inscripcion, a.id_alumno
+), first_coursework AS MATERIALIZED (
+    -- Same SCD2 presence rule as DIM_ESTUDIANTE (fec_inscripcion is rewritten).
+    SELECT n.id_alumno, min(ARRAY[n.id_gestion::integer, n.id_periodo::integer]) AS first_cut
+    FROM academico.notas_planilla n
+    WHERE n.id_gestion BETWEEN 1950 AND 2100
+      AND n.id_alumno IN (SELECT id_alumno FROM application_link)
+    GROUP BY n.id_alumno
 )
 SELECT params.run_id, params.run_id AS staging_run_id,
        row_number() OVER (ORDER BY p.id_alumno)::bigint AS row_ordinal,
        jsonb_build_object(
            'id_alumno', alumno.id_alumno,
            'id_alumno_postulante', p.id_alumno,
-           'alumno_ra_match_count', alumno.match_count,
+           'alumno_link_count', coalesce(alumno.link_count, 0),
+           'alumno_fec_inscripcion', alumno.fec_inscripcion,
+           'alumno_first_coursework_gestion', fcw.first_cut[1],
+           'alumno_first_coursework_periodo', fcw.first_cut[2],
            'id_ra', p.id_ra,
            'id_programa', p.id_programa, 'id_gestion', p.id_gestion,
            'id_periodo', p.id_periodo, 'id_acceso', p.id_acceso,
-           'nota', p.nota, 'estado', p.estado
+           'nota', p.nota, 'estado', p.estado,
+           -- Admission mode: examen is complete since 2019 (id_acceso is empty);
+           -- both use the public.prs_examen codes.
+           'modalidad', coalesce(p.examen::text, nullif(btrim(p.id_acceso), '')),
+           -- Applicant profile from the person (id_ra), for every application.
+           'postulante_sexo', u.id_sexo, 'postulante_tipo_colegio', c.tipo,
+           'colegio_pais', c.id_pais, 'colegio_departamento', c.cod_dep, 'colegio_provincia', c.cod_prov, 'colegio_localidad', c.cod_loc,
+           'nacimiento_pais', u.nac_pais, 'nacimiento_departamento', u.id_dep, 'nacimiento_provincia', u.id_prov, 'nacimiento_localidad', u.id_loc
        ) AS source_data
 FROM public.postulantes p CROSS JOIN params
 JOIN academico.alm_programas programa ON programa.id_programa=p.id_programa
-LEFT JOIN LATERAL (
-    SELECT count(*)::integer AS match_count, min(a.id_alumno)::integer AS id_alumno
-    FROM academico.alumnos a
-    WHERE a.id_ra=p.id_ra
-) alumno ON TRUE
+LEFT JOIN public.uatf_datos u ON u.id_ra=p.id_ra
+LEFT JOIN public.prs_colegios c ON c.id_colegio=u.id_colegio
+LEFT JOIN application_link alumno
+       ON alumno.id_postulante=p.id_alumno AND alumno.id_programa=p.id_programa
+LEFT JOIN first_coursework fcw ON fcw.id_alumno=alumno.id_alumno
 WHERE p.id_gestion=params.gestion AND p.id_periodo=params.periodo
   AND upper(btrim(programa._tipo_academico)) IN ('CAR','PRO','TES','TEM')
   AND upper(btrim(coalesce(programa.activo,''))) = 'A'

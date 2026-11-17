@@ -39,19 +39,19 @@ export function AppThemePanel({ app, onChange }: ConfigurationPanelProps) {
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="font-semibold">Visual identity</h3>
+        <h3 className="font-semibold">Identidad visual</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Name and brand accents used across this app.
+          Nombre y elementos de identidad de la aplicación.
         </p>
       </div>
-      <Field label="App name" htmlFor="app-name">
+      <Field label="Nombre de la aplicación" htmlFor="app-name">
         <Input
           id="app-name"
           value={app.name}
           onChange={(event) => onChange({ ...app, name: event.target.value })}
         />
       </Field>
-      <Field label="Description" htmlFor="app-description">
+      <Field label="Descripción" htmlFor="app-description">
         <Textarea
           id="app-description"
           rows={3}
@@ -59,13 +59,13 @@ export function AppThemePanel({ app, onChange }: ConfigurationPanelProps) {
           onChange={(event) =>
             onChange({ ...app, description: event.target.value })
           }
-          placeholder="What is this app for?"
+          placeholder="¿Para qué sirve esta aplicación?"
         />
       </Field>
       <Field
-        label="Logo image URL"
+        label="URL de la imagen del logotipo"
         htmlFor="app-logo"
-        hint="Use a trusted, publicly accessible image URL."
+        hint="Usa una URL de imagen confiable y accesible públicamente."
       >
         <Input
           id="app-logo"
@@ -85,15 +85,15 @@ export function AppHeaderPanel({ app, onChange }: ConfigurationPanelProps) {
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="font-semibold">Header</h3>
+        <h3 className="font-semibold">Encabezado</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Set the context shown above your app pages.
+          Define el contexto que se muestra sobre las páginas de la aplicación.
         </p>
       </div>
       <Field
-        label="Eyebrow"
+        label="Texto superior"
         htmlFor="header-eyebrow"
-        hint="A short label displayed above the app name."
+        hint="Texto breve que aparece sobre el nombre de la aplicación."
       >
         <Input
           id="header-eyebrow"
@@ -101,7 +101,7 @@ export function AppHeaderPanel({ app, onChange }: ConfigurationPanelProps) {
           onChange={(event) =>
             onChange({ ...app, headerEyebrow: event.target.value || undefined })
           }
-          placeholder="Department analytics"
+          placeholder="Análisis de la unidad académica"
         />
       </Field>
     </div>
@@ -112,12 +112,12 @@ export function AppNavigationPanel({ app, onChange }: ConfigurationPanelProps) {
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="font-semibold">Navigation</h3>
+        <h3 className="font-semibold">Navegación</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choose how people move between app pages.
+          Elige cómo navegar entre las páginas de la aplicación.
         </p>
       </div>
-      <Field label="Navigation layout" htmlFor="app-navigation">
+      <Field label="Diseño de navegación" htmlFor="app-navigation">
         <select
           id="app-navigation"
           value={app.navigation}
@@ -130,16 +130,16 @@ export function AppNavigationPanel({ app, onChange }: ConfigurationPanelProps) {
           className="h-9 w-full rounded-lg border border-input bg-background px-3 text-sm text-foreground outline-none focus-visible:border-ring focus-visible:ring-2 focus-visible:ring-ring"
         >
           {' '}
-          <option value="rail">Side rail</option>
-          <option value="top">Top tabs</option>
+          <option value="rail">Menú lateral</option>
+          <option value="top">Pestañas superiores</option>
         </select>
       </Field>
       <div className="rounded-lg border border-border bg-muted/40 p-3">
         <p className="text-sm font-medium">
-          {app.pages.length} {app.pages.length === 1 ? 'page' : 'pages'}
+          {app.pages.length} {app.pages.length === 1 ? 'página' : 'páginas'}
         </p>
         <p className="mt-1 text-xs text-muted-foreground">
-          Page order follows the list in the Pages panel.
+          El orden de las páginas sigue la lista del panel de páginas.
         </p>
       </div>
     </div>
@@ -150,9 +150,9 @@ export function AppAssistantPanel({ app, onChange }: ConfigurationPanelProps) {
   return (
     <div className="space-y-5">
       <div>
-        <h3 className="font-semibold">Assistant</h3>
+        <h3 className="font-semibold">Asistente</h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Choose whether this app shows an analysis assistant entry point.
+          Elige si la aplicación muestra acceso al asistente de análisis.
         </p>
       </div>
       <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3">
@@ -166,11 +166,11 @@ export function AppAssistantPanel({ app, onChange }: ConfigurationPanelProps) {
         />
         <span>
           <span className="block text-sm font-medium">
-            Show assistant button
+            Mostrar botón del asistente
           </span>
           <span className="mt-1 block text-xs text-muted-foreground">
-            The workspace can connect this control to an assistant in a later
-            integration step.
+            Este control puede conectarse a un asistente en una
+            etapa posterior de integración.
           </span>
         </span>
       </label>
@@ -182,7 +182,7 @@ export function AppPagesPanel({ app, onChange }: ConfigurationPanelProps) {
   const addPage = () => {
     const page: AppBuilderPage = {
       id: `page-${Date.now()}`,
-      title: `Page ${app.pages.length + 1}`,
+      title: `Página ${app.pages.length + 1}`,
     };
     onChange({ ...app, pages: [...app.pages, page] });
   };
@@ -199,25 +199,25 @@ export function AppPagesPanel({ app, onChange }: ConfigurationPanelProps) {
     <div className="space-y-5">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h3 className="font-semibold">Pages</h3>
+          <h3 className="font-semibold">Páginas</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Name and organize the pages in your app.
+            Asigna nombres y organiza las páginas de la aplicación.
           </p>
         </div>
         <Button size="sm" variant="outline" onClick={addPage}>
           <Plus className="size-4" />
-          Add page
+          Agregar página
         </Button>
       </div>
       {app.pages.length === 0 ? (
         <div className="rounded-lg border border-dashed border-border p-4 text-sm text-muted-foreground">
-          No pages yet. Add a page to give the app a place for its content.
+          Aún no hay páginas. Agrega una página para incluir contenido.
         </div>
       ) : (
         <ol className="space-y-3">
           {app.pages.map((page, index) => (
             <li key={page.id} className="flex items-end gap-2">
-              <Field label={`Page ${index + 1}`} htmlFor={`page-${page.id}`}>
+              <Field label={`Página ${index + 1}`} htmlFor={`page-${page.id}`}>
                 <Input
                   id={`page-${page.id}`}
                   value={page.title}
@@ -227,7 +227,7 @@ export function AppPagesPanel({ app, onChange }: ConfigurationPanelProps) {
               <Button
                 variant="ghost"
                 size="icon-sm"
-                aria-label={`Remove ${page.title}`}
+                aria-label={`Eliminar ${page.title}`}
                 disabled={app.pages.length <= 1}
                 onClick={() => removePage(page.id)}
               >
@@ -263,15 +263,15 @@ export function AppConfigurationPanel({
 }) {
   const Panel = panelBySection[section];
   const labels: Record<AppBuilderSection, string> = {
-    theme: 'Brand & theme',
-    header: 'Header',
-    navigation: 'Navigation',
-    assistant: 'Assistant',
-    pages: 'Pages',
+    theme: 'Identidad y tema',
+    header: 'Encabezado',
+    navigation: 'Navegación',
+    assistant: 'Asistente',
+    pages: 'Páginas',
   };
   return (
     <aside
-      aria-label={`${labels[section]} settings`}
+      aria-label={`Configuración: ${labels[section]}`}
       className="flex h-full w-full flex-col border-l border-border bg-background sm:w-[22rem]"
     >
       <header className="border-b border-border px-5 py-4">
@@ -279,12 +279,12 @@ export function AppConfigurationPanel({
           <h2 className="font-semibold">{labels[section]}</h2>
           {onClose && (
             <Button variant="ghost" size="sm" onClick={onClose}>
-              Close
+              Cerrar
             </Button>
           )}
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Changes update the app preview.
+          Los cambios actualizan la vista previa de la aplicación.
         </p>
       </header>
       <div className="min-h-0 flex-1 overflow-y-auto p-5">

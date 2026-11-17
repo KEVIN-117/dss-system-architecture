@@ -316,8 +316,8 @@ services:
       PGHOST: postgres-dw
       PGPORT: "5432"
       PGDATABASE: dw_integration
-      PGUSER: dw_test
-      PGPASSWORD: dw_test
+      PGUSER: hop_vertical_test
+      PGPASSWORD: hop_vertical_test
     volumes:
       - ./tests/prepare_hop_publish.sql:/tests/prepare_hop_publish.sql:ro
     entrypoint: ["/bin/sh", "-c", "psql -X -v ON_ERROR_STOP=1 -f /tests/prepare_hop_publish.sql"]

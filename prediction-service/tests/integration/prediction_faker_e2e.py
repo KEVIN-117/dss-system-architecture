@@ -24,6 +24,7 @@ from sklearn.dummy import DummyClassifier
 SERVICE_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(SERVICE_ROOT))
 
+from feature_contract import contract_reference
 from inference import PredictionService, Principal
 from inference_adapters import ConfiguredAcademicPolicy, DwPredictionDataProvider
 from main import app
@@ -140,6 +141,8 @@ def _create_test_bundle(root: Path, event_type: str, cadence: str, version: str 
         "serving_scope": {"event_type": event_type, "cadence": cadence, "evaluation_unit": evaluation_unit},
         "created_at": "2026-11-03T00:00:00Z", "evaluation_ref": f"integration-{model_id}",
         "lifecycle_state": "CANDIDATE",
+        # Serving refuses bundles not bound to the running point-in-time contract.
+        "feature_contract": contract_reference(event_code, feature_names),
     }
     dataset_digest = f"integration-only-{event_type}-{cadence}"
     result = write_training_artifacts(

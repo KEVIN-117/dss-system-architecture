@@ -63,6 +63,38 @@ class InferenceTests(unittest.TestCase):
         self.assertEqual(predicted, "NEGATIVE_EVENT")
         self.assertEqual(probability, 0.1)
 
+    def test_stored_decision_threshold_drives_served_class(self):
+        bundle = Bundle()
+        # ThresholdModel.predict() says NEGATIVE for signal 0.1 (p=0.1), but the
+        # bundle was evaluated with a 0.05 threshold, so serving must agree.
+        bundle.manifest["decision_threshold"] = 0.05
+        predicted, probability, _ = score_loaded_model(bundle, {"signal": 0.1})
+        self.assertEqual(predicted, "POSITIVE_EVENT")
+        self.assertEqual(probability, 0.1)
+
+        bundle.manifest["decision_threshold"] = 0.9
+        predicted, probability, _ = score_loaded_model(bundle, {"signal": 0.9})
+        self.assertEqual(predicted, "NEGATIVE_EVENT")
+        self.assertEqual(probability, 0.8)
+
+    def test_invalid_or_unusable_decision_threshold_fails_closed(self):
+        bundle = Bundle()
+        for value in (1.5, -0.1, True, "0.5", float("nan")):
+            bundle.manifest["decision_threshold"] = value
+            with self.assertRaises(InferenceFailure) as raised:
+                score_loaded_model(bundle, {"signal": 0.5})
+            self.assertEqual(raised.exception.code, "INCOMPATIBLE_SCHEMA")
+
+        class Classifier:
+            def predict(self, frame):
+                return np.asarray([0])
+
+        no_proba = Bundle(model=Classifier())
+        no_proba.manifest["decision_threshold"] = 0.3
+        with self.assertRaises(InferenceFailure) as raised:
+            score_loaded_model(no_proba, {"signal": 0.5})
+        self.assertEqual(raised.exception.code, "INCOMPATIBLE_SCHEMA")
+
     def test_model_without_predict_proba_returns_null(self):
         class Classifier:
             def predict(self, frame):

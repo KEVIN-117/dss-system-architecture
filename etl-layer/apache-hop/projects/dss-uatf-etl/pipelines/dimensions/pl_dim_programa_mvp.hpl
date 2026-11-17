@@ -14,7 +14,9 @@
        p.id_programa, p.programa, p.id_facultad::integer AS id_facultad,
        f.facultad, f.facu_abre AS facultad_abreviatura,
        p.id_nivel::smallint AS id_nivel, p.nivel, p.sede,
-       p._tipo_academico AS tipo_academico, p.activo
+       p._tipo_academico AS tipo_academico, p.activo,
+       -- Regime (FK academico.carreras_tipos): A anual, S semestral; drives retention cadence.
+       nullif(upper(btrim(p.tipo)), '')::varchar(1) AS regimen
 FROM academico.alm_programas p
 LEFT JOIN academico.alm_programas_facultades f ON f.id_facultad = p.id_facultad
 WHERE upper(btrim(p._tipo_academico)) IN ('CAR','PRO','TES','TEM')
@@ -33,7 +35,8 @@ ORDER BY p.id_programa</sql><limit>0</limit><lookup>Get run ID</lookup><execute_
         ?::varchar(255) AS nivel,
         ?::varchar(1) AS sede,
         ?::varchar(3) AS tipo_academico,
-        ?::varchar(16) AS activo
+        ?::varchar(16) AS activo,
+        ?::varchar(1) AS regimen
 ), dimension_key AS MATERIALIZED (
     SELECT CASE WHEN p.run_id IS NULL THEN NULL ELSE etl_control.resolve_hop_dimension_key('programa', p.id_programa::text) END AS surrogate_key
     FROM p
@@ -54,6 +57,7 @@ SELECT p.run_id, etl_control.stage_hop_publication_row(
             'sede', p.sede,
             'tipo_academico', p.tipo_academico,
             'activo', p.activo,
+            'regimen', p.regimen,
         'source_run_id', p.run_id,
         'created_at', clock_timestamp(), 'updated_at', clock_timestamp()
     )

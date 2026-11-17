@@ -35,6 +35,52 @@ export async function fetchBffSession(
   return parseBffSessionResponse(await response.json());
 }
 
+export interface BffSessionHeartbeat {
+  /** Epoch milliseconds when the session ends unless more activity is reported. */
+  expiresAt: number;
+  /** Epoch milliseconds of the absolute session cap (login + max lifetime). */
+  absoluteExpiresAt: number;
+  idleTimeoutSeconds: number;
+}
+
+/**
+ * Reports user activity to the BFF. It extends the idle window and renews the
+ * Keycloak access token server-side when needed; no token reaches the browser.
+ */
+export async function refreshBffSession(
+  bffBaseUrl: string,
+  signal?: AbortSignal,
+): Promise<BffSessionHeartbeat> {
+  const response = await fetch(bffUrl(bffBaseUrl, '/api/auth/refresh'), {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    credentials: 'include',
+    cache: 'no-store',
+    signal,
+  });
+  if (!response.ok) {
+    throw new AuthProfileError(response.status, await response.text());
+  }
+  const value: unknown = await response.json();
+  if (
+    !isRecord(value) ||
+    !isPositiveNumber(value.expiresAt) ||
+    !isPositiveNumber(value.absoluteExpiresAt) ||
+    !isPositiveNumber(value.idleTimeoutSeconds)
+  ) {
+    throw new AuthProfileError(502, 'BFF returned an invalid session heartbeat');
+  }
+  return {
+    expiresAt: value.expiresAt,
+    absoluteExpiresAt: value.absoluteExpiresAt,
+    idleTimeoutSeconds: value.idleTimeoutSeconds,
+  };
+}
+
+function isPositiveNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0;
+}
+
 export function parseBffSessionResponse(value: unknown): BffSessionResponse {
   if (
     !isRecord(value) ||

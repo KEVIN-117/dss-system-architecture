@@ -47,6 +47,9 @@ class TrainerTests(unittest.TestCase):
         self.assertEqual(result.manifest["algorithm"], "random_forest")
         self.assertEqual(result.manifest["lifecycle_state"], "CANDIDATE")
         self.assertEqual(result.manifest["contract_version"], "1.0")
+        # Serving uses exactly the threshold that produced the reported metrics.
+        self.assertEqual(result.manifest["decision_threshold"], result.metrics["decision_threshold"])
+        self.assertTrue(0.0 <= result.manifest["decision_threshold"] <= 1.0)
 
         # Check metrics completeness
         metrics = result.metrics
@@ -115,6 +118,27 @@ class TrainerTests(unittest.TestCase):
     def test_unapproved_threshold_policy_is_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "approved=true"):
             _validated_decision_policy({"decision_policy": {"policy_ref": "dsa:pending"}})
+
+    def test_alert_rate_policy_flags_the_requested_share(self) -> None:
+        policy = _validated_decision_policy({"decision_policy": {"alert_rate": 0.2}}, exploratory=True)
+        self.assertEqual((policy["kind"], policy["approved"]), ("alert_rate", False))
+        scores = [i / 10 for i in range(10)]  # 0.0 .. 0.9
+        truth = [0] * 7 + [1] * 3
+        threshold, summary = _select_validation_threshold(truth, scores, policy)
+        self.assertEqual(sum(score >= threshold for score in scores), 2)
+        self.assertEqual(summary["validation_alert_rate"], 0.2)
+        self.assertEqual((summary["false_negatives"], summary["false_positives"]), (1, 0))
+        self.assertIsNone(summary["validation_cost"])
+
+    def test_alert_rate_policy_needs_approval_outside_exploratory_runs(self) -> None:
+        with self.assertRaisesRegex(ValueError, "approved=true"):
+            _validated_decision_policy({"decision_policy": {"alert_rate": 0.2}})
+        approved = _validated_decision_policy(
+            {"decision_policy": {"alert_rate": 0.2, "approved": True, "policy_ref": "dsa:alert-20"}})
+        self.assertTrue(approved["approved"])
+        for rate in (0, 1, 1.5, True):
+            with self.assertRaisesRegex(ValueError, "alert_rate"):
+                _validated_decision_policy({"decision_policy": {"alert_rate": rate}}, exploratory=True)
 
     def test_configuration_reference_loads_from_catalog_and_is_digested(self) -> None:
         import os

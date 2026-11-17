@@ -1,13 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { AuthLanding } from '@dss-monorepo/design-system';
+import Image from 'next/image';
 import { useAuth } from '@dss-monorepo/auth';
 
-import { motion, type Variants } from 'motion/react';
-import Image from 'next/image';
-
 import { LandingAuthProvider } from '@/components/auth/LandingAuthProvider';
+import {
+  authCallbackPath,
+  currentPortalReturnTo,
+} from '@/components/auth/portal-return';
+import { GatewayEyebrow, GatewayScene } from '@/components/auth/GatewayScene';
 
 export default function LoginPage() {
   return (
@@ -18,142 +20,192 @@ export default function LoginPage() {
 }
 
 function LoginContent() {
-  const { isAuthenticated, isLoading, error, login, register } = useAuth();
+  const {
+    isAuthenticated,
+    isLoading,
+    error: sessionError,
+    login,
+    register,
+  } = useAuth();
   const [isStarting, setIsStarting] = useState(false);
+  const [callbackError, setCallbackError] = useState<string | null>(null);
+  const isBusy = isLoading || isStarting;
+  // A failed callback explains more than a generic session check.
+  const error = callbackError ?? sessionError;
+
+  // Failed Keycloak callbacks land here directly or forwarded by a portal.
+  useEffect(() => {
+    if (
+      new URLSearchParams(window.location.search).get('error') ===
+      'authentication_failed'
+    ) {
+      setCallbackError(
+        'No fue posible iniciar sesión. Verifica tus credenciales e inténtalo nuevamente.',
+      );
+    }
+  }, []);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated) {
-      window.location.replace('/auth/callback');
+      window.location.replace(authCallbackPath(currentPortalReturnTo()));
     }
   }, [isAuthenticated, isLoading]);
 
+  // Carries a validated portal deep link through Keycloak and the callback.
   const callbackUrl = () =>
-    new URL('/auth/callback', window.location.origin).toString();
-
-  const itemVariants: Variants = {
-    hidden: { opacity: 0, y: 20 },
-    show: {
-      opacity: 1,
-      y: 0,
-      transition: { type: 'tween', stiffness: 300, damping: 24 },
-    },
-  };
+    new URL(
+      authCallbackPath(currentPortalReturnTo()),
+      window.location.origin,
+    ).toString();
 
   return (
-    <main className="flex min-h-screen bg-dss-navy-950 items-center justify-center p-4 md:p-8 font-sans relative overflow-hidden">
-      <div className="absolute inset-0 z-0" aria-hidden="true">
-        <motion.div
-          animate={{ scale: [1, 1.2, 1], opacity: [0.3, 0.5, 0.3] }}
-          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-          className="absolute top-[-20%] left-[-10%] w-[50vw] h-[50vw] bg-dss-blue-500/20 rounded-full blur-[120px] mix-blend-screen"
-        />
-        <motion.div
-          animate={{ scale: [1, 1.5, 1], opacity: [0.2, 0.4, 0.2] }}
-          transition={{
-            duration: 10,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: 1,
-          }}
-          className="absolute bottom-[-20%] right-[-10%] w-[40vw] h-[40vw] bg-dss-red-500/20 rounded-full blur-[120px] mix-blend-screen"
-        />
+    <GatewayScene
+      image="/images/portal-login.webp"
+      imagePosition="origin-top object-[50%_30%] lg:object-[50%_0%]"
+      tone={error ? 'error' : 'working'}
+    >
+      <div className="flex items-center gap-3">
+        <span className="grid size-11 shrink-0 place-items-center rounded-xl border border-white/15 bg-white/10 p-1.5">
+          <Image
+            src="/images/dsa.png"
+            alt="Escudo de la Dirección de Servicios Académicos"
+            width={36}
+            height={36}
+            className="object-contain"
+          />
+        </span>
+        <div className="leading-tight">
+          <GatewayEyebrow>UATF · DSA</GatewayEyebrow>
+          <p className="mt-1 text-sm font-medium text-white/80">
+            Dirección de Servicios Académicos
+          </p>
+        </div>
       </div>
 
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95, filter: 'blur(10px)' }}
-        animate={{ opacity: 1, scale: 1, filter: 'blur(0px)' }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="relative w-full max-w-[90vw] h-[90vh] bg-foreground/5 backdrop-blur-3xl rounded-[2.5rem] flex overflow-hidden shadow-[0_0_80px_color-mix(in_srgb,var(--dss-navy-950)_80%,transparent)] border border-border/40 z-10"
-      >
-        <div
-          className="hidden lg:block absolute inset-y-0 left-0 w-[50%] z-10 m-5 rounded-3xl overflow-hidden shadow-[0_0_50px_rgba(0,0,0,0.8)]"
-          style={{ clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)' }}
+      <h1 className="mt-8 bg-linear-to-br from-white via-white to-dss-cyan-400/80 bg-clip-text font-heading text-3xl leading-[1.1] font-semibold tracking-tight text-balance text-transparent sm:text-[2.25rem]">
+        Portal de Servicios Académicos
+      </h1>
+      <p className="mt-3 text-sm leading-relaxed text-white/65 sm:text-base">
+        Inicia sesión con tu cuenta institucional para entrar al portal que
+        corresponde a tu rol.
+      </p>
+
+      {error ? (
+        <p
+          role="alert"
+          className="mt-6 flex gap-3 rounded-2xl border border-dss-red-500/40 bg-dss-red-500/10 p-4 text-sm leading-relaxed text-red-200"
         >
-          <motion.div
-            initial={{ scale: 1.1 }}
-            animate={{ scale: 1 }}
-            transition={{ duration: 10, ease: 'easeOut' }}
-            className="absolute inset-0 bg-dss-navy-950"
-          >
-            <Image
-              src="/images/login_bg.jpg"
-              alt="Abstract Sci-Fi Data Landscape"
-              width={1000}
-              height={600}
-              className="object-cover w-full h-full"
-            />
-            <div className="absolute inset-0 bg-linear-to-br from-dss-blue-500/40 via-dss-navy-950/70 to-dss-red-500/40 mix-blend-multiply" />
-            <div className="absolute inset-0 bg-linear-to-b from-transparent via-transparent to-dss-navy-950" />
-          </motion.div>
+          <AlertIcon />
+          <span>{error}</span>
+        </p>
+      ) : null}
 
-          <motion.div
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            transition={{ delay: 0.8, duration: 0.8 }}
-            className="absolute bottom-10 left-10 z-20 flex items-center justify-between right-32"
-          >
-            <div className="flex items-center gap-5 glass-panel p-4 rounded-2xl bg-dss-navy-950/40 backdrop-blur-md border border-border/40">
-              <div className="w-14 h-14 rounded-xl overflow-hidden bg-foreground/10 flex items-center justify-center p-1.5 border border-border/60">
-                <Image
-                  src="/images/dsa.png"
-                  alt="Escudo UATF"
-                  width={50}
-                  height={50}
-                  className="object-contain drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]"
-                />
-              </div>
-              <div>
-                <p className="text-foreground font-bold tracking-tight text-lg">
-                  UATF DSA
-                </p>
-                <p className="text-muted-foreground text-sm font-medium">
-                  Dirección de Servicios Académicos
-                </p>
-              </div>
-            </div>
-          </motion.div>
-        </div>
+      <div className="mt-8 flex flex-col gap-3">
+        <button
+          type="button"
+          disabled={isBusy}
+          onClick={() => {
+            setIsStarting(true);
+            login(callbackUrl());
+          }}
+          className="group relative inline-flex h-12 w-full items-center justify-center gap-2 overflow-hidden rounded-xl bg-linear-to-r from-dss-cyan-400 to-dss-blue-500 px-5 text-sm font-semibold text-dss-navy-950 shadow-[0_10px_30px_-10px] shadow-dss-cyan-400/70 transition-[transform,box-shadow,filter] hover:-translate-y-px hover:shadow-[0_14px_36px_-10px] hover:shadow-dss-cyan-400/90 hover:brightness-110 disabled:pointer-events-none disabled:opacity-70"
+        >
+          <span
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-white/35 opacity-0 transition-[left,opacity] duration-700 group-hover:left-[110%] group-hover:opacity-100"
+          />
+          {isBusy ? <SpinnerIcon /> : <LoginIcon />}
+          {isBusy ? 'Verificando sesión…' : 'Iniciar sesión'}
+        </button>
 
-        <div className="absolute inset-y-0 right-0 w-full lg:w-[60%] z-0 flex flex-col justify-center px-8 md:px-16 lg:pl-[12%] lg:pr-24">
-          <div className="w-full max-w-sm mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4, duration: 0.8 }}
-              className="mb-10 text-center"
-            >
-              <h1 className="text-4xl md:text-[2.75rem] font-extrabold text-transparent bg-clip-text bg-linear-to-r from-foreground to-muted-foreground tracking-tight mb-3 drop-shadow-sm">
-                Portal de Servicios Académicos
-              </h1>
-              <p className="text-muted-foreground text-sm font-medium tracking-wide">
-                Inicie sesión para comenzar a utilizar el DSS
-              </p>
-            </motion.div>
-            <motion.div
-              variants={itemVariants}
-              initial="hidden"
-              animate="show"
-              transition={{ delay: 0.4, duration: 0.8 }}
-              className="space-y-5"
-            >
-              <AuthLanding
-                title="Dirección de Servicios Académicos"
-                description="Inicia sesión con tu cuenta institucional para entrar al portal que corresponde a tu rol."
-                onLogin={() => {
-                  setIsStarting(true);
-                  login(callbackUrl());
-                }}
-                onRegister={() => {
-                  setIsStarting(true);
-                  register(callbackUrl());
-                }}
-                isLoading={isLoading || isStarting}
-                error={error}
-              />
-            </motion.div>
-          </div>
-        </div>
-      </motion.div>
-    </main>
+        <button
+          type="button"
+          disabled={isBusy}
+          onClick={() => {
+            setIsStarting(true);
+            register(callbackUrl());
+          }}
+          className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-5 text-sm font-medium text-white/90 transition-colors hover:border-dss-cyan-400/50 hover:bg-white/10 disabled:pointer-events-none disabled:opacity-50"
+        >
+          <UserPlusIcon />
+          Crear cuenta
+        </button>
+      </div>
+
+      <p className="mt-8 flex gap-3 border-t border-white/10 pt-6 text-xs leading-relaxed text-white/50">
+        <LockIcon />
+        <span>
+          Te llevaremos al servicio de identidad de la universidad. Tu
+          contraseña nunca pasa por este portal.
+        </span>
+      </p>
+    </GatewayScene>
+  );
+}
+
+const iconProps = {
+  fill: 'none',
+  stroke: 'currentColor',
+  strokeLinecap: 'round',
+  strokeLinejoin: 'round',
+  'aria-hidden': true,
+} as const;
+
+function LoginIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4" strokeWidth={2} {...iconProps}>
+      <path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4M10 17l5-5-5-5M15 12H3" />
+    </svg>
+  );
+}
+
+function UserPlusIcon() {
+  return (
+    <svg viewBox="0 0 24 24" className="size-4" strokeWidth={2} {...iconProps}>
+      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+      <circle cx="9" cy="7" r="4" />
+      <path d="M19 8v6M22 11h-6" />
+    </svg>
+  );
+}
+
+function SpinnerIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-4 animate-spin"
+      strokeWidth={2.4}
+      {...iconProps}
+    >
+      <path d="M21 12a9 9 0 1 1-6.2-8.56" />
+    </svg>
+  );
+}
+
+function AlertIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="mt-0.5 size-4 shrink-0"
+      strokeWidth={2}
+      {...iconProps}
+    >
+      <circle cx="12" cy="12" r="9" />
+      <path d="M12 8v5M12 16.5v.01" />
+    </svg>
+  );
+}
+
+function LockIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      className="mt-px size-4 shrink-0 text-dss-cyan-400/80"
+      strokeWidth={2}
+      {...iconProps}
+    >
+      <rect x="4" y="11" width="16" height="10" rx="2" />
+      <path d="M8 11V7a4 4 0 0 1 8 0v4" />
+    </svg>
   );
 }

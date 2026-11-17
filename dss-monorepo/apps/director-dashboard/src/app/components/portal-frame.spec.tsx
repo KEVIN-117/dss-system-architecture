@@ -13,11 +13,12 @@ vi.mock('@dss-monorepo/auth', () => ({
     logout: vi.fn(),
   }),
   ProtectedRoute: ({ children, loadingFallback }: { children: ReactNode; loadingFallback: ReactNode }) => <>{nav.loading ? loadingFallback : children}</>,
+  LandingLoginRedirect: () => null,
 }));
 vi.mock('@dss-monorepo/rbac', () => ({
   RoleGuard: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
-vi.mock('@dss-monorepo/design-system', async () => {
+vi.mock('@dss-monorepo/design-system/portal', async () => {
   const React = await import('react');
   return {
     AccessDenied: () => null,

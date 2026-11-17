@@ -30,8 +30,25 @@ export interface KeycloakTokenSet {
   refreshExpiresIn?: number;
 }
 
+export interface KeycloakRefreshedTokenSet {
+  accessToken: string;
+  /** Keycloak normally re-issues it for `openid` scopes; callers keep the previous one otherwise. */
+  idToken?: string;
+  /** Present when Keycloak rotates refresh tokens; callers keep the previous one otherwise. */
+  refreshToken?: string;
+  expiresIn: number;
+  refreshExpiresIn?: number;
+}
+
 export class KeycloakOidcClientError extends Error {
-  constructor(message = 'Keycloak authentication exchange failed') {
+  /**
+   * `rejected` means Keycloak refused the grant (expired/revoked session) and
+   * the caller must end the local session. `unavailable` is transient.
+   */
+  constructor(
+    message = 'Keycloak authentication exchange failed',
+    public readonly reason: 'rejected' | 'unavailable' | 'invalid_response' = 'unavailable',
+  ) {
     super(message);
     this.name = 'KeycloakOidcClientError';
   }
@@ -92,6 +109,63 @@ export async function exchangeAuthorizationCode(
   return parseTokenSet(await response.json());
 }
 
+/**
+ * Renews an access token with the refresh_token grant. Only the confidential
+ * BFF calls this; refresh tokens never reach the browser.
+ */
+export async function refreshAccessToken(
+  config: KeycloakOidcClientConfig,
+  refreshToken: string,
+): Promise<KeycloakRefreshedTokenSet> {
+  const body = new URLSearchParams({
+    grant_type: 'refresh_token',
+    client_id: config.clientId,
+    client_secret: config.clientSecret,
+    refresh_token: refreshToken,
+  });
+
+  let response: Response;
+  try {
+    response = await fetch(endpointUrl(config, 'token'), {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/x-www-form-urlencoded',
+      },
+      body,
+      signal: AbortSignal.timeout(10_000),
+    });
+  } catch {
+    throw new KeycloakOidcClientError('Keycloak token refresh failed', 'unavailable');
+  }
+
+  if (response.status === 400 || response.status === 401) {
+    // invalid_grant: SSO session idle/max reached, logout, or token reuse.
+    throw new KeycloakOidcClientError('Keycloak rejected the refresh token', 'rejected');
+  }
+  if (!response.ok) {
+    throw new KeycloakOidcClientError('Keycloak token refresh failed', 'unavailable');
+  }
+
+  const value: unknown = await response.json().catch(() => null);
+  if (!isRecord(value) ||
+    typeof value.access_token !== 'string' ||
+    !isPositiveNumber(value.expires_in) ||
+    (value.id_token !== undefined && typeof value.id_token !== 'string') ||
+    (value.refresh_token !== undefined && typeof value.refresh_token !== 'string') ||
+    (value.refresh_expires_in !== undefined && !isPositiveNumber(value.refresh_expires_in))) {
+    throw new KeycloakOidcClientError('Keycloak returned an invalid token response', 'invalid_response');
+  }
+
+  return {
+    accessToken: value.access_token,
+    idToken: value.id_token,
+    refreshToken: value.refresh_token,
+    expiresIn: value.expires_in,
+    refreshExpiresIn: value.refresh_expires_in,
+  };
+}
+
 export function createLogoutUrl(
   config: KeycloakOidcClientConfig,
   idTokenHint: string,
@@ -120,7 +194,7 @@ function parseTokenSet(value: unknown): KeycloakTokenSet {
     !isPositiveNumber(value.expires_in) ||
     (value.refresh_token !== undefined && typeof value.refresh_token !== 'string') ||
     (value.refresh_expires_in !== undefined && !isPositiveNumber(value.refresh_expires_in))) {
-    throw new KeycloakOidcClientError('Keycloak returned an invalid token response');
+    throw new KeycloakOidcClientError('Keycloak returned an invalid token response', 'invalid_response');
   }
 
   return {

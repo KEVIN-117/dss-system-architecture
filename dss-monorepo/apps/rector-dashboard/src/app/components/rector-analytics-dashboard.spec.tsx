@@ -2,79 +2,115 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@dss-monorepo/charts', () => ({
-  RiskDonutChart: ({
-    data,
-    ariaLabel,
-    loading,
-  }: {
-    data: Array<{ label: string; value: number }>;
-    ariaLabel: string;
-    loading: boolean;
-  }) => (
-    <div role="img" aria-label={ariaLabel}>
-      {loading
-        ? 'Cargando gráfico'
-        : data.map((point) => point.label).join(', ')}
-    </div>
-  ),
   TrendLineChart: ({
     data,
     ariaLabel,
-    loading,
   }: {
     data: Array<{ label: string; value: number }>;
     ariaLabel: string;
-    loading: boolean;
   }) => (
     <div role="img" aria-label={ariaLabel}>
-      {loading
-        ? 'Cargando gráfico'
-        : data.map((point) => point.label).join(', ')}
+      {data.map((point) => point.label).join(', ')}
     </div>
   ),
 }));
 
 import { RectorAnalyticsDashboard } from './rector-analytics-dashboard';
 
-const cubeId = 'academic/UATF/UATF/Academic Performance';
-const schema = {
+const admissionCubeId = 'academic/UATF/UATF/Admision';
+const retentionCubeId = 'academic/UATF/UATF/Permanencia';
+
+const periodDimension = {
+  name: 'Periodo',
+  hierarchies: {
+    period: {
+      name: 'Gestión y periodo',
+      levels: { year: { name: 'Gestión' }, number: { name: 'Periodo' } },
+    },
+  },
+};
+
+const admissionSchema = {
   measures: {
-    enrolled: { name: 'Enrollment Attempts', unit: 'intentos' },
-    average: { name: 'Average Final Grade', unit: 'puntos' },
+    applications: { name: 'Postulaciones' },
+    admitted: { name: 'Admitidos' },
+    known: { name: 'Postulaciones con resultado' },
   },
   dimensions: {
+    period: periodDimension,
     program: {
-      name: 'Academic Program',
+      name: 'Programa',
       hierarchies: {
-        program: { name: 'Program', levels: { faculty: { name: 'Faculty' } } },
-      },
-    },
-    period: {
-      name: 'Academic Period',
-      hierarchies: {
-        period: {
-          name: 'Academic Period',
-          levels: {
-            year: { name: 'Academic Year' },
-            number: { name: 'Period Number' },
-          },
+        program: {
+          name: 'Facultad y carrera',
+          levels: { faculty: { name: 'Facultad' } },
         },
       },
     },
   },
 };
 
+const retentionSchema = {
+  measures: {
+    retained: { name: 'Permanecen' },
+    evaluated: { name: 'Estudiantes evaluados' },
+  },
+  dimensions: { period: periodDimension },
+};
+
+type AnalyticInput = {
+  cubeId: string;
+  measures?: Array<{ name: string }>;
+  rows?: Array<{ level: string }>;
+  filters?: Array<{ dimension: string; level: string; members: string[] }>;
+};
+
+type GraphqlRequest = {
+  query: string;
+  variables?: Record<string, unknown>;
+};
+
+const ok = (data: unknown) =>
+  new Response(JSON.stringify({ data }), { status: 200 });
+
+function analyticRows(input: AnalyticInput) {
+  if (input.cubeId === retentionCubeId)
+    return [{ Permanecen: { value: 800 }, 'Estudiantes evaluados': 1000 }];
+  const level = input.rows?.[0]?.level;
+  if (level === 'Facultad')
+    return [
+      {
+        Facultad: 'Ingeniería',
+        Postulaciones: { value: 700 },
+        Admitidos: 350,
+        'Postulaciones con resultado': 600,
+      },
+      {
+        Facultad: 'Ciencias Puras',
+        Postulaciones: { value: 580 },
+        Admitidos: 290,
+        'Postulaciones con resultado': 400,
+      },
+    ];
+  if (level === 'Gestión')
+    return [
+      { 'Gestión': '2026', Postulaciones: 680 },
+      { 'Gestión': '2025', Postulaciones: 600 },
+    ];
+  return [
+    {
+      Postulaciones: { value: 1280 },
+      Admitidos: { value: 640 },
+      'Postulaciones con resultado': { value: 1000 },
+    },
+  ];
+}
+
 function setupFetch(options?: { failCubes?: boolean; emptyCubes?: boolean }) {
-  const requests: Array<{
-    query: string;
-    variables?: Record<string, unknown>;
-  }> = [];
+  const requests: GraphqlRequest[] = [];
   const fetchMock = vi.fn(
     async (_input: RequestInfo | URL, init?: RequestInit) => {
-      const body = JSON.parse(String(init?.body)) as {
-        query: string;
-        variables?: Record<string, unknown>;
-      };
+      const body = JSON.parse(String(init?.body)) as GraphqlRequest;
       requests.push(body);
       if (body.query.includes('RectorCubes')) {
         if (options?.failCubes)
@@ -82,114 +118,50 @@ function setupFetch(options?: { failCubes?: boolean; emptyCubes?: boolean }) {
             JSON.stringify({ errors: [{ message: 'BFF unavailable' }] }),
             { status: 503 },
           );
-        return new Response(
-          JSON.stringify({
-            data: {
-              olapCubes: options?.emptyCubes
-                ? []
-                : [{ cubeId, cubeName: 'Academic Performance' }],
-            },
-          }),
-          { status: 200 },
-        );
+        return ok({
+          olapCubes: options?.emptyCubes
+            ? []
+            : [
+                { cubeId: admissionCubeId, cubeName: 'Admisión' },
+                { cubeId: retentionCubeId, cubeName: 'Permanencia y deserción' },
+              ],
+        });
       }
       if (body.query.includes('RectorCubeSchema'))
-        return new Response(
-          JSON.stringify({ data: { olapCubeSchema: schema } }),
-          { status: 200 },
-        );
+        return ok({
+          olapCubeSchema:
+            body.variables?.cubeId === retentionCubeId
+              ? retentionSchema
+              : admissionSchema,
+        });
       if (body.query.includes('RectorCubeMembers'))
-        return new Response(
-          JSON.stringify({
-            data: {
-              olapCubeMembers: [
-                {
-                  name: '2025',
-                  uniqueName:
-                    '[Academic Period].[Academic Period].[Academic Year].&[2025]',
-                  caption: '2025',
-                },
-                {
-                  name: '2026',
-                  uniqueName:
-                    '[Academic Period].[Academic Period].[Academic Year].&[2026]',
-                  caption: '2026',
-                },
-              ],
-            },
-          }),
-          { status: 200 },
-        );
+        return ok({
+          olapCubeMembers: ['2025', '2026'].map((year) => ({
+            name: year,
+            uniqueName: `[Periodo].[Gestión y periodo].[Gestión].&[${year}]`,
+            caption: year,
+          })),
+        });
 
-      const input = body.variables?.input as {
-        measures?: Array<{ name: string }>;
-        rows?: unknown[];
-        filters?: unknown[];
-      };
-      if (input.measures?.length === 2)
-        return new Response(
-          JSON.stringify({
-            data: {
-              analyticQuery: {
-                data: [
-                  {
-                    'Enrollment Attempts': { value: 1280 },
-                    'Average Final Grade': { value: 72.5 },
-                  },
-                ],
-                totalRows: 1,
-              },
-            },
-          }),
-          { status: 200 },
-        );
-      if (input.rows?.length === 2)
-        return new Response(
-          JSON.stringify({
-            data: {
-              analyticQuery: {
-                data: [
-                  {
-                    'Academic Year': '2025',
-                    'Period Number': 1,
-                    'Enrollment Attempts': { value: 120 },
-                  },
-                  {
-                    'Academic Year': '2025',
-                    'Period Number': 2,
-                    'Enrollment Attempts': { value: 140 },
-                  },
-                ],
-                totalRows: 2,
-              },
-            },
-          }),
-          { status: 200 },
-        );
-      return new Response(
-        JSON.stringify({
-          data: {
-            analyticQuery: {
-              data: [
-                {
-                  Faculty: 'Ingeniería',
-                  'Enrollment Attempts': { value: 700 },
-                },
-                {
-                  Faculty: 'Ciencias Puras',
-                  'Enrollment Attempts': { value: 580 },
-                },
-              ],
-              totalRows: 2,
-            },
-          },
-        }),
-        { status: 200 },
-      );
+      const input = body.variables?.input as AnalyticInput;
+      return ok({
+        analyticQuery: { data: analyticRows(input), totalRows: 1 },
+      });
     },
   );
   vi.stubGlobal('fetch', fetchMock);
   return { fetchMock, requests };
+}
+
+function analyticInputs(requests: GraphqlRequest[]): AnalyticInput[] {
+  return requests
+    .filter((request) => request.query.includes('RectorAnalyticQuery'))
+    .map((request) => request.variables?.input as AnalyticInput);
+}
+
+/** Year-scoped queries: the overall and faculty admission queries plus retention. */
+function yearScoped(inputs: AnalyticInput[]): AnalyticInput[] {
+  return inputs.filter((input) => input.rows?.[0]?.level !== 'Gestión');
 }
 
 afterEach(() => {
@@ -203,27 +175,29 @@ beforeEach(() => {
 });
 
 describe('RectorAnalyticsDashboard', () => {
-  it('loads published OLAP indicators, charts, and periods from the authenticated BFF', async () => {
+  it('loads admission and retention indicators from the authenticated BFF', async () => {
     const { requests } = setupFetch();
     render(<RectorAnalyticsDashboard />);
 
     expect(await screen.findByText('1.280')).toBeTruthy();
-    expect(screen.getByText('72,5')).toBeTruthy();
+    expect(screen.getAllByText('640').length).toBeGreaterThan(0);
+    // 640 admitted applications out of 1 000 with a known result.
+    expect(screen.getByText('64 %')).toBeTruthy();
+    // 800 retained out of 1 000 evaluable records.
+    expect(screen.getByText('80 %')).toBeTruthy();
     expect(
       screen.getByRole('list', {
-        name: /facultades ordenadas por intentos de cursado/i,
+        name: /facultades ordenadas por postulaciones/i,
       }),
     ).toBeTruthy();
     expect(
-      screen.getByRole('img', {
-        name: /ingeniería: 100% del volumen de la facultad con más intentos/i,
-      }),
+      screen.getByRole('img', { name: 'Ingeniería: 700 postulaciones' }),
     ).toBeTruthy();
     expect(
       screen.getByRole('img', {
-        name: /tendencia de intentos de inscripción/i,
-      }),
-    ).toBeTruthy();
+        name: 'Postulaciones registradas por gestión',
+      }).textContent,
+    ).toBe('2025, 2026');
     expect(
       requests.some((request) => request.query.includes('olapCubeSchema')),
     ).toBe(true);
@@ -232,51 +206,35 @@ describe('RectorAnalyticsDashboard', () => {
     ).toBe(true);
   });
 
-  it('re-runs the data query when a schema-published academic year is selected', async () => {
+  it('re-runs the year-scoped queries when another academic year is selected', async () => {
     const { requests } = setupFetch();
     render(<RectorAnalyticsDashboard />);
     await screen.findByText('1.280');
+    // The latest published year is selected by default.
+    expect(
+      (screen.getByLabelText('Gestión académica') as HTMLSelectElement).value,
+    ).toBe('2026');
 
+    const before = analyticInputs(requests).length;
     fireEvent.change(screen.getByLabelText('Gestión académica'), {
-      target: { value: '2026' },
+      target: { value: '2025' },
     });
-    await waitFor(() =>
-      expect(
-        requests.filter((request) =>
-          request.query.includes('RectorAnalyticQuery'),
-        ).length,
-      ).toBe(5),
-    );
 
-    const filteredInputs = requests
-      .filter((request) => request.query.includes('RectorAnalyticQuery'))
-      .slice(-2)
-      .map(
-        (request) =>
-          request.variables?.input as {
-            filters?: Array<{
-              dimension: string;
-              level: string;
-              members: string[];
-            }>;
-          },
-      );
-    expect(
-      filteredInputs.every(
-        (input) => input.filters?.[0]?.dimension === 'Academic Period',
+    await waitFor(() =>
+      expect(new URLSearchParams(window.location.search).get('gestion')).toBe(
+        '2025',
       ),
-    ).toBe(true);
-    expect(
-      filteredInputs.every((input) =>
-        input.filters?.[0]?.members[0].endsWith('&[2026]'),
-      ),
-    ).toBe(true);
-    expect(new URLSearchParams(window.location.search).get('gestion')).toBe(
-      '2026',
     );
-    expect(screen.getByText('Intentos acumulados · gestión 2026')).toBeTruthy();
-    expect(screen.getByText('Nota final promedio · gestión 2026')).toBeTruthy();
-    expect(screen.getByText(/Selecciona “Todas las gestiones”/)).toBeTruthy();
+    const rerun = yearScoped(analyticInputs(requests).slice(before));
+    expect(rerun.length).toBe(3);
+    expect(
+      rerun.every(
+        (input) =>
+          input.filters?.[0]?.dimension === 'Periodo' &&
+          input.filters[0].members[0].endsWith('&[2025]'),
+      ),
+    ).toBe(true);
+    expect(screen.getByText('Gestión 2025')).toBeTruthy();
   });
 
   it('restores a valid academic year from the URL', async () => {
@@ -288,17 +246,10 @@ describe('RectorAnalyticsDashboard', () => {
     expect(
       (screen.getByLabelText('Gestión académica') as HTMLSelectElement).value,
     ).toBe('2025');
-    const analyticsRequests = requests.filter((request) =>
-      request.query.includes('RectorAnalyticQuery'),
-    );
-    await waitFor(() => expect(analyticsRequests.length).toBe(2));
+    const scoped = yearScoped(analyticInputs(requests));
+    expect(scoped.length).toBeGreaterThan(0);
     expect(
-      analyticsRequests.every((request) => {
-        const input = request.variables?.input as {
-          filters?: Array<{ members: string[] }>;
-        };
-        return input.filters?.[0]?.members[0].endsWith('&[2025]');
-      }),
+      scoped.every((input) => input.filters?.[0]?.members[0].endsWith('&[2025]')),
     ).toBe(true);
   });
 
@@ -310,7 +261,7 @@ describe('RectorAnalyticsDashboard', () => {
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
   });
 
-  it('explains when the academic cube is not available to the account', async () => {
+  it('explains when the admission cube is not available to the account', async () => {
     setupFetch({ emptyCubes: true });
     render(<RectorAnalyticsDashboard />);
     expect((await screen.findByRole('status')).textContent).toContain(

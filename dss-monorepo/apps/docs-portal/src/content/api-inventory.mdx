@@ -6,16 +6,16 @@ La [referencia API](/reference) se genera únicamente desde archivos OpenAPI YAM
 
 | Servicio | Contrato | Alcance |
 | --- | --- | --- |
-| Auth Service | `docs/auth/contracts/auth-service-v1.yaml` | Perfil, directorio administrativo, contextos académicos y catálogo. |
+| servicio de autenticación | `docs/auth/contracts/auth-service-v1.yaml` | Perfil, directorio administrativo, contextos académicos y catálogo. |
 | BFF | `docs/bff/contracts/bff-v1.yaml` | Sesión, administración, Data Warehouse y fachadas de OLAP y Predicción. |
 | DW Control | `docs/dw/contracts/dw-control-service-v1.yaml` | Cierres académicos y ejecuciones ETL. |
-| OLAP Service | `docs/olap/contracts/olap-service-v1.yaml` | Subconjunto de Saiku que usan los portales: descubrimiento, consultas y administración. |
+| servicio OLAP | `docs/olap/contracts/olap-service-v1.yaml` | Subconjunto de Saiku que usan los portales: descubrimiento, consultas y administración. |
 | Prediction Service | `docs/prediction/contracts/prediction-api-v1.yaml` | Inferencia, lotes, publicaciones y entrenamiento. |
 
 ### Qué no cubren
 
-- **Auth Service**: los endpoints de demostración y las rutas internas servidor a servidor no se publican. Springdoc puede generar el esquema en ejecución con `AUTH_API_DOCS_ENABLED=true` para contrastarlo.
-- **OLAP Service**: las rutas de IA, repositorio, apps, dashboards y GraphQL de Saiku siguen documentadas en `olap-service/docs/`. Los cuerpos `ThinQuery` y `QueryResult` se describen solo a nivel de propiedades estables.
+- **servicio de autenticación**: los endpoints de demostración y las rutas internas servidor a servidor no se publican. Springdoc puede generar el esquema en ejecución con `AUTH_API_DOCS_ENABLED=true` para contrastarlo.
+- **servicio OLAP**: las rutas de IA, repositorio, aplicaciones, tableros y GraphQL de Saiku siguen documentadas en `olap-service/docs/`. Los cuerpos `ThinQuery` y `QueryResult` se describen solo a nivel de propiedades estables.
 - **BFF**: el esquema GraphQL se describe en `docs/graphql/bff-analytics.md`.
 - **ETL Apache Hop**: no expone un API HTTP; su operación se explica en [Integración de datos](/docs/integracion-de-datos).
 
@@ -35,4 +35,4 @@ Cada operación muestra ejemplos en cURL, JavaScript y Python. Si el contrato de
   Añade ejemplos de request y response al contrato solo después de verificarlos contra la implementación o fixtures autorizados, sin datos personales.
 </Callout>
 
-<Source path="auth-service/README.md" label="Auth Service" /> · <Source path="olap-service/docs/AI-QUERY-API.md" label="Saiku AI Query API" /> · <Source path="dss-monorepo/apps/bff/README.md" label="BFF" />
+<Source path="auth-service/README.md" label="servicio de autenticación" /> · <Source path="olap-service/docs/AI-QUERY-API.md" label="Saiku AI Query API" /> · <Source path="dss-monorepo/apps/bff/README.md" label="BFF" />

@@ -27,18 +27,18 @@ export function CubeTableNode({
             {table.name}
           </h3>
           <p className="truncate text-xs text-muted-foreground">
-            {table.schema || 'Default schema'}
+            {table.schema || 'Esquema predeterminado'}
           </p>
         </div>
         <Badge variant={table.role === 'fact' ? 'default' : 'secondary'}>
-          {table.role === 'fact' ? 'Fact' : 'Dimension'}
+          {table.role === 'fact' ? 'Hechos' : 'Dimensión'}
         </Badge>
         {onRemove && (
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
-            aria-label={`Remove ${table.name}`}
+            aria-label={`Eliminar ${table.name}`}
             onClick={(event) => {
               event.stopPropagation();
               onRemove(id);
@@ -60,17 +60,17 @@ export function CubeTableNode({
               type="target"
               position={Position.Left}
               className="!size-2 !border-2 !border-background !bg-muted-foreground"
-              aria-label={`Join into ${table.name}.${column.name}`}
+              aria-label={`Conectar hacia ${table.name}.${column.name}`}
             />
             {column.isPrimaryKey ? (
               <KeyRound
                 className="size-3 shrink-0 text-primary"
-                aria-label="Primary key"
+                aria-label="Clave primaria"
               />
             ) : column.isForeignKey ? (
               <Link2
                 className="size-3 shrink-0 text-muted-foreground"
-                aria-label="Foreign key"
+                aria-label="Clave foránea"
               />
             ) : (
               <span className="size-3 shrink-0" />
@@ -84,13 +84,13 @@ export function CubeTableNode({
               type="source"
               position={Position.Right}
               className="!size-2 !border-2 !border-background !bg-primary"
-              aria-label={`Join from ${table.name}.${column.name}`}
+              aria-label={`Conectar desde ${table.name}.${column.name}`}
             />
           </li>
         ))}
       </ul>
       <footer className="flex items-center justify-between bg-muted/30 px-3 py-1.5 text-[11px] text-muted-foreground">
-        <span>{table.columns.length} columns</span>
+        <span>{table.columns.length} columnas</span>
         <MoreHorizontal className="size-3.5" aria-hidden="true" />
       </footer>
     </article>

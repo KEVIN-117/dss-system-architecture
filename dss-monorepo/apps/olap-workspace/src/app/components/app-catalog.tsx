@@ -25,7 +25,7 @@ export function AppCatalog() {
           setError(
             cause instanceof Error
               ? cause.message
-              : 'No se pudo cargar el catálogo de apps.',
+              : 'No se pudo cargar el catálogo de aplicaciones.',
           );
         }
       })
@@ -53,10 +53,10 @@ export function AppCatalog() {
             id="apps-heading"
             className="text-2xl font-semibold tracking-tight"
           >
-            Apps analíticas
+            Aplicaciones analíticas
           </h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-            Abre aplicaciones que reúnen dashboards y páginas para un flujo de
+            Abre aplicaciones que reúnen tableros y páginas para un flujo de
             análisis.
           </p>
         </div>
@@ -71,7 +71,7 @@ export function AppCatalog() {
       </header>
 
       {loading ? (
-        <Loader text="Cargando apps…" fullScreen={false} className="rounded-xl" />
+        <Loader text="Cargando aplicaciones…" fullScreen={false} className="rounded-xl" />
       ) : error ? (
         <div
           role="alert"
@@ -94,9 +94,9 @@ export function AppCatalog() {
             aria-hidden="true"
             className="mx-auto size-8 text-muted-foreground"
           />
-          <h2 className="mt-3 font-semibold">No hay apps publicadas</h2>
+          <h2 className="mt-3 font-semibold">No hay aplicaciones publicadas</h2>
           <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-            Las apps creadas para compartir análisis aparecerán en esta
+            Las aplicaciones creadas para compartir análisis aparecerán en esta
             biblioteca.
           </p>
         </div>
@@ -119,7 +119,7 @@ export function AppCatalog() {
                 </span>
                 <span className="mt-4 truncate font-medium">{app.name}</span>
                 <span className="mt-1 flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                  <Badge variant="secondary">App</Badge>
+                  <Badge variant="secondary">Aplicación</Badge>
                   <span className="truncate">{app.path}</span>
                 </span>
               </Link>
