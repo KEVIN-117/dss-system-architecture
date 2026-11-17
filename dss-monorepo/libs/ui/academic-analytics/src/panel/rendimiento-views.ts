@@ -76,7 +76,7 @@ export const RENDIMIENTO_VIEWS: RendimientoView[] = [
       'Indicadores principales de la gestión: estudiantes y materias programadas, aprobación, promedio de notas, repitencia y retención, con su evolución y el ranking de facultades.',
     measures: [
       { source: E, name: 'Estudiantes programados', label: 'Estudiantes programados', format: 'count', help: 'Estudiantes con al menos una materia programada en la carrera y la gestión.' },
-      // { source: E, name: 'Porcentaje de aprobados', label: '% de estudiantes aprobados', format: 'percent', help: 'Estudiantes que aprobaron al menos la mitad de sus materias.' },
+      { source: E, name: 'Porcentaje de aprobados', label: '% de estudiantes aprobados', format: 'percent', help: 'Estudiantes que aprobaron al menos la mitad de sus materias.' },
       { source: E, name: 'Promedio de notas', label: 'Promedio de notas (PN)', format: 'decimal', help: 'Promedio por estudiante; las materias sin nota cuentan como 0.' },
       { source: E, name: 'Índice de retención', label: 'Retención (IRETE)', format: 'percent', help: 'Estudiantes que siguen en su carrera la gestión siguiente.' },
       { source: M, name: 'Inscripciones en materias', label: 'Materias programadas', format: 'count', help: 'Cada materia que un estudiante programó en la gestión.' },

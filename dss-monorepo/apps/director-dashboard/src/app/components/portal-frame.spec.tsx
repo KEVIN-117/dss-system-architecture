@@ -18,7 +18,7 @@ vi.mock('@dss-monorepo/auth', () => ({
 vi.mock('@dss-monorepo/rbac', () => ({
   RoleGuard: ({ children }: { children: ReactNode }) => <>{children}</>,
 }));
-vi.mock('@dss-monorepo/design-system', async () => {
+vi.mock('@dss-monorepo/design-system/portal', async () => {
   const React = await import('react');
   return {
     AccessDenied: () => null,

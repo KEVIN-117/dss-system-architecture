@@ -1,7 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { formatValue, readLabel, readNumber, YEAR_AXIS } from '../../../../../libs/ui/academic-analytics/src/panel/rendimiento-data';
-import { RENDIMIENTO_VIEWS, findView } from '../../../../../libs/ui/academic-analytics/src/panel/rendimiento-views';
-import { ADMISION_VIEWS, findAdmisionView } from '../../../../../libs/ui/academic-analytics/src/panel/admision-views';
+import { formatValue, readLabel, readNumber, YEAR_AXIS } from '@dss-monorepo/academic-analytics/panel/data';
+import {
+  ADMISION_VIEWS,
+  RENDIMIENTO_VIEWS,
+  findAdmisionView,
+  findView,
+} from '@dss-monorepo/academic-analytics/panel';
 
 describe('Rendimiento data mapping', () => {
   it('reads Saiku record cells by name, tolerating accents and value wrappers', () => {

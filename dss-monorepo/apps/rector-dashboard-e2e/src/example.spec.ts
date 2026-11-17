@@ -14,18 +14,13 @@ async function stubLandingLogin(page: import('@playwright/test').Page) {
   );
 }
 
-/** Asserts the hop to the landing login and the query it carries. */
-async function expectLandingLogin(
-  page: import('@playwright/test').Page,
-  params: Record<string, string>,
-) {
-  await expect(page).toHaveURL(
-    (url) =>
-      `${url.origin}${url.pathname}` === `${landingURL}/login` &&
-      Object.entries(params).every(
-        ([key, value]) => url.searchParams.get(key) === value,
-      ),
-  );
+/** Matches the landing login URL carrying exactly these query values. */
+function isLandingLogin(params: Record<string, string>) {
+  return (url: URL) =>
+    `${url.origin}${url.pathname}` === `${landingURL}/login` &&
+    Object.entries(params).every(
+      ([key, value]) => url.searchParams.get(key) === value,
+    );
 }
 
 test('sends visitors without a session to the landing login and back', async ({
@@ -35,7 +30,9 @@ test('sends visitors without a session to the landing login and back', async ({
   await stubLandingLogin(page);
   await page.goto('/');
 
-  await expectLandingLogin(page, { returnTo: new URL('/', baseURL).href });
+  await expect(page).toHaveURL(
+    isLandingLogin({ returnTo: new URL('/', baseURL).href }),
+  );
 });
 
 test('forwards the portal login route and callback errors to the landing', async ({
@@ -45,10 +42,12 @@ test('forwards the portal login route and callback errors to the landing', async
   await stubLandingLogin(page);
   await page.goto('/login?error=authentication_failed&returnTo=%2Freportes');
 
-  await expectLandingLogin(page, {
-    error: 'authentication_failed',
-    returnTo: new URL('/reportes', baseURL).href,
-  });
+  await expect(page).toHaveURL(
+    isLandingLogin({
+      error: 'authentication_failed',
+      returnTo: new URL('/reportes', baseURL).href,
+    }),
+  );
 });
 
 test('shows access denied to an authenticated user without the rector role', async ({
@@ -105,9 +104,11 @@ test('opens the unified OLAP explorer on mobile', async ({ page }) => {
 test('protects the integrated OLAP route', async ({ page, baseURL }) => {
   await stubLandingLogin(page);
   await page.goto('/analisis-olap');
-  await expectLandingLogin(page, {
-    returnTo: new URL('/analisis-olap', baseURL).href,
-  });
+  await expect(page).toHaveURL(
+    isLandingLogin({
+      returnTo: new URL('/analisis-olap', baseURL).href,
+    }),
+  );
   await mockSession(page, 'http://localhost:3004', ['DIRECTOR']);
   await page.goto('/analisis-olap');
   await expect(

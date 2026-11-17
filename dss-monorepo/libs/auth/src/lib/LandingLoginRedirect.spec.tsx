@@ -35,7 +35,7 @@ describe('landingLoginUrl', () => {
   it('rejects missing or non-HTTP landing origins', () => {
     expect(landingLoginUrl(undefined)).toBeNull();
     expect(landingLoginUrl('  ')).toBeNull();
-    expect(landingLoginUrl('javascript:alert(1)')).toBeNull();
+    expect(landingLoginUrl('ftp://dss.example.edu')).toBeNull();
     expect(landingLoginUrl('not a url')).toBeNull();
   });
 });

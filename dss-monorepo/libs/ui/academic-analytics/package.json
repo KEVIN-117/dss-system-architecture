@@ -14,7 +14,8 @@
     "./olap-sidebar": "./src/olap-sidebar.tsx",
     "./olap-portal": "./src/olap-portal.tsx",
     "./panel": "./src/panel/index.ts",
-    "./panel/navigation": "./src/panel/navigation.tsx"
+    "./panel/navigation": "./src/panel/navigation.tsx",
+    "./panel/data": "./src/panel/rendimiento-data.ts"
   },
   "nx": {
     "name": "academic-analytics",
