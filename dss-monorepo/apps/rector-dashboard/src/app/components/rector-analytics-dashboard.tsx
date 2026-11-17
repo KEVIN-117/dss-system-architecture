@@ -105,8 +105,25 @@ export function RectorAnalyticsDashboard() {
         const findCube = (name: string) =>
           olapCubes.find((cube) => cube.cubeName.toLowerCase() === name);
         const admissionCube = findCube('admisión');
-        if (!admissionCube)
-          throw new Error('El cubo de admisión no está disponible.');
+        if (!admissionCube) {
+          if (active) {
+            setError('');
+            setAdmission(null);
+            setRetention(null);
+            setRetentionError(false);
+            setData({
+              applications: null,
+              admitted: null,
+              admittedApplications: null,
+              known: null,
+              retained: null,
+              evaluable: null,
+              faculty: [],
+              trend: [],
+            });
+          }
+          return;
+        }
         const admissionSchema = await graphql<{ olapCubeSchema: unknown }>(
           SCHEMA_QUERY,
           { cubeId: admissionCube.cubeId },
@@ -408,6 +425,11 @@ export function RectorAnalyticsDashboard() {
             Reintentar
           </Button>
         </div>
+      )}
+      {!loading && !error && !admission && (
+        <p role="status" className="rounded-lg border border-border p-4 text-sm text-muted-foreground">
+          El cubo de admisión no está publicado para esta cuenta.
+        </p>
       )}
       {retentionError && !loading && (
         <p role="status" className="text-sm text-muted-foreground">
