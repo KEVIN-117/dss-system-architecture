@@ -9,11 +9,6 @@ public record EtlExecutionMetricResponse(
 
     public static EtlExecutionMetricResponse from(EtlExecutionMetric metric) {
         return new EtlExecutionMetricResponse(
-                metric.name(),
-                metric.value(),
-                metric.unit(),
-                metric.measuredAt(),
-                metric.source(),
-                metric.stepCode());
+                metric.name(), metric.value(), metric.unit(), metric.measuredAt(), metric.source(), metric.stepCode());
     }
 }

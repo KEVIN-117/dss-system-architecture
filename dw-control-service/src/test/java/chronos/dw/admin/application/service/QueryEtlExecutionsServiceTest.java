@@ -29,11 +29,19 @@ class QueryEtlExecutionsServiceTest {
     void exposesSafeMetricSourceAndStepAndDropsUnsafeOnes() {
         List<EtlExecutionMetric> metrics = List.of(
                 new EtlExecutionMetric(
-                        "source_rows_observed", BigDecimal.valueOf(107560), "ROWS", NOW,
-                        "academico.alumnos", "source_alumnos"),
+                        "source_rows_observed",
+                        BigDecimal.valueOf(107560),
+                        "ROWS",
+                        NOW,
+                        "academico.alumnos",
+                        "source_alumnos"),
                 new EtlExecutionMetric(
-                        "source_rows_observed", BigDecimal.valueOf(23), "ROWS", NOW,
-                        "<script>alert(1)</script>", "paso con espacios"),
+                        "source_rows_observed",
+                        BigDecimal.valueOf(23),
+                        "ROWS",
+                        NOW,
+                        "<script>alert(1)</script>",
+                        "paso con espacios"),
                 new EtlExecutionMetric("student_snapshot_rows", BigDecimal.TEN, "ROWS", NOW, null, null));
 
         QueryEtlExecutionsService service = new QueryEtlExecutionsService(new FakePort(metrics));
@@ -63,8 +71,16 @@ class QueryEtlExecutionsServiceTest {
         @Override
         public Optional<EtlExecutionSummary> findSummary(UUID runId) {
             return Optional.of(new EtlExecutionSummary(
-                    runId, EtlExecutionKind.CIERRE_ACADEMICO, EtlExecutionStatus.EN_EJECUCION,
-                    1L, 2002, 1, "admin", NOW, NOW, null));
+                    runId,
+                    EtlExecutionKind.CIERRE_ACADEMICO,
+                    EtlExecutionStatus.EN_EJECUCION,
+                    1L,
+                    2002,
+                    1,
+                    "admin",
+                    NOW,
+                    NOW,
+                    null));
         }
 
         @Override
