@@ -4,9 +4,11 @@ type Credentials = { username: string; password: string };
 
 function requiredEnv(name: string): string {
   const value = process.env[name]?.trim();
-  if (!value)
+  if (!value) {
     test.skip(true, `Set ${name} in apps/rector-dashboard-e2e/.env.e2e.`);
-  return value!;
+    return '';
+  }
+  return value;
 }
 
 function testData() {

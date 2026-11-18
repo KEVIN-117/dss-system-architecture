@@ -129,45 +129,59 @@ export function AdminPortalLayout({
         ]
       : []),
   ];
-  const portal = (
-    <DashboardTemplate
-      sidebarTitle="Administración DSS"
-      navGroups={navGroups}
-      surfaceMaterial="frosted"
-      user={
-        user
-          ? {
-              name: `${user.firstName} ${user.lastName}`,
-              email: user.email,
-            }
-          : undefined
+  return (
+    <ProtectedRoute
+      loadingFallback={<Loader text="Verificando sesión…" fullScreen={false} className="min-h-[60vh]" />}
+      unauthenticatedFallback={
+        <LandingLoginRedirect landingUrl={process.env.NEXT_PUBLIC_LANDING_URL} />
       }
-      onDisconnect={logout}
     >
-      <ProtectedRoute
-        loadingFallback={<Loader text="Verificando sesión…" fullScreen={false} className="min-h-[60vh]" />}
-        unauthenticatedFallback={
-          <LandingLoginRedirect landingUrl={process.env.NEXT_PUBLIC_LANDING_URL} />
-        }
-      >
-        {access === 'authenticated' ? (
-          children
-        ) : (
-          <RoleGuard
-            rolesAllowed={['SUPERADMIN']}
-            fallback={
-              <AccessDenied
-                portalName="de administración"
-                logoutHref={`${process.env.NEXT_PUBLIC_BFF_URL}/api/auth/logout`}
-              />
+      {access === 'authenticated' ? (
+        <DashboardTemplate
+          sidebarTitle="Administración DSS"
+          navGroups={navGroups}
+          surfaceMaterial="frosted"
+          user={
+            user
+              ? {
+                  name: `${user.firstName} ${user.lastName}`,
+                  email: user.email,
+                }
+              : undefined
+          }
+          onDisconnect={logout}
+        >
+          {children}
+        </DashboardTemplate>
+      ) : (
+        <RoleGuard
+          rolesAllowed={['SUPERADMIN']}
+          fallback={
+            <AccessDenied
+              portalName="de administración"
+              logoutHref={`${process.env.NEXT_PUBLIC_BFF_URL}/api/auth/logout`}
+            />
+          }
+        >
+          <DashboardTemplate
+            sidebarTitle="Administración DSS"
+            navGroups={navGroups}
+            surfaceMaterial="frosted"
+            user={
+              user
+                ? {
+                    name: `${user.firstName} ${user.lastName}`,
+                    email: user.email,
+                  }
+                : undefined
             }
+            onDisconnect={logout}
           >
             {children}
-          </RoleGuard>
-        )}
-      </ProtectedRoute>
-    </DashboardTemplate>
+          </DashboardTemplate>
+        </RoleGuard>
+      )}
+    </ProtectedRoute>
   );
-  return portal;
 }
 

@@ -97,9 +97,13 @@ export function LandingLoginRedirect({
         ? new URLSearchParams(window.location.search).get('error')
         : null;
     const returnTo = portalReturnTo(window.location, source);
-    window.location.replace(
-      landingLoginUrl(landingUrl, { error, returnTo }) ?? target,
-    );
+    const destination =
+      landingLoginUrl(landingUrl, { error, returnTo }) ?? target;
+    try {
+      window.location.replace(destination);
+    } catch {
+      window.location.assign(destination);
+    }
   }, [landingUrl, source, target]);
 
   if (!target) {

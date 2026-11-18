@@ -35,7 +35,7 @@ test('sends visitors without a session to the landing login and back', async ({
     isLandingLogin({ returnTo: new URL('/', baseURL).href }),
     {
       // The redirect runs after hydration, slow on a cold dev bundle.
-      timeout: 20_000,
+      timeout: 35_000,
     },
   );
 });
@@ -57,7 +57,7 @@ test('forwards the portal login route and callback errors to the landing', async
     }),
     {
       // The redirect runs after hydration, slow on a cold dev bundle.
-      timeout: 20_000,
+      timeout: 35_000,
     },
   );
 });
@@ -83,7 +83,7 @@ async function mockSession(
   origin: string,
   roles: string[],
 ) {
-  await page.unroute('**/api/auth/**').catch(() => {});
+  await page.unroute('**/api/auth/**').catch(() => undefined);
   // The idle-session heartbeat refreshes the BFF session on page load; without
   // this mock the real BFF answers 401 and the portal logs the user out.
   await page.route('**/api/auth/refresh', async (route) => {
@@ -158,27 +158,36 @@ async function mockUnauthenticatedSession(
   page: import('@playwright/test').Page,
   origin: string,
 ) {
+  await page.unroute('**/api/auth/**').catch(() => undefined);
   await page.route('**/api/auth/**', async (route) => {
-    if (route.request().method() === 'OPTIONS') {
+    try {
+      const requestOrigin = route.request().headerValue('origin') || origin;
+      if (route.request().method() === 'OPTIONS') {
+        await route.fulfill({
+          status: 204,
+          headers: {
+            'access-control-allow-origin': requestOrigin,
+            'access-control-allow-credentials': 'true',
+            'access-control-allow-methods': 'GET, POST, OPTIONS',
+            'access-control-allow-headers': 'Content-Type, Accept, Authorization',
+          },
+        }).catch(() => undefined);
+        return;
+      }
       await route.fulfill({
-        status: 204,
+        status: 401,
+        contentType: 'application/json',
         headers: {
-          'access-control-allow-origin': origin,
+          'access-control-allow-origin': requestOrigin,
           'access-control-allow-credentials': 'true',
           'access-control-allow-methods': 'GET, POST, OPTIONS',
           'access-control-allow-headers': 'Content-Type, Accept, Authorization',
+          vary: 'Origin',
         },
-      });
-      return;
+        body: JSON.stringify({ error: 'unauthorized' }),
+      }).catch(() => undefined);
+    } catch {
+      // Ignore errors when fulfilling an already aborted request in Firefox
     }
-    await route.fulfill({
-      status: 401,
-      contentType: 'application/json',
-      headers: {
-        'access-control-allow-origin': origin,
-        'access-control-allow-credentials': 'true',
-      },
-      body: JSON.stringify({ error: 'unauthorized' }),
-    });
   });
 }

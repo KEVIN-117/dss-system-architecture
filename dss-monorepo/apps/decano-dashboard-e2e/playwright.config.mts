@@ -31,6 +31,7 @@ const baseURL = resolveBaseURL(env['DECANO_DASHBOARD_BASE_URL'], port);
  */
 export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src' }),
+  timeout: 60_000,
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     baseURL,
