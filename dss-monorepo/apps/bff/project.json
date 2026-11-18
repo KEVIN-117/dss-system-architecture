@@ -18,8 +18,10 @@
     },
     "dev": {
       "dependsOn": ["^build"],
+      "command": "next dev --webpack",
       "options": {
-        "port": 3006
+        "port": 3006,
+        "cwd": "apps/bff"
       }
     },
     "serve": {

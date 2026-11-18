@@ -2,6 +2,7 @@ const sharedNextConfig = require('../../next.config.shared');
 
 module.exports = {
   ...sharedNextConfig,
+  turbopack: {},
   transpilePackages: [
     '@dss-monorepo/auth-connector',
     '@dss-monorepo/auth-models',
