@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.3.1](https://github.com/KEVIN-117/dss-system-architecture/compare/apache-hop-v1.3.0...apache-hop-v1.3.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **prediction:** auditoría PRED-011 — seguridad, robustez de jobs y contrato de features ([#257](https://github.com/KEVIN-117/dss-system-architecture/issues/257)) ([44eea0e](https://github.com/KEVIN-117/dss-system-architecture/commit/44eea0e7d2af3207d186f30d0f422d3c15c19617))
+* Verify Apache Hop and DW migrations / Validate Hop project and Compose files ([c2844f7](https://github.com/KEVIN-117/dss-system-architecture/commit/c2844f71d748a6129a1e863209881562dc9ffcdc))
+* Verify Apache Hop and DW migrations / Validate Hop project and Compose files ([b8c6021](https://github.com/KEVIN-117/dss-system-architecture/commit/b8c6021b5e973c9554d66741e407a90dbd084877))
+
 ## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/apache-hop-v1.2.1...apache-hop-v1.3.0) (2026-11-03)
 
 
