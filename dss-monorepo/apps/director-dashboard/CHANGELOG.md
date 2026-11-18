@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.1](https://github.com/KEVIN-117/dss-system-architecture/compare/director-dashboard-v1.1.0...director-dashboard-v1.1.1) (2026-11-18)
+
+
+### Bug Fixes
+
+* **prediction:** auditoría PRED-011 — seguridad, robustez de jobs y contrato de features ([#257](https://github.com/KEVIN-117/dss-system-architecture/issues/257)) ([44eea0e](https://github.com/KEVIN-117/dss-system-architecture/commit/44eea0e7d2af3207d186f30d0f422d3c15c19617))
+
 ## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/director-dashboard-v1.0.0...director-dashboard-v1.1.0) (2026-11-10)
 
 
