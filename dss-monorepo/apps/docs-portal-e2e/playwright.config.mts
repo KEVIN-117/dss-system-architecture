@@ -13,12 +13,19 @@ export default defineConfig({
   },
   // With BASE_URL (e.g. a production `next start` or the Docker image) no dev
   // server is started; dev mode compiles routes on first hit and is slower.
+  //
+  // reuseExistingServer must be false in CI. When it is true, @nx/playwright
+  // turns this webServer into a continuous `docs-portal:dev` task in the Nx
+  // graph. In `nx affected`, the Next.js `build` and the other `e2e` targets
+  // have `parallelism: false`, and Nx only starts those once no other task is
+  // running. If that `dev` process does not exit after the e2e run, the
+  // pipeline waits forever.
   webServer: process.env['BASE_URL']
     ? undefined
     : {
         command: 'bun nx run @dss-monorepo/docs-portal:dev',
         url: 'http://localhost:3005',
-        reuseExistingServer: true,
+        reuseExistingServer: !process.env['CI'],
         cwd: workspaceRoot,
         timeout: 180_000,
       },

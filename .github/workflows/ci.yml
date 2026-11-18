@@ -21,6 +21,8 @@ jobs:
   affected:
     name: Affected lint, tests, build, and E2E
     runs-on: ubuntu-24.04
+    # Safety net: if a task hangs, fail instead of burning 6h of runner time.
+    timeout-minutes: 90
     environment:
       name: ${{ github.ref == 'refs/heads/main' && 'nx-cloud-protected' || 'nx-cloud-unprotected' }}
     defaults:
