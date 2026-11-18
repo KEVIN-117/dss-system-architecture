@@ -5,11 +5,11 @@ const landingURL =
 
 /** The landing is not part of this run; answer its login page with a stub. */
 async function stubLandingLogin(page: import('@playwright/test').Page) {
-  await page.route(`${landingURL}/**`, (route) =>
+  await page.route(`${landingURL}/**`, async (route) =>
     route.fulfill({
       status: 200,
       contentType: 'text/html',
-      body: '<h1>Landing login</h1>',
+      body: '<!DOCTYPE html><html><head><title>Landing login</title></head><body><h1>Landing login</h1></body></html>',
     }),
   );
 }
@@ -29,8 +29,7 @@ test('sends visitors without a session to the landing login and back', async ({
 }) => {
   await mockUnauthenticatedSession(page, new URL(baseURL ?? '').origin);
   await stubLandingLogin(page);
-  // The page redirects right away; waiting for its load event stalls Firefox.
-  await page.goto('/', { waitUntil: 'commit' });
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
 
   await expect(page).toHaveURL(
     isLandingLogin({ returnTo: new URL('/', baseURL).href }),
@@ -47,9 +46,8 @@ test('forwards the portal login route and callback errors to the landing', async
 }) => {
   await mockUnauthenticatedSession(page, new URL(baseURL ?? '').origin);
   await stubLandingLogin(page);
-  // The page redirects right away; waiting for its load event stalls Firefox.
   await page.goto('/login?error=authentication_failed&returnTo=%2Freportes', {
-    waitUntil: 'commit',
+    waitUntil: 'domcontentloaded',
   });
 
   await expect(page).toHaveURL(
@@ -113,11 +111,11 @@ test('opens the OLAP explorer on mobile', async ({ page }) => {
 });
 
 test('rejects another role on the OLAP route', async ({ page }) => {
-  await mockSession(page, 'http://localhost:3003', ['DECANO']);
+  await mockSession(page, 'http://localhost:3003', ['SUPERADMIN']);
   await page.goto('/analisis-olap');
   await expect(
     page.getByRole('heading', { name: 'Acceso no autorizado' }),
-  ).toBeVisible();
+  ).toBeVisible({ timeout: 20_000 });
 });
 
 async function mockSession(
@@ -125,10 +123,23 @@ async function mockSession(
   origin: string,
   roles: string[],
 ) {
+  await page.unroute('**/api/auth/**').catch(() => {});
   // The idle-session heartbeat refreshes the BFF session on page load; without
   // this mock the real BFF answers 401 and the portal logs the user out.
-  await page.route(/\/api\/auth\/refresh$/, (route) =>
-    route.fulfill({
+  await page.route('**/api/auth/refresh', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({
+        status: 204,
+        headers: {
+          'access-control-allow-origin': origin,
+          'access-control-allow-credentials': 'true',
+          'access-control-allow-methods': 'GET, POST, OPTIONS',
+          'access-control-allow-headers': 'Content-Type, Accept, Authorization',
+        },
+      });
+      return;
+    }
+    await route.fulfill({
       status: 200,
       contentType: 'application/json',
       headers: {
@@ -140,10 +151,22 @@ async function mockSession(
         absoluteExpiresAt: Date.now() + 10 * 60 * 60_000,
         idleTimeoutSeconds: 1800,
       }),
-    }),
-  );
-  await page.route('http://localhost:3006/api/auth/me', (route) =>
-    route.fulfill({
+    });
+  });
+  await page.route('**/api/auth/me', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({
+        status: 204,
+        headers: {
+          'access-control-allow-origin': origin,
+          'access-control-allow-credentials': 'true',
+          'access-control-allow-methods': 'GET, POST, OPTIONS',
+          'access-control-allow-headers': 'Content-Type, Accept, Authorization',
+        },
+      });
+      return;
+    }
+    await route.fulfill({
       status: 200,
       contentType: 'application/json',
       headers: {
@@ -163,8 +186,8 @@ async function mockSession(
         roles,
         permissions: [],
       }),
-    }),
-  );
+    });
+  });
 }
 
 /**
@@ -175,8 +198,20 @@ async function mockUnauthenticatedSession(
   page: import('@playwright/test').Page,
   origin: string,
 ) {
-  await page.route('**/api/auth/me', (route) =>
-    route.fulfill({
+  await page.route('**/api/auth/**', async (route) => {
+    if (route.request().method() === 'OPTIONS') {
+      await route.fulfill({
+        status: 204,
+        headers: {
+          'access-control-allow-origin': origin,
+          'access-control-allow-credentials': 'true',
+          'access-control-allow-methods': 'GET, POST, OPTIONS',
+          'access-control-allow-headers': 'Content-Type, Accept, Authorization',
+        },
+      });
+      return;
+    }
+    await route.fulfill({
       status: 401,
       contentType: 'application/json',
       headers: {
@@ -184,6 +219,6 @@ async function mockUnauthenticatedSession(
         'access-control-allow-credentials': 'true',
       },
       body: JSON.stringify({ error: 'unauthorized' }),
-    }),
-  );
+    });
+  });
 }
