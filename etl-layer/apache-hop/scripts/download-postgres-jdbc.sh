@@ -22,8 +22,15 @@ verify() {
 
 mkdir -p "${jdbc_dir}"
 
+# The jdbc folder is bind-mounted read-only into Hop containers that run as a
+# non-root user, so the driver must be world-readable (mktemp creates 0600).
+publish_readable() {
+  chmod 0644 "${jdbc_file}"
+}
+
 # Reuse a previously downloaded (or CI-cached) driver when it is intact.
 if verify "${jdbc_file}"; then
+  publish_readable
   echo "PostgreSQL JDBC driver already present and verified: ${jdbc_file}"
   exit 0
 fi
@@ -41,6 +48,7 @@ for mirror in "${mirrors[@]}"; do
       "${url}" --output "${tmp_file}"; then
     if verify "${tmp_file}"; then
       mv -f "${tmp_file}" "${jdbc_file}"
+      publish_readable
       echo "PostgreSQL JDBC driver downloaded and verified: ${jdbc_file}"
       exit 0
     fi
