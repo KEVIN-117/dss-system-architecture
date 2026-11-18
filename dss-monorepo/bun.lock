@@ -333,6 +333,7 @@
       "version": "0.0.1",
       "dependencies": {
         "@dss-monorepo/olap-connector": "workspace:*",
+        "@dss-monorepo/olap-models": "workspace:*",
       },
     },
     "libs/shared/olap-models": {

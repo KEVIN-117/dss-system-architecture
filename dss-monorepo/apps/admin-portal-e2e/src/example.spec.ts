@@ -27,12 +27,17 @@ test('sends visitors without a session to the landing login and back', async ({
   page,
   baseURL,
 }) => {
-  await mockUnauthenticatedSession(page);
+  await mockUnauthenticatedSession(page, new URL(baseURL ?? '').origin);
   await stubLandingLogin(page);
-  await page.goto('/');
+  // The page redirects right away; waiting for its load event stalls Firefox.
+  await page.goto('/', { waitUntil: 'commit' });
 
   await expect(page).toHaveURL(
     isLandingLogin({ returnTo: new URL('/', baseURL).href }),
+    {
+      // The redirect runs after hydration, slow on a cold dev bundle.
+      timeout: 20_000,
+    },
   );
 });
 
@@ -40,15 +45,22 @@ test('forwards the portal login route and callback errors to the landing', async
   page,
   baseURL,
 }) => {
-  await mockUnauthenticatedSession(page);
+  await mockUnauthenticatedSession(page, new URL(baseURL ?? '').origin);
   await stubLandingLogin(page);
-  await page.goto('/login?error=authentication_failed&returnTo=%2Freportes');
+  // The page redirects right away; waiting for its load event stalls Firefox.
+  await page.goto('/login?error=authentication_failed&returnTo=%2Freportes', {
+    waitUntil: 'commit',
+  });
 
   await expect(page).toHaveURL(
     isLandingLogin({
       error: 'authentication_failed',
       returnTo: new URL('/reportes', baseURL).href,
     }),
+    {
+      // The redirect runs after hydration, slow on a cold dev bundle.
+      timeout: 20_000,
+    },
   );
 });
 
@@ -73,6 +85,23 @@ async function mockSession(
   origin: string,
   roles: string[],
 ) {
+  // The idle-session heartbeat refreshes the BFF session on page load; without
+  // this mock the real BFF answers 401 and the portal logs the user out.
+  await page.route(/\/api\/auth\/refresh$/, (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      headers: {
+        'access-control-allow-origin': origin,
+        'access-control-allow-credentials': 'true',
+      },
+      body: JSON.stringify({
+        expiresAt: Date.now() + 30 * 60_000,
+        absoluteExpiresAt: Date.now() + 10 * 60 * 60_000,
+        idleTimeoutSeconds: 1800,
+      }),
+    }),
+  );
   await page.route('http://localhost:3006/api/auth/me', (route) =>
     route.fulfill({
       status: 200,
@@ -98,13 +127,22 @@ async function mockSession(
   );
 }
 
+/**
+ * The BFF answers 401. CORS headers make every browser read the response;
+ * without a mock, Firefox keeps the request to the absent BFF pending.
+ */
 async function mockUnauthenticatedSession(
   page: import('@playwright/test').Page,
+  origin: string,
 ) {
   await page.route('**/api/auth/me', (route) =>
     route.fulfill({
       status: 401,
       contentType: 'application/json',
+      headers: {
+        'access-control-allow-origin': origin,
+        'access-control-allow-credentials': 'true',
+      },
       body: JSON.stringify({ error: 'unauthorized' }),
     }),
   );

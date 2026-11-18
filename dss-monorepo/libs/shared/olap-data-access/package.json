@@ -22,6 +22,7 @@
     ]
   },
   "dependencies": {
-    "@dss-monorepo/olap-connector": "workspace:*"
+    "@dss-monorepo/olap-connector": "workspace:*",
+    "@dss-monorepo/olap-models": "workspace:*"
   }
 }

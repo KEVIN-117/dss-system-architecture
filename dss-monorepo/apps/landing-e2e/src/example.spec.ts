@@ -1,17 +1,16 @@
 import { expect, test, type Page } from '@playwright/test';
 
 test('renders the public landing page', async ({ page }) => {
+  // The landing follows the system colour scheme unless the visitor picked one.
+  await page.emulateMedia({ colorScheme: 'dark' });
   await page.goto('/');
 
   await expect(
-    page.getByRole('heading', {
-      name: /la plataforma inteligente para datos académicos/i,
-    }),
+    page.getByRole('heading', { level: 1, name: /datos que deciden/i }),
   ).toBeVisible();
-  await expect(page.getByRole('link', { name: /ingresar/i })).toHaveAttribute(
-    'href',
-    '/login',
-  );
+  await expect(
+    page.getByRole('link', { name: 'Ingresar', exact: true }),
+  ).toHaveAttribute('href', '/login');
   await expect(page.locator('html')).toHaveClass(/\bdark\b/);
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dsa');
 });
