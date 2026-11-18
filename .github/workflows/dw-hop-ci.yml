@@ -43,6 +43,12 @@ jobs:
           python -m json.tool .github/release-please-config.json > /dev/null
           python -m json.tool .release-please-manifest.json > /dev/null
 
+      - name: Cache pinned PostgreSQL JDBC driver
+        uses: actions/cache@v4
+        with:
+          path: etl-layer/apache-hop/jdbc/postgresql-42.7.11.jar
+          key: postgres-jdbc-42.7.11-${{ hashFiles('etl-layer/apache-hop/scripts/download-postgres-jdbc.sh') }}
+
       - name: Download pinned PostgreSQL JDBC driver
         run: |
           bash etl-layer/apache-hop/scripts/download-postgres-jdbc.sh
