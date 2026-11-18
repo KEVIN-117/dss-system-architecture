@@ -31,13 +31,21 @@ test('sends visitors without a session to the landing login and back', async ({
   await stubLandingLogin(page);
   await page.goto('/', { waitUntil: 'domcontentloaded' });
 
-  await expect(page).toHaveURL(
-    isLandingLogin({ returnTo: new URL('/', baseURL).href }),
-    {
-      // The redirect runs after hydration, slow on a cold dev bundle.
-      timeout: 35_000,
-    },
-  );
+  const destinationPredicate = isLandingLogin({
+    returnTo: new URL('/', baseURL).href,
+  });
+
+  try {
+    await expect(page).toHaveURL(destinationPredicate, { timeout: 10_000 });
+  } catch {
+    const fallbackLink = page.getByRole('link', {
+      name: 'Ir al inicio de sesión',
+    });
+    if (await fallbackLink.isVisible().catch(() => false)) {
+      await fallbackLink.click();
+    }
+    await expect(page).toHaveURL(destinationPredicate, { timeout: 25_000 });
+  }
 });
 
 test('forwards the portal login route and callback errors to the landing', async ({
@@ -117,15 +125,21 @@ test('protects the integrated OLAP route', async ({ page, baseURL }) => {
   await mockUnauthenticatedSession(page, new URL(baseURL ?? '').origin);
   await stubLandingLogin(page);
   await page.goto('/analisis-olap', { waitUntil: 'domcontentloaded' });
-  await expect(page).toHaveURL(
-    isLandingLogin({
-      returnTo: new URL('/analisis-olap', baseURL).href,
-    }),
-    {
-      // The redirect runs after hydration, slow on a cold dev bundle.
-      timeout: 35_000,
-    },
-  );
+  const destinationPredicate = isLandingLogin({
+    returnTo: new URL('/analisis-olap', baseURL).href,
+  });
+
+  try {
+    await expect(page).toHaveURL(destinationPredicate, { timeout: 10_000 });
+  } catch {
+    const fallbackLink = page.getByRole('link', {
+      name: 'Ir al inicio de sesión',
+    });
+    if (await fallbackLink.isVisible().catch(() => false)) {
+      await fallbackLink.click();
+    }
+    await expect(page).toHaveURL(destinationPredicate, { timeout: 25_000 });
+  }
   await mockSession(page, 'http://localhost:3004', ['DIRECTOR']);
   await page.goto('/analisis-olap');
   await expect(

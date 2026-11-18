@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 /** Callback errors the landing login knows how to explain to the user. */
 const FORWARDED_ERRORS = new Set(['authentication_failed']);
@@ -89,6 +89,7 @@ export function LandingLoginRedirect({
 }: LandingLoginRedirectProps) {
   // Rendered on the server too, so the location is only read on the client.
   const target = useMemo(() => landingLoginUrl(landingUrl), [landingUrl]);
+  const [destination, setDestination] = useState<string | null>(null);
 
   useEffect(() => {
     if (!target) return;
@@ -97,12 +98,16 @@ export function LandingLoginRedirect({
         ? new URLSearchParams(window.location.search).get('error')
         : null;
     const returnTo = portalReturnTo(window.location, source);
-    const destination =
-      landingLoginUrl(landingUrl, { error, returnTo }) ?? target;
+    const dest = landingLoginUrl(landingUrl, { error, returnTo }) ?? target;
+    setDestination(dest);
     try {
-      window.location.replace(destination);
+      window.location.replace(dest);
     } catch {
-      window.location.assign(destination);
+      try {
+        window.location.assign(dest);
+      } catch {
+        window.location.href = dest;
+      }
     }
   }, [landingUrl, source, target]);
 
@@ -129,7 +134,10 @@ export function LandingLoginRedirect({
       className="flex min-h-screen flex-col items-center justify-center gap-3 p-6 text-center"
     >
       <p className="text-sm opacity-70">Redirigiendo al inicio de sesión…</p>
-      <a className="text-sm underline underline-offset-4" href={target}>
+      <a
+        className="text-sm underline underline-offset-4"
+        href={destination ?? target}
+      >
         Ir al inicio de sesión
       </a>
     </main>
