@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.2](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.5.1...bff-v1.5.2) (2026-11-19)
+
+
+### Bug Fixes
+
+* **rector-dashboard-e2e:** build BFF libs before e2e so auth-connector resolves ([#269](https://github.com/KEVIN-117/dss-system-architecture/issues/269)) ([d574257](https://github.com/KEVIN-117/dss-system-architecture/commit/d574257dd10dc0ef6105485611f02e48f033cdd6))
+
 ## [1.5.1](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.5.0...bff-v1.5.1) (2026-11-18)
 
 
