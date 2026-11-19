@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.1](https://github.com/KEVIN-117/dss-system-architecture/compare/rector-dashboard-v1.3.0...rector-dashboard-v1.3.1) (2026-11-19)
+
+
+### Bug Fixes
+
+* fixed test and lint on apps ([855e064](https://github.com/KEVIN-117/dss-system-architecture/commit/855e0646d3e541869c0607a1903dbdae7cad82b3))
+* **prediction:** auditoría PRED-011 — seguridad, robustez de jobs y contrato de features ([#257](https://github.com/KEVIN-117/dss-system-architecture/issues/257)) ([44eea0e](https://github.com/KEVIN-117/dss-system-architecture/commit/44eea0e7d2af3207d186f30d0f422d3c15c19617))
+
 ## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/rector-dashboard-v1.2.0...rector-dashboard-v1.3.0) (2026-11-10)
 
 
