@@ -679,6 +679,19 @@
       "realmRoles": [
         "default-roles-uatf-dss-realm"
       ],
+      "clientRoles": {
+        "realm-management": [
+          "manage-clients",
+          "manage-realm",
+          "manage-users",
+          "query-clients",
+          "query-groups",
+          "query-users",
+          "view-clients",
+          "view-realm",
+          "view-users"
+        ]
+      },
       "notBefore": 0,
       "groups": []
     },
@@ -1240,7 +1253,7 @@
       "enabled": true,
       "alwaysDisplayInConsole": false,
       "clientAuthenticatorType": "client-secret",
-      "secret": "**********",
+      "secret": "${KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET}",
       "redirectUris": [],
       "webOrigins": [],
       "notBefore": 0,

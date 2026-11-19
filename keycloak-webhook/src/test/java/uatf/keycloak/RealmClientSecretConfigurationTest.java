@@ -14,6 +14,7 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -29,7 +30,8 @@ class RealmClientSecretConfigurationTest {
 
     private static final Map<String, String> EXPECTED_SECRET_PLACEHOLDERS = Map.of(
             "dss-bff", "${KEYCLOAK_BFF_CLIENT_SECRET}",
-            "olap-service", "${KEYCLOAK_OLAP_CLIENT_SECRET}");
+            "olap-service", "${KEYCLOAK_OLAP_CLIENT_SECRET}",
+            "uatf-auth-service", "${KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET}");
 
     private static Map<String, JsonNode> clients() throws Exception {
         Path realmExport = Path.of("..", "infra", "keycloak", "realm", "uatf-dss-realm-realm.json");
@@ -55,6 +57,19 @@ class RealmClientSecretConfigurationTest {
             assertNotNull(client, clientId + " must exist in the realm export");
             assertFalse(client.path("publicClient").asBoolean(false), clientId + " must be confidential");
             assertEquals(placeholder, secretOf(client), clientId + " secret placeholder");
+        });
+    }
+
+    @Test
+    void noConfidentialClientKeepsAMaskedExportSecret() throws Exception {
+        // Bearer-only clients (broker, realm-management, ...) never authenticate, so their secret is irrelevant.
+        clients().forEach((clientId, client) -> {
+            boolean authenticates = !client.path("publicClient").asBoolean(false)
+                    && !client.path("bearerOnly").asBoolean(false);
+            if (authenticates) {
+                assertNotEquals("**********", secretOf(client),
+                        clientId + " keeps the masked export secret, which would become its literal secret on import");
+            }
         });
     }
 

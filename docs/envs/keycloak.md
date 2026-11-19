@@ -8,7 +8,30 @@ El Compose raíz utiliza `KC_BOOTSTRAP_ADMIN_USERNAME` y `KC_BOOTSTRAP_ADMIN_PAS
 
 `KEYCLOAK_OLAP_CLIENT_SECRET` es el secreto del cliente confidencial `olap-service`. Ese cliente ya no es público ni admite login interactivo (standard flow desactivado): solo emite tokens `client_credentials` para su cuenta de servicio `service-account-olap-service`, que tiene el rol `uatf-auth-service: CONTEXT_READER` para leer el alcance académico. Se exige al interpolar Compose y se usa al importar el realm.
 
+`KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET` es el secreto del cliente confidencial `uatf-auth-service`. Solo admite `client_credentials` (sin standard flow, password ni implicit). Su cuenta de servicio `service-account-uatf-auth-service` tiene los roles mínimos de `realm-management` para que auth-service gestione identidad desde el admin-portal mediante la Admin REST API (épica IAM, #290):
+
+| Rol `realm-management` | Para qué |
+|---|---|
+| `view-users`, `query-users`, `manage-users` | Listar, crear, actualizar y desactivar usuarios; asignar roles; enviar correos de acción requerida |
+| `view-clients`, `query-clients`, `manage-clients` | Listar y registrar clientes; crear roles de cliente (permisos de `dss-permissions`); rotar secretos |
+| `view-realm`, `manage-realm` | Listar y crear roles del realm y editar sus compuestos. Keycloak exige `manage-realm` para escribir roles del realm |
+| `query-groups` | Resolver grupos en búsquedas de usuarios |
+
+No se otorgan `realm-admin`, `manage-authorization`, `manage-identity-providers` ni `manage-events`. `RealmAuthServiceAdminAccessTest` (módulo `keycloak-webhook`) verifica este conjunto exacto. El secreto se exige al interpolar Compose y se usa al importar el realm.
+
 **Realms ya importados:** `--import-realm` no sobrescribe un realm existente. En un entorno que ya tiene `uatf-dss-realm`, aplicar a mano (consola o `kcadm`): volver confidencial `olap-service` con service account y el secreto anterior, desactivar standard flow, crear el rol de cliente `CONTEXT_READER` en `uatf-auth-service` y asignarlo a `service-account-olap-service`.
+
+Para `uatf-auth-service` (IAM-001), con `kcadm.sh` dentro del contenedor:
+
+```sh
+kcadm.sh config credentials --server http://localhost:8080 --realm master --user "$KC_BOOTSTRAP_ADMIN_USERNAME" --password "$KC_BOOTSTRAP_ADMIN_PASSWORD"
+CID=$(kcadm.sh get clients -r uatf-dss-realm -q clientId=uatf-auth-service --fields id --format csv --noquotes)
+# Fijar el secreto al valor de KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET (sustituye al '**********' importado antes)
+kcadm.sh update clients/$CID -r uatf-dss-realm -s "secret=$KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET"
+kcadm.sh add-roles -r uatf-dss-realm --uusername service-account-uatf-auth-service --cclientid realm-management   --rolename manage-clients --rolename manage-realm --rolename manage-users   --rolename query-clients --rolename query-groups --rolename query-users   --rolename view-clients --rolename view-realm --rolename view-users
+```
+
+Comprobación: un `client_credentials` con `uatf-auth-service` debe devolver un token cuyo `resource_access.realm-management.roles` contenga exactamente esos nueve roles.
 
 ## Provider de eventos
 
