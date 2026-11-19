@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/keycloak-v1.3.0...keycloak-v1.4.0) (2026-11-19)
+
+
+### Features
+
+* Admin api service enabled ([#291](https://github.com/KEVIN-117/dss-system-architecture/issues/291)) ([eb816dd](https://github.com/KEVIN-117/dss-system-architecture/commit/eb816dd31f589adb3348302169d292bf6d993377))
+
 ## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/keycloak-v1.2.0...keycloak-v1.3.0) (2026-10-25)
 
 
