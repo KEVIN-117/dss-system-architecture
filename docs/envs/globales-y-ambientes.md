@@ -24,6 +24,7 @@ Docker Compose carga `.env` para interpolar `docker-compose.yml`; no es automát
 | `KC_DB_USERNAME`, `KC_DB_PASSWORD` | Sí | Credenciales de Keycloak para el esquema de identidad. No confundir con el usuario de la aplicación `AUTH_DB_USER`. |
 | `KC_DB_POOL_INITIAL_SIZE`, `KC_DB_POOL_MIN_SIZE`, `KC_DB_POOL_MAX_SIZE` | Perfil Keycloak | Pool documentado en el ejemplo; comprobar soporte y configuración efectiva de la imagen antes de cambiarlo. No se interpolan actualmente en el Compose raíz. |
 | `KEYCLOAK_BFF_CLIENT_SECRET` | Sí, secreto | Secreto del cliente confidencial BFF en realm import/runtime. Compose valida que no esté vacío. |
+| `KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET` | Sí, secreto | Secreto del cliente confidencial `uatf-auth-service` (cuenta de servicio de la Admin REST API). Se usa al importar el realm y lo usará auth-service (IAM-003). Compose valida que no esté vacío. |
 | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_VHOST` | Sí/valores por defecto | Endpoint compartido por provider y auth-service. En Compose: `rabbitmq:5672`, vhost `/`; desde host, `localhost:5672`. |
 | `RABBITMQ_DEFAULT_USER`, `RABBITMQ_DEFAULT_PASS` | Sí, la segunda secreta | Crea la cuenta inicial del broker; Compose la inyecta como `RABBITMQ_USERNAME/PASSWORD` en Keycloak y auth-service. |
 | `AUTH_DB_USER`, `AUTH_DB_PASSWORD`, `AUTH_DB_NAME` | Sí | Bootstrap de PostgreSQL IAM. El password es secreto. |
