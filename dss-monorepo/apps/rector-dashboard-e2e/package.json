@@ -4,8 +4,16 @@
   "private": true,
   "nx": {
     "implicitDependencies": [
-      "@dss-monorepo/rector-dashboard"
+      "@dss-monorepo/rector-dashboard",
+      "@dss-monorepo/bff"
     ],
+    "targets": {
+      "e2e": {
+        "dependsOn": [
+          "^build"
+        ]
+      }
+    },
     "tags": [
       "type:e2e",
       "scope:rector"
