@@ -58,6 +58,12 @@
             "uatf-auth-service": [
               "DECANO",
               "DIRECTOR"
+            ],
+            "dss-permissions": [
+              "analytics:read",
+              "analytics:career",
+              "analytics:faculty",
+              "pipelines:read"
             ]
           }
         },
@@ -76,6 +82,14 @@
               "DECANO",
               "DIRECTOR",
               "RECTOR"
+            ],
+            "dss-permissions": [
+              "analytics:read",
+              "analytics:career",
+              "analytics:faculty",
+              "pipelines:read",
+              "analytics:global",
+              "connectors:read"
             ]
           }
         },
@@ -123,8 +137,19 @@
             "uatf-auth-service": [
               "SUPERADMIN"
             ],
-            "olap-service": [
-              "OLAP_ADMIN"
+            "dss-permissions": [
+              "connectors:read",
+              "connectors:write",
+              "pipelines:read",
+              "pipelines:execute",
+              "prediction:train",
+              "iam:users:read",
+              "iam:users:write",
+              "iam:roles:read",
+              "iam:roles:write",
+              "iam:clients:read",
+              "iam:clients:write",
+              "iam:audit:read"
             ]
           }
         },
@@ -141,6 +166,10 @@
           "client": {
             "uatf-auth-service": [
               "DIRECTOR"
+            ],
+            "dss-permissions": [
+              "analytics:read",
+              "analytics:career"
             ]
           }
         },
@@ -455,7 +484,6 @@
           "attributes": {}
         }
       ],
-      "uatf-dss-spa": [],
       "security-admin-console": [],
       "admin-cli": [],
       "account-console": [],
@@ -607,6 +635,206 @@
           "containerId": "c0d94e51-6e3c-4b7c-9210-6d4767cdce7c",
           "attributes": {}
         }
+      ],
+      "dss-permissions": [
+        {
+          "id": "4d8a9960-34de-5726-99a7-949d4dd7faf6",
+          "name": "analytics:read",
+          "description": "Consultar analítica académica dentro del alcance asignado.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "2db730a8-80af-5e9e-8d1e-86ab412f58e9",
+          "name": "analytics:career",
+          "description": "Analítica con alcance de carrera o programa académico.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "5905e2a3-b80c-5df0-a4b3-1d7342e44883",
+          "name": "analytics:faculty",
+          "description": "Analítica con alcance de facultad.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "d51bafc5-cbcd-593a-9d6d-9c60ab8177df",
+          "name": "analytics:global",
+          "description": "Analítica con alcance institucional completo.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "70b5cecd-1998-5a83-889d-861ce67c15ac",
+          "name": "pipelines:read",
+          "description": "Consultar el estado de los pipelines de datos.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "c7da0fc4-6854-54a3-bb55-dafd65d6a6d2",
+          "name": "pipelines:execute",
+          "description": "Ejecutar pipelines de datos.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "38218432-a1e8-513d-a37a-8e1233d37d3a",
+          "name": "connectors:read",
+          "description": "Consultar conectores de datos.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "f6c89932-c582-5ae4-8e84-656052c44d51",
+          "name": "connectors:write",
+          "description": "Crear y modificar conectores de datos.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "998e31a7-701a-56fe-aef5-ba603fdf331c",
+          "name": "prediction:train",
+          "description": "Entrenar modelos y gestionar datasets y modelos de predicción.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "aa4b87aa-941b-58d6-a359-36b1542ea7bd",
+          "name": "olap:admin",
+          "description": "Administrar Saiku: datasources, estadísticas y endpoints de administración.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "904e6d5e-c144-5932-ad00-af2731177a57",
+          "name": "olap:user",
+          "description": "Usar el workspace OLAP de Saiku.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "56715a0c-7a59-5639-b25c-36ea247bd8c4",
+          "name": "dw:closure:read",
+          "description": "Consultar cierres académicos y sus eventos.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "4d8ac911-f5f9-53cf-983a-8ccbd88903da",
+          "name": "dw:closure:manage",
+          "description": "Crear y gestionar cierres académicos.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "57cddd7f-57ea-53ed-8a39-304c2b5c5655",
+          "name": "dw:etl-monitor:read",
+          "description": "Consultar ejecuciones ETL del Data Warehouse.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "1111ea23-74ff-557b-b801-8d02f042ec62",
+          "name": "context:read",
+          "description": "Servicio a servicio: leer el contexto académico de un usuario en auth-service.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "bdd09132-8c41-56df-adc1-89365c1f8d5c",
+          "name": "iam:users:read",
+          "description": "Consultar usuarios, sus roles y permisos desde el admin-portal.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "40dcfeeb-1016-56a8-b796-3320385714f2",
+          "name": "iam:users:write",
+          "description": "Crear, activar, desactivar usuarios y asignar roles y permisos.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "d239463f-907b-5a01-b368-fee6eeaf76f4",
+          "name": "iam:roles:read",
+          "description": "Consultar roles, permisos y la matriz rol-permiso.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "64d15742-e68a-55bc-a61f-b28c81470fd1",
+          "name": "iam:roles:write",
+          "description": "Crear, modificar y eliminar roles y permisos.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "a135cab4-e15a-529d-a509-fc6ac9f99295",
+          "name": "iam:clients:read",
+          "description": "Consultar las aplicaciones (clientes) registradas.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "077e53a3-86c7-5407-911f-78afb1baba0c",
+          "name": "iam:clients:write",
+          "description": "Registrar y modificar aplicaciones y rotar sus secretos.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "e146dc97-e66e-5372-9946-bdd4761c9bb0",
+          "name": "iam:audit:read",
+          "description": "Consultar la auditoría de operaciones administrativas.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        }
       ]
     }
   },
@@ -710,6 +938,9 @@
       "clientRoles": {
         "uatf-auth-service": [
           "CONTEXT_READER"
+        ],
+        "dss-permissions": [
+          "context:read"
         ]
       },
       "notBefore": 0,
@@ -987,6 +1218,19 @@
       },
       "protocolMappers": [
         {
+          "id": "fea38436-b8b2-5b67-9ea8-464029a98784",
+          "name": "audience-auth-service",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "uatf-auth-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        },
+        {
           "id": "13c5f758-8b82-4115-b308-cf2c817ec941",
           "name": "audience-olap-service",
           "protocol": "openid-connect",
@@ -1031,6 +1275,34 @@
         "offline_access",
         "microprofile-jwt"
       ]
+    },
+    {
+      "id": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+      "clientId": "dss-permissions",
+      "name": "DSS Permissions",
+      "description": "Catálogo de permisos funcionales del DSS (recurso:acción). Cada rol de cliente es un permiso; los roles del realm los agrupan como compuestos.",
+      "enabled": true,
+      "clientAuthenticatorType": "client-secret",
+      "redirectUris": [],
+      "webOrigins": [],
+      "notBefore": 0,
+      "bearerOnly": true,
+      "consentRequired": false,
+      "standardFlowEnabled": false,
+      "implicitFlowEnabled": false,
+      "directAccessGrantsEnabled": false,
+      "serviceAccountsEnabled": false,
+      "publicClient": false,
+      "frontchannelLogout": false,
+      "protocol": "openid-connect",
+      "attributes": {
+        "realm_client": "false"
+      },
+      "authenticationFlowBindingOverrides": {},
+      "fullScopeAllowed": false,
+      "nodeReRegistrationTimeout": -1,
+      "defaultClientScopes": [],
+      "optionalClientScopes": []
     },
     {
       "id": "c0d94e51-6e3c-4b7c-9210-6d4767cdce7c",
@@ -1285,94 +1557,6 @@
       "nodeReRegistrationTimeout": -1,
       "defaultClientScopes": [
         "service_account",
-        "web-origins",
-        "acr",
-        "roles",
-        "profile",
-        "basic",
-        "email"
-      ],
-      "optionalClientScopes": [
-        "address",
-        "phone",
-        "organization",
-        "offline_access",
-        "microprofile-jwt"
-      ]
-    },
-    {
-      "id": "13e7a229-f0a8-4675-be77-e7aa02c11b1a",
-      "clientId": "uatf-dss-spa",
-      "name": "",
-      "description": "",
-      "rootUrl": "",
-      "adminUrl": "",
-      "baseUrl": "http://localhost:3000",
-      "surrogateAuthRequired": false,
-      "enabled": true,
-      "alwaysDisplayInConsole": false,
-      "clientAuthenticatorType": "client-secret",
-      "redirectUris": [
-        "http://localhost:3000/*",
-        "http://localhost:3002/*",
-        "http://localhost:3001/*",
-        "http://localhost:3004/*",
-        "http://localhost:3003/*",
-        "http://localhost:3006/*",
-        "http://localhost:3005/*"
-      ],
-      "webOrigins": [
-        "http://localhost:3005",
-        "http://localhost:3004",
-        "http://localhost:3003",
-        "http://localhost:3002",
-        "http://localhost:3006",
-        "http://localhost:3001",
-        "http://localhost:3000"
-      ],
-      "notBefore": 0,
-      "bearerOnly": false,
-      "consentRequired": false,
-      "standardFlowEnabled": true,
-      "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
-      "serviceAccountsEnabled": false,
-      "publicClient": true,
-      "frontchannelLogout": false,
-      "protocol": "openid-connect",
-      "attributes": {
-        "logout.confirmation.enabled": "false",
-        "realm_client": "false",
-        "oidc.ciba.grant.enabled": "false",
-        "backchannel.logout.session.required": "true",
-        "standard.token.exchange.enabled": "false",
-        "oauth2.jwt.authorization.grant.enabled": "false",
-        "post.logout.redirect.uris": "http://localhost:3000/*##http://localhost:3001/*##http://localhost:3002/*##http://localhost:3003/*##http://localhost:3004/*##http://localhost:3005/*##http://localhost:3006/*",
-        "oauth2.device.authorization.grant.enabled": "false",
-        "display.on.consent.screen": "false",
-        "pkce.code.challenge.method": "S256",
-        "backchannel.logout.revoke.offline.tokens": "false",
-        "dpop.bound.access.tokens": "false"
-      },
-      "authenticationFlowBindingOverrides": {},
-      "fullScopeAllowed": false,
-      "nodeReRegistrationTimeout": -1,
-      "protocolMappers": [
-        {
-          "id": "9696dd27-5a7e-4b16-8c27-0196e251d399",
-          "name": "audience-auth-service",
-          "protocol": "openid-connect",
-          "protocolMapper": "oidc-audience-mapper",
-          "consentRequired": false,
-          "config": {
-            "included.client.audience": "uatf-auth-service",
-            "id.token.claim": "false",
-            "access.token.claim": "true",
-            "userinfo.token.claim": "false"
-          }
-        }
-      ],
-      "defaultClientScopes": [
         "web-origins",
         "acr",
         "roles",

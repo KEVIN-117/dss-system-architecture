@@ -151,7 +151,7 @@ it is public). That also closes the open question from the bypass analysis — a
 | `AuthServiceContextClient` (new) | Client-credentials call to §4.3, 2 s timeout, **no** fallback to stale data on error. Cache per subject, TTL 60 s (configurable), invalidated by the existing RabbitMQ user events when practical. |
 | `SecurityAwareConnectionManager.applySecurity` | Treat `ACADEMIC` like `LOOKUP`/`ONE2ONE`: resolved list → `setRole`; empty → `enforceRoleResolvedOrAdmin`. No new deny logic. |
 | `infra/olap/datasources/uatf-dw.sds` | Add `security.enabled=true`, `security.type=academic`. |
-| SUPERADMIN | Unchanged: `OLAP_ADMIN` → `ROLE_ADMIN` → admin keeps root role. |
+| SUPERADMIN | Since IAM-002 the SUPERADMIN composite no longer includes `OLAP_ADMIN`. Only users explicitly granted `olap-service:OLAP_ADMIN` (`dss-permissions:olap:admin` once IAM-012 lands) map to `ROLE_ADMIN` and keep the root role. |
 | Embed / share tokens | **Open question (§6).** They carry `ROLE_EMBED_GUEST`, not a DSS role, so they would be denied once security is on. |
 
 ### 4.5 Query cache key (required fix)
