@@ -33,6 +33,40 @@ kcadm.sh add-roles -r uatf-dss-realm --uusername service-account-uatf-auth-servi
 
 Comprobación: un `client_credentials` con `uatf-auth-service` debe devolver un token cuyo `resource_access.realm-management.roles` contenga exactamente esos nueve roles.
 
+## Catálogo de permisos (`dss-permissions`)
+
+Desde IAM-002 (decisiones D1 y D4 de `docs/auth/rbac-iam-admin-proposal.md`), el realm tiene un modelo de permisos funcionales:
+
+- **Permiso:** un rol del cliente bearer-only `dss-permissions`. Se nombra `recurso:acción` (por ejemplo `analytics:faculty`, `dw:closure:manage`, `iam:users:write`) y lleva una descripción. El cliente no tiene secreto, flujos ni cuenta de servicio, y solo sirve de contenedor.
+- **Rol del realm:** agrupa permisos como compuestos. Llegan al token en `resource_access.dss-permissions.roles` (y `dss-permissions` aparece en `aud`).
+
+| Rol | Permisos |
+|---|---|
+| DIRECTOR | `analytics:read`, `analytics:career` |
+| DECANO | DIRECTOR + `analytics:faculty`, `pipelines:read` |
+| RECTOR | DECANO + `analytics:global`, `connectors:read` |
+| SUPERADMIN | `connectors:read`, `connectors:write`, `pipelines:read`, `pipelines:execute`, `prediction:train`, `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read` |
+
+- **Permisos que se asignan por usuario:** `olap:admin`, `olap:user`, `dw:closure:read`, `dw:closure:manage` y `dw:etl-monitor:read`. Ningún rol los incluye.
+- **Permiso de servicio:** `context:read`, que tiene `service-account-olap-service`.
+
+**Convivencia:** los roles antiguos (`uatf-auth-service:*`, `DW_*`, `OLAP_*`, `CONTEXT_READER`) se mantienen en los compuestos y en las cuentas de servicio hasta que todos los servicios lean `dss-permissions` (IAM-011 a IAM-014). Se retiran en IAM-019.
+
+**Cambios de D4:**
+- SUPERADMIN ya no incluye `olap-service:OLAP_ADMIN`. Hasta IAM-012, quien deba administrar Saiku necesita `olap-service:OLAP_ADMIN` asignado directamente, porque Saiku todavía no lee `olap:admin`.
+- Se eliminó el cliente público `uatf-dss-spa`, que no se usaba.
+- `dss-bff` agrega `uatf-auth-service` a `aud` con un audience mapper explícito.
+
+`RealmPermissionCatalogTest` (módulo `keycloak-webhook`) verifica este modelo y que el script de migración declare el mismo catálogo que el export.
+
+**Realms ya importados:** aplicar el script idempotente:
+
+```sh
+docker exec -i uatf-keycloak bash -s < infra/keycloak/migrations/iam-002-permission-catalog.sh
+```
+
+Usa las credenciales `KC_BOOTSTRAP_ADMIN_*` del contenedor. Para otro servidor, definir `KC_SERVER`, `KC_ADMIN` y `KC_ADMIN_PASSWORD`. Eliminar `uatf-dss-spa` no se puede deshacer. Los usuarios necesitan volver a iniciar sesión para recibir tokens con los permisos.
+
 ## Provider de eventos
 
 El provider usa `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD` y `RABBITMQ_VHOST`. Compose inyecta las credenciales desde `RABBITMQ_DEFAULT_USER/PASS`; dentro de Docker usa `rabbitmq:5672` y vhost `/`. La publicación no usa una URL HTTP al auth-service: RabbitMQ desacopla temporalmente la disponibilidad de ambos servicios.
