@@ -134,6 +134,21 @@ describe('BFF server configuration', () => {
     ).toThrow(BffConfigurationError);
   });
 
+  it('marks cookies Secure in production unless BFF_COOKIE_SECURE overrides it', () => {
+    const production = { ...environment, NODE_ENV: 'production' };
+    expect(getBffSessionConfig(production).secure).toBe(true);
+    expect(getBffSessionConfig(environment).secure).toBe(false);
+    expect(
+      getBffSessionConfig({ ...production, BFF_COOKIE_SECURE: 'false' }).secure,
+    ).toBe(false);
+    expect(
+      getBffSessionConfig({ ...environment, BFF_COOKIE_SECURE: ' TRUE ' }).secure,
+    ).toBe(true);
+    expect(() =>
+      getBffSessionConfig({ ...production, BFF_COOKIE_SECURE: 'no' }),
+    ).toThrow(BffConfigurationError);
+  });
+
   it('fails closed when a required connector value is missing', () => {
     expect(() =>
       getBffAuthConfig({ ...environment, KEYCLOAK_AUDIENCE: '' }),
