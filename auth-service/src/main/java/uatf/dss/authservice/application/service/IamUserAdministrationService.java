@@ -261,8 +261,9 @@ public class IamUserAdministrationService implements IamUserAdministrationUseCas
                 user.firstName(), user.lastName(), user.enabled(), roleSnapshot));
     }
 
+    /** Effective realm roles, like the token and the webhook's schema-2 snapshot (IAM-010). */
     private List<KeycloakRoleSnapshot> localRoleSnapshot(String keycloakId) {
-        return mappings.listUserRealmRoles(keycloakId, false).stream()
+        return mappings.listUserRealmRoles(keycloakId, true).stream()
                 .map(role -> new KeycloakRoleSnapshot(role.name(), false))
                 .toList();
     }

@@ -81,31 +81,62 @@ El endpoint no consulta Keycloak si el perfil local falta, no devuelve los roles
 
 ### Emisión
 
-El módulo `keycloak-webhook` implementa un `EventListenerProvider` con id `uatf-webhook`. El listener examina eventos administrativos cuyo recurso sea `USER`:
+El módulo `keycloak-webhook` implementa un `EventListenerProvider` con id `uatf-webhook` que escucha Admin Events (el callback de eventos de usuario final, `onEvent(Event)`, está vacío). Desde IAM-010 publica estos eventos:
 
-- `CREATE` y `UPDATE` generan snapshots de perfil.
-- `CREATE` y `DELETE` bajo rutas de `role-mappings` generan `USER_ROLES_UPDATED`.
-- El callback de eventos de usuario final (`onEvent(Event)`) está vacío; el comportamiento observado depende de Admin Events.
-- No se maneja el borrado del usuario como evento de sincronización.
+| Admin Event de Keycloak | `eventType` publicado |
+|---|---|
+| `USER` `CREATE`/`UPDATE` sobre `users/{id}` | `USER_CREATED` / `USER_UPDATED` |
+| `USER` `DELETE` sobre `users/{id}` | `USER_DELETED` (solo el id: el usuario ya no existe) |
+| `REALM_ROLE_MAPPING` / `CLIENT_ROLE_MAPPING` sobre `users/{id}/role-mappings/...` | `USER_ROLES_UPDATED` |
+| `GROUP_MEMBERSHIP` sobre `users/{id}/groups/...` | `USER_ROLES_UPDATED` (los roles de un grupo son roles efectivos) |
+| `REALM_ROLE` / `CLIENT_ROLE`: compuestos agregados o quitados, rol renombrado o borrado | `ROLE_CHANGED` |
 
-Para cada evento manejado, el provider obtiene al usuario de Keycloak y construye un JSON con `eventId` UUID, realm, tipo, timestamp, perfil habilitado y snapshot de roles. Publica el mensaje persistente en la cola `keycloak.user.events`, usando el exchange default; el `messageId` coincide con `eventId`. El publisher espera confirmación del broker, usa entrega obligatoria y realiza hasta tres intentos de publicación.
+Antes de IAM-010 el listener solo miraba el tipo `USER`, pero Keycloak 26 informa las asignaciones de roles como `REALM_ROLE_MAPPING` y `CLIENT_ROLE_MAPPING`, así que los cambios de roles hechos en la consola no llegaban a auth-service. El tipo `USER` con `/role-mappings` se sigue aceptando.
+
+**Contrato del mensaje (`schemaVersion`: 2).** Los campos solo se agregan, nunca se quitan ni cambian de significado, así que un consumidor del esquema 1 sigue funcionando. Un mensaje sin `schemaVersion` es del esquema 1.
+
+- Todos: `schemaVersion`, `eventId` (UUID, también `messageId`), `realmId`, `eventType`, `timestamp`.
+- Eventos de usuario: `user` con perfil, `isActive`, `roles` (asignaciones directas, como en el esquema 1) y `effectiveRoles` (directas, de grupos y compuestos expandidos: lo que lleva el token).
+- `ROLE_CHANGED`: `role` con `id`, `name` (puede faltar si el rol se borró por id), `clientRole`, `clientId` (id público del cliente), `change` (`COMPOSITES_ADDED`, `COMPOSITES_REMOVED`, `UPDATED` = renombrado, `DELETED`) y `affectsRealmRoles`. Este último es `false` cuando solo se agregaron o quitaron roles de cliente (permisos), que no alteran la réplica de roles del realm. Editar solo la descripción de un rol no publica nada.
+
+El mensaje es persistente, va a la cola `keycloak.user.events` por el exchange default, con confirmación del broker, entrega obligatoria y hasta tres intentos de publicación.
 
 ### Consumo y persistencia
 
-1. `KeycloakUserEventConsumer` recibe el JSON en `keycloak.user.events`; valida presencia de `eventId` y del UUID del usuario.
-2. En una transacción, `KeycloakEventInboxAdapter` inserta el identificador en `processed_keycloak_events`. Una clave primaria evita procesar dos veces el mismo `eventId`.
-3. Si el evento es nuevo, el consumer forma `SyncUserCommand` y llama a `SyncUserService`; si ya se procesó, retorna sin cambios.
-4. `SyncUserService` crea o actualiza el usuario por `keycloak_id`, usando las reglas de validación del dominio.
-5. Si el mensaje incluye snapshot de roles, el servicio descarta roles de cliente y conserva únicamente roles de realm que coinciden con `SUPERADMIN`, `RECTOR`, `DECANO` o `DIRECTOR`. Reemplaza la relación local de roles por ese conjunto. Si el snapshot de roles no viene, conserva la réplica previa.
-6. El inbox, el perfil y la actualización de roles se guardan con la transacción local. El listener AMQP trabaja con concurrencia máxima uno y prefetch uno; los fallos tienen hasta tres intentos y, agotados estos, no se reencolan y pasan a `keycloak.user.events.dlq`.
+1. `KeycloakUserEventConsumer` valida el mensaje (`eventId`; `user.keycloakId` en los eventos de usuario; `role.change` en `ROLE_CHANGED`). Un mensaje inválido falla y termina en la DLQ.
+2. En la misma transacción, `KeycloakEventInboxAdapter` inserta el `eventId` en `processed_keycloak_events`; un `eventId` repetido se ignora, para todos los tipos de evento.
+3. Según el tipo:
+   - `USER_CREATED`, `USER_UPDATED`, `USER_ROLES_UPDATED`: `SyncUserService` crea o actualiza el usuario y reemplaza su réplica de roles con `effectiveRoles` (o `roles` si el mensaje es del esquema 1). Se guardan los roles del realm, salvo los integrados de Keycloak.
+   - `USER_DELETED`: `IdentitySyncService.removeLocalUser` hace un borrado lógico (ver abajo).
+   - `ROLE_CHANGED`: `IdentitySyncService.resyncAfterRoleChange` vuelve a leer de la Admin API a los usuarios afectados:
+     - Compuestos de un rol del realm: los usuarios locales que tienen ese rol. Como la réplica guarda roles efectivos, esto incluye a quienes lo reciben a través de otro rol compuesto.
+     - Rol borrado o renombrado: los usuarios locales que tienen un nombre de rol que Keycloak ya no tiene. Así funciona aunque el evento no traiga el nombre.
+     - Rol de cliente con compuestos del realm: sus titulares directos. Las cadenas más profundas quedan para la resincronización completa.
+     - Con `affectsRealmRoles: false` no se hace nada.
+   - Un `eventType` desconocido se confirma y se ignora con un aviso, para que el publisher pueda agregar tipos antes que el consumidor.
+4. El listener AMQP trabaja con concurrencia y prefetch uno; los fallos tienen hasta tres intentos y, agotados estos, pasan a `keycloak.user.events.dlq`.
 
-La deduplicación más entrega persistente proporciona procesamiento repetible para un mismo `eventId`; no es una transacción distribuida ni una garantía *exactly-once*. La DLQ es durable y requiere operación de inspección/reproceso que no forma parte del servicio analizado.
+**Roles efectivos.** Desde IAM-010 la réplica local guarda los roles efectivos del realm, como el JWT. Lo mismo hace la administración de usuarios (IAM-006) al refrescar la copia local. Así coinciden las decisiones que auth-service toma con esa réplica (precedencia de rol del contexto académico, endpoint interno de alcance) con las del token.
+
+**Borrado lógico.** Un usuario borrado en Keycloak conserva su fila local, porque `admin_audit_log` la referencia, pero:
+- queda desactivado y con `deleted_at`;
+- su username y su email se reemplazan por `deleted-<keycloakId>` y `deleted-<keycloakId>@deleted.invalid`, y se borran sus nombres, para no conservar datos personales y para que una cuenta nueva pueda reutilizar ese username o email sin chocar con las restricciones únicas;
+- pierde sus roles y contextos académicos;
+- deja de aparecer en el directorio.
+
+La deduplicación más la entrega persistente dan procesamiento repetible por `eventId`; no es una transacción distribuida ni una garantía *exactly-once*.
 
 El diagrama de extremo a extremo, con reintentos y límites de recuperación, está centralizado en [Diagramas de secuencia — auth-service](../../docs/sequence-diagrams/auth-service.md#flujo-implementado--eventos-keycloak-rabbitmq-y-persistencia-iam).
 
-### Límite de fiabilidad observado
+### Resincronización completa
 
-El listener de Keycloak captura las excepciones del publisher y solo las escribe en el log. Si no logra publicar después de los reintentos, la operación administrativa de Keycloak no se revierte y no se observa un outbox ni un proceso de reconciliación que recupere automáticamente ese evento perdido. Por tanto, la fila local puede quedar temporalmente o permanentemente desactualizada hasta que otro evento la actualice o se ejecute una recuperación externa.
+`POST /api/v1/admin/iam/users/resync` (`iam:users:write`, auditado como `USERS_RESYNCED`) recorre todos los usuarios de Keycloak en páginas de 100, actualiza cada copia local con sus roles efectivos y borra lógicamente a los usuarios locales que ya no existen en Keycloak. Devuelve `{scanned, synced, skipped, removed}`. Un usuario de Keycloak que no cumple las reglas locales (por ejemplo, sin email, que el modelo local exige) se omite y se registra en el log, sin abortar la operación ni borrarse; lo mismo ocurre al resincronizar por un cambio de rol.
+
+Si la cantidad leída no coincide con `GET /users/count`, la operación falla sin borrar nada, porque alguien creó o borró usuarios mientras se recorría la lista. Es síncrona y hace dos llamadas a Keycloak por usuario.
+
+### Límite de fiabilidad
+
+El listener de Keycloak captura las excepciones del publisher y solo las escribe en el log. Si no logra publicar después de los reintentos, la operación de Keycloak no se revierte y el evento se pierde. Ese caso, y los mensajes que terminan en la DLQ, se recuperan con la resincronización completa.
 
 ## Flujo C: asignación del contexto académico
 
@@ -197,7 +228,7 @@ Reglas de `IamClientAdministrationService` (los rechazos quedan auditados):
 
 Las migraciones observadas definen:
 
-- `users`: UUID local, `keycloak_id` único, username/email únicos, perfil, estado y marcas de tiempo.
+- `users`: UUID local, `keycloak_id` único, username/email únicos, perfil, estado y marcas de tiempo. Desde V9, `deleted_at` marca el borrado lógico de un usuario eliminado en Keycloak.
 - `roles` y `user_roles`: roles del realm vistos en la sincronización y su relación con usuarios. Desde V6 la tabla se llena sola: un rol nuevo de Keycloak se registra la primera vez que llega en un evento.
 - `user_academic_contexts`: asignaciones de facultad/programa, con reglas y referencias a catálogos. Un usuario puede tener varias; desde V8 la restricción `uq_user_academic_contexts_scope` (`UNIQUE NULLS NOT DISTINCT (user_id, faculty_id, career_id)`) impide repetir una.
 - `academic_faculties` y `academic_programs`: catálogo académico local, consumido por la API de asignación.
@@ -205,7 +236,7 @@ Las migraciones observadas definen:
 - `example_users`: tabla de la antigua funcionalidad demostrativa. El código que la usaba se eliminó en IAM-004; la tabla se conserva para no borrar datos.
 - `admin_audit_log`: auditoría persistente de operaciones administrativas (V7), con estado antes/después en `jsonb`.
 
-V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los cuatro roles de aplicación. V5 crea la tabla inbox de eventos. V6 da a `roles.id` una secuencia, amplía `name` a 255 caracteres y hace opcional `description`, para que la sincronización registre roles nuevos. V7 crea `admin_audit_log` y elimina `revinfo`/`revchanges`, que V1 había creado para Hibernate Envers sin que Envers llegara a usarse. V8 borra contextos duplicados (si los hubiera, conserva el más antiguo) y agrega la restricción única por usuario, facultad y carrera.
+V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los cuatro roles de aplicación. V5 crea la tabla inbox de eventos. V6 da a `roles.id` una secuencia, amplía `name` a 255 caracteres y hace opcional `description`, para que la sincronización registre roles nuevos. V7 crea `admin_audit_log` y elimina `revinfo`/`revchanges`, que V1 había creado para Hibernate Envers sin que Envers llegara a usarse. V8 borra contextos duplicados (si los hubiera, conserva el más antiguo) y agrega la restricción única por usuario, facultad y carrera. V9 agrega `users.deleted_at`.
 
 ## Rutas auxiliares y límites funcionales
 

@@ -69,14 +69,7 @@ public final class KeycloakTestRealm {
     @SuppressWarnings("unchecked")
     public static Map<String, Object> bffAccessTokenFor(String keycloakUserId) {
         RestClient http = RestClient.create(baseUrl());
-        LinkedMultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("grant_type", "password");
-        form.add("client_id", "admin-cli");
-        form.add("username", MASTER_ADMIN);
-        form.add("password", MASTER_ADMIN_PASSWORD);
-        String adminToken = (String) http.post().uri("/realms/master/protocol/openid-connect/token")
-                .contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form)
-                .retrieve().body(Map.class).get("access_token");
+        String adminToken = masterAdminToken();
         List<Map<String, Object>> clients = http.get()
                 .uri("/admin/realms/{realm}/clients?clientId=dss-bff", REALM)
                 .header("Authorization", "Bearer " + adminToken)
@@ -86,6 +79,19 @@ public final class KeycloakTestRealm {
                         REALM, clients.getFirst().get("id"), keycloakUserId)
                 .header("Authorization", "Bearer " + adminToken)
                 .retrieve().body(Map.class);
+    }
+
+    /** Access token of the master-realm admin, for test set-up the service account is not meant to do. */
+    @SuppressWarnings("unchecked")
+    public static String masterAdminToken() {
+        LinkedMultiValueMap<String, String> form = new LinkedMultiValueMap<>();
+        form.add("grant_type", "password");
+        form.add("client_id", "admin-cli");
+        form.add("username", MASTER_ADMIN);
+        form.add("password", MASTER_ADMIN_PASSWORD);
+        return (String) RestClient.create(baseUrl()).post().uri("/realms/master/protocol/openid-connect/token")
+                .contentType(MediaType.APPLICATION_FORM_URLENCODED).body(form)
+                .retrieve().body(Map.class).get("access_token");
     }
 
     /** {@code resource_access.<clientId>.roles} of a token, or an empty list. */
