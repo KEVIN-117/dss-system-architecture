@@ -75,6 +75,16 @@ describe('AdminPortalLayout', () => {
     expect(screen.queryByText('Usuarios')).toBeNull();
   });
 
+  it('shows applications and audit only with their own permissions', () => {
+    useAuth.mockReturnValue(session([], ['iam:audit:read']));
+    render(<AdminPortalLayout access={ADMIN_PERMISSIONS.audit}><p>auditoría</p></AdminPortalLayout>);
+
+    expect(screen.getByText('auditoría')).toBeTruthy();
+    expect(screen.getByText('Auditoría')).toBeTruthy();
+    expect(screen.queryByText('Aplicaciones')).toBeNull();
+    expect(screen.queryByText('Roles')).toBeNull();
+  });
+
   it('denies a page to SUPERADMIN when the token lacks its permission', () => {
     useAuth.mockReturnValue(session(['SUPERADMIN'], ['iam:users:read']));
     render(<AdminPortalLayout access={ADMIN_PERMISSIONS.ml}><p>modelos</p></AdminPortalLayout>);

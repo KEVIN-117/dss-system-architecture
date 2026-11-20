@@ -2,7 +2,7 @@ export const metadata = { title: 'Portal de administración', audience: ['admini
 
 ## Acceso
 
-El portal de administración muestra cada sección según los permisos de tu cuenta: **Usuarios** requiere `iam:users:read`, **Roles**, **Permisos** y **Matriz de acceso** `iam:roles:read`, **Servicio OLAP** `olap:admin`, **Aprendizaje automático** `prediction:train`, y los cierres y ejecuciones ETL `dw:closure:read`/`dw:etl-monitor:read`. Los permisos se asignan desde este mismo portal, directamente o a través de un rol. Cada operación vuelve a validarse en el BFF y en el servicio correspondiente. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso necesario.
+El portal de administración muestra cada sección según los permisos de tu cuenta: **Usuarios** requiere `iam:users:read`, **Roles**, **Permisos** y **Matriz de acceso** `iam:roles:read`, **Aplicaciones** `iam:clients:read`, **Auditoría** `iam:audit:read`, **Servicio OLAP** `olap:admin`, **Aprendizaje automático** `prediction:train`, y los cierres y ejecuciones ETL `dw:closure:read`/`dw:etl-monitor:read`. Los permisos se asignan desde este mismo portal, directamente o a través de un rol. Cada operación vuelve a validarse en el BFF y en el servicio correspondiente. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso necesario.
 
 El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio de autenticación**, **servicio OLAP**, **servicio de control del almacén de datos** y **servicio de aprendizaje automático**.
 
@@ -13,6 +13,8 @@ El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio d
 | <Ui>Roles</Ui> | servicio de autenticación | Crear, describir y eliminar roles y elegir a qué portal entra cada uno. |
 | <Ui>Permisos</Ui> | servicio de autenticación | Catálogo de permisos `recurso:acción`, agrupados por recurso. |
 | <Ui>Matriz de acceso</Ui> | servicio de autenticación | Decidir qué permisos agrupa cada rol, revisando los cambios antes de guardarlos. |
+| <Ui>Aplicaciones</Ui> | servicio de autenticación | Registrar y editar las aplicaciones que inician sesión con Keycloak y rotar sus secretos. |
+| <Ui>Auditoría</Ui> | servicio de autenticación | Revisar quién cambió qué en usuarios, roles, permisos y aplicaciones. |
 | <Ui>Cierres académicos</Ui> | servicio de control del almacén de datos | Crear, autorizar y reabrir cortes de periodo. |
 | <Ui>Ejecuciones ETL</Ui> | servicio de control del almacén de datos | Revisar el historial y el detalle de las cargas. |
 | <Ui>Conexiones</Ui> | servicio OLAP | Registrar y mantener conexiones OLAP. |
@@ -53,6 +55,21 @@ Un **permiso** autoriza una acción concreta y se escribe `recurso:acción` en m
 - <Ui>Matriz de acceso</Ui>: cada fila es un permiso (agrupado por recurso) y cada columna un rol. Marca o desmarca las casillas; las celdas cambiadas se resaltan. <Ui>Revisar cambios</Ui> muestra, por rol, qué permisos **agrega** y cuáles **quita**; <Ui>Guardar cambios</Ui> los aplica rol por rol y, si alguno falla, ese rol queda pendiente con el motivo. <Ui>Descartar</Ui> vuelve al estado guardado. SUPERADMIN siempre conserva los permisos `iam:*`.
 
 **Eliminar algo en uso.** Si un rol está asignado a usuarios, o un permiso lo agrupa un rol o lo tiene un usuario, el servicio se niega a eliminarlo y el diálogo muestra dónde se usa. Solo <Ui>Eliminar de todas formas</Ui> lo borra, quitándolo de todos los roles y usuarios. No se puede deshacer.
+
+## Aplicaciones
+
+Lista las aplicaciones (clientes de Keycloak) con su tipo y estado, y permite buscarlas por identificador. Para consultar basta `iam:clients:read`; registrar, editar y rotar secretos requieren `iam:clients:write`.
+
+- Las marcadas **Protegida** sostienen la plataforma y se abren en modo de solo lectura. La excepción es `dss-bff`: se pueden cambiar su nombre, descripción y URIs, pero no desactivarlo.
+- <Ui>Nueva aplicación</Ui> pide un identificador en minúsculas (no se puede cambiar después) y el tipo: **Confidencial**, para servidores que guardan un secreto, o **Pública**, para aplicaciones de navegador con PKCE, que necesitan al menos una URI de redirección. Las URIs de redirección, los orígenes web y las URIs tras cerrar sesión se escriben una por línea. Una confidencial puede tener **cuenta de servicio** para obtener tokens propios.
+- Al registrar una aplicación confidencial, o con <Ui>Rotar secreto</Ui>, el portal muestra el secreto **una sola vez**. Cópialo con <Ui>Copiar</Ui> y guárdalo en el gestor de secretos de la aplicación antes de pulsar <Ui>Ya lo guardé</Ui>: no se guarda en el portal ni en la auditoría. Rotar invalida de inmediato el secreto anterior, así que la aplicación falla hasta que configures el nuevo.
+
+## Auditoría
+
+Muestra los cambios administrativos, del más reciente al más antiguo, con su fecha, actor, acción, objetivo y resultado (**Correcto**, **Fallido** o **Pendiente** si Keycloak aún no confirmó la operación). Requiere `iam:audit:read` y es de solo lectura.
+
+- Filtra por actor (usuario exacto), acción, tipo de objetivo, objetivo (id o nombre exacto), resultado y rango de fechas; <Ui>Desde</Ui> y <Ui>Hasta</Ui> incluyen ambos días. <Ui>Limpiar</Ui> quita todos los filtros.
+- <Ui>Ver detalle</Ui> abre el registro completo: la IP del actor, el motivo si falló y una tabla **Antes y después** con cada campo; los que cambiaron aparecen resaltados. Las contraseñas, secretos y tokens se muestran como `[REDACTED]`.
 
 ## Cierres académicos
 
