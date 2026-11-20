@@ -1,5 +1,7 @@
 export {
   AuthServiceClientError,
+  AuthServiceIamError,
+  callAuthServiceIam,
   fetchUserProfile,
   getAcademicCatalog,
   getAdminUser,
@@ -8,6 +10,9 @@ export {
   replaceUserAcademicContexts,
 } from './clients/auth-service-client.js';
 export type {
+  IamCall,
+  IamCallResult,
+  IamHttpMethod,
   AcademicCatalog,
   AcademicCareerOption,
   AcademicFacultyOption,

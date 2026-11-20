@@ -12,6 +12,7 @@ El BFF es el único punto de integración de los portales con Keycloak y `auth-s
 - `PUT /api/admin/users/:userId/academic-contexts`: reemplaza los contextos académicos del usuario. Requiere `iam:users:write` en el BFF, y `auth-service` vuelve a exigir el mismo permiso como segunda barrera. Las lecturas de `/api/admin/users*` y `/api/admin/academic-catalog` requieren `iam:users:read`.
 - `/api/admin/dw/academic-closures*`: fachada autenticada de cierres académicos, historial y transiciones. Requiere `dw:closure:read` o `dw:closure:manage`; mientras `DW_CONTROL_LEGACY_ROLES_ENABLED` no sea `false`, también sirve el rol antiguo `DW_CLOSURE_READ`/`DW_CLOSURE_MANAGE` del cliente `dw-control-service`. El BFF reenvía el JWT verificado y el servicio conserva el `sub` para auditoría.
 - `/api/admin/dw/etl/executions*`: consulta paginada y detalle de ejecuciones ETL. Requiere `dw:etl-monitor:read` (o, durante la convivencia, `DW_ETL_MONITOR_READ` del cliente `dw-control-service`). El BFF valida y normaliza respuestas y no propaga cuerpos de error del servicio.
+- `/api/admin/iam/**`: administración IAM (usuarios, roles, permisos, aplicaciones y auditoría) hacia `auth-service` `/api/v1/admin/iam/**`. Ver [Administración IAM (IAM-015)](#administración-iam-iam-015).
 - `GET|POST /api/graphql`: endpoint Apollo Server protegido por la misma sesión BFF o Bearer token. Expone identidad y alcance académicos, catálogo/metadatos OLAP, `analyticQuery` y `predictionPublication` para consultar la publicación vigente del Prediction Service. Los resolvers llaman a los servicios con el token validado; los tokens nunca forman parte de la respuesta.
 - `/api/olap/rest/saiku/*`: proxy autenticado a `olap-service`, incluido su endpoint GraphQL real en `/api/olap/rest/saiku/api/graphql`. El BFF valida la sesión y reenvía el access token; las rutas `/rest/saiku/admin/*` requieren además `olap:admin` (o `OLAP_ADMIN` de `olap-service` durante la convivencia). Keycloak debe incluir la audiencia `olap-service` en los tokens solicitados por `dss-bff`.
 - `/api/prediction/v1/predictions`, `/api/prediction/v1/training-jobs*`, `/api/prediction/v1/prediction-batches*`, `/api/prediction/v1/prediction-publications` y `/api/prediction/v1/academic-options`: fachada autenticada para inferencia, entrenamiento, publicación y carga de programas/cierres autorizados. El BFF valida la sesión y reenvía el token a Prediction Service; el servicio vuelve a validar identidad, permiso y ámbito académico. El navegador no accede al worker ni al DW.
@@ -31,6 +32,40 @@ El JWE stateless es la implementación inicial y funciona sin una base de sesion
 ## Configuración
 
 Configura `apps/bff/.env` a partir de `.env.example`:
+
+## Administración IAM (IAM-015)
+
+`/api/admin/iam/<ruta>` corresponde uno a uno a `auth-service` `/api/v1/admin/iam/<ruta>`. Una sola ruta (`app/api/admin/iam/[...path]/route.ts`) aplica la tabla de `_lib/iam-operations.ts`. Para cada operación, el BFF:
+
+1. exige la sesión y el permiso `iam:*` de la operación (auth-service lo vuelve a comprobar);
+2. valida los identificadores de la ruta (UUID de usuario, nombre de rol, permiso `recurso:acción`, `clientId`), los parámetros de query declarados y el cuerpo, con los validadores de `@dss-monorepo/auth-models`; un campo que el contrato no define se rechaza;
+3. reenvía el **access token del propio usuario**: el navegador nunca recibe un token administrativo;
+4. responde con `Cache-Control: no-store`. Los secretos de cliente (alta y rotación) pasan una sola vez y nunca se registran.
+
+| Ruta | Métodos | Permiso |
+|---|---|---|
+| `users` | POST | `iam:users:write` |
+| `users/resync` | POST | `iam:users:write` |
+| `users/{userId}` | PATCH | `iam:users:write` |
+| `users/{userId}/actions-email` | POST | `iam:users:write` |
+| `users/{userId}/roles`, `users/{userId}/permissions` | GET / PUT | `iam:users:read` / `iam:users:write` |
+| `roles` | GET / POST | `iam:roles:read` / `iam:roles:write` |
+| `roles/{name}` | GET / PATCH / DELETE (`?force=`) | `iam:roles:read` / `iam:roles:write` |
+| `roles/{name}/permissions` | GET / PUT | `iam:roles:read` / `iam:roles:write` |
+| `permissions` | GET / POST | `iam:roles:read` / `iam:roles:write` |
+| `permissions/matrix` | GET | `iam:roles:read` |
+| `permissions/{name}` | PATCH / DELETE (`?force=`) | `iam:roles:write` |
+| `clients` | GET (`search`, `page`, `size`) / POST | `iam:clients:read` / `iam:clients:write` |
+| `clients/{clientId}` | GET / PATCH | `iam:clients:read` / `iam:clients:write` |
+| `clients/{clientId}/secret` | POST | `iam:clients:write` |
+| `audit` | GET (`actor`, `action`, `targetType`, `targetId`, `outcome`, `from`, `to`, `page`, `size`) | `iam:audit:read` |
+
+El directorio de usuarios sigue en `/api/admin/users`. Errores uniformes:
+
+- un 4xx de auth-service conserva su estado y devuelve `{ error, code, detail }`, donde `code` y `detail` son el `title` y el mensaje de dominio de su ProblemDetail;
+- un 5xx, una indisponibilidad o un timeout devuelven 502, 503 o 504 sin el cuerpo de auth-service;
+- una ruta o un método desconocidos devuelven 404;
+- un identificador, un query, un JSON o un cuerpo inválidos devuelven 400 con `code` `INVALID_PARAMETER`, `INVALID_QUERY`, `INVALID_JSON` o `INVALID_BODY`.
 
 ## Permisos (IAM-014)
 

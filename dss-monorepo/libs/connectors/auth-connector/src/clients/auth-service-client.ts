@@ -420,3 +420,92 @@ function isNonNegativeInteger(value: unknown): value is number {
 function isPositiveInteger(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value) && value > 0;
 }
+
+// ---- IAM administration (IAM-015) -------------------------------------------------------------------
+
+export type IamHttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+/** One call to the auth-service IAM API (`/api/v1/admin/iam/**`), already validated by the caller. */
+export interface IamCall {
+  method: IamHttpMethod;
+  /** Path below `/api/v1`, starting with `/admin/iam/`; identifiers must already be encoded. */
+  path: string;
+  query?: URLSearchParams;
+  body?: unknown;
+}
+
+export interface IamCallResult {
+  status: number;
+  /** Parsed JSON body, or `null` for 204/empty responses. */
+  body: unknown;
+}
+
+/** auth-service rejected the call. `title`/`detail` come from its ProblemDetail and only for 4xx. */
+export class AuthServiceIamError extends AuthServiceClientError {
+  constructor(
+    status: number,
+    public readonly title: string | null,
+    public readonly detail: string | null,
+  ) {
+    super(status, 'auth-service rejected the IAM request');
+    this.name = 'AuthServiceIamError';
+  }
+}
+
+/**
+ * Forwards one IAM administration call with the user's own bearer token: the BFF never holds an
+ * administrative token, and auth-service authorizes the user again with its `iam:*` permissions.
+ */
+export async function callAuthServiceIam(
+  authServiceUrl: string,
+  bearerToken: string,
+  call: IamCall,
+  signal?: AbortSignal,
+): Promise<IamCallResult> {
+  if (!call.path.startsWith('/admin/iam/') || call.path.includes('..') || /[?#\s]/.test(call.path)) {
+    throw new AuthServiceClientError(400, 'Invalid IAM path');
+  }
+  const query = call.query && [...call.query.keys()].length ? `?${call.query.toString()}` : '';
+  const headers: Record<string, string> = {
+    Accept: 'application/json',
+    Authorization: `Bearer ${bearerToken}`,
+  };
+  if (call.body !== undefined) headers['Content-Type'] = 'application/json';
+
+  const response = await fetchAuthService(
+    `${authServiceUrl.replace(/\/$/, '')}/api/v1${call.path}${query}`,
+    {
+      method: call.method,
+      headers,
+      body: call.body === undefined ? undefined : JSON.stringify(call.body),
+      redirect: 'manual',
+    },
+    signal,
+  );
+
+  if (!response.ok) {
+    const problem = response.status < 500 ? await readProblem(response) : null;
+    throw new AuthServiceIamError(response.status, problem?.title ?? null, problem?.detail ?? null);
+  }
+  if (response.status === 204) return { status: 204, body: null };
+  const text = await response.text();
+  if (!text) return { status: response.status, body: null };
+  try {
+    return { status: response.status, body: JSON.parse(text) as unknown };
+  } catch {
+    throw new AuthServiceClientError(502, 'auth-service returned an invalid IAM response');
+  }
+}
+
+async function readProblem(response: Response): Promise<{ title: string | null; detail: string | null } | null> {
+  try {
+    const payload: unknown = await response.json();
+    if (!isRecord(payload)) return null;
+    return {
+      title: typeof payload.title === 'string' ? payload.title.slice(0, 200) : null,
+      detail: typeof payload.detail === 'string' ? payload.detail.slice(0, 1000) : null,
+    };
+  } catch {
+    return null;
+  }
+}
