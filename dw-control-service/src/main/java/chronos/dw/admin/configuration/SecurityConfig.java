@@ -25,6 +25,8 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableMethodSecurity
 public class SecurityConfig {
 
+    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
+
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
@@ -49,12 +51,13 @@ public class SecurityConfig {
                                 "/swagger-ui/**",
                                 "/swagger-ui.html")
                         .permitAll()
+                        // dss-permissions names only (IAM-011); legacy DW_* roles are translated by the converter.
                         .requestMatchers(HttpMethod.GET, "/api/v1/academic-closures", "/api/v1/academic-closures/**")
-                        .hasAuthority("DW_CLOSURE_READ")
+                        .hasAuthority(DwControlJwtAuthenticationConverter.CLOSURE_READ)
                         .requestMatchers(HttpMethod.POST, "/api/v1/academic-closures", "/api/v1/academic-closures/**")
-                        .hasAuthority("DW_CLOSURE_MANAGE")
+                        .hasAuthority(DwControlJwtAuthenticationConverter.CLOSURE_MANAGE)
                         .requestMatchers(HttpMethod.GET, "/api/v1/etl/executions", "/api/v1/etl/executions/**")
-                        .hasAuthority("DW_ETL_MONITOR_READ")
+                        .hasAuthority(DwControlJwtAuthenticationConverter.ETL_MONITOR_READ)
                         .anyRequest()
                         .denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer
@@ -66,8 +69,20 @@ public class SecurityConfig {
 
     @Bean
     DwControlJwtAuthenticationConverter dwControlJwtAuthenticationConverter(
-            @Value("${app.security.jwt.client-id}") String clientId) {
-        return new DwControlJwtAuthenticationConverter(clientId);
+            @Value("${app.security.jwt.permissions-client-id:dss-permissions}") String permissionsClientId,
+            @Value("${app.security.jwt.client-id}") String legacyClientId,
+            @Value("${app.security.legacy-dw-roles-enabled:true}") boolean legacyRolesEnabled) {
+        DwControlJwtAuthenticationConverter converter =
+                new DwControlJwtAuthenticationConverter(permissionsClientId, legacyClientId, legacyRolesEnabled);
+        if (legacyRolesEnabled) {
+            LOGGER.warn(
+                    "Convivencia activa: se aceptan los roles DW_* de {} además de los permisos de {}. "
+                            + "Desactívala con DW_CONTROL_LEGACY_ROLES_ENABLED=false cuando todos los usuarios tengan los "
+                            + "permisos nuevos.",
+                    legacyClientId,
+                    permissionsClientId);
+        }
+        return converter;
     }
 
     @Bean

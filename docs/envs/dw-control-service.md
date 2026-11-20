@@ -9,7 +9,9 @@ service audience are validated from Keycloak's JWK Set.
 | `KEYCLOAK_ISSUER_URI` | `http://localhost:8080/realms/uatf-dss-realm` | Must match the token `iss` claim. |
 | `KEYCLOAK_JWK_SET_URI` | `http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs` | Signing keys used to validate JWT signatures. |
 | `KEYCLOAK_DW_CONTROL_AUDIENCE` | `dw-control-service` | Required member of the token `aud` claim. |
-| `KEYCLOAK_DW_CONTROL_CLIENT_ID` | `dw-control-service` | Client claim from which this API reads permissions. |
+| `KEYCLOAK_PERMISSIONS_CLIENT_ID` | `dss-permissions` | Catalog client whose roles are the API permissions (`dw:*`, IAM-011). |
+| `KEYCLOAK_DW_CONTROL_CLIENT_ID` | `dw-control-service` | Client of the legacy `DW_*` roles; read only while coexistence is on. |
+| `DW_CONTROL_LEGACY_ROLES_ENABLED` | `true` | Coexistence: also accept the legacy `DW_*` roles. Set to `false` once every operator has the `dss-permissions` permissions. |
 | `DW_CONTROL_DB_URL` | `jdbc:postgresql://postgres-dw:5432/dss_dw` | PostgreSQL connection URL for the DW control schema. |
 | `DW_CONTROL_DB_USERNAME` | `dw_control_runtime` | Dedicated LOGIN account; grant membership in `dw_control_service` only. Do not use `dw_owner`, `dw_control_operator`, or a migration account. |
 | `DW_CONTROL_DB_PASSWORD` | Managed secret | Password for the dedicated runtime login. |
@@ -23,22 +25,36 @@ token, while the JWK endpoint must be reachable from the service runtime. The ex
 for local development; production values must use the deployment's trusted Keycloak issuer and
 private network endpoint.
 
-The realm import registers `dw-control-service` as a bearer-only resource client, adds an audience
-mapper to the `dss-bff` access token, and defines these client roles:
+The realm import registers `dw-control-service` as a bearer-only resource client and adds an audience
+mapper to the `dss-bff` access token. Since IAM-011 the API permissions are client roles of the catalog
+client `dss-permissions`, managed from the admin portal (`PUT /admin/iam/users/{id}/permissions` or as
+composites of a role):
 
-| Keycloak client role | Granted API authority |
-| --- | --- |
-| `DW_CLOSURE_READ` | `DW_CLOSURE_READ` |
-| `DW_CLOSURE_MANAGE` | `DW_CLOSURE_MANAGE` |
-| `DW_ETL_MONITOR_READ` | `DW_ETL_MONITOR_READ` |
+| Permission (`resource_access.dss-permissions.roles`) | Legacy role (`resource_access.dw-control-service.roles`) | Grants |
+| --- | --- | --- |
+| `dw:closure:read` | `DW_CLOSURE_READ` | Read closures and their events. |
+| `dw:closure:manage` | `DW_CLOSURE_MANAGE` | Create, close and reopen closures. |
+| `dw:etl-monitor:read` | `DW_ETL_MONITOR_READ` | Read ETL executions. |
 
-Only roles under `resource_access.dw-control-service.roles` are used for these permissions. Realm
-roles and roles belonging to other clients do not grant them. The initial realm config deliberately
-does not assign these permissions to `SUPERADMIN` or another realm role. Assign client roles
-explicitly according to the institutional authorization policy before granting access.
+While `DW_CONTROL_LEGACY_ROLES_ENABLED=true` (the default), the legacy role is translated to the same
+permission, so both formats work. With `false`, only the `dss-permissions` permissions are accepted.
+In both cases a name is only valid under its own client: `dw:*` under `dw-control-service`, `DW_*`
+under `dss-permissions`, realm roles and roles of other clients grant nothing. The realm config does
+not assign these permissions to `SUPERADMIN` or another realm role; grant them explicitly according
+to the institutional authorization policy.
 
-The request policy is deny-by-default. Closure reads require `DW_CLOSURE_READ`, closure write
-commands require `DW_CLOSURE_MANAGE`, and ETL execution reads require `DW_ETL_MONITOR_READ`. Unknown
+**Turning coexistence off.** Until IAM-014 the BFF still requires the legacy `DW_*` roles on
+`/api/admin/dw/*`. Turn the flag off only after (1) IAM-014 is deployed and (2) every operator holds
+the `dw:*` permissions; then the legacy client roles can be removed from users. The service logs a
+warning at startup while coexistence is on.
+
+**Audience.** The token must still contain `dw-control-service` in `aud`, added by `dss-bff`'s explicit
+audience mapper. `dss-permissions` is deliberately not accepted as an audience: Keycloak's "audience
+resolve" mapper adds it to any token that carries permissions, including tokens meant for other
+services.
+
+The request policy is deny-by-default. Closure reads require `dw:closure:read`, closure write
+commands require `dw:closure:manage`, and ETL execution reads require `dw:etl-monitor:read`. Unknown
 paths and methods remain denied.
 
 ## Runtime and operations

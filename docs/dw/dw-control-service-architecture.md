@@ -33,14 +33,14 @@ El borrador OpenAPI está en [`contracts/dw-control-service-v1.yaml`](contracts/
 
 | Operación | Permiso | Efecto |
 | --- | --- | --- |
-| `GET /api/v1/academic-closures` | `DW_CLOSURE_READ` | Lista paginada, filtrable por gestión, periodo y estado. |
-| `GET /api/v1/academic-closures/{closureId}` | `DW_CLOSURE_READ` | Detalle del cierre y su versión actual. |
-| `GET /api/v1/academic-closures/{closureId}/events` | `DW_CLOSURE_READ` | Bitácora inmutable, paginada en orden cronológico inverso. |
-| `POST /api/v1/academic-closures` | `DW_CLOSURE_MANAGE` | Crea un cierre en `PENDIENTE`; no autoriza una carga. |
-| `POST /api/v1/academic-closures/{closureId}/close` | `DW_CLOSURE_MANAGE` | Transiciona `PENDIENTE` o `REABIERTO` a `CERRADO`; exige fecha efectiva y motivo. |
-| `POST /api/v1/academic-closures/{closureId}/reopen` | `DW_CLOSURE_MANAGE` | Transiciona `CERRADO` o `PROCESADO` a `REABIERTO`; exige motivo. |
-| `GET /api/v1/etl/executions` | `DW_ETL_MONITOR_READ` | Lista ejecuciones con filtros y paginación. |
-| `GET /api/v1/etl/executions/{runId}` | `DW_ETL_MONITOR_READ` | Detalle con pasos, métricas y errores saneados. |
+| `GET /api/v1/academic-closures` | `dw:closure:read` | Lista paginada, filtrable por gestión, periodo y estado. |
+| `GET /api/v1/academic-closures/{closureId}` | `dw:closure:read` | Detalle del cierre y su versión actual. |
+| `GET /api/v1/academic-closures/{closureId}/events` | `dw:closure:read` | Bitácora inmutable, paginada en orden cronológico inverso. |
+| `POST /api/v1/academic-closures` | `dw:closure:manage` | Crea un cierre en `PENDIENTE`; no autoriza una carga. |
+| `POST /api/v1/academic-closures/{closureId}/close` | `dw:closure:manage` | Transiciona `PENDIENTE` o `REABIERTO` a `CERRADO`; exige fecha efectiva y motivo. |
+| `POST /api/v1/academic-closures/{closureId}/reopen` | `dw:closure:manage` | Transiciona `CERRADO` o `PROCESADO` a `REABIERTO`; exige motivo. |
+| `GET /api/v1/etl/executions` | `dw:etl-monitor:read` | Lista ejecuciones con filtros y paginación. |
+| `GET /api/v1/etl/executions/{runId}` | `dw:etl-monitor:read` | Detalle con pasos, métricas y errores saneados. |
 
 No habrá operaciones HTTP para iniciar, cancelar o reintentar cargas en esta entrega. Esas operaciones pertenecen al contrato de orquestación de Hop y requieren una decisión posterior.
 
@@ -61,11 +61,11 @@ Estos son permisos de aplicación, independientes de los roles PostgreSQL:
 
 | Permiso | Capacidades |
 | --- | --- |
-| `DW_CLOSURE_READ` | Leer cierres y eventos. |
-| `DW_CLOSURE_MANAGE` | Crear cierres pendientes, cerrar y reabrir. No concede consultas ETL automáticamente. |
-| `DW_ETL_MONITOR_READ` | Consultar ejecuciones, pasos, métricas y errores saneados. |
+| `dw:closure:read` | Leer cierres y eventos. |
+| `dw:closure:manage` | Crear cierres pendientes, cerrar y reabrir. No concede consultas ETL automáticamente. |
+| `dw:etl-monitor:read` | Consultar ejecuciones, pasos, métricas y errores saneados. |
 
-El mapeo desde roles/grupos de Keycloak a estos permisos queda explícito para #175/#179; el inventario actual no define aún roles DW dedicados. No asumir `SUPERADMIN` como política de autorización dentro del servicio ni aceptar permisos declarados por el navegador. La política se resuelve desde claims de confianza del token validado y se prueba en el servicio.
+Desde IAM-011 son roles del cliente catálogo `dss-permissions` y se asignan desde el admin-portal. Durante la convivencia (`DW_CONTROL_LEGACY_ROLES_ENABLED=true`) también se aceptan los roles antiguos `DW_CLOSURE_READ`, `DW_CLOSURE_MANAGE` y `DW_ETL_MONITOR_READ` del cliente `dw-control-service`, traducidos al permiso equivalente; ver `docs/envs/dw-control-service.md`. No asumir `SUPERADMIN` como política de autorización dentro del servicio ni aceptar permisos declarados por el navegador. La política se resuelve desde claims de confianza del token validado y se prueba en el servicio.
 
 ## Roles objetivo en PostgreSQL
 
@@ -105,7 +105,7 @@ La migración `0024_add_academic_closure_commands.sql` implementa estas funcione
 
 `dw-control-service` aplica autorización funcional antes de invocarlas: PostgreSQL registra el sujeto derivado del JWT validado, pero no valida por sí mismo el JWT. Los permisos directos `INSERT` y de secuencia que la migración actual otorga a `dw_control_operator` son estado existente; retirarlos requiere una migración hacia adelante y una transición de las operaciones manuales a la función de creación. No se cambia esa concesión como parte de la issue #177.
 
-La conexión del servicio usa un LOGIN dedicado, normalmente `dw_control_runtime`, que recibe membresía únicamente en `dw_control_service`. La migración `0025_grant_dw_execution_monitoring_read.sql` amplía `dw_control_reader` con SELECT únicamente en las tablas necesarias para el monitoreo. No debe heredar `dw_owner`, `dw_publisher`, `dw_hop_runtime`, `dw_reader`, `dw_control_operator` ni otros roles de escritura. Las contraseñas de ese LOGIN se aprovisionan por ambiente como secretos, fuera de migraciones y del repositorio. Las transacciones de consulta se marcan `readOnly`; los permisos PostgreSQL mantienen la restricción aun si se omite esa indicación en la aplicación. La capacidad de leer datos no reemplaza los permisos de aplicación: la API comprueba `DW_ETL_MONITOR_READ` en cada endpoint de monitoreo.
+La conexión del servicio usa un LOGIN dedicado, normalmente `dw_control_runtime`, que recibe membresía únicamente en `dw_control_service`. La migración `0025_grant_dw_execution_monitoring_read.sql` amplía `dw_control_reader` con SELECT únicamente en las tablas necesarias para el monitoreo. No debe heredar `dw_owner`, `dw_publisher`, `dw_hop_runtime`, `dw_reader`, `dw_control_operator` ni otros roles de escritura. Las contraseñas de ese LOGIN se aprovisionan por ambiente como secretos, fuera de migraciones y del repositorio. Las transacciones de consulta se marcan `readOnly`; los permisos PostgreSQL mantienen la restricción aun si se omite esa indicación en la aplicación. La capacidad de leer datos no reemplaza los permisos de aplicación: la API comprueba `dw:etl-monitor:read` en cada endpoint de monitoreo.
 
 ## Estados y responsabilidades
 

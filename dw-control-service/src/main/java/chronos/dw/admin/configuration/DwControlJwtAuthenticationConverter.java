@@ -14,20 +14,56 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtAut
 import org.springframework.security.oauth2.server.resource.authentication.JwtGrantedAuthoritiesConverter;
 import org.springframework.util.StringUtils;
 
-/** Maps only roles belonging to the dw-control-service Keycloak client into API permissions. */
+/**
+ * Maps DW permissions from the token into authorities (IAM-011).
+ *
+ * <p>Permissions come from the catalog client ({@code resource_access.dss-permissions.roles}): {@link #CLOSURE_READ},
+ * {@link #CLOSURE_MANAGE} and {@link #ETL_MONITOR_READ}. They are managed from the admin portal, so granting DW access
+ * no longer needs the Keycloak console.
+ *
+ * <p>While users still hold the old {@code dw-control-service} client roles ({@code DW_CLOSURE_READ}, ...), they are
+ * accepted <em>only</em> when {@code legacyRolesEnabled} is on, and translated to the same permission names. The URL
+ * rules therefore only know the new names, and turning the flag off is the whole migration.
+ *
+ * <p>Any other role of either client is ignored.
+ */
 public class DwControlJwtAuthenticationConverter implements Converter<Jwt, AbstractAuthenticationToken> {
 
-    private static final Set<String> DW_CONTROL_PERMISSIONS =
-            Set.of("DW_CLOSURE_READ", "DW_CLOSURE_MANAGE", "DW_ETL_MONITOR_READ");
+    public static final String CLOSURE_READ = "dw:closure:read";
+    public static final String CLOSURE_MANAGE = "dw:closure:manage";
+    public static final String ETL_MONITOR_READ = "dw:etl-monitor:read";
+
+    static final Set<String> DW_PERMISSIONS = Set.of(CLOSURE_READ, CLOSURE_MANAGE, ETL_MONITOR_READ);
+    static final Map<String, String> LEGACY_ROLES = Map.of(
+            "DW_CLOSURE_READ", CLOSURE_READ,
+            "DW_CLOSURE_MANAGE", CLOSURE_MANAGE,
+            "DW_ETL_MONITOR_READ", ETL_MONITOR_READ);
 
     private final JwtGrantedAuthoritiesConverter scopeConverter = new JwtGrantedAuthoritiesConverter();
-    private final String clientId;
+    private final String permissionsClientId;
+    private final String legacyClientId;
+    private final boolean legacyRolesEnabled;
 
-    public DwControlJwtAuthenticationConverter(String clientId) {
-        if (!StringUtils.hasText(clientId)) {
-            throw new IllegalArgumentException("Keycloak client id is required");
+    /**
+     * @param permissionsClientId catalog client holding the permissions ({@code dss-permissions})
+     * @param legacyClientId      client that held the old {@code DW_*} roles ({@code dw-control-service})
+     * @param legacyRolesEnabled  whether the old roles are still accepted (coexistence)
+     */
+    public DwControlJwtAuthenticationConverter(
+            String permissionsClientId, String legacyClientId, boolean legacyRolesEnabled) {
+        if (!StringUtils.hasText(permissionsClientId)) {
+            throw new IllegalArgumentException("Keycloak permissions client id is required");
         }
-        this.clientId = clientId.trim();
+        if (legacyRolesEnabled && !StringUtils.hasText(legacyClientId)) {
+            throw new IllegalArgumentException("Keycloak client id of the legacy DW roles is required");
+        }
+        this.permissionsClientId = permissionsClientId.trim();
+        this.legacyClientId = legacyClientId == null ? null : legacyClientId.trim();
+        this.legacyRolesEnabled = legacyRolesEnabled;
+    }
+
+    public boolean legacyRolesEnabled() {
+        return legacyRolesEnabled;
     }
 
     @Override
@@ -41,12 +77,25 @@ public class DwControlJwtAuthenticationConverter implements Converter<Jwt, Abstr
         if (scopes != null) {
             authorities.addAll(scopes);
         }
-        authorities.addAll(extractServicePermissions(jwt.getClaim("resource_access")));
+        Object resourceAccess = jwt.getClaim("resource_access");
+        for (String role : clientRoles(resourceAccess, permissionsClientId)) {
+            if (DW_PERMISSIONS.contains(role)) {
+                authorities.add(new SimpleGrantedAuthority(role));
+            }
+        }
+        if (legacyRolesEnabled) {
+            for (String role : clientRoles(resourceAccess, legacyClientId)) {
+                String permission = LEGACY_ROLES.get(role);
+                if (permission != null) {
+                    authorities.add(new SimpleGrantedAuthority(permission));
+                }
+            }
+        }
 
         return new JwtAuthenticationToken(jwt, authorities, jwt.getSubject());
     }
 
-    private Set<GrantedAuthority> extractServicePermissions(Object resourceAccessClaim) {
+    private static Set<String> clientRoles(Object resourceAccessClaim, String clientId) {
         if (!(resourceAccessClaim instanceof Map<?, ?> resourceAccess)) {
             return Set.of();
         }
@@ -58,13 +107,12 @@ public class DwControlJwtAuthenticationConverter implements Converter<Jwt, Abstr
         if (!(rolesClaim instanceof Collection<?> roles)) {
             return Set.of();
         }
-
-        Set<GrantedAuthority> permissions = new LinkedHashSet<>();
+        Set<String> names = new LinkedHashSet<>();
         for (Object role : roles) {
-            if (role instanceof String permission && DW_CONTROL_PERMISSIONS.contains(permission)) {
-                permissions.add(new SimpleGrantedAuthority(permission));
+            if (role instanceof String name) {
+                names.add(name);
             }
         }
-        return permissions;
+        return names;
     }
 }

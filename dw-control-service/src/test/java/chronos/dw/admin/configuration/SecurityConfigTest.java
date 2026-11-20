@@ -26,6 +26,19 @@ class SecurityConfigTest {
                 .hasErrors());
     }
 
+    @Test
+    void theCatalogClientIsNotAnAcceptedAudience() {
+        // IAM-011: Keycloak's "audience resolve" adds dss-permissions to any token carrying permissions, including
+        // tokens issued for other services. Only tokens meant for this service (dss-bff's explicit audience mapper)
+        // are accepted.
+        assertTrue(SecurityConfig.jwtValidator(ISSUER, AUDIENCE)
+                .validate(token(ISSUER, List.of("dss-permissions")))
+                .hasErrors());
+        assertFalse(SecurityConfig.jwtValidator(ISSUER, AUDIENCE)
+                .validate(token(ISSUER, List.of("dss-permissions", AUDIENCE)))
+                .hasErrors());
+    }
+
     private Jwt token(String issuer, List<String> audiences) {
         Instant now = Instant.now();
         return Jwt.withTokenValue("test-token")

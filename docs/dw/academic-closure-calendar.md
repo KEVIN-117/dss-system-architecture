@@ -26,7 +26,7 @@ El diagrama separa la autorización funcional de la ejecución técnica. DSA hab
 | TI/DBA | Aplicar migraciones, administrar permisos de base de datos y revisar la bitácora. |
 | Apache Hop y operador autorizado | Registrar la ejecución técnica y marcar el corte como `PROCESADO` mediante la función, solo tras publicación exitosa con `run_id` del mismo cierre. |
 
-La API `dw-control-service` implementa los comandos DSA de la issue #177. Valida el permiso `DW_CLOSURE_MANAGE`, deriva el actor del `sub` del JWT validado y solo invoca funciones SQL auditadas para crear, cerrar o reabrir. La función de bajo nivel `etl_control.transition_academic_period_closure` permanece reservada a los propietarios y flujos técnicos autorizados; no se concede directamente al rol del API.
+La API `dw-control-service` implementa los comandos DSA de la issue #177. Valida el permiso `dw:closure:manage` (antes `DW_CLOSURE_MANAGE`), deriva el actor del `sub` del JWT validado y solo invoca funciones SQL auditadas para crear, cerrar o reabrir. La función de bajo nivel `etl_control.transition_academic_period_closure` permanece reservada a los propietarios y flujos técnicos autorizados; no se concede directamente al rol del API.
 
 ## Elegibilidad y reapertura
 
@@ -34,7 +34,7 @@ El workflow Hop deberá solicitar una carga por cierre solo cuando el corte est�
 
 ## Operación manual
 
-Las operaciones ordinarias se realizan mediante `dw-control-service` con un JWT que tenga `DW_CLOSURE_MANAGE`. La API no acepta el actor en el body. El rol SQL del servicio no tiene DML directo; la migración `0024_add_academic_closure_commands.sql` concede únicamente estas funciones:
+Las operaciones ordinarias se realizan mediante `dw-control-service` con un JWT que tenga `dw:closure:manage` (antes `DW_CLOSURE_MANAGE`). La API no acepta el actor en el body. El rol SQL del servicio no tiene DML directo; la migración `0024_add_academic_closure_commands.sql` concede únicamente estas funciones:
 
 ```sql
 SELECT etl_control.create_academic_period_closure(
