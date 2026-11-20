@@ -95,7 +95,8 @@ class Settings:
             missing.append("PREDICTION_DW_DATABASE_URL")
 
         # Keycloak settings
-        for key in ("KEYCLOAK_URL", "KEYCLOAK_REALM", "KEYCLOAK_AUDIENCE", "KEYCLOAK_ROLE_CLIENT_ID"):
+        # KEYCLOAK_ROLE_CLIENT_ID is optional since IAM-013: it only names the client of legacy roles.
+        for key in ("KEYCLOAK_URL", "KEYCLOAK_REALM", "KEYCLOAK_AUDIENCE"):
             if not os.getenv(key, "").strip():
                 missing.append(key)
 
@@ -104,11 +105,14 @@ class Settings:
         if not auth_url:
             missing.append("AUTH_SERVICE_URL")
 
-        # Academic role policies
+        # Access comes from dss-permissions (IAM-013). The legacy role lists below are optional and
+        # only read while PREDICTION_LEGACY_ROLES_ENABLED is true; when present they must be valid.
+        legacy_flag = os.getenv("PREDICTION_LEGACY_ROLES_ENABLED", "true").strip().lower()
+        if legacy_flag not in {"true", "false", "1", "0", "yes", "no", ""}:
+            missing.append("PREDICTION_LEGACY_ROLES_ENABLED (must be true or false)")
+
         allowed_roles_raw = os.getenv("PREDICTION_ALLOWED_ROLES", "").strip()
-        if not allowed_roles_raw:
-            missing.append("PREDICTION_ALLOWED_ROLES")
-        else:
+        if allowed_roles_raw:
             try:
                 roles = json.loads(allowed_roles_raw)
                 valid = {"DIRECTOR", "DECANO", "RECTOR"}

@@ -47,7 +47,7 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `PREDICTION_CUSTOM_DATASET_ROOT` | `/app/custom-datasets` | Almacén compartido de datasets subidos: lectura-escritura en la API, solo lectura en el worker (volumen `prediction_custom_datasets`). |
 | `PREDICTION_DATASET_UPLOAD_MAX_BYTES` | `52428800` | Tamaño máximo del `.zip` subido; se rechaza con `413` sin cargarlo completo en memoria. |
 | `PREDICTION_DATASET_MAX_UNCOMPRESSED_BYTES` | `209715200` | Tamaño máximo descomprimido de `manifest.json` + `rows.jsonl` (protección contra zip bombs). |
-| `PREDICTION_TRAINING_ROLES` | `["SUPERADMIN"]` | Lista JSON de roles del token que pueden entrenar y gestionar datasets. Inválida o vacía bloquea esos endpoints con `503`. |
+| `PREDICTION_TRAINING_ROLES` | `["SUPERADMIN"]` | **Convivencia.** Roles que además de `prediction:train` pueden entrenar y gestionar datasets. Inválida o vacía bloquea esos endpoints con `503`. Se ignora con `PREDICTION_LEGACY_ROLES_ENABLED=false`. |
 | `PREDICTION_CONFIG_ROOT` | `/app/configurations` (worker) | Catálogo de configuraciones versionadas; Compose lo monta en solo lectura. |
 | `PREDICTION_OUTBOX_POLL_SECONDS` | `5` | Intervalo de recuperación de mensajes pendientes en outbox. |
 | `PREDICTION_MAX_QUEUED_JOBS` | `4` | Jobs de entrenamiento en cola admitidos además de `WORKER_MAX_CONCURRENT_JOBS` en ejecución; al superarse responde `429 JOB_CAPACITY`. |
@@ -55,12 +55,14 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `KEYCLOAK_URL` | *(sin configurar)* | URL base del issuer Keycloak. |
 | `KEYCLOAK_REALM` | *(sin configurar)* | Realm usado para validar firma e issuer del bearer token. |
 | `KEYCLOAK_AUDIENCE` | *(sin configurar)* | Audience requerido en el access token. |
-| `KEYCLOAK_ROLE_CLIENT_ID` | *(sin configurar)* | Cliente cuyas roles se leen del token, además de realm roles. |
+| `KEYCLOAK_PERMISSIONS_CLIENT_ID` | `dss-permissions` | Cliente catálogo cuyos roles son los permisos (`analytics:*`, `prediction:publish`, `prediction:train`). |
+| `KEYCLOAK_ROLE_CLIENT_ID` | *(sin configurar)* | Opcional. Cliente de los roles antiguos que se leen además de los roles del realm, solo para la convivencia. |
+| `PREDICTION_LEGACY_ROLES_ENABLED` | `true` | Convivencia: también acepta las listas de roles `PREDICTION_ALLOWED_ROLES`, `PREDICTION_BATCH_SUBMITTER_ROLES` y `PREDICTION_TRAINING_ROLES`. Con `false`, solo los permisos. Un valor que no sea `true`/`false` bloquea con `503`. |
 | `KEYCLOAK_ISSUER_URI` | Derivado de URL + realm | Emisor exacto que debe coincidir con el claim `iss`; admite hostname externo distinto. |
 | `KEYCLOAK_JWKS_URL` | Derivado del issuer | URL para descargar claves de firma; permite hostname interno del contenedor. |
 | `AUTH_SERVICE_URL` | `http://auth-service:8000` | Servicio que devuelve el perfil activo y sus `academicContexts` confiables. |
-| `PREDICTION_ALLOWED_ROLES` | *(sin configurar)* | Lista JSON de roles académicos aprobados (`DIRECTOR`, `DECANO`, `RECTOR`). Vacío o inválido bloquea autorización con `503`. |
-| `PREDICTION_BATCH_SUBMITTER_ROLES` | `[]` | Lista JSON explícita de roles que pueden iniciar scoring poblacional. No hereda permisos de lectura; vacía bloquea el submit con `503`. |
+| `PREDICTION_ALLOWED_ROLES` | *(sin configurar)* | **Convivencia.** Roles académicos que siguen valiendo como permisos: `RECTOR` = `analytics:read` + `analytics:global`, `DECANO` = `analytics:faculty`, `DIRECTOR` = `analytics:career`. Sin configurar no acepta ningún rol; inválida bloquea con `503`. |
+| `PREDICTION_BATCH_SUBMITTER_ROLES` | `[]` | **Convivencia.** Roles que además de `prediction:publish` pueden iniciar el scoring poblacional. Vacía no acepta ningún rol (responde `403`); inválida bloquea con `503`. |
 
 ### Variables del Worker y Broker
 
@@ -89,15 +91,31 @@ En Compose, `prediction-worker` consume solo `prediction.train_model` y `predict
 
 El API recibe solo `configuration_ref`. El worker resuelve `<configuration_ref>.json` dentro del catálogo de solo lectura y registra la referencia y el digest de su contenido. El directorio local está en `infra/prediction-configurations/`; sus JSON no se versionan. Una política institucional requiere aprobación y costes DSA válidos; los valores no se envían directamente en una petición.
 
+## Autorización (IAM-013)
+
+Los permisos vienen del token (`resource_access.dss-permissions.roles`) y se gestionan desde el admin-portal:
+
+| Permiso | Permite |
+|---|---|
+| `analytics:read` + `analytics:global` | Leer predicciones de toda la institución. |
+| `analytics:read` + `analytics:faculty` | Leer predicciones de las facultades de sus contextos de facultad. |
+| `analytics:read` + `analytics:career` | Leer predicciones de las carreras de sus contextos de carrera. |
+| `prediction:publish` | Iniciar el scoring poblacional, siempre dentro del alcance anterior. |
+| `prediction:train` | Entrenar modelos y gestionar datasets y modelos. |
+
+El alcance es la **unión** de todos los contextos académicos que devuelve auth-service (IAM-009) y de todos los permisos de alcance: por ejemplo, un decano interino con dos facultades ve ambas, y un usuario con `analytics:faculty` y `analytics:career` ve su facultad y además su carrera de otra facultad. SUPERADMIN no tiene permisos `analytics:*` y, por lo tanto, no tiene acceso académico.
+
+Durante la convivencia (`PREDICTION_LEGACY_ROLES_ENABLED=true`), las listas de roles siguen valiendo y se traducen a los mismos permisos. Antes de poner `false`, asigna `prediction:publish` y `prediction:train` a quien los necesite: SUPERADMIN ya incluye `prediction:train`, pero ningún rol incluye `prediction:publish`.
+
 ## Endpoints de la API
 
 - `GET /`: Health check básico del servicio.
 - `POST /predict`: ruta heredada deshabilitada para scoring. Devuelve `503` si no hay modelo aprobado; con uno activo informa que falta el adaptador confiable de features DW. Nunca fabrica una predicción ni acepta features del cliente como datos institucionales.
 - `POST /v1/predictions`: inferencia puntual. `event_type=program_dropout` predice abandono de programa; `event_type=course_abandonment` requiere además `course_ref`. Requiere bearer JWT, estudiante/programa/corte y bundle aprobado para el evento y cadencia correspondientes. La población abarca los tres primeros años académicos (tres cortes anuales o seis semestrales). El cliente no puede enviar features.
-- `POST /v1/prediction-batches`: crea un lote asíncrono de abandono de programa para programa/corte, con idempotencia y modelo aprobado fijado al aceptar el trabajo. Requiere ámbito académico válido y rol explícito en `PREDICTION_BATCH_SUBMITTER_ROLES`.
+- `POST /v1/prediction-batches`: crea un lote asíncrono de abandono de programa para programa/corte, con idempotencia y modelo aprobado fijado al aceptar el trabajo. Requiere el permiso `prediction:publish` (o un rol de `PREDICTION_BATCH_SUBMITTER_ROLES` durante la convivencia) y, además, ámbito académico sobre el programa.
 - `GET /v1/prediction-batches/{batch_id}`: consulta estado e historial; devuelve filas únicamente tras `PUBLISHED` y si el solicitante conserva ámbito para el programa/corte.
 - `GET /v1/prediction-publications?program_ref=…&cut_id=…`: obtiene la publicación completa vigente; devuelve `publication: null` si aún no existe. Los lotes históricos se consultan por `batch_id`.
-- `GET /v1/academic-options`: devuelve programas activos y cierres procesados visibles para el usuario autenticado; filtra las opciones por rol y ámbito académico.
+- `GET /v1/academic-options`: devuelve programas activos y cierres procesados visibles para el usuario autenticado; filtra las opciones por permisos y ámbito académico.
 - `POST /v1/training-jobs`: Solicita un trabajo asíncrono de entrenamiento para `random_forest` o `xgboost`. Requiere header `Idempotency-Key`. Retorna `202 Accepted` con `job_id` y estado `QUEUED`. La clave de idempotencia queda acotada al `sub` del operador y `submitted_by` registra ese `sub` verificado.
 - `GET /v1/training-jobs/{jobId}`: Consulta el estado, progreso, candidato generado o detalle de error según el estándar RFC 7807 Problem Details.
 - `POST /v1/training-jobs/{jobId}/cancel`: cancela un job `QUEUED` (`200`). Un job que ya está en ejecución o terminado responde `409 JOB_NOT_CANCELLABLE`; no se interrumpe un entrenamiento en curso.

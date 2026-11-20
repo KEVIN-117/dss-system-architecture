@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import os
 from datetime import datetime, timezone
 from functools import lru_cache
@@ -24,6 +23,7 @@ from feature_contract import (
     program_dropout_query,
     verify_reference,
 )
+import access_policy
 from inference import (
     AuthorizationPolicy,
     InferenceFailure,
@@ -36,7 +36,8 @@ from inference import (
 class KeycloakIdentityProvider:
     def authenticate(self, access_token: str) -> Principal:
         audience = _required_env("KEYCLOAK_AUDIENCE")
-        role_client_id = _required_env("KEYCLOAK_ROLE_CLIENT_ID")
+        # Client of the legacy academic roles (coexistence); optional since IAM-013.
+        role_client_id = os.getenv("KEYCLOAK_ROLE_CLIENT_ID", "").strip()
         issuer = os.getenv("KEYCLOAK_ISSUER_URI", "").strip()
         if not issuer:
             keycloak_url = _required_env("KEYCLOAK_URL")
@@ -67,10 +68,9 @@ class KeycloakIdentityProvider:
         if isinstance(realm_access, dict) and isinstance(realm_access.get("roles"), list):
             role_names.update(role for role in realm_access["roles"] if isinstance(role, str))
         resource_access = claims.get("resource_access")
-        if isinstance(resource_access, dict):
-            client_access = resource_access.get(role_client_id)
-            if isinstance(client_access, dict) and isinstance(client_access.get("roles"), list):
-                role_names.update(role for role in client_access["roles"] if isinstance(role, str))
+        if role_client_id:
+            role_names.update(_client_roles(resource_access, role_client_id))
+        permissions = frozenset(_client_roles(resource_access, access_policy.permissions_client_id()))
 
         # AUTH_SERVICE_URL is the service origin (for example,
         # http://auth-service:8000); Auth Service is mounted below /api/v1.
@@ -87,23 +87,25 @@ class KeycloakIdentityProvider:
         contexts = profile.get("academicContexts")
         if not isinstance(contexts, list) or any(not isinstance(item, dict) for item in contexts):
             raise InferenceFailure("DATA_UNAVAILABLE", 503, "The identity profile has no valid academic scope.")
-        return Principal(subject=subject, roles=frozenset(role_names), academic_contexts=tuple(contexts))
+        return Principal(subject=subject, roles=frozenset(role_names), academic_contexts=tuple(contexts),
+                         permissions=permissions)
+
+
+def _client_roles(resource_access: Any, client_id: str) -> set[str]:
+    """``resource_access.<client_id>.roles`` of a token, ignoring anything malformed."""
+    if not isinstance(resource_access, dict):
+        return set()
+    client_access = resource_access.get(client_id)
+    if not isinstance(client_access, dict) or not isinstance(client_access.get("roles"), list):
+        return set()
+    return {role for role in client_access["roles"] if isinstance(role, str)}
 
 
 class ConfiguredAcademicPolicy(AuthorizationPolicy):
-    def __init__(self) -> None:
-        self.raw_roles = os.getenv("PREDICTION_ALLOWED_ROLES", "").strip()
+    """Academic scope from catalog permissions, plus ``PREDICTION_ALLOWED_ROLES`` during the coexistence."""
 
     def authorize(self, principal: Principal, context: ProgramContext) -> None:
-        if not self.raw_roles:
-            raise InferenceFailure("AUTHORIZATION_UNAVAILABLE", 503, "Prediction academic role policy is not configured.")
-        try:
-            roles = json.loads(self.raw_roles)
-        except json.JSONDecodeError as exc:
-            raise InferenceFailure("AUTHORIZATION_UNAVAILABLE", 503, "Prediction role policy is invalid.") from exc
-        if not isinstance(roles, list) or not roles or any(role not in {"DIRECTOR", "DECANO", "RECTOR"} for role in roles):
-            raise InferenceFailure("AUTHORIZATION_UNAVAILABLE", 503, "Prediction role policy must list approved academic roles.")
-        authorize_program_context(principal, context, set(roles))
+        authorize_program_context(principal, context, access_policy.legacy_academic_roles())
 
 
 class DwPredictionDataProvider:

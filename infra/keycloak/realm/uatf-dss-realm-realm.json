@@ -719,6 +719,15 @@
           "attributes": {}
         },
         {
+          "id": "50fe9e0f-f2d4-529e-b32f-00ac88b50014",
+          "name": "prediction:publish",
+          "description": "Iniciar el scoring poblacional y publicar predicciones dentro del alcance académico.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
           "id": "aa4b87aa-941b-58d6-a359-36b1542ea7bd",
           "name": "olap:admin",
           "description": "Administrar Saiku: datasources, estadísticas y endpoints de administración.",

@@ -30,6 +30,7 @@ from config import (
 from dataset_contract import DatasetValidationReport, validate_prepared_dataset
 from training.job_store import IdempotencyConflict, JobStore
 from training.model_registry import InvalidModelArtifact, ModelRegistry, NoActiveModel
+import access_policy
 from inference import InferenceFailure, PredictionService, Principal
 from inference_adapters import ConfiguredAcademicPolicy, DwPredictionDataProvider, KeycloakIdentityProvider
 
@@ -594,16 +595,6 @@ def _failure_response(exc: InferenceFailure, request_id: str, title: str) -> JSO
     )
 
 
-def _ml_operator_roles() -> set[str]:
-    """Roles allowed to train models and manage datasets (fails closed)."""
-    raw = os.getenv("PREDICTION_TRAINING_ROLES", '["SUPERADMIN"]').strip()
-    try:
-        roles = json.loads(raw)
-    except json.JSONDecodeError as exc:
-        raise InferenceFailure("AUTHORIZATION_UNAVAILABLE", 503, "ML operator role policy is invalid.") from exc
-    if not isinstance(roles, list) or not roles or any(not isinstance(role, str) or not role.strip() for role in roles):
-        raise InferenceFailure("AUTHORIZATION_UNAVAILABLE", 503, "ML operator role policy must list at least one role.")
-    return {role.strip() for role in roles}
 
 
 def _positive_int_env(name: str, default: int, minimum: int = 1) -> int:
@@ -638,10 +629,11 @@ def _authenticate_ml_operator(authorization: str | None) -> Principal:
     """Verify the bearer JWT in this service; the BFF check is not the only gate."""
     if not authorization or not authorization.startswith("Bearer ") or not authorization[7:].strip():
         raise InferenceFailure("INVALID_TOKEN", 401, "A bearer access token is required.")
-    allowed_roles = _ml_operator_roles()
+    # prediction:train, or a PREDICTION_TRAINING_ROLES role during the coexistence (IAM-013).
+    legacy_roles = access_policy.legacy_training_roles()
     identity = getattr(app.state, "identity_provider", None) or KeycloakIdentityProvider()
     principal = identity.authenticate(authorization[7:].strip())
-    if not principal.roles & allowed_roles:
+    if not access_policy.has_permission(principal, access_policy.PREDICTION_TRAIN, legacy_roles):
         raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The account cannot operate model training or datasets.")
     return principal
 
