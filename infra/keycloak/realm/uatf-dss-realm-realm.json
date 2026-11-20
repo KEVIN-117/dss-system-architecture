@@ -1184,7 +1184,8 @@
       "clientAuthenticatorType": "client-secret",
       "secret": "${KEYCLOAK_BFF_CLIENT_SECRET}",
       "redirectUris": [
-        "http://localhost:3006/api/auth/callback"
+        "http://localhost:3006/api/auth/callback",
+        "http://136.80.32.128:3006/api/auth/callback"
       ],
       "webOrigins": [],
       "notBefore": 0,
@@ -1200,7 +1201,7 @@
       "attributes": {
         "oauth2.jwt.authorization.grant.enabled": "false",
         "frontchannel.logout.session.required": "true",
-        "post.logout.redirect.uris": "http://localhost:3000/login",
+        "post.logout.redirect.uris": "http://localhost:3000/login##http://136.80.32.128:3000/login##http://136.80.32.128:3010/login##http://136.80.32.128:3010/*",
         "oauth2.device.authorization.grant.enabled": "false",
         "use.jwks.url": "false",
         "backchannel.logout.revoke.offline.tokens": "false",
