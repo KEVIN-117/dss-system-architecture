@@ -29,15 +29,15 @@ sequenceDiagram
     Decoder->>Decoder: firma, exp/nbf, issuer y audience
     Decoder-->>Filter: JWT validado o rechazo
     Filter->>Converter: convertir claims de roles
-    Converter->>Converter: resource_access.olap-service.roles
-    Note over Converter: OLAP_ADMIN → ROLE_ADMIN; OLAP_USER → ROLE_USER
+    Converter->>Converter: resource_access.dss-permissions.roles (y olap-service en convivencia)
+    Note over Converter: olap:admin → ROLE_ADMIN; olap:user → ROLE_USER (OLAP_ADMIN/OLAP_USER en convivencia)
     Converter-->>Filter: Authentication con principal y authorities
     Filter->>Jax: establece contexto Spring autenticado
     Jax->>Resource: SecurityContext JAX-RS para @RolesAllowed
     Resource-->>User: respuesta de endpoint
 ```
 
-La validación requiere que issuer y audience coincidan con la configuración del servicio. La conversión de autorización consulta los roles del cliente `olap-service`; roles de `uatf-auth-service` o roles de realm no se elevan por sí solos a `ROLE_ADMIN`. Para operaciones bajo `/rest/saiku/admin/**` se exige administración. Las operaciones protegidas generales requieren autenticación; los endpoints públicos son excepciones explícitas de configuración, como OpenAPI/health cuando estén habilitados.
+La validación requiere que issuer y audience coincidan con la configuración del servicio. Desde IAM-012 la conversión consulta los permisos `olap:admin` y `olap:user` del cliente catálogo `dss-permissions`; mientras `OLAP_LEGACY_ROLES_ENABLED=true` también acepta `OLAP_ADMIN`/`OLAP_USER` del cliente `olap-service`. Los roles de otros clientes y los del realm no se elevan a `ROLE_ADMIN` (un rol de realm llamado `ADMIN` tampoco), y un `SUPERADMIN` sin `olap:admin` no administra Saiku. El BFF aplica la misma regla antes de reenviar `/rest/saiku/admin/**`. Para operaciones bajo `/rest/saiku/admin/**` se exige administración. Las operaciones protegidas generales requieren autenticación; los endpoints públicos son excepciones explícitas de configuración, como OpenAPI/health cuando estén habilitados.
 
 ## Resultados de autorización
 

@@ -39,6 +39,18 @@ const adminAuthentication = {
     token: 'verified-admin-token',
     user: { id: 'admin-1', roles: ['SUPERADMIN'] },
     roles: ['SUPERADMIN'],
+    clientRoles: { 'dss-permissions': ['olap:admin'] },
+  },
+};
+
+/** A platform administrator without the OLAP admin permission (D4). */
+const superadminWithoutOlapAdmin = {
+  authenticated: true as const,
+  value: {
+    token: 'verified-superadmin-token',
+    user: { id: 'admin-2', roles: ['SUPERADMIN'] },
+    roles: ['SUPERADMIN'],
+    clientRoles: { 'dss-permissions': ['iam:users:write'] },
   },
 };
 
@@ -178,31 +190,77 @@ describe('OLAP BFF proxy route', () => {
     await assertion;
   });
 
-  it('rejects non-SUPERADMIN users from OLAP admin paths before proxying', async () => {
-    authenticateRequest.mockResolvedValue(authentication);
-    requireRoles.mockReturnValue(
-      NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
-    );
+  it('rejects users without olap:admin from OLAP admin paths before proxying', async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
-    const response = await GET(
-      new Request('http://bff/api/olap/rest/saiku/admin/schema'),
-      {
-        params: Promise.resolve({ path: ['rest', 'saiku', 'admin', 'schema'] }),
-      },
-    );
+    for (const caller of [authentication, superadminWithoutOlapAdmin]) {
+      authenticateRequest.mockResolvedValue(caller);
+      const response = await GET(
+        new Request('http://bff/api/olap/rest/saiku/admin/schema'),
+        {
+          params: Promise.resolve({ path: ['rest', 'saiku', 'admin', 'schema'] }),
+        },
+      );
 
-    expect(response.status).toBe(403);
-    expect(requireRoles).toHaveBeenCalledWith(authentication.value, [
-      'SUPERADMIN',
-    ]);
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toMatchObject({
+        requiredPermissions: ['olap:admin'],
+      });
+    }
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it('forwards OLAP admin operations only after the SUPERADMIN guard passes', async () => {
+  it('accepts the legacy OLAP_ADMIN role only while the coexistence is on', async () => {
+    const legacyAdmin = {
+      authenticated: true as const,
+      value: {
+        token: 'verified-legacy-token',
+        user: { id: 'admin-3', roles: [] },
+        roles: [],
+        clientRoles: { 'olap-service': ['OLAP_ADMIN'] },
+      },
+    };
+    authenticateRequest.mockResolvedValue(legacyAdmin);
+    vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('[]', { status: 200 })));
+    const request = () =>
+      GET(new Request('http://bff/api/olap/rest/saiku/admin/schema'), {
+        params: Promise.resolve({ path: ['rest', 'saiku', 'admin', 'schema'] }),
+      });
+
+    expect((await request()).status).toBe(200);
+    vi.stubEnv('OLAP_LEGACY_ROLES_ENABLED', 'false');
+    expect((await request()).status).toBe(403);
+  });
+
+  it('forwards OLAP admin operations with olap:admin, without academic-scope checks', async () => {
+    const olapAdminOnly = {
+      authenticated: true as const,
+      value: {
+        token: 'verified-admin-token',
+        user: { id: 'admin-4', roles: [] },
+        roles: [],
+        clientRoles: { 'dss-permissions': ['olap:admin'] },
+      },
+    };
+    authenticateRequest.mockResolvedValue(olapAdminOnly);
+    vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('[]', { status: 200 })));
+
+    const response = await GET(
+      new Request('http://bff/api/olap/rest/saiku/admin/datasources'),
+      {
+        params: Promise.resolve({ path: ['rest', 'saiku', 'admin', 'datasources'] }),
+      },
+    );
+
+    expect(response.status).toBe(200);
+    expect(requireRoles).not.toHaveBeenCalled();
+  });
+
+  it('forwards OLAP admin operations only after the olap:admin guard passes', async () => {
     authenticateRequest.mockResolvedValue(adminAuthentication);
-    requireRoles.mockReturnValue(null);
     vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080');
     const fetchMock = vi.fn().mockResolvedValue(
       new Response('[{"name":"academic.xml"}]', {
@@ -220,9 +278,6 @@ describe('OLAP BFF proxy route', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requireRoles).toHaveBeenCalledWith(adminAuthentication.value, [
-      'SUPERADMIN',
-    ]);
     const upstreamOptions = fetchMock.mock.calls[0][1] as RequestInit;
     expect(String(fetchMock.mock.calls[0][0])).toBe(
       'http://olap-service:8080/rest/saiku/admin/schema',
