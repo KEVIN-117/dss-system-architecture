@@ -67,6 +67,9 @@ app:
     context-reader:
       # Keycloak clients (token azp) allowed to call /internal/users/{id}/academic-contexts.
       allowed-clients: ${AUTH_CONTEXT_READER_CLIENTS:olap-service}
+  iam:
+    # Validity of the invitation / required-actions e-mail links sent from the admin portal. IAM-006.
+    invitation-lifespan: ${IAM_INVITATION_LIFESPAN:72h}
   keycloak:
     # Keycloak Admin REST API with the uatf-auth-service service account (client_credentials). IAM-003.
     admin:

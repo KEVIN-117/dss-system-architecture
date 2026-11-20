@@ -5,12 +5,8 @@ import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
 import org.springframework.util.LinkedMultiValueMap;
 import org.springframework.web.client.RestClient;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.images.builder.Transferable;
-import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
-import org.testcontainers.utility.DockerImageName;
+import uatf.dss.authservice.KeycloakTestRealm;
 import uatf.dss.authservice.domain.exception.conflict.IdentityResourceConflictException;
 import uatf.dss.authservice.domain.exception.notfound.IdentityResourceNotFoundException;
 import uatf.dss.authservice.domain.exception.upstream.IdentityProviderException;
@@ -23,9 +19,6 @@ import uatf.dss.authservice.domain.model.identity.IdentityUser;
 import uatf.dss.authservice.domain.model.identity.IdentityUserChanges;
 import uatf.dss.authservice.domain.model.identity.NewIdentityUser;
 
-import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.Clock;
 import java.time.Duration;
 import java.util.List;
@@ -44,43 +37,14 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 @Testcontainers(disabledWithoutDocker = true)
 class KeycloakAdminAdapterIntegrationTest {
 
-    private static final String KEYCLOAK_IMAGE = "quay.io/keycloak/keycloak:26.7.4";
-    private static final String REALM = "uatf-dss-realm";
-    private static final String AUTH_SERVICE_SECRET = "it-auth-service-" + UUID.randomUUID();
+    private static final String REALM = KeycloakTestRealm.REALM;
+    private static final String AUTH_SERVICE_SECRET = KeycloakTestRealm.AUTH_SERVICE_SECRET;
     private static final String PERMISSIONS = "dss-permissions";
-
-    @Container
-    static final GenericContainer<?> KEYCLOAK = new GenericContainer<>(DockerImageName.parse(KEYCLOAK_IMAGE))
-            .withExposedPorts(8080)
-            .withEnv("KC_BOOTSTRAP_ADMIN_USERNAME", "admin")
-            .withEnv("KC_BOOTSTRAP_ADMIN_PASSWORD", "admin-" + UUID.randomUUID())
-            .withEnv("KEYCLOAK_BFF_CLIENT_SECRET", "it-bff")
-            .withEnv("KEYCLOAK_OLAP_CLIENT_SECRET", "it-olap")
-            .withEnv("KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET", AUTH_SERVICE_SECRET)
-            .withCopyToContainer(Transferable.of(realmForStockImage()), "/opt/keycloak/data/import/" + REALM + "-realm.json")
-            .withCommand("start-dev", "--import-realm")
-            .waitingFor(Wait.forHttp("/realms/" + REALM + "/.well-known/openid-configuration")
-                    .forPort(8080)
-                    .withStartupTimeout(Duration.ofMinutes(4)));
 
     private static KeycloakAdminModule module;
 
-    /** The stock image has no {@code uatf-webhook} provider (it lives in our image), so the listener is dropped. */
-    private static String realmForStockImage() {
-        try {
-            String realm = Files.readString(Path.of("..", "infra", "keycloak", "realm", REALM + "-realm.json"));
-            String withoutWebhook = realm.replaceFirst("\"uatf-webhook\",\\s*", "");
-            if (withoutWebhook.equals(realm)) {
-                throw new IllegalStateException("uatf-webhook listener not found in the realm export");
-            }
-            return withoutWebhook;
-        } catch (IOException e) {
-            throw new IllegalStateException("cannot read the realm export", e);
-        }
-    }
-
     private static String baseUrl() {
-        return "http://" + KEYCLOAK.getHost() + ":" + KEYCLOAK.getMappedPort(8080);
+        return KeycloakTestRealm.baseUrl();
     }
 
     @BeforeAll
