@@ -62,7 +62,7 @@ Traducción de errores de Keycloak a excepciones de dominio:
 
 ### Endpoint interno de alcance académico
 
-`GET /api/v1/internal/users/{keycloakId}/academic-contexts` devuelve `{keycloakId, active, roles, contexts}` sin datos personales y con `Cache-Control: no-store`. Es solo servicio-a-servicio (backstop OLAP, ver `docs/olap/academic-scope-backstop-design.md`); el BFF no lo expone. Respuestas: 401 sin token, 403 sin el permiso `context:read` o con un `azp` no permitido, 404 si el usuario no está sincronizado.
+`GET /api/v1/internal/users/{keycloakId}/academic-contexts` devuelve `{keycloakId, active, roles, contexts}` (todos los contextos del usuario, que pueden ser varios desde IAM-009) sin datos personales y con `Cache-Control: no-store`. Es solo servicio-a-servicio (backstop OLAP, ver `docs/olap/academic-scope-backstop-design.md`); el BFF no lo expone. Respuestas: 401 sin token, 403 sin el permiso `context:read` o con un `azp` no permitido, 404 si el usuario no está sincronizado.
 
 ### Diferencias por perfil
 

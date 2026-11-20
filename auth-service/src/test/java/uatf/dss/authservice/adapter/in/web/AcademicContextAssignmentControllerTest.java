@@ -78,6 +78,42 @@ class AcademicContextAssignmentControllerTest extends BaseWebMvcTest {
     }
 
     @Test
+    void severalContextsArePassedThroughInOrder() throws Exception {
+        UUID targetId = UUID.randomUUID();
+        when(useCase.execute(any())).thenReturn(List.of(
+                new UserAcademicContext(UUID.randomUUID(), targetId, 5, null),
+                new UserAcademicContext(UUID.randomUUID(), targetId, 8, null)));
+
+        mockMvc.perform(put("/admin/users/{id}/academic-contexts", targetId)
+                        .with(jwt().authorities(new SimpleGrantedAuthority("iam:users:write")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contexts\":[{\"facultyId\":5},{\"facultyId\":8}]}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[1].facultyId").value(8));
+
+        verify(useCase).execute(org.mockito.ArgumentMatchers.argThat(command -> command.contexts().equals(List.of(
+                new SetUserAcademicContextsCommand.AcademicContextInput(5, null),
+                new SetUserAcademicContextsCommand.AcademicContextInput(8, null)))));
+    }
+
+    @Test
+    void moreContextsThanTheLimitAreRejectedBeforeTheUseCase() throws Exception {
+        String contexts = java.util.stream.IntStream
+                .rangeClosed(1, uatf.dss.authservice.domain.validator.AcademicContextValidator.MAX_CONTEXTS + 1)
+                .mapToObj(i -> "{\"facultyId\":" + i + "}")
+                .collect(java.util.stream.Collectors.joining(","));
+
+        mockMvc.perform(put("/admin/users/{id}/academic-contexts", UUID.randomUUID())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("iam:users:write")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"contexts\":[" + contexts + "]}"))
+                .andExpect(status().isBadRequest());
+
+        verify(useCase, org.mockito.Mockito.never()).execute(any());
+    }
+
+    @Test
     void portalCanPreflightPutRequest() throws Exception {
         mockMvc.perform(options("/admin/users/{id}/academic-contexts", UUID.randomUUID())
                         .header("Origin", "http://localhost:3001")

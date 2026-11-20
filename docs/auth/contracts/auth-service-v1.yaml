@@ -106,9 +106,11 @@ paths:
       summary: Reemplaza los contextos académicos de un usuario
       x-required-permission: iam:users:write
       description: >-
-        Sustituye la lista completa de contextos académicos. Una carrera requiere
-        su facultad; `facultyId` no puede ser negativo y `careerId` tiene tres
-        caracteres sin espacios.
+        Sustituye la lista completa de contextos académicos. SUPERADMIN y RECTOR no
+        llevan contextos; DECANO lleva una o más facultades (sin carrera) y DIRECTOR
+        una o más carreras (con su facultad), hasta 20 y sin repetir ninguno (IAM-009).
+        Una carrera requiere su facultad; `facultyId` no puede ser negativo y
+        `careerId` tiene tres caracteres sin espacios.
       parameters:
         - $ref: '#/components/parameters/UserId'
       requestBody:
@@ -1020,6 +1022,8 @@ components:
       properties:
         contexts:
           type: array
+          maxItems: 20
+          description: Sin duplicados (misma facultad y carrera). El filtro analítico es la unión de todos.
           items:
             type: object
             properties:

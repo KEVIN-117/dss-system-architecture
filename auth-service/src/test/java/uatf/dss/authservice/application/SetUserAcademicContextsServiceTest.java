@@ -36,6 +36,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.Mockito.*;
 
@@ -86,6 +87,67 @@ class SetUserAcademicContextsServiceTest {
         assertEquals(1, result.size());
         assertEquals(10, result.getFirst().facultyId());
         assertNull(result.getFirst().careerId());
+    }
+
+    @Test
+    void actingDeanCanBeAssignedTwoFaculties() {
+        var command = new SetUserAcademicContextsCommand(actor, targetId, List.of(
+                new SetUserAcademicContextsCommand.AcademicContextInput(10, null),
+                new SetUserAcademicContextsCommand.AcademicContextInput(12, null)));
+        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DECANO"));
+        when(catalogRepository.existsActiveFaculty(anyInt())).thenReturn(true);
+        when(contextRepository.replaceAllForUser(eq(targetId), anyList())).thenAnswer(invocation -> invocation.getArgument(1));
+
+        var result = service.execute(command);
+
+        verify(contextRepository).replaceAllForUser(targetId, List.of(
+                new UserAcademicContext(null, targetId, 10, null),
+                new UserAcademicContext(null, targetId, 12, null)));
+        assertEquals(2, result.size());
+        ArgumentCaptor<AdminAuditEntry> entry = ArgumentCaptor.forClass(AdminAuditEntry.class);
+        verify(auditLogRepository).append(entry.capture());
+        assertEquals(2, contextsOf(entry.getValue().after()).size());
+    }
+
+    @Test
+    void directorCanLeadCareersOfDifferentFacultiesAndEachIsCheckedInTheCatalog() {
+        var command = new SetUserAcademicContextsCommand(actor, targetId, List.of(
+                new SetUserAcademicContextsCommand.AcademicContextInput(10, "025"),
+                new SetUserAcademicContextsCommand.AcademicContextInput(8, "015")));
+        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DIRECTOR"));
+        when(catalogRepository.existsActiveFaculty(anyInt())).thenReturn(true);
+        when(catalogRepository.existsActiveProgram("025", 10)).thenReturn(true);
+        when(catalogRepository.existsActiveProgram("015", 8)).thenReturn(false);
+
+        assertThrows(CareerNotFoundException.class, () -> service.execute(command));
+        verify(catalogRepository).existsActiveProgram("015", 8);
+        verify(contextRepository, never()).replaceAllForUser(any(), any());
+    }
+
+    @Test
+    void duplicateContextsAreRejectedAndAuditedAsFailure() {
+        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DECANO"));
+        var command = new SetUserAcademicContextsCommand(actor, targetId, List.of(
+                new SetUserAcademicContextsCommand.AcademicContextInput(10, null),
+                new SetUserAcademicContextsCommand.AcademicContextInput(10, null)));
+
+        assertThrows(InvalidAcademicContextException.class, () -> service.execute(command));
+        verify(contextRepository, never()).replaceAllForUser(any(), any());
+        ArgumentCaptor<AdminAuditEntry> entry = ArgumentCaptor.forClass(AdminAuditEntry.class);
+        verify(auditLogRepository).appendIndependently(entry.capture());
+        assertEquals(AuditOutcome.FAILURE, entry.getValue().outcome());
+    }
+
+    @Test
+    void deanWithoutAnyContextAndRectorWithOneAreRejected() {
+        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DECANO"));
+        assertThrows(InvalidAcademicContextException.class,
+                () -> service.execute(new SetUserAcademicContextsCommand(actor, targetId, List.of())));
+
+        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("RECTOR"));
+        assertThrows(InvalidAcademicContextException.class, () -> service.execute(new SetUserAcademicContextsCommand(
+                actor, targetId, List.of(new SetUserAcademicContextsCommand.AcademicContextInput(10, null)))));
+        verify(contextRepository, never()).replaceAllForUser(any(), any());
     }
 
     @Test

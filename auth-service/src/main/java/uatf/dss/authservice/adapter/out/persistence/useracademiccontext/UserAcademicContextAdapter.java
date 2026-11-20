@@ -23,11 +23,6 @@ public class UserAcademicContextAdapter implements AcademicContextRepository {
     }
 
     @Override
-    public Optional<UserAcademicContext> findByUserId(UUID userId) {
-        return academicContextRepository.findByUserId(userId).map(mapper::toDomain);
-    }
-
-    @Override
     public List<UserAcademicContext> findAllByUserId(UUID userId) {
         return academicContextRepository.findAllByUserId(userId).stream().map(mapper::toDomain).toList();
     }
@@ -51,6 +46,9 @@ public class UserAcademicContextAdapter implements AcademicContextRepository {
     @Transactional
     public List<UserAcademicContext> replaceAllForUser(UUID userId, List<UserAcademicContext> contexts) {
         academicContextRepository.deleteAllByUserId(userId);
+        // Hibernate flushes inserts before deletes; without this flush, re-assigning a context the user already
+        // has would violate uq_user_academic_contexts_scope (V8).
+        academicContextRepository.flush();
         List<UserAcademicContextEntity> entities = contexts.stream().map(mapper::toEntity).toList();
         return academicContextRepository.saveAll(entities).stream().map(mapper::toDomain).toList();
     }
