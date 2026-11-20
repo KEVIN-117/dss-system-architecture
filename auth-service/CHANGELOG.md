@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.4.0...auth-service-v1.5.0) (2026-11-20)
+
+
+### Features
+
+* **auth-service:** API de gestión de clientes (aplicaciones) en auth-service ([#302](https://github.com/KEVIN-117/dss-system-architecture/issues/302)) ([aca1a0e](https://github.com/KEVIN-117/dss-system-architecture/commit/aca1a0e5a05bd0cd580958a3295da5ea9e8746d1))
+
 ## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.3.0...auth-service-v1.4.0) (2026-11-20)
 
 
