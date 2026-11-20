@@ -29,6 +29,8 @@ import uatf.dss.authservice.application.port.out.IdentityRoleAdminPort;
 import uatf.dss.authservice.application.port.out.IdentityRoleMappingPort;
 import uatf.dss.authservice.application.port.out.IdentityUserAdminPort;
 import uatf.dss.authservice.application.service.IamUserAdministrationService;
+import uatf.dss.authservice.application.service.IamRoleAdministrationService;
+import uatf.dss.authservice.application.port.in.IamRoleAdministrationUseCase;
 
 @Configuration
 public class ApplicationConfig {
@@ -85,6 +87,14 @@ public class ApplicationConfig {
             @Value("${app.iam.invitation-lifespan:72h}") Duration invitationLifespan) {
         return new IamUserAdministrationService(identityUsers, identityRoles, identityRoleMappings, userRepository,
                 syncUserUseCase, adminAuditRecorder, permissionsClientId, invitationLifespan);
+    }
+
+    @Bean
+    public IamRoleAdministrationUseCase iamRoleAdministrationUseCase(
+            IdentityRoleAdminPort identityRoles,
+            AdminAuditRecorder adminAuditRecorder,
+            @Value("${jwt.auth.converter.permissions-client-id:dss-permissions}") String permissionsClientId) {
+        return new IamRoleAdministrationService(identityRoles, adminAuditRecorder, permissionsClientId);
     }
 
     @Bean

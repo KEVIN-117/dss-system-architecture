@@ -161,6 +161,27 @@ Reglas de `IamUserAdministrationService`:
 - **Copia local inmediata:** después de crear, actualizar o cambiar roles se ejecuta `SyncUserUseCase` con los datos y roles directos leídos de Keycloak. El evento que llega después por RabbitMQ es idempotente.
 - **Invitación al crear:** si el correo falla (por ejemplo, el realm no tiene SMTP), el usuario se conserva, la respuesta trae `invitationSent: false` y el fallo queda auditado. La vigencia del enlace es `IAM_INVITATION_LIFESPAN` (72 h por defecto).
 
+## Flujo E: roles y permisos (IAM-007)
+
+`IamRoleController` (`/api/v1/admin/iam/roles`) e `IamPermissionController` (`/api/v1/admin/iam/permissions`) administran los roles del realm, el catálogo de permisos (roles de cliente de `dss-permissions`, `recurso:acción`) y qué permisos agrupa cada rol. Las lecturas exigen `iam:roles:read` y las escrituras `iam:roles:write`.
+
+| Ruta | Acción de auditoría | Función |
+|---|---|---|
+| `GET`/`POST /admin/iam/roles`, `GET`/`PATCH`/`DELETE /admin/iam/roles/{name}` | `ROLE_CREATED`, `ROLE_UPDATED`, `ROLE_DELETED` | Roles del realm con descripción y atributo `portal` |
+| `GET`/`PUT /admin/iam/roles/{name}/permissions` | `ROLE_PERMISSIONS_REPLACED` | Permisos que agrupa el rol (compuestos) |
+| `GET`/`POST /admin/iam/permissions`, `PATCH`/`DELETE /admin/iam/permissions/{name}` | `PERMISSION_CREATED`, `PERMISSION_UPDATED`, `PERMISSION_DELETED` | Catálogo de permisos |
+| `GET /admin/iam/permissions/matrix` | — | Matriz rol × permiso |
+
+Reglas de `IamRoleAdministrationService` (los rechazos responden 409 y quedan auditados):
+
+- **Nombres:** los de rol siguen `^[A-Z][A-Z0-9_]{1,49}$` y los de permiso `recurso:acción` en minúsculas (hasta 100 caracteres). Los nombres no se pueden cambiar. Un duplicado devuelve 409 y un formato inválido 400.
+- **Roles del sistema:** SUPERADMIN, RECTOR, DECANO, DIRECTOR y los integrados de Keycloak se editan, pero no se eliminan, ni siquiera con `force`.
+- **Permisos del sistema:** `iam:*` y `context:read` no se eliminan.
+- **SUPERADMIN** conserva siempre todos los permisos `iam:*`, para que la administración no se bloquee a sí misma.
+- **Borrado de algo en uso:** un rol con usuarios, o un permiso que agrupa algún rol o tiene algún usuario, solo se elimina con `?force=true`. El 409 indica los roles que lo usan.
+- **`PATCH` de rol:** conserva los demás atributos del rol y un `portal` vacío lo elimina.
+- **Propagación:** los cambios llegan a los usuarios en su próximo token. El test `newPermissionReachesTheNextToken` lo comprueba con un token real de `dss-bff`.
+
 ## Persistencia local
 
 Las migraciones observadas definen:
@@ -178,7 +199,7 @@ V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los c
 ## Rutas auxiliares y límites funcionales
 
 - Los roles locales sirven como snapshot consultado para reglas del contexto académico. La seguridad HTTP usa los roles presentes en el JWT.
-- Desde IAM-006, `auth-service` crea usuarios y concede o revoca roles y permisos en Keycloak (Flujo D). La definición de roles, permisos y clientes todavía se hace en Keycloak (IAM-007 e IAM-008).
+- Desde IAM-006, `auth-service` crea usuarios y concede o revoca roles y permisos en Keycloak (Flujo D). Desde IAM-007 también define roles, permisos y qué permisos agrupa cada rol (Flujo E). La gestión de clientes llega en IAM-008.
 - El servicio no implementa autorización por facultad/programa sobre endpoints de analítica, no configura RLS y no propaga aquí un contexto de sesión al Data Warehouse.
 - `GET /auth/me` expone los contextos para que un cliente autorizado los consuma; la aplicación de ese alcance fuera de este servicio corresponde a otra capa.
 

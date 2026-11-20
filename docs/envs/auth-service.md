@@ -47,6 +47,10 @@ Traducción de errores de Keycloak a excepciones de dominio:
 - La cuenta de servicio de `uatf-auth-service` con los roles de `realm-management` de IAM-001 y `KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET` configurado.
 - **SMTP configurado en el realm** (Realm settings → Email) para que lleguen las invitaciones y los correos de restablecimiento. Sin SMTP, crear usuarios funciona, pero `invitationSent` vuelve `false` y `actions-email` responde 502.
 
+### Roles y permisos (IAM-007)
+
+`/api/v1/admin/iam/roles` y `/api/v1/admin/iam/permissions` crean, editan y eliminan roles del realm y permisos de `dss-permissions`, y definen qué permisos agrupa cada rol (`iam:roles:read` / `iam:roles:write`). No requieren variables nuevas: usan la cuenta de servicio de IAM-001, que necesita `manage-realm` para escribir roles del realm y `manage-clients` para los permisos.
+
 ### Auditoría administrativa
 
 `GET /api/v1/admin/iam/audit` (permiso `iam:audit:read`) consulta `admin_audit_log`, de lo más reciente a lo más antiguo, con filtros opcionales `actor` (Keycloak id o username), `action`, `targetType`, `targetId`, `outcome`, `from`/`to` (ISO-8601; `from` incluido, `to` excluido) y paginación `page`/`size` (máximo 100). No requiere variables nuevas. El detalle de cómo se registra cada operación está en `auth-service/docs/auth-service-funcionamiento.md`.

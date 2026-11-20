@@ -352,6 +352,273 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/BadGateway' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/roles:
+    get:
+      tags: [Roles y permisos]
+      operationId: listIamRoles
+      summary: Lista los roles del realm (sin los integrados de Keycloak)
+      x-required-permission: iam:roles:read
+      responses:
+        '200':
+          description: Roles.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IamRoleView' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Roles y permisos]
+      operationId: createIamRole
+      summary: Crea un rol del realm
+      x-required-permission: iam:roles:write
+      x-audit-action: ROLE_CREATED
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,49}$' }
+                description: { type: string, maxLength: 255 }
+                portal: { type: string, pattern: '^[a-z][a-z0-9-]{0,49}$' }
+      responses:
+        '201':
+          description: Rol creado; `Location` apunta a `/admin/iam/roles/{name}`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamRoleView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/roles/{name}:
+    get:
+      tags: [Roles y permisos]
+      operationId: getIamRole
+      summary: Obtiene un rol
+      x-required-permission: iam:roles:read
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Rol.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamRoleView' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Roles y permisos]
+      operationId: updateIamRole
+      summary: Actualiza la descripción o el portal de un rol
+      x-required-permission: iam:roles:write
+      x-audit-action: ROLE_UPDATED
+      description: El nombre no cambia. Los campos omitidos no cambian; un `portal` vacío lo elimina.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description: { type: string, maxLength: 255 }
+                portal: { type: string, maxLength: 50 }
+      responses:
+        '200':
+          description: Rol actualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamRoleView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Roles y permisos]
+      operationId: deleteIamRole
+      summary: Elimina un rol
+      x-required-permission: iam:roles:write
+      x-audit-action: ROLE_DELETED
+      description: >-
+        Los roles del sistema (SUPERADMIN, RECTOR, DECANO, DIRECTOR y los integrados de Keycloak) nunca se eliminan
+        (409). Un rol asignado a usuarios requiere `force=true` (sin él, 409).
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: force, in: query, schema: { type: boolean, default: false }, description: Confirma el borrado de un elemento en uso. }
+      responses:
+        '204': { description: Rol eliminado. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/roles/{name}/permissions:
+    get:
+      tags: [Roles y permisos]
+      operationId: getIamRolePermissions
+      summary: Permisos que agrupa el rol
+      x-required-permission: iam:roles:read
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Permisos del rol.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IamPermissionView' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Roles y permisos]
+      operationId: replaceIamRolePermissions
+      summary: Reemplaza los permisos que agrupa el rol
+      x-required-permission: iam:roles:write
+      x-audit-action: ROLE_PERMISSIONS_REPLACED
+      description: >-
+        Agrega o quita solo la diferencia. Los usuarios con el rol reciben el cambio en su próximo token.
+        SUPERADMIN no puede perder ningún permiso `iam:*` (409). Un permiso inexistente devuelve 404.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissions]
+              properties:
+                permissions: { type: array, uniqueItems: true, items: { type: string, maxLength: 100 } }
+      responses:
+        '200':
+          description: Permisos resultantes.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IamPermissionView' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/permissions:
+    get:
+      tags: [Roles y permisos]
+      operationId: listIamPermissions
+      summary: Lista el catálogo de permisos (`dss-permissions`)
+      x-required-permission: iam:roles:read
+      responses:
+        '200':
+          description: Permisos.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IamPermissionView' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Roles y permisos]
+      operationId: createIamPermission
+      summary: Crea un permiso
+      x-required-permission: iam:roles:write
+      x-audit-action: PERMISSION_CREATED
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, description]
+              properties:
+                name: { type: string, maxLength: 100, pattern: '^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*)+$', example: 'reports:export' }
+                description: { type: string, maxLength: 255 }
+      responses:
+        '201':
+          description: Permiso creado; `Location` apunta a `/admin/iam/permissions/{name}`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamPermissionView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/permissions/matrix:
+    get:
+      tags: [Roles y permisos]
+      operationId: getIamPermissionMatrix
+      summary: Matriz rol × permiso
+      x-required-permission: iam:roles:read
+      responses:
+        '200':
+          description: Roles, permisos y qué permisos agrupa cada rol.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamPermissionMatrix' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/iam/permissions/{name}:
+    patch:
+      tags: [Roles y permisos]
+      operationId: updateIamPermission
+      summary: Actualiza la descripción de un permiso
+      x-required-permission: iam:roles:write
+      x-audit-action: PERMISSION_UPDATED
+      description: El nombre no cambia.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description]
+              properties:
+                description: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Permiso actualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamPermissionView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Roles y permisos]
+      operationId: deleteIamPermission
+      summary: Elimina un permiso
+      x-required-permission: iam:roles:write
+      x-audit-action: PERMISSION_DELETED
+      description: >-
+        Los permisos del sistema (`iam:*`, `context:read`) nunca se eliminan (409). Uno que agrupa algún rol o tiene
+        algún usuario requiere `force=true` (sin él, 409 con los roles que lo usan).
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: force, in: query, schema: { type: boolean, default: false }, description: Confirma el borrado de un elemento en uso. }
+      responses:
+        '204': { description: Permiso eliminado. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 components:
   securitySchemes:
     bearerAuth:
@@ -515,6 +782,33 @@ components:
           type: array
           description: Directos más los heredados por roles compuestos.
           items: { $ref: '#/components/schemas/IamRole' }
+    IamRoleView:
+      type: object
+      required: [name, system]
+      properties:
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        portal: { type: [string, 'null'], description: 'Portal al que se dirige a quien tiene el rol (atributo `portal`).' }
+        system: { type: boolean, description: 'Rol del que depende la plataforma: se edita, pero no se elimina.' }
+    IamPermissionView:
+      type: object
+      required: [name, resource, action, system]
+      properties:
+        name: { type: string, example: 'dw:closure:manage' }
+        description: { type: [string, 'null'] }
+        resource: { type: string, example: 'dw:closure' }
+        action: { type: string, example: 'manage' }
+        system: { type: boolean, description: 'Permiso del que depende la plataforma (`iam:*`, `context:read`).' }
+    IamPermissionMatrix:
+      type: object
+      required: [roles, permissions, grants]
+      properties:
+        roles: { type: array, items: { $ref: '#/components/schemas/IamRoleView' } }
+        permissions: { type: array, items: { $ref: '#/components/schemas/IamPermissionView' } }
+        grants:
+          type: object
+          description: Rol → permisos que agrupa.
+          additionalProperties: { type: array, items: { type: string } }
     AdminAuditEntry:
       type: object
       required: [id, occurredAt, actor, action, targetType, outcome]
