@@ -75,12 +75,12 @@ public class UserAcademicContextAdapterIntegrationTest {
         assertEquals(10, savedContext.facultyId());
         assertEquals("025", savedContext.careerId());
 
-        Optional<UserAcademicContext> foundOpt = academicContextRepository.findByUserId(user.id());
-        assertTrue(foundOpt.isPresent(), "Should find academic context by userId");
-        assertEquals(savedContext.id(), foundOpt.get().id());
-        assertEquals(user.id(), foundOpt.get().userId());
-        assertEquals(10, foundOpt.get().facultyId());
-        assertEquals("025", foundOpt.get().careerId());
+        List<UserAcademicContext> found = academicContextRepository.findAllByUserId(user.id());
+        assertEquals(1, found.size(), "Should find academic context by userId");
+        assertEquals(savedContext.id(), found.getFirst().id());
+        assertEquals(user.id(), found.getFirst().userId());
+        assertEquals(10, found.getFirst().facultyId());
+        assertEquals("025", found.getFirst().careerId());
     }
 
     @Test
@@ -102,6 +102,22 @@ public class UserAcademicContextAdapterIntegrationTest {
     }
 
     @Test
+    @DisplayName("Should replace with several contexts, keeping one the user already had (IAM-009)")
+    void shouldReplaceWithSeveralContextsKeepingAnExistingOne() {
+        User dean = createAndSaveTestUser("decano.interino", "decano.interino@uatf.edu.bo");
+        academicContextRepository.replaceAllForUser(dean.id(), List.of(
+                new UserAcademicContext(null, dean.id(), 5, null),
+                new UserAcademicContext(null, dean.id(), 8, null)));
+
+        academicContextRepository.replaceAllForUser(dean.id(), List.of(
+                new UserAcademicContext(null, dean.id(), 8, null),
+                new UserAcademicContext(null, dean.id(), 10, null)));
+
+        assertEquals(List.of(8, 10), academicContextRepository.findAllByUserId(dean.id()).stream()
+                .map(UserAcademicContext::facultyId).sorted().toList());
+    }
+
+    @Test
     @DisplayName("Should save Dean academic context with faculty only")
     void shouldSaveDeanContextWithFacultyOnly() {
         User dean = createAndSaveTestUser("decano.ingenieria", "decano.ing@uatf.edu.bo");
@@ -118,10 +134,10 @@ public class UserAcademicContextAdapterIntegrationTest {
         assertEquals(5, saved.facultyId());
         assertNull(saved.careerId());
 
-        Optional<UserAcademicContext> found = academicContextRepository.findByUserId(dean.id());
-        assertTrue(found.isPresent());
-        assertEquals(5, found.get().facultyId());
-        assertNull(found.get().careerId());
+        List<UserAcademicContext> found = academicContextRepository.findAllByUserId(dean.id());
+        assertEquals(1, found.size());
+        assertEquals(5, found.getFirst().facultyId());
+        assertNull(found.getFirst().careerId());
     }
 
     @Test
@@ -141,10 +157,10 @@ public class UserAcademicContextAdapterIntegrationTest {
         assertNull(saved.facultyId());
         assertNull(saved.careerId());
 
-        Optional<UserAcademicContext> found = academicContextRepository.findByUserId(rector.id());
-        assertTrue(found.isPresent());
-        assertNull(found.get().facultyId());
-        assertNull(found.get().careerId());
+        List<UserAcademicContext> found = academicContextRepository.findAllByUserId(rector.id());
+        assertEquals(1, found.size());
+        assertNull(found.getFirst().facultyId());
+        assertNull(found.getFirst().careerId());
     }
 
     @Test
@@ -164,7 +180,7 @@ public class UserAcademicContextAdapterIntegrationTest {
         assertTrue(deleted.isPresent(), "Delete should return the deleted domain entity");
         assertEquals(saved.id(), deleted.get().id());
 
-        Optional<UserAcademicContext> foundAfterDelete = academicContextRepository.findByUserId(user.id());
-        assertFalse(foundAfterDelete.isPresent(), "Context should no longer exist after deletion");
+        assertTrue(academicContextRepository.findAllByUserId(user.id()).isEmpty(),
+                "Context should no longer exist after deletion");
     }
 }

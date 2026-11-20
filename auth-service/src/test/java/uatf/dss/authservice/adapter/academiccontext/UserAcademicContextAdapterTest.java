@@ -60,23 +60,25 @@ class UserAcademicContextAdapterTest {
     }
 
     @Test
-    @DisplayName("Should find academic context by userId")
-    void shouldFindByUserId() {
+    @DisplayName("Should find every academic context of a user")
+    void shouldFindAllByUserId() {
         UUID userId = UUID.randomUUID();
         UUID contextId = UUID.randomUUID();
         UserEntity userEntity = new UserEntity();
         userEntity.setId(userId);
 
         UserAcademicContextEntity entity = new UserAcademicContextEntity(contextId, 3, "009", userEntity);
-        when(repository.findByUserId(userId)).thenReturn(Optional.of(entity));
+        UserAcademicContextEntity second = new UserAcademicContextEntity(UUID.randomUUID(), 4, "010", userEntity);
+        when(repository.findAllByUserId(userId)).thenReturn(java.util.List.of(entity, second));
 
-        Optional<UserAcademicContext> result = adapter.findByUserId(userId);
+        java.util.List<UserAcademicContext> result = adapter.findAllByUserId(userId);
 
-        assertTrue(result.isPresent());
-        assertEquals(contextId, result.get().id());
-        assertEquals(userId, result.get().userId());
-        assertEquals(3, result.get().facultyId());
-        assertEquals("009", result.get().careerId());
+        assertEquals(2, result.size());
+        assertEquals(contextId, result.getFirst().id());
+        assertEquals(userId, result.getFirst().userId());
+        assertEquals(3, result.getFirst().facultyId());
+        assertEquals("009", result.getFirst().careerId());
+        assertEquals(4, result.get(1).facultyId());
     }
 
     @Test

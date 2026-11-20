@@ -10,7 +10,6 @@ import uatf.dss.authservice.domain.exception.conflict.UserRoleSnapshotNotFoundEx
 import uatf.dss.authservice.domain.exception.notfound.CareerNotFoundException;
 import uatf.dss.authservice.domain.exception.notfound.FacultyNotFoundException;
 import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
-import uatf.dss.authservice.domain.exception.validation.InvalidAcademicContextException;
 import uatf.dss.authservice.domain.model.RoleType;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 import uatf.dss.authservice.domain.model.audit.AuditTargetType;
@@ -76,8 +75,6 @@ public class SetUserAcademicContextsService implements SetUserAcademicContextsUs
                 .max(Comparator.comparingInt(ROLE_PRECEDENCE::get))
                 .orElseThrow(UserRoleSnapshotNotFoundException::new);
 
-        validateContextCount(targetRole, command.contexts().size());
-
         List<UserAcademicContext> requestedContexts = command.contexts().stream()
                 .map(input -> new UserAcademicContext(
                         null,
@@ -86,7 +83,8 @@ public class SetUserAcademicContextsService implements SetUserAcademicContextsUs
                         input.careerId()))
                 .toList();
 
-        requestedContexts.forEach(context -> AcademicContextValidator.validate(context, targetRole));
+        // Count (0 for global roles, 1..N for DECANO/DIRECTOR), shape per role and no duplicates (IAM-009).
+        AcademicContextValidator.validateAll(requestedContexts, targetRole);
         validateCatalogReferences(requestedContexts);
 
         return contextRepository.replaceAllForUser(command.targetUserId(), requestedContexts);
@@ -114,17 +112,6 @@ public class SetUserAcademicContextsService implements SetUserAcademicContextsUs
                     && !catalogRepository.existsActiveProgram(context.careerId(), context.facultyId())) {
                 throw new CareerNotFoundException();
             }
-        }
-    }
-
-    private void validateContextCount(RoleType role, int count) {
-        int expected = switch (role) {
-            case SUPERADMIN, RECTOR -> 0;
-            case DECANO, DIRECTOR -> 1;
-        };
-        if (count != expected) {
-            throw new InvalidAcademicContextException(
-                    "Role " + role + " requires exactly " + expected + " academic context(s).");
         }
     }
 

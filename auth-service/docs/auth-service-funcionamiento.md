@@ -125,8 +125,8 @@ El caso de uso ejecuta, en este orden, las verificaciones relevantes:
 
 1. Confirma que el usuario objetivo exista.
 2. Lee sus roles locales reconocidos, sincronizados desde Keycloak, y selecciona el de mayor precedencia: `SUPERADMIN`, `RECTOR`, `DECANO`, `DIRECTOR`.
-3. Exige cero contextos para `SUPERADMIN`/`RECTOR` y exactamente uno para `DECANO`/`DIRECTOR`.
-4. Valida la forma del contexto: rector y superadmin sin facultad/programa; decano con facultad y sin programa; director con facultad y programa.
+3. Exige cero contextos para `SUPERADMIN`/`RECTOR` y entre uno y 20 para `DECANO`/`DIRECTOR` (IAM-009: por ejemplo, un decano interino de dos facultades o un director de dos carreras).
+4. Valida la forma de cada contexto (rector y superadmin sin facultad/programa; decano con facultad y sin programa; director con facultad y programa) y rechaza los repetidos (`400`). Las reglas viven en `AcademicContextValidator.validateAll`.
 5. Comprueba que facultad y programa existan y estén activos en los catálogos locales; el programa debe pertenecer a la facultad indicada.
 6. Reemplaza el conjunto previo dentro de una transacción y registra `USER_ACADEMIC_CONTEXTS_REPLACED` en `admin_audit_log` (misma transacción) con actor, IP, objetivo y los contextos antes y después. Si la operación falla, el registro `FAILURE` se escribe en una transacción independiente y sobrevive al rollback.
 
@@ -199,13 +199,13 @@ Las migraciones observadas definen:
 
 - `users`: UUID local, `keycloak_id` único, username/email únicos, perfil, estado y marcas de tiempo.
 - `roles` y `user_roles`: roles del realm vistos en la sincronización y su relación con usuarios. Desde V6 la tabla se llena sola: un rol nuevo de Keycloak se registra la primera vez que llega en un evento.
-- `user_academic_contexts`: asignaciones de facultad/programa, con reglas y referencias a catálogos.
+- `user_academic_contexts`: asignaciones de facultad/programa, con reglas y referencias a catálogos. Un usuario puede tener varias; desde V8 la restricción `uq_user_academic_contexts_scope` (`UNIQUE NULLS NOT DISTINCT (user_id, faculty_id, career_id)`) impide repetir una.
 - `academic_faculties` y `academic_programs`: catálogo académico local, consumido por la API de asignación.
 - `processed_keycloak_events`: inbox de idempotencia, con `event_id` como clave primaria y timestamp de procesamiento.
 - `example_users`: tabla de la antigua funcionalidad demostrativa. El código que la usaba se eliminó en IAM-004; la tabla se conserva para no borrar datos.
 - `admin_audit_log`: auditoría persistente de operaciones administrativas (V7), con estado antes/después en `jsonb`.
 
-V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los cuatro roles de aplicación. V5 crea la tabla inbox de eventos. V6 da a `roles.id` una secuencia, amplía `name` a 255 caracteres y hace opcional `description`, para que la sincronización registre roles nuevos. V7 crea `admin_audit_log` y elimina `revinfo`/`revchanges`, que V1 había creado para Hibernate Envers sin que Envers llegara a usarse.
+V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los cuatro roles de aplicación. V5 crea la tabla inbox de eventos. V6 da a `roles.id` una secuencia, amplía `name` a 255 caracteres y hace opcional `description`, para que la sincronización registre roles nuevos. V7 crea `admin_audit_log` y elimina `revinfo`/`revchanges`, que V1 había creado para Hibernate Envers sin que Envers llegara a usarse. V8 borra contextos duplicados (si los hubiera, conserva el más antiguo) y agrega la restricción única por usuario, facultad y carrera.
 
 ## Rutas auxiliares y límites funcionales
 
