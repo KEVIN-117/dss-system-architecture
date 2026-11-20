@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.6.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.5.0...admin-portal-v1.6.0) (2026-11-20)
+
+
+### Features
+
+* **Admin-portal:** gestión de roles y permisos ([#330](https://github.com/KEVIN-117/dss-system-architecture/issues/330)) ([7a74b91](https://github.com/KEVIN-117/dss-system-architecture/commit/7a74b9192561bafdf2b35696e84e3444d71bfe39))
+* **Admin-portal:** users management ([#327](https://github.com/KEVIN-117/dss-system-architecture/issues/327)) ([638d675](https://github.com/KEVIN-117/dss-system-architecture/commit/638d675395f2156bf4766543c5ee187cd9d7e30c))
+
 ## [1.5.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.4.1...admin-portal-v1.5.0) (2026-11-20)
 
 
