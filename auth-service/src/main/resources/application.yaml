@@ -58,6 +58,8 @@ jwt:
     converter:
       resource-id: ${KEYCLOAK_RESOURCE_ID:uatf-auth-service}
       principal-attribute: ${KEYCLOAK_PRINCIPAL_ATTRIBUTE:preferred_username}
+      # Catalog client whose roles are functional permissions (resource:action). IAM-004.
+      permissions-client-id: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:dss-permissions}
 
 app:
   security:

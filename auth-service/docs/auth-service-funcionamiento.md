@@ -49,17 +49,23 @@ Las rutas combinan el contexto `/api/v1` con los mappings de cada controlador:
 | Ruta | Acceso | Función |
 |---|---|---|
 | `GET /api/v1/auth/me` | JWT válido | Devuelve el perfil local del `sub` y sus contextos académicos. |
-| `PUT /api/v1/admin/users/{userId}/academic-contexts` | JWT con `ROLE_SUPERADMIN` | Reemplaza los contextos académicos del usuario indicado por su UUID local. |
-| `GET /api/v1/demo/public` | Pública | Ruta demostrativa. |
-| `GET /api/v1/demo/admin` | JWT y `SUPERADMIN` | Comprueba el control de acceso por rol. |
-| `GET /api/v1/demo/rector` | JWT y `RECTOR` | Comprueba el control de acceso por rol. |
-| `GET /api/v1/demo/decano` | JWT y `DECANO` | Comprueba el control de acceso por rol. |
-| `GET /api/v1/demo/director` | JWT y `DIRECTOR` | Comprueba el control de acceso por rol. |
-| `POST /api/v1/example-user` | JWT válido | Registra un usuario auxiliar de ejemplo; responde `201` o `409`. |
+| `GET /api/v1/admin/users`, `GET /api/v1/admin/users/{userId}` | Permiso `iam:users:read` | Directorio administrativo de usuarios. |
+| `PUT /api/v1/admin/users/{userId}/academic-contexts` | Permiso `iam:users:write` | Reemplaza los contextos académicos del usuario indicado por su UUID local. |
+| `GET /api/v1/admin/academic-catalog` | Permiso `iam:users:read` | Catálogo de facultades y carreras activas. |
+| `GET /api/v1/internal/users/{keycloakId}/academic-contexts` | Permiso `context:read` y `azp` permitido | Alcance académico para cuentas de servicio. |
 
-La cadena de seguridad es stateless, deshabilita CSRF y requiere bearer JWT para toda ruta que no esté declarada pública. OpenAPI/Swagger también está permitido en la cadena; su disponibilidad se controla con `AUTH_API_DOCS_ENABLED` y su valor cambia por perfil. CORS permite explícitamente `GET`, `PUT` y `OPTIONS`, los encabezados `Authorization` y `Content-Type`, y no permite credenciales de navegador. Por ello, `POST /example-user` no está incluido en los métodos CORS actuales.
+La cadena de seguridad es stateless, deshabilita CSRF y requiere bearer JWT para toda ruta que no esté declarada pública. OpenAPI/Swagger también está permitido en la cadena; su disponibilidad se controla con `AUTH_API_DOCS_ENABLED` y su valor cambia por perfil. CORS permite explícitamente `GET`, `PUT` y `OPTIONS`, los encabezados `Authorization` y `Content-Type`, y no permite credenciales de navegador.
 
-`JwtConverter` agrega autoridades derivadas de scopes y roles del claim `resource_access[KEYCLOAK_RESOURCE_ID].roles`; convierte los roles a `ROLE_<nombre>`. El principal se obtiene del claim configurado, con fallback a `preferred_username` y luego `sub`. Para consultar el perfil, sin embargo, el controlador usa directamente el `sub` como UUID de Keycloak.
+`JwtConverter` (IAM-004) construye las autoridades así:
+
+| Claim | Authority | Ejemplo |
+|---|---|---|
+| `resource_access[KEYCLOAK_PERMISSIONS_CLIENT_ID].roles` (default `dss-permissions`) | El permiso tal cual, sin prefijo | `iam:users:write` |
+| `realm_access.roles` | `ROLE_<rol>` | `ROLE_SUPERADMIN` |
+| `resource_access[KEYCLOAK_RESOURCE_ID].roles` (default `uatf-auth-service`) | `ROLE_<rol>` (heredado; se retira en IAM-019) | `ROLE_CONTEXT_READER` |
+| `scope` | `SCOPE_<scope>` | `SCOPE_profile` |
+
+Los endpoints autorizan con `hasAuthority('<permiso>')`. Tener el rol `ROLE_SUPERADMIN` sin el permiso ya no da acceso. El principal se obtiene del claim configurado, con fallback a `preferred_username` y luego `sub`. Para consultar el perfil, sin embargo, el controlador usa directamente el `sub` como UUID de Keycloak.
 
 ## Flujo A: consulta del perfil
 
@@ -103,7 +109,7 @@ El listener de Keycloak captura las excepciones del publisher y solo las escribe
 
 ## Flujo C: asignación del contexto académico
 
-`AcademicContextAssignmentController` expone `PUT /api/v1/admin/users/{userId}/academic-contexts`. `userId` es el UUID local; el actor se identifica a partir del `sub` del JWT. `@PreAuthorize` exige `ROLE_SUPERADMIN` directamente desde las autoridades del token.
+`AcademicContextAssignmentController` expone `PUT /api/v1/admin/users/{userId}/academic-contexts`. `userId` es el UUID local; el actor se identifica a partir del `sub` del JWT. `@PreAuthorize` exige el permiso `iam:users:write` directamente desde las autoridades del token.
 
 El body contiene el conjunto completo a guardar:
 
@@ -139,19 +145,17 @@ La secuencia de sincronización del catálogo está centralizada en [Diagramas d
 Las migraciones observadas definen:
 
 - `users`: UUID local, `keycloak_id` único, username/email únicos, perfil, estado y marcas de tiempo.
-- `roles` y `user_roles`: catálogo de roles reconocidos y relación de usuarios.
+- `roles` y `user_roles`: roles del realm vistos en la sincronización y su relación con usuarios. Desde V6 la tabla se llena sola: un rol nuevo de Keycloak se registra la primera vez que llega en un evento.
 - `user_academic_contexts`: asignaciones de facultad/programa, con reglas y referencias a catálogos.
 - `academic_faculties` y `academic_programs`: catálogo académico local, consumido por la API de asignación.
 - `processed_keycloak_events`: inbox de idempotencia, con `event_id` como clave primaria y timestamp de procesamiento.
-- `example_users`: tabla auxiliar de registro demostrativo.
+- `example_users`: tabla de la antigua funcionalidad demostrativa. El código que la usaba se eliminó en IAM-004; la tabla se conserva para no borrar datos.
 - `revinfo` y `revchanges`: tablas preexistentes en la migración inicial.
 
-V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los cuatro roles de aplicación. V5 crea la tabla inbox de eventos. Las tablas `revinfo`/`revchanges` no bastan para afirmar que el historial se registre: el `pom.xml` revisado no declara Hibernate Envers ni se encontraron entidades anotadas con `@Audited`.
+V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los cuatro roles de aplicación. V5 crea la tabla inbox de eventos. V6 da a `roles.id` una secuencia, amplía `name` a 255 caracteres y hace opcional `description`, para que la sincronización registre roles nuevos. Las tablas `revinfo`/`revchanges` no bastan para afirmar que el historial se registre: el `pom.xml` revisado no declara Hibernate Envers ni se encontraron entidades anotadas con `@Audited`.
 
 ## Rutas auxiliares y límites funcionales
 
-- `DemoEndpoint` contiene rutas para probar acceso por rol; no implementa acciones DSS ni dashboards.
-- `ExampleUserController` y `RegisterExampleUserService` verifican correo duplicado y persisten un registro en `example_users`; son funcionalidad demostrativa.
 - Los roles locales sirven como snapshot consultado para reglas del contexto académico. La seguridad HTTP usa los roles presentes en el JWT.
 - No hay un endpoint en `auth-service` para conceder o revocar roles en Keycloak; el servicio recibe y replica snapshots de roles, pero la administración de esos roles ocurre en Keycloak.
 - El servicio no implementa autorización por facultad/programa sobre endpoints de analítica, no configura RLS y no propaga aquí un contexto de sesión al Data Warehouse.
@@ -182,7 +186,7 @@ El diagrama C4 de componentes actualizado está en [auth-service-componentes.mmd
 | Build y ejecución | `auth-service/pom.xml`, `auth-service/Dockerfile`, `auth-service/src/main/java/uatf/dss/authservice/AuthServiceApplication.java` |
 | API, seguridad y configuración | `adapter/in/web/*Controller.java`, `SecurityConfig.java`, `JwtConverter.java`, `application*.yaml`, `OpenApiConfig.java` |
 | Eventos | `adapter/in/messaging/KeycloakUserEventConsumer.java`, `RabbitMessagingConfiguration.java`, módulo `keycloak-webhook/src/main/java/uatf/keycloak/*` |
-| Casos de uso | `GetAuthUserProfileService.java`, `SyncUserService.java`, `SetUserAcademicContextsService.java`, `RegisterExampleUserService.java` |
+| Casos de uso | `GetAuthUserProfileService.java`, `SyncUserService.java`, `SetUserAcademicContextsService.java` |
 | Dominio | `User.java`, `UserAcademicContext.java`, `RoleType.java`, `AcademicContextValidator.java`, excepciones de dominio |
 | Persistencia | `adapter/out/persistence/*`, `V1__init_schema.sql`–`V5__create_keycloak_event_inbox.sql` |
 | Catálogo académico | `V3__create_academic_catalog.sql`, `auth-service/ops/database/provision-hop-academic-catalog.sql`, workflow y pipelines `etl-layer/apache-hop/projects/dss-uatf-etl` |

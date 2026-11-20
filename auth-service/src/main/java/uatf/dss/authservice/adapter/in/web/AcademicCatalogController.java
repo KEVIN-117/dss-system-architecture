@@ -23,8 +23,8 @@ public class AcademicCatalogController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_SUPERADMIN')")
-    @Operation(summary = "Listar facultades y carreras activas", description = "Catálogo académico local para asignar contextos. Requiere SUPERADMIN.")
+    @PreAuthorize("hasAuthority('iam:users:read')")
+    @Operation(summary = "Listar facultades y carreras activas", description = "Catálogo académico local para asignar contextos. Requiere el permiso iam:users:read.")
     public ResponseEntity<AcademicCatalog> getCatalog() {
         return ResponseEntity.ok(listAcademicCatalog.execute());
     }

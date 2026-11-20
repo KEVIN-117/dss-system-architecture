@@ -17,7 +17,6 @@ import org.springframework.context.annotation.Configuration;
         tags = {
                 @Tag(name = "Autenticación", description = "Consulta del perfil del usuario autenticado."),
                 @Tag(name = "Administración", description = "Administración protegida de contextos académicos."),
-                @Tag(name = "Demostración", description = "Rutas de ejemplo para validar roles del token."),
                 @Tag(name = "Mensajería", description = "Consumidores de eventos de Keycloak desde RabbitMQ.")
         })
 @SecuritySchemes({

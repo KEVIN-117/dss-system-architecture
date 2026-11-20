@@ -12,53 +12,77 @@ import org.springframework.security.oauth2.server.resource.authentication.JwtGra
 import org.springframework.stereotype.Component;
 
 import java.util.Collection;
+import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.Set;
-import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
+/**
+ * Turns a Keycloak access token into Spring Security authorities (IAM-004, decision D1):
+ * <ul>
+ *     <li>{@code resource_access.<permissions-client-id>.roles} (default {@code dss-permissions}): functional
+ *     permissions, kept as-is without prefix, e.g. {@code iam:users:write}. Checked with {@code hasAuthority}.</li>
+ *     <li>{@code realm_access.roles}: realm roles as {@code ROLE_<name>}, e.g. {@code ROLE_SUPERADMIN}.</li>
+ *     <li>{@code resource_access.<resource-id>.roles} (default {@code uatf-auth-service}): legacy client roles as
+ *     {@code ROLE_<name>}, kept while services migrate to {@code dss-permissions} (removed in IAM-019).</li>
+ *     <li>{@code scope}: {@code SCOPE_<scope>}.</li>
+ * </ul>
+ */
 @Component
 public class JwtConverter implements Converter<Jwt, AbstractAuthenticationToken> {
-    private final JwtGrantedAuthoritiesConverter jwtGrantedAuthoritiesConverter = new JwtGrantedAuthoritiesConverter();
 
-    @Value("${jwt.auth.converter.principal-attribute}")
-    private String principalAttribute;
-    @Value("${jwt.auth.converter.resource-id}")
-    private String resourceId;
+    private static final String ROLE_PREFIX = "ROLE_";
 
-    @Override
-    public AbstractAuthenticationToken convert(@NonNull Jwt jwt){
-        Collection<GrantedAuthority> authorities = Stream.concat(jwtGrantedAuthoritiesConverter.convert(jwt).stream(), extractResourceRoles(jwt).stream()).collect(Collectors.toSet());
+    private final JwtGrantedAuthoritiesConverter scopesConverter = new JwtGrantedAuthoritiesConverter();
+    private final String principalAttribute;
+    private final String legacyRoleClientId;
+    private final String permissionsClientId;
 
-        return new JwtAuthenticationToken(jwt, authorities, getPrincipleClaimName(jwt));
+    public JwtConverter(
+            @Value("${jwt.auth.converter.principal-attribute:preferred_username}") String principalAttribute,
+            @Value("${jwt.auth.converter.resource-id:uatf-auth-service}") String legacyRoleClientId,
+            @Value("${jwt.auth.converter.permissions-client-id:dss-permissions}") String permissionsClientId) {
+        this.principalAttribute = principalAttribute;
+        this.legacyRoleClientId = legacyRoleClientId;
+        this.permissionsClientId = permissionsClientId;
     }
 
-    private String getPrincipleClaimName(Jwt jwt) {
+    @Override
+    public AbstractAuthenticationToken convert(@NonNull Jwt jwt) {
+        Set<GrantedAuthority> authorities = new LinkedHashSet<>(scopesConverter.convert(jwt));
+        clientRoles(jwt, permissionsClientId).map(SimpleGrantedAuthority::new).forEach(authorities::add);
+        realmRoles(jwt).map(role -> new SimpleGrantedAuthority(ROLE_PREFIX + role)).forEach(authorities::add);
+        clientRoles(jwt, legacyRoleClientId).map(role -> new SimpleGrantedAuthority(ROLE_PREFIX + role))
+                .forEach(authorities::add);
+        return new JwtAuthenticationToken(jwt, authorities, principalName(jwt));
+    }
+
+    private String principalName(Jwt jwt) {
         if (principalAttribute != null && jwt.hasClaim(principalAttribute)) {
             return jwt.getClaimAsString(principalAttribute);
         }
-        return jwt.hasClaim("preferred_username")
-                ? jwt.getClaimAsString("preferred_username")
-                : jwt.getSubject();
+        return jwt.hasClaim("preferred_username") ? jwt.getClaimAsString("preferred_username") : jwt.getSubject();
     }
 
-    private Collection<? extends GrantedAuthority> extractResourceRoles(Jwt jwt) {
-        Object resourceAccessClaim = jwt.getClaim("resource_access");
-        if (!(resourceAccessClaim instanceof Map<?, ?> resourceAccess)) {
-            return Set.of();
+    private static Stream<String> realmRoles(Jwt jwt) {
+        return roles(jwt.getClaim("realm_access"));
+    }
+
+    private static Stream<String> clientRoles(Jwt jwt, String clientId) {
+        if (clientId == null || clientId.isBlank()
+                || !(jwt.getClaim("resource_access") instanceof Map<?, ?> resourceAccess)) {
+            return Stream.empty();
         }
-        Object resourceObj = resourceAccess.get(resourceId);
-        if (!(resourceObj instanceof Map<?, ?> resource)) {
-            return Set.of();
-        }
-        Object rolesObj = resource.get("roles");
-        if (!(rolesObj instanceof Collection<?> roles)) {
-            return Set.of();
+        return roles(resourceAccess.get(clientId));
+    }
+
+    private static Stream<String> roles(Object container) {
+        if (!(container instanceof Map<?, ?> map) || !(map.get("roles") instanceof Collection<?> roles)) {
+            return Stream.empty();
         }
         return roles.stream()
                 .filter(String.class::isInstance)
                 .map(String.class::cast)
-                .map(role -> new SimpleGrantedAuthority("ROLE_" + role))
-                .collect(Collectors.toSet());
+                .filter(role -> !role.isBlank());
     }
 }

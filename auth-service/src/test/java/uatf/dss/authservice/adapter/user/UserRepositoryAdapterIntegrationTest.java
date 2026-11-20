@@ -14,6 +14,8 @@ import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
 import uatf.dss.authservice.domain.model.User;
 
 import java.util.Optional;
+import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -205,5 +207,28 @@ public class UserRepositoryAdapterIntegrationTest {
     void shouldThrowNotFoundExceptionWhenDeletingNonExistentUser() {
         UUID nonExistentId = UUID.randomUUID();
         assertThrows(UserNotFoundException.class, () -> userRepository.delete(nonExistentId));
+    }
+    @Test
+    @DisplayName("Should register a realm role seen for the first time instead of failing the sync (IAM-004)")
+    void shouldRegisterUnknownRolesWhenReplacingSnapshot() {
+        String newRole = "COORDINADOR_" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        User saved = userRepository.save(User.create(null, UUID.randomUUID(), "coordinador", "coordinador@uatf.edu.bo",
+                "Coordinación", "Académica", true));
+        try {
+            userRepository.replaceRoleSnapshot(saved.id(), Set.of("DIRECTOR", newRole));
+
+            assertEquals(Set.of("DIRECTOR", newRole), Set.copyOf(userRepository.findRoleNamesByUserId(saved.id())));
+            Integer newRoleId = jdbcTemplate.queryForObject("SELECT id FROM roles WHERE name = ?", Integer.class, newRole);
+            assertTrue(newRoleId > 4, "new roles take ids after the V4 seed");
+            assertNull(jdbcTemplate.queryForObject("SELECT description FROM roles WHERE name = ?", String.class, newRole));
+
+            // A second sync with the same role reuses the row.
+            userRepository.replaceRoleSnapshot(saved.id(), Set.of(newRole));
+            assertEquals(List.of(newRole), userRepository.findRoleNamesByUserId(saved.id()));
+            assertEquals(1, jdbcTemplate.queryForObject("SELECT COUNT(*) FROM roles WHERE name = ?", Integer.class, newRole));
+        } finally {
+            jdbcTemplate.update("DELETE FROM user_roles WHERE role_id IN (SELECT id FROM roles WHERE name = ?)", newRole);
+            jdbcTemplate.update("DELETE FROM roles WHERE name = ?", newRole);
+        }
     }
 }

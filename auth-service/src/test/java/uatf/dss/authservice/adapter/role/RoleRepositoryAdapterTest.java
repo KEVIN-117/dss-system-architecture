@@ -13,7 +13,6 @@ import uatf.dss.authservice.adapter.out.persistence.role.RolePersistenceMapper;
 import uatf.dss.authservice.adapter.out.persistence.role.RoleRepositoryAdapter;
 import uatf.dss.authservice.adapter.out.persistence.role.SpringDataRoleRepository;
 import uatf.dss.authservice.domain.model.Role;
-import uatf.dss.authservice.domain.model.RoleType;
 
 import java.util.List;
 import java.util.Optional;
@@ -46,7 +45,7 @@ class RoleRepositoryAdapterTest {
 
         assertTrue(result.isPresent());
         assertEquals(1, result.get().id());
-        assertEquals(RoleType.SUPERADMIN, result.get().name());
+        assertEquals("SUPERADMIN", result.get().name());
         assertEquals("Super Admin role", result.get().description());
     }
 
@@ -70,7 +69,7 @@ class RoleRepositoryAdapterTest {
         List<Role> result = adapter.listAll();
 
         assertEquals(2, result.size());
-        assertEquals(RoleType.SUPERADMIN, result.get(0).name());
-        assertEquals(RoleType.RECTOR, result.get(1).name());
+        assertEquals("SUPERADMIN", result.get(0).name());
+        assertEquals("RECTOR", result.get(1).name());
     }
 }

@@ -19,13 +19,14 @@ import java.util.Set;
 @AllArgsConstructor
 public class RoleEntity {
     @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "id", nullable = false, updatable = false)
     private Integer id;
 
-    @Column(name = "name", nullable = false, unique = true, length = 50)
+    @Column(name = "name", nullable = false, unique = true, length = 255)
     private String name;
 
-    @Column(name = "description", nullable = false, unique = false, length = 255)
+    @Column(name = "description", length = 255)
     private String description;
 
     @ManyToMany(mappedBy = "roles")

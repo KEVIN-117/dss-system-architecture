@@ -26,7 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class InternalAcademicScopeControllerTest extends BaseWebMvcTest {
 
     private static final String PATH = "/internal/users/{id}/academic-contexts";
-    private static final SimpleGrantedAuthority CONTEXT_READER = new SimpleGrantedAuthority("ROLE_CONTEXT_READER");
+    private static final SimpleGrantedAuthority CONTEXT_READER = new SimpleGrantedAuthority("context:read");
 
     @MockitoBean
     private GetUserAcademicScopeUseCase useCase;
@@ -35,6 +35,15 @@ class InternalAcademicScopeControllerTest extends BaseWebMvcTest {
     void unauthenticatedRequestIsRejected() throws Exception {
         mockMvc.perform(get(PATH, UUID.randomUUID()))
                 .andExpect(status().isUnauthorized());
+        verify(useCase, never()).execute(any());
+    }
+
+    @Test
+    void legacyContextReaderRoleWithoutPermissionIsForbidden() throws Exception {
+        mockMvc.perform(get(PATH, UUID.randomUUID())
+                        .with(jwt().jwt(token -> token.claim("azp", "olap-service"))
+                                .authorities(new SimpleGrantedAuthority("ROLE_CONTEXT_READER"))))
+                .andExpect(status().isForbidden());
         verify(useCase, never()).execute(any());
     }
 

@@ -11,7 +11,6 @@ import org.springframework.test.context.ActiveProfiles;
 import uatf.dss.authservice.TestcontainersConfiguration;
 import uatf.dss.authservice.application.port.out.RoleRepository;
 import uatf.dss.authservice.domain.model.Role;
-import uatf.dss.authservice.domain.model.RoleType;
 
 import java.util.List;
 import java.util.Optional;
@@ -41,14 +40,14 @@ public class RoleRepositoryAdapterIntegrationTest {
     }
 
     @Test
-    @DisplayName("Should find role by name matching domain RoleType")
+    @DisplayName("Should find role by name matching the Keycloak role name")
     void shouldFindRoleByName() {
         Optional<Role> roleOpt = roleRepository.findByName("SUPERADMIN");
 
         assertTrue(roleOpt.isPresent(), "Role SUPERADMIN should be found");
         Role role = roleOpt.get();
         assertEquals(1, role.id());
-        assertEquals(RoleType.SUPERADMIN, role.name());
+        assertEquals("SUPERADMIN", role.name());
         assertEquals("Super Administrator role", role.description());
     }
 
@@ -67,9 +66,9 @@ public class RoleRepositoryAdapterIntegrationTest {
 
         assertNotNull(allRoles);
         assertEquals(4, allRoles.size(), "Should return all 4 seeded roles");
-        assertTrue(allRoles.stream().anyMatch(r -> r.name() == RoleType.SUPERADMIN));
-        assertTrue(allRoles.stream().anyMatch(r -> r.name() == RoleType.RECTOR));
-        assertTrue(allRoles.stream().anyMatch(r -> r.name() == RoleType.DECANO));
-        assertTrue(allRoles.stream().anyMatch(r -> r.name() == RoleType.DIRECTOR));
+        assertTrue(allRoles.stream().anyMatch(r -> "SUPERADMIN".equals(r.name())));
+        assertTrue(allRoles.stream().anyMatch(r -> "RECTOR".equals(r.name())));
+        assertTrue(allRoles.stream().anyMatch(r -> "DECANO".equals(r.name())));
+        assertTrue(allRoles.stream().anyMatch(r -> "DIRECTOR".equals(r.name())));
     }
 }
