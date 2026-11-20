@@ -6,6 +6,7 @@ import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
+from collections.abc import Collection
 from typing import Any, Mapping, Protocol
 from uuid import uuid4
 
@@ -39,6 +40,8 @@ class Principal:
     subject: str
     roles: frozenset[str]
     academic_contexts: tuple[Mapping[str, Any], ...]
+    #: Catalog permissions (``resource_access.dss-permissions.roles``), IAM-013.
+    permissions: frozenset[str] = frozenset()
 
 
 class IdentityProvider(Protocol):
@@ -95,25 +98,48 @@ class PredictionService:
         }
 
 
-def authorize_program_context(principal: Principal, context: ProgramContext, allowed_roles: set[str]) -> None:
-    """Apply the existing DSS academic hierarchy to one requested program.
+ANALYTICS_READ = "analytics:read"
+ANALYTICS_GLOBAL = "analytics:global"
+ANALYTICS_FACULTY = "analytics:faculty"
+ANALYTICS_CAREER = "analytics:career"
+#: What each legacy academic role meant, expressed as catalog permissions (coexistence, IAM-013).
+LEGACY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
+    "RECTOR": frozenset({ANALYTICS_READ, ANALYTICS_GLOBAL}),
+    "DECANO": frozenset({ANALYTICS_READ, ANALYTICS_FACULTY}),
+    "DIRECTOR": frozenset({ANALYTICS_READ, ANALYTICS_CAREER}),
+}
 
-    The enabled role set is mandatory configuration. SUPERADMIN has no
-    academic access. Rector is institution-wide; decano and director are
-    constrained by current Auth Service academicContexts.
+
+def academic_permissions(principal: Principal, legacy_roles: Collection[str] = frozenset()) -> frozenset[str]:
+    """Token permissions plus what the accepted legacy academic roles meant."""
+    granted = set(principal.permissions)
+    for role in principal.roles & frozenset(legacy_roles):
+        granted |= LEGACY_ROLE_PERMISSIONS.get(role, frozenset())
+    return frozenset(granted)
+
+
+def authorize_program_context(
+    principal: Principal, context: ProgramContext, legacy_roles: Collection[str] = frozenset()
+) -> None:
+    """Authorize one requested program against the principal's permissions and academic contexts.
+
+    ``analytics:read`` is required, then a scope: ``analytics:global`` is institution-wide,
+    ``analytics:faculty`` covers the faculty of any faculty context (``careerId`` empty) and
+    ``analytics:career`` the program of any career context. The scope is the union over every
+    context and every scope permission (IAM-009). ``legacy_roles`` are the academic roles still
+    accepted during the coexistence, translated through :data:`LEGACY_ROLE_PERMISSIONS`. SUPERADMIN
+    has no academic permission, hence no academic access.
     """
-    roles = principal.roles & allowed_roles
-    if "RECTOR" in roles:
-        return
-    if "DECANO" in roles:
-        if any(
+    permissions = academic_permissions(principal, legacy_roles)
+    if ANALYTICS_READ in permissions:
+        if ANALYTICS_GLOBAL in permissions:
+            return
+        if ANALYTICS_FACULTY in permissions and any(
             item.get("facultyId") == context.faculty_id and item.get("careerId") is None
             for item in principal.academic_contexts
         ):
             return
-        raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The requested academic program is outside the authorized scope.")
-    if "DIRECTOR" in roles:
-        if any(
+        if ANALYTICS_CAREER in permissions and any(
             item.get("facultyId") == context.faculty_id and item.get("careerId") == context.program_code
             for item in principal.academic_contexts
         ):

@@ -40,6 +40,7 @@ PERMISSIONS=(
   "connectors:read|Consultar conectores de datos."
   "connectors:write|Crear y modificar conectores de datos."
   "prediction:train|Entrenar modelos y gestionar datasets y modelos de predicción."
+  "prediction:publish|Iniciar el scoring poblacional y publicar predicciones dentro del alcance académico."
   "olap:admin|Administrar Saiku: datasources, estadísticas y endpoints de administración."
   "olap:user|Usar el workspace OLAP de Saiku."
   "dw:closure:read|Consultar cierres académicos y sus eventos."

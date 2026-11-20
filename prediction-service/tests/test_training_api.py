@@ -20,6 +20,8 @@ class FakeIdentity:
     PRINCIPALS = {
         "operator-token": Principal("operator-1", frozenset({"SUPERADMIN"}), ()),
         "rector-token": Principal("rector-1", frozenset({"RECTOR"}), ()),
+        # IAM-013: the permission alone, without the SUPERADMIN role.
+        "ml-permission-token": Principal("ml-1", frozenset(), (), frozenset({"prediction:train"})),
     }
 
     def authenticate(self, access_token: str) -> Principal:
@@ -162,6 +164,21 @@ class TrainingApiTests(unittest.TestCase):
                                           headers={"Idempotency-Key": "bad-policy-key-0001"})
         self.assertEqual(response.status_code, 503)
         self.assertEqual(response.json()["code"], "AUTHORIZATION_UNAVAILABLE")
+
+    @patch("training.tasks.train_model_task.apply_async")
+    def test_prediction_train_permission_grants_training_and_legacy_role_follows_the_flag(self, mock_dispatch) -> None:
+        body = {"dataset_ref": "fixture:pred003_synthetic-v1", "algorithm": "random_forest"}
+        permitted = self.client.post("/v1/training-jobs", json=body, headers={
+            "Authorization": "Bearer ml-permission-token", "Idempotency-Key": "permission-operator-0001"})
+        self.assertEqual(permitted.status_code, 202)
+        self.assertEqual(permitted.json()["submitted_by"], "ml-1")
+        with patch.dict("os.environ", {"PREDICTION_LEGACY_ROLES_ENABLED": "false"}):
+            legacy = self.operator.post("/v1/training-jobs", json=body,
+                                        headers={"Idempotency-Key": "legacy-operator-0001"})
+            still_permitted = self.client.post("/v1/training-jobs", json=body, headers={
+                "Authorization": "Bearer ml-permission-token", "Idempotency-Key": "permission-operator-0002"})
+        self.assertEqual(legacy.status_code, 403, "SUPERADMIN without prediction:train once the coexistence is off")
+        self.assertEqual(still_permitted.status_code, 202)
 
     def test_training_job_status_requires_operator(self) -> None:
         job_id = "d8b9e194-87bf-41e6-a668-2f8c95dab731"

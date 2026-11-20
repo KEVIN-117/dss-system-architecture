@@ -47,7 +47,7 @@ Desde IAM-002 (decisiones D1 y D4 de `docs/auth/rbac-iam-admin-proposal.md`), el
 | RECTOR | DECANO + `analytics:global`, `connectors:read` |
 | SUPERADMIN | `connectors:read`, `connectors:write`, `pipelines:read`, `pipelines:execute`, `prediction:train`, `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read` |
 
-- **Permisos que se asignan por usuario:** `olap:admin`, `olap:user`, `dw:closure:read`, `dw:closure:manage` y `dw:etl-monitor:read`. Ningún rol los incluye.
+- **Permisos que se asignan por usuario:** `olap:admin`, `olap:user`, `dw:closure:read`, `dw:closure:manage`, `dw:etl-monitor:read` y `prediction:publish` (IAM-013: iniciar el scoring poblacional). Ningún rol los incluye.
 - **Permiso de servicio:** `context:read`, que tiene `service-account-olap-service`.
 
 **Convivencia:** los roles antiguos (`uatf-auth-service:*`, `DW_*`, `OLAP_*`, `CONTEXT_READER`) se mantienen en los compuestos y en las cuentas de servicio hasta que todos los servicios lean `dss-permissions` (IAM-011 a IAM-014). Se retiran en IAM-019.

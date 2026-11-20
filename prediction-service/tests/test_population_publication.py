@@ -12,8 +12,8 @@ from training.prediction_publication_store import PredictionPublicationStore
 
 
 class Identity:
-    def __init__(self, roles=("RECTOR",)):
-        self.principal = Principal("actor-1", frozenset(roles), ())
+    def __init__(self, roles=("RECTOR",), permissions=()):
+        self.principal = Principal("actor-1", frozenset(roles), (), frozenset(permissions))
 
     def authenticate(self, token):
         return self.principal
@@ -56,12 +56,41 @@ class PopulationPublicationTests(unittest.TestCase):
         self.assertNotIn("authorized_scope", first)
         self.assertEqual(self.store.pending(), [first["batch_id"]])
 
-    def test_explicit_submitter_policy_fails_closed(self):
+    def test_empty_submitter_list_accepts_no_legacy_role(self):
+        # IAM-013: an empty list no longer means "not configured"; submission is granted by prediction:publish.
         self.env.stop()
         with patch.dict(os.environ, {"PREDICTION_BATCH_SUBMITTER_ROLES": "[]"}):
             with self.assertRaises(InferenceFailure) as error:
                 self.service.submit("token", "P01", "42", "idempotency-key-0002")
-        self.assertEqual(error.exception.status_code, 503)
+        self.assertEqual(error.exception.status_code, 403)
+
+    def test_invalid_submitter_policy_fails_closed(self):
+        self.env.stop()
+        for raw in ("not-json", '["SUPERADMIN"]'):
+            with patch.dict(os.environ, {"PREDICTION_BATCH_SUBMITTER_ROLES": raw}):
+                with self.assertRaises(InferenceFailure) as error:
+                    self.service.submit("token", "P01", "42", "idempotency-key-0004")
+            self.assertEqual(error.exception.status_code, 503)
+
+    def test_prediction_publish_starts_scoring_within_the_academic_scope(self):
+        self.env.stop()
+        with patch.dict(os.environ, {"PREDICTION_BATCH_SUBMITTER_ROLES": "[]"}):
+            self.service.identity = Identity(("RECTOR",), ("prediction:publish",))
+            batch = self.service.submit("token", "P01", "42", "idempotency-key-0005")
+            self.assertEqual(batch["status"], "QUEUED")
+            # The permission never widens the scope: the policy still rejects programs outside it.
+            self.service.identity = Identity(("DIRECTOR",), ("prediction:publish",))
+            with self.assertRaises(InferenceFailure) as error:
+                self.service.submit("token", "P01", "42", "idempotency-key-0006")
+        self.assertEqual(error.exception.status_code, 403)
+
+    def test_legacy_submitter_roles_are_ignored_without_coexistence(self):
+        self.env.stop()
+        with patch.dict(os.environ, {"PREDICTION_BATCH_SUBMITTER_ROLES": '["RECTOR"]',
+                                     "PREDICTION_LEGACY_ROLES_ENABLED": "false"}):
+            with self.assertRaises(InferenceFailure) as error:
+                self.service.submit("token", "P01", "42", "idempotency-key-0007")
+        self.assertEqual(error.exception.status_code, 403)
 
     def test_account_without_submitter_role_is_rejected(self):
         self.service.identity = Identity(("DIRECTOR",))
