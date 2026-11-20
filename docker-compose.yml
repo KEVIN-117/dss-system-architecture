@@ -115,6 +115,8 @@ services:
       KEYCLOAK_JWK_SET_URI: ${AUTH_KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs}
       KEYCLOAK_DW_CONTROL_AUDIENCE: ${KEYCLOAK_DW_CONTROL_AUDIENCE:-dw-control-service}
       KEYCLOAK_DW_CONTROL_CLIENT_ID: ${KEYCLOAK_DW_CONTROL_CLIENT_ID:-dw-control-service}
+      KEYCLOAK_PERMISSIONS_CLIENT_ID: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:-dss-permissions}
+      DW_CONTROL_LEGACY_ROLES_ENABLED: ${DW_CONTROL_LEGACY_ROLES_ENABLED:-true}
     ports:
       - "127.0.0.1:${DW_CONTROL_PORT:-8090}:8090"
     networks:
