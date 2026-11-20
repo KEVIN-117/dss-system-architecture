@@ -213,8 +213,27 @@ export function getBffSessionConfig(
     idleTimeoutSeconds,
     maxLifetimeSeconds,
     refreshLeewaySeconds: SESSION_REFRESH_LEEWAY_SECONDS,
-    secure: environment.NODE_ENV === 'production',
+    secure: cookieSecureSetting(environment),
   };
+}
+
+/**
+ * Whether BFF cookies carry the `Secure` attribute. Defaults to production
+ * mode; `BFF_COOKIE_SECURE=false` is an explicit opt-out for deployments that
+ * are still served over plain HTTP, where browsers drop `Secure` cookies.
+ */
+function cookieSecureSetting(environment: Environment): boolean {
+  const raw = environment.BFF_COOKIE_SECURE?.trim().toLowerCase();
+  if (!raw) {
+    return environment.NODE_ENV === 'production';
+  }
+  if (raw === 'true') {
+    return true;
+  }
+  if (raw === 'false') {
+    return false;
+  }
+  throw new BffConfigurationError('BFF_COOKIE_SECURE must be "true" or "false"');
 }
 
 export function getBffSessionCookieName(

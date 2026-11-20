@@ -26,5 +26,6 @@ El BFF es el límite servidor para OAuth/OIDC, sesión web y llamadas a auth/OLA
 | `BFF_SESSION_MAX_LIFETIME_SECONDS` | Opcional | Duración absoluta desde el login, entero 900–86400 y ≥ idle; default 36000 (10 h). Alinear con `ssoSessionMaxLifespan`. |
 | `BFF_SESSION_COOKIE` | Opcional | Nombre seguro, caracteres alfanuméricos, `_` o `-`; default `dss_session`. |
 | `NODE_ENV` | Runtime | En `production`, la cookie se marca `Secure`; definirlo correctamente en el despliegue productivo. |
+| `BFF_COOKIE_SECURE` | Opcional | `true` o `false`; sobrescribe el atributo `Secure` de las cookies de sesión y de la transacción OAuth. Sin definir, sigue a `NODE_ENV`. Usar `false` **solo** mientras el despliegue se sirva por HTTP plano (p. ej. una IP sin TLS), porque el navegador descarta cookies `Secure` y el callback falla con `transaction_cookie_missing_or_invalid`. Cualquier otro valor impide arrancar. |
 
 Los archivos `.env` locales existen por aplicación y no se versionan. En producción usa HTTPS, dominios reales coherentes con callbacks, cookie secure y secretos de larga entropía desde un gestor aprobado.
