@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.1](https://github.com/KEVIN-117/dss-system-architecture/compare/keycloak-v1.5.0...keycloak-v1.5.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **keycloak:** permitir callback y logout del BFF en la IP pública ([#323](https://github.com/KEVIN-117/dss-system-architecture/issues/323)) ([b1a2d7b](https://github.com/KEVIN-117/dss-system-architecture/commit/b1a2d7b601d7040897e698266f19861b844f15bd))
+
 ## [1.5.0](https://github.com/KEVIN-117/dss-system-architecture/compare/keycloak-v1.4.0...keycloak-v1.5.0) (2026-11-20)
 
 
