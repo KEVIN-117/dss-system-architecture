@@ -1,5 +1,5 @@
 {
-  "auth-service": "1.2.0",
+  "auth-service": "1.3.0",
   "olap-service": "1.1.0",
   "infra/keycloak": "1.4.0",
   "etl-layer/apache-hop": "1.3.1",
