@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.2.0...auth-service-v1.3.0) (2026-11-20)
+
+
+### Features
+
+* **auth-service:** Persistir la auditoría de operaciones administrativas ([#297](https://github.com/KEVIN-117/dss-system-architecture/issues/297)) ([bad9d94](https://github.com/KEVIN-117/dss-system-architecture/commit/bad9d94188122a2ba7579ec9fc0a26e04a4349b5))
+
 ## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.1.0...auth-service-v1.2.0) (2026-11-20)
 
 
