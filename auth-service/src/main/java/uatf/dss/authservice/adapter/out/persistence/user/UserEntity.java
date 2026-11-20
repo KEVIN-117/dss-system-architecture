@@ -38,6 +38,10 @@ public class UserEntity {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    /** Set when the user was deleted in Keycloak (IAM-010); the row is kept, anonymized, for audit references. */
+    @Column(name = "deleted_at")
+    private java.time.Instant deletedAt;
+
     @ManyToMany
     @JoinTable(
             name = "user_roles",

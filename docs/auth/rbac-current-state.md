@@ -93,6 +93,8 @@ flowchart LR
 - La foto de roles sale de `getRoleMappingsStream()`, que devuelve **solo asignaciones directas** (los roles compuestos no se expanden).
 - **No se publican:** borrado de usuarios, cambios de pertenencia a grupos, cambios en los compuestos de un rol, ni eventos de login (`onEvent` está vacío).
 
+> **Actualizado en IAM-010.** Keycloak 26 informa las asignaciones de roles como `REALM_ROLE_MAPPING`/`CLIENT_ROLE_MAPPING`, no como `USER`, así que el listener original nunca publicaba `USER_ROLES_UPDATED`. Ahora el webhook publica también `USER_DELETED`, cambios de grupos y `ROLE_CHANGED`, y envía los roles efectivos (`schemaVersion` 2). auth-service hace borrado lógico y tiene una resincronización completa (`POST /admin/iam/users/resync`). Ver el Flujo B de `auth-service/docs/auth-service-funcionamiento.md`.
+
 ---
 
 ## 2. auth-service (Spring Boot)

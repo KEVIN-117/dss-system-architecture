@@ -109,6 +109,42 @@ public class UserRepositoryAdapter implements UserRepository {
     }
 
     @Override
+    @Transactional
+    public boolean markDeleted(UUID keycloakId, java.time.Instant deletedAt) {
+        return springDataRepository.findByKeycloakId(keycloakId)
+                .filter(entity -> entity.getDeletedAt() == null)
+                .map(entity -> {
+                    String tombstone = "deleted-" + keycloakId;
+                    entity.setUsername(tombstone);
+                    entity.setEmail(tombstone + "@deleted.invalid");
+                    entity.setFirstName(null);
+                    entity.setLastName(null);
+                    entity.setActive(false);
+                    entity.setDeletedAt(deletedAt);
+                    entity.getRoles().clear();
+                    entity.getAcademicContexts().clear();
+                    return true;
+                })
+                .orElse(false);
+    }
+
+    @Override
+    public List<UUID> findKeycloakIdsByRoleNames(Collection<String> roleNames) {
+        if (roleNames == null || roleNames.isEmpty()) return List.of();
+        return springDataRepository.findLiveKeycloakIdsByRoleNames(Set.copyOf(roleNames));
+    }
+
+    @Override
+    public Set<String> findAssignedRoleNames() {
+        return Set.copyOf(springDataRepository.findRoleNamesOfLiveUsers());
+    }
+
+    @Override
+    public Set<UUID> findLiveKeycloakIds() {
+        return Set.copyOf(springDataRepository.findLiveKeycloakIds());
+    }
+
+    @Override
     public boolean existsByEmail(String email) {
         return springDataRepository.existsByEmail(email);
     }
@@ -116,7 +152,8 @@ public class UserRepositoryAdapter implements UserRepository {
     @Override
     public uatf.dss.authservice.application.port.out.UserDirectorySearchResult searchDirectory(
             String query, Boolean active, String role, Integer facultyId, String careerId, int page, int size) {
-        Specification<UserEntity> specification = (root, criteriaQuery, builder) -> builder.conjunction();
+        // Users deleted in Keycloak (IAM-010) are kept anonymized for audit references, never listed.
+        Specification<UserEntity> specification = (root, criteriaQuery, builder) -> builder.isNull(root.get("deletedAt"));
         if (query != null && !query.isBlank()) {
             String pattern = "%" + query.trim().toLowerCase(java.util.Locale.ROOT) + "%";
             specification = specification.and((root, criteriaQuery, builder) -> builder.or(

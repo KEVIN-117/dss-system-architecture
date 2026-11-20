@@ -354,6 +354,28 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '502': { $ref: '#/components/responses/BadGateway' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/users/resync:
+    post:
+      tags: [Administración de identidad]
+      operationId: resyncIamUsers
+      summary: Resincroniza la copia local de todos los usuarios desde Keycloak
+      x-required-permission: iam:users:write
+      x-audit-action: USERS_RESYNCED
+      description: >-
+        Recorre todos los usuarios de Keycloak, actualiza su copia local con los roles efectivos del realm y borra
+        lógicamente (desactiva, anonimiza y oculta del directorio) a los usuarios locales que ya no existen en
+        Keycloak. Sirve para recuperar eventos perdidos o mensajes en la DLQ (IAM-010). Es síncrona. Si Keycloak
+        cambia mientras se recorre (la cantidad leída no coincide con el conteo), falla con 502 sin borrar nada.
+      responses:
+        '200':
+          description: Resultado de la resincronización.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamResyncReport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
   /admin/iam/roles:
     get:
       tags: [Roles y permisos]
@@ -889,6 +911,14 @@ components:
       properties:
         name: { type: string }
         description: { type: [string, 'null'] }
+    IamResyncReport:
+      type: object
+      required: [scanned, synced, skipped, removed]
+      properties:
+        scanned: { type: integer, description: Usuarios leídos de Keycloak. }
+        synced: { type: integer, description: Copias locales creadas o actualizadas. }
+        skipped: { type: integer, description: 'Usuarios de Keycloak que no cumplen las reglas locales (por ejemplo, sin email): se registran en el log y no se borran.' }
+        removed: { type: integer, description: Usuarios locales borrados lógicamente porque Keycloak ya no los tiene. }
     IamAssignments:
       type: object
       required: [direct, effective]

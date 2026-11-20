@@ -79,6 +79,38 @@ class KeycloakUserEventConsumerRabbitIntegrationTest {
         assertEquals(1, count("SELECT COUNT(*) FROM user_roles ur JOIN users u ON u.id = ur.user_id JOIN roles r ON r.id = ur.role_id WHERE u.keycloak_id = ? AND r.name = 'DECANO'", KEYCLOAK_ID));
     }
 
+    @Test
+    void schema2EffectiveRolesAndADuplicatedUserDeletedAreAppliedOnce() {
+        rabbitTemplate.convertAndSend("", RabbitMessagingConfiguration.USER_EVENTS_QUEUE, """
+                {"schemaVersion": 2, "eventId": "%s", "eventType": "USER_CREATED", "timestamp": 1,
+                 "user": {"keycloakId": "%s", "username": "rabbit.v2", "email": "rabbit.v2@example.org",
+                          "isActive": true,
+                          "roles": [{"name": "RECTOR", "clientRole": false}],
+                          "effectiveRoles": [{"name": "RECTOR", "clientRole": false},
+                                             {"name": "DECANO", "clientRole": false}]}}
+                """.formatted(UUID.randomUUID(), KEYCLOAK_ID));
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> assertEquals(2, count(
+                "SELECT COUNT(*) FROM user_roles ur JOIN users u ON u.id = ur.user_id WHERE u.keycloak_id = ?",
+                KEYCLOAK_ID)));
+
+        String deleted = """
+                {"schemaVersion": 2, "eventId": "%s", "eventType": "USER_DELETED", "timestamp": 2,
+                 "user": {"keycloakId": "%s", "isActive": false}}
+                """.formatted(EVENT_ID, KEYCLOAK_ID);
+        rabbitTemplate.convertAndSend("", RabbitMessagingConfiguration.USER_EVENTS_QUEUE, deleted);
+        rabbitTemplate.convertAndSend("", RabbitMessagingConfiguration.USER_EVENTS_QUEUE, deleted);
+
+        await().atMost(Duration.ofSeconds(10)).untilAsserted(() -> {
+            assertEquals(0, rabbitAdmin.getQueueInfo(RabbitMessagingConfiguration.USER_EVENTS_QUEUE).getMessageCount());
+            assertEquals(1, count("SELECT COUNT(*) FROM users WHERE keycloak_id = ? AND deleted_at IS NOT NULL",
+                    KEYCLOAK_ID));
+        });
+        assertEquals(1, count("SELECT COUNT(*) FROM processed_keycloak_events WHERE event_id = ?", EVENT_ID));
+        assertEquals(0, count("SELECT COUNT(*) FROM user_roles ur JOIN users u ON u.id = ur.user_id WHERE u.keycloak_id = ?",
+                KEYCLOAK_ID));
+        assertEquals(0, rabbitAdmin.getQueueInfo(RabbitMessagingConfiguration.DEAD_LETTER_QUEUE).getMessageCount());
+    }
+
     private int count(String sql, Object value) {
         return jdbcTemplate.queryForObject(sql, Integer.class, value);
     }

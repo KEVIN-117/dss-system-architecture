@@ -93,6 +93,18 @@ public class ApplicationConfig {
     }
 
     @Bean
+    public uatf.dss.authservice.application.port.in.IdentitySyncUseCase identitySyncUseCase(
+            IdentityUserAdminPort identityUsers,
+            IdentityRoleAdminPort identityRoles,
+            IdentityRoleMappingPort identityRoleMappings,
+            UserRepository userRepository,
+            SyncUserUseCase syncUserUseCase,
+            AdminAuditRecorder adminAuditRecorder) {
+        return new uatf.dss.authservice.application.service.IdentitySyncService(identityUsers, identityRoles,
+                identityRoleMappings, userRepository, syncUserUseCase, adminAuditRecorder, Clock.systemUTC());
+    }
+
+    @Bean
     public IamRoleAdministrationUseCase iamRoleAdministrationUseCase(
             IdentityRoleAdminPort identityRoles,
             AdminAuditRecorder adminAuditRecorder,
