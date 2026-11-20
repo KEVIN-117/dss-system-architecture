@@ -1,5 +1,6 @@
 package uatf.dss.authservice.adapter.in.web;
 
+import uatf.dss.authservice.domain.model.audit.AuditActor;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
@@ -58,15 +59,21 @@ class AcademicContextAssignmentControllerTest extends BaseWebMvcTest {
         when(useCase.execute(any())).thenReturn(List.of(new UserAcademicContext(contextId, targetId, 10, "025")));
 
         mockMvc.perform(put("/admin/users/{id}/academic-contexts", targetId)
-                        .with(jwt().jwt(token -> token.subject(actorId.toString()))
+                        .with(jwt().jwt(token -> token.subject(actorId.toString()).claim("preferred_username", "ana.admin"))
                                 .authorities(new SimpleGrantedAuthority("iam:users:write")))
+                        .with(request -> {
+                            request.setRemoteAddr("10.0.0.5");
+                            return request;
+                        })
+                        .header("X-Forwarded-For", "203.0.113.9, 10.0.0.5")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"contexts\":[{\"facultyId\":10,\"careerId\":\"025\"}]}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].facultyId").value(10))
                 .andExpect(jsonPath("$[0].careerId").value("025"));
 
-        verify(useCase).execute(new SetUserAcademicContextsCommand(actorId, targetId,
+        verify(useCase).execute(new SetUserAcademicContextsCommand(
+                new AuditActor(actorId.toString(), "ana.admin", "203.0.113.9"), targetId,
                 List.of(new SetUserAcademicContextsCommand.AcademicContextInput(10, "025"))));
     }
 

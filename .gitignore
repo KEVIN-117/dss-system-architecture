@@ -119,6 +119,9 @@ docker-compose.override.yml
 !olap-service/saiku-core/saiku-service/src/main/java/org/saiku/service/olap/ai/audit/*.java
 !olap-service/saiku-core/saiku-web/src/main/java/org/saiku/web/security/audit/
 !olap-service/saiku-core/saiku-web/src/main/java/org/saiku/web/security/audit/*.java
+# auth-service Java packages named "audit" (IAM-005) are source code, not Hop runtime output.
+!auth-service/src/**/audit/
+!auth-service/src/**/audit/**
 **/.hop/
 **/hop-audit/
 *.hpl.cache
