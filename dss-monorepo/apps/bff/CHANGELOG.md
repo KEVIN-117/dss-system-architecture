@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.5.2...bff-v1.6.0) (2026-11-20)
+
+
+### Features
+
+* **auth-service:** Permitir varios contextos académicos por usuario ([#304](https://github.com/KEVIN-117/dss-system-architecture/issues/304)) ([6a6b460](https://github.com/KEVIN-117/dss-system-architecture/commit/6a6b4609e60894f4c352b3ef0535575bcf437966))
+
 ## [1.5.2](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.5.1...bff-v1.5.2) (2026-11-19)
 
 
