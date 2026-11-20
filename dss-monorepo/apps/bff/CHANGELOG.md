@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.6.0...bff-v1.7.0) (2026-11-20)
+
+
+### Features
+
+* **olap-service:** dss-permissions permissions authorization ([#311](https://github.com/KEVIN-117/dss-system-architecture/issues/311)) ([7e78cad](https://github.com/KEVIN-117/dss-system-architecture/commit/7e78cad227f9aab0b23c3052f8347804f66f233d))
+
 ## [1.6.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.5.2...bff-v1.6.0) (2026-11-20)
 
 
