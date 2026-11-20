@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.3.0...auth-service-v1.4.0) (2026-11-20)
+
+
+### Features
+
+* **auth-service:** API de gestión de roles y permisos en auth-service ([#300](https://github.com/KEVIN-117/dss-system-architecture/issues/300)) ([a42d51e](https://github.com/KEVIN-117/dss-system-architecture/commit/a42d51ee00c76f6a693918d1be3e6319fe4667a7))
+
 ## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.2.0...auth-service-v1.3.0) (2026-11-20)
 
 
