@@ -286,6 +286,8 @@ services:
       KEYCLOAK_JWK_SET_URI: ${AUTH_KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs}
       KEYCLOAK_OLAP_AUDIENCE: ${OLAP_KEYCLOAK_AUDIENCE:-olap-service}
       KEYCLOAK_OLAP_CLIENT_ID: ${OLAP_KEYCLOAK_CLIENT_ID:-olap-service}
+      KEYCLOAK_PERMISSIONS_CLIENT_ID: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:-dss-permissions}
+      OLAP_LEGACY_ROLES_ENABLED: ${OLAP_LEGACY_ROLES_ENABLED:-true}
     ports:
       - "127.0.0.1:${OLAP_PORT:-8088}:8080"
     volumes:
@@ -491,6 +493,10 @@ services:
       AUTH_SERVICE_URL: http://auth-service:${AUTH_SERVER_PORT:-8000}
       DW_CONTROL_SERVICE_URL: http://dw-control-service:8090
       OLAP_SERVICE_URL: http://olap-service:8080
+      # Saiku admin gate (IAM-012): same switches as olap-service.
+      KEYCLOAK_OLAP_CLIENT_ID: ${OLAP_KEYCLOAK_CLIENT_ID:-olap-service}
+      KEYCLOAK_PERMISSIONS_CLIENT_ID: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:-dss-permissions}
+      OLAP_LEGACY_ROLES_ENABLED: ${OLAP_LEGACY_ROLES_ENABLED:-true}
       OLAP_ACADEMIC_SCOPE_FILTERS: '{"faculty":{"dimension":"Ámbito de facultad","hierarchy":"Facultad","level":"Facultad","memberTemplate":"[Ámbito de facultad].[Facultad].[Facultad].&[{id}]"},"career":{"dimension":"Ámbito de carrera","hierarchy":"Carrera","level":"Carrera","memberTemplate":"[Ámbito de carrera].[Carrera].[Carrera].&[{id}]"}}'
       PREDICTION_SERVICE_URL: http://prediction-service:8000
       BFF_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004

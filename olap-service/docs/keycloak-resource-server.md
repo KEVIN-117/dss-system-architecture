@@ -13,7 +13,9 @@ Set these environment variables before starting the launcher:
 | `KEYCLOAK_ISSUER_URI` | `https://identity.example/realms/uatf` | Must exactly match the token's `iss` claim. |
 | `KEYCLOAK_JWK_SET_URI` | `https://identity.example/realms/uatf/protocol/openid-connect/certs` | Keycloak signing keys used to verify the JWT signature. |
 | `KEYCLOAK_OLAP_AUDIENCE` | `olap-service` | Required value in the token's `aud` claim. |
-| `KEYCLOAK_OLAP_CLIENT_ID` | `olap-service` | Client whose `resource_access` roles Saiku maps to authorities. |
+| `KEYCLOAK_OLAP_CLIENT_ID` | `olap-service` | Client of the legacy `OLAP_ADMIN` / `OLAP_USER` roles; read only while coexistence is on. |
+| `KEYCLOAK_PERMISSIONS_CLIENT_ID` | `dss-permissions` | Catalog client whose `olap:admin` / `olap:user` permissions grant `ROLE_ADMIN` / `ROLE_USER`. |
+| `OLAP_LEGACY_ROLES_ENABLED` | `true` | Coexistence: also accept the roles of `KEYCLOAK_OLAP_CLIENT_ID`. Set `false` once every administrator holds `olap:admin`. |
 
 PowerShell example:
 
@@ -32,12 +34,20 @@ Saiku authentication, but Bearer tokens are rejected. Supplying only one is a co
 
 Configure the frontend to obtain an access token for this API. Add an audience mapper so `aud`
 contains `olap-service`, and assign the OLAP client roles `user` and/or `admin` as appropriate.
-The converter reads `resource_access[KEYCLOAK_OLAP_CLIENT_ID].roles` and realm roles. The OLAP
-client roles `OLAP_ADMIN` and `OLAP_USER` map to `ROLE_OLAP_ADMIN` / `ROLE_OLAP_USER` and also to
-the legacy Saiku authorities `ROLE_ADMIN` / `ROLE_USER` used by existing endpoint gates. This alias
-is created only for roles inside the configured OLAP client; a realm `SUPERADMIN` or a similarly
-named role from another client does not implicitly grant Saiku administrator access. Scope
-authorities remain `SCOPE_*`.
+Saiku's gates use `ROLE_ADMIN` (`/rest/saiku/admin/**`, statistics, datasources) and `ROLE_USER`.
+Since IAM-012 they come from the catalog client: `resource_access[KEYCLOAK_PERMISSIONS_CLIENT_ID].roles`
+containing `olap:admin` grants `ROLE_ADMIN` and `olap:user` grants `ROLE_USER`; other permissions are
+ignored. Administration is a permission of its own (decision D4): a realm `SUPERADMIN` without
+`olap:admin` is not a Saiku administrator.
+
+While `OLAP_LEGACY_ROLES_ENABLED=true`, the roles of `KEYCLOAK_OLAP_CLIENT_ID` are still read as
+before: `OLAP_ADMIN` / `OLAP_USER` also grant `ROLE_ADMIN` / `ROLE_USER`, and every role keeps its
+`ROLE_<NAME>` authority. With `false`, that client grants nothing.
+
+Realm roles keep their `ROLE_<NAME>` authority (Mondrian role mapping uses them), except the
+reserved `ROLE_ADMIN` and `ROLE_USER`: realm roles can be created from the admin API, so a realm role
+called `ADMIN` must not make its holders Saiku administrators. Roles of other clients are ignored.
+Scope authorities remain `SCOPE_*`.
 
 Saiku uses the immutable Keycloak `sub` claim as the canonical repository/ACL identity. The
 `preferred_username` claim is kept only as the session's display/pass-through principal. User homes

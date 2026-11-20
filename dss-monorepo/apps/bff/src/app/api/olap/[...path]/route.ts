@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 
 import { authenticateRequest, requireRoles } from '../../_lib/auth-guard';
+import { hasOlapAdminAccess, olapAdminForbidden } from '../../_lib/olap-admin';
 import {
   BffConfigurationError,
   getOlapServiceUrl,
@@ -68,17 +69,22 @@ async function proxy(
     );
   }
 
-  // Saiku's administrative API manages OLAP infrastructure. Keep those
-  // operations restricted to SUPERADMIN even when the user has a valid DSS
-  // session; ordinary OLAP queries remain available to their authorized roles.
-  if (safeSegments[2] === 'admin') {
-    const forbidden = requireRoles(authentication.value, ['SUPERADMIN']);
-    if (forbidden) return withCors(request, forbidden);
+  // Saiku's administrative API manages OLAP infrastructure. Since IAM-012 it
+  // requires the olap:admin permission (or the legacy OLAP_ADMIN role during
+  // the coexistence), the same rule olap-service enforces; a platform role
+  // such as SUPERADMIN does not imply it (D4). Admin operations are not data
+  // queries, so they skip the academic-scope checks below.
+  const isOlapAdminPath = safeSegments[2] === 'admin';
+  if (
+    isOlapAdminPath &&
+    !hasOlapAdminAccess(authentication.value.clientRoles ?? {})
+  ) {
+    return withCors(request, olapAdminForbidden());
   }
 
   let proxiedBody: BodyInit | undefined;
   const isSuperadmin = authentication.value.roles.includes('SUPERADMIN');
-  if (!isSuperadmin) {
+  if (!isOlapAdminPath && !isSuperadmin) {
     const roleDenied = requireRoles(authentication.value, [
       'RECTOR',
       'DECANO',

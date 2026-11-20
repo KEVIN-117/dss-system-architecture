@@ -53,7 +53,7 @@ Desde IAM-002 (decisiones D1 y D4 de `docs/auth/rbac-iam-admin-proposal.md`), el
 **Convivencia:** los roles antiguos (`uatf-auth-service:*`, `DW_*`, `OLAP_*`, `CONTEXT_READER`) se mantienen en los compuestos y en las cuentas de servicio hasta que todos los servicios lean `dss-permissions` (IAM-011 a IAM-014). Se retiran en IAM-019.
 
 **Cambios de D4:**
-- SUPERADMIN ya no incluye `olap-service:OLAP_ADMIN`. Hasta IAM-012, quien deba administrar Saiku necesita `olap-service:OLAP_ADMIN` asignado directamente, porque Saiku todavía no lee `olap:admin`.
+- SUPERADMIN ya no incluye `olap-service:OLAP_ADMIN`. Desde IAM-012 la administración de Saiku se concede con el permiso `olap:admin`; durante la convivencia también sirve `olap-service:OLAP_ADMIN` asignado directamente.
 - Se eliminó el cliente público `uatf-dss-spa`, que no se usaba.
 - `dss-bff` agrega `uatf-auth-service` a `aud` con un audience mapper explícito.
 
