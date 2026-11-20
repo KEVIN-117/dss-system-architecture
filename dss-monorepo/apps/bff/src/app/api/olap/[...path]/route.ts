@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 
-import { authenticateRequest, requireRoles } from '../../_lib/auth-guard';
+import { authenticateRequest, requirePermissions } from '../../_lib/auth-guard';
 import { hasOlapAdminAccess, olapAdminForbidden } from '../../_lib/olap-admin';
 import {
   BffConfigurationError,
@@ -83,19 +83,23 @@ async function proxy(
   }
 
   let proxiedBody: BodyInit | undefined;
-  const isSuperadmin = authentication.value.roles.includes('SUPERADMIN');
-  if (!isOlapAdminPath && !isSuperadmin) {
-    const roleDenied = requireRoles(authentication.value, [
-      'RECTOR',
-      'DECANO',
-      'DIRECTOR',
+  // A Saiku administrator (olap:admin) manages OLAP infrastructure and is not
+  // narrowed to an academic scope. Everyone else needs analytics:read and only
+  // reaches metadata and scoped queries. SUPERADMIN gets no implicit business
+  // access (D4): without analytics or olap:admin permissions it is denied.
+  const isOlapAdministrator = hasOlapAdminAccess(
+    authentication.value.clientRoles ?? {},
+  );
+  if (!isOlapAdminPath && !isOlapAdministrator) {
+    const permissionDenied = requirePermissions(authentication.value, [
+      'analytics:read',
     ]);
-    if (roleDenied) return withCors(request, roleDenied);
+    if (permissionDenied) return withCors(request, permissionDenied);
 
     let scope;
     try {
       scope = deriveAcademicScope(
-        authentication.value.roles,
+        authentication.value.permissions,
         authentication.value.user.academicContexts ?? [],
       );
     } catch (error) {
@@ -236,7 +240,7 @@ async function proxy(
         ? null
         : await upstream.arrayBuffer();
     if (
-      !isSuperadmin &&
+      !isOlapAdministrator &&
       request.method === 'GET' &&
       safeSegments.at(-1) === 'metadata' &&
       upstream.ok &&

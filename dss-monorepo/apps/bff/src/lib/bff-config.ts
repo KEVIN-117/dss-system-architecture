@@ -117,6 +117,9 @@ export function getBffAuthConfig(
       realm: requiredValue(environment, 'KEYCLOAK_REALM'),
       audience: requiredValue(environment, 'KEYCLOAK_AUDIENCE'),
       roleClientId: requiredValue(environment, 'KEYCLOAK_ROLE_CLIENT_ID'),
+      permissionsClientId:
+        environment.KEYCLOAK_PERMISSIONS_CLIENT_ID?.trim() || 'dss-permissions',
+      portalRoles: getPortalRoleMap(environment),
     },
     oidc: {
       keycloakUrl: requiredHttpUrl(environment, 'KEYCLOAK_URL'),
@@ -129,6 +132,42 @@ export function getBffAuthConfig(
     defaultPostLoginRedirectUri,
     session: getBffSessionConfig(environment),
   };
+}
+
+const PORTAL_ROLES = ['SUPERADMIN', 'RECTOR', 'DECANO', 'DIRECTOR'] as const;
+
+/**
+ * `KEYCLOAK_PORTAL_ROLES`: JSON object mapping extra realm roles to the portal they open, for example
+ * `{"VICERRECTOR":"RECTOR"}` (IAM-014). Without it only the four known roles open a portal.
+ */
+export function getPortalRoleMap(
+  environment: Environment = process.env,
+): Record<string, (typeof PORTAL_ROLES)[number]> {
+  const raw = environment.KEYCLOAK_PORTAL_ROLES?.trim();
+  if (!raw) return {};
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
+  } catch {
+    throw new BffConfigurationError('KEYCLOAK_PORTAL_ROLES must be a JSON object');
+  }
+  if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+    throw new BffConfigurationError('KEYCLOAK_PORTAL_ROLES must be a JSON object');
+  }
+  const map: Record<string, (typeof PORTAL_ROLES)[number]> = {};
+  for (const [role, portal] of Object.entries(parsed)) {
+    if (
+      !role.trim() ||
+      typeof portal !== 'string' ||
+      !(PORTAL_ROLES as readonly string[]).includes(portal)
+    ) {
+      throw new BffConfigurationError(
+        `KEYCLOAK_PORTAL_ROLES maps "${role}" to an unknown portal role`,
+      );
+    }
+    map[role.trim()] = portal as (typeof PORTAL_ROLES)[number];
+  }
+  return map;
 }
 
 export function getBffSessionConfig(

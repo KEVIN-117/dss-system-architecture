@@ -19,6 +19,8 @@ export type {
 } from './clients/auth-service-client.js';
 export {
   extractDssRoles,
+  extractPermissions,
+  DEFAULT_PERMISSIONS_CLIENT_ID,
   JwtVerificationError,
   verifyKeycloakIdToken,
   verifyKeycloakJwt,

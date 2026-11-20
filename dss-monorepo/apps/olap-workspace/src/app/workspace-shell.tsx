@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { ProtectedRoute, useAuth } from '@dss-monorepo/auth';
 import { AccessDenied, Button, ThemeToggle } from '@dss-monorepo/design-system';
-import { getHighestRole, RoleGuard } from '@dss-monorepo/rbac';
+import { Can, getHighestRole, hasPermission } from '@dss-monorepo/rbac';
 import { getBffBaseUrl } from '../lib/auth-config';
 
 const portalUrls = {
@@ -41,11 +41,12 @@ function getPortalUrl(
 }
 
 export function WorkspaceShell({ children }: { children: ReactNode }) {
-  const { user, logout, login } = useAuth();
+  const { user, permissions, logout, login } = useAuth();
   const pathname = usePathname() ?? '';
   const portalUrl = getPortalUrl(user?.roles ?? []);
-  const highestRole = getHighestRole(user?.roles ?? []);
-  const isAcademicAnalyst = highestRole !== null && highestRole !== 'SUPERADMIN';
+  // IAM-014: the technical Saiku tools (dashboards, MDX editor, apps) follow the olap:admin permission;
+  // everyone else is an academic analyst limited to the scoped analysis view.
+  const isAcademicAnalyst = !hasPermission(user ? permissions : [], 'olap:admin');
   const navItems = isAcademicAnalyst
     ? [
         {
@@ -84,8 +85,8 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
 
   return (
     <ProtectedRoute unauthenticatedFallback={<LoginRequired onLogin={login} />}>
-      <RoleGuard
-        rolesAllowed={['RECTOR', 'DECANO', 'DIRECTOR', 'SUPERADMIN']}
+      <Can
+        permissions={['analytics:read', 'olap:admin']}
         fallback={
           <AccessDenied
             portalName="Espacio de análisis OLAP"
@@ -153,7 +154,7 @@ export function WorkspaceShell({ children }: { children: ReactNode }) {
           </header>
           <div className="min-w-0 flex-1">{children}</div>
         </div>
-      </RoleGuard>
+      </Can>
     </ProtectedRoute>
   );
 }

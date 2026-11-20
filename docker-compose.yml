@@ -489,6 +489,9 @@ services:
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-uatf-dss-realm}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-uatf-auth-service}
       KEYCLOAK_ROLE_CLIENT_ID: ${KEYCLOAK_ROLE_CLIENT_ID:-uatf-auth-service}
+      # IAM-014: optional realm roles that open a portal, e.g. {"VICERRECTOR":"RECTOR"}.
+      KEYCLOAK_PORTAL_ROLES: ${KEYCLOAK_PORTAL_ROLES:-}
+      DW_CONTROL_LEGACY_ROLES_ENABLED: ${DW_CONTROL_LEGACY_ROLES_ENABLED:-true}
       KEYCLOAK_BFF_CLIENT_ID: dss-bff
       KEYCLOAK_BFF_CLIENT_SECRET: ${KEYCLOAK_BFF_CLIENT_SECRET:?KEYCLOAK_BFF_CLIENT_SECRET must be set}
       KEYCLOAK_BFF_REDIRECT_URI: http://localhost:3006/api/auth/callback

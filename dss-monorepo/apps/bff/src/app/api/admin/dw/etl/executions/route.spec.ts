@@ -1,14 +1,24 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { NextResponse } from 'next/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { authenticateRequest, requireClientRoles } = vi.hoisted(() => ({
+const { authenticateRequest, requireClientRoles, requirePermissions } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
   requireClientRoles: vi.fn(),
+  // IAM-014: the dw:* permission is checked first; these tests use the legacy DW_* role path.
+  requirePermissions: vi.fn(),
 }));
 
 vi.mock('../../../../_lib/auth-guard', () => ({
   authenticateRequest,
   requireClientRoles,
+  requirePermissions,
 }));
+
+beforeEach(() => {
+  requirePermissions.mockReturnValue(
+    NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
+  );
+});
 
 import { GET } from './route';
 

@@ -1,9 +1,9 @@
 import { AdminSchemasPage } from '../components/AdminSchemasPage';
-import { AdminPortalLayout } from '../components/AdminPortalLayout';
+import { ADMIN_PERMISSIONS, AdminPortalLayout } from '../components/AdminPortalLayout';
 
 export default function SchemasRoute() {
   return (
-    <AdminPortalLayout>
+    <AdminPortalLayout access={ADMIN_PERMISSIONS.olap}>
       <AdminSchemasPage />
     </AdminPortalLayout>
   );

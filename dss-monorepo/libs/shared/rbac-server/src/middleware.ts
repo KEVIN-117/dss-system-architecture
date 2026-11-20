@@ -1,10 +1,13 @@
 import type { DSSRole } from '@dss-monorepo/auth-models';
 
-import { hasRequiredPermissions, type DSSPermission } from './permission-map.js';
+import { hasRequiredPermissions, type DSSPermission, type PermissionSet } from './permission-map.js';
 import { hasRequiredRoles, type RoleMatch } from './permissions.js';
 
 export interface RbacPrincipal {
+  /** Portal roles; only used for portal/persona checks. */
   roles: readonly DSSRole[];
+  /** Permissions from the token (`resource_access.dss-permissions.roles`). */
+  permissions: PermissionSet;
 }
 
 interface RolePolicy {
@@ -24,11 +27,11 @@ export type RbacPrincipalResolver = (request: Request) => RbacPrincipal | null |
 export type RbacMiddlewareHandler = (request: Request) => Response | Promise<Response>;
 export type RbacMiddlewareOptions = RbacPolicy & { resolvePrincipal: RbacPrincipalResolver };
 
-export function isRbacAllowed(roles: readonly DSSRole[], policy: RbacPolicy): boolean {
+export function isRbacAllowed(principal: RbacPrincipal, policy: RbacPolicy): boolean {
   if ('roles' in policy && policy.roles !== undefined) {
-    return hasRequiredRoles(roles, policy.roles, policy.match);
+    return hasRequiredRoles(principal.roles, policy.roles, policy.match);
   }
-  return hasRequiredPermissions(roles, policy.permissions, policy.match);
+  return hasRequiredPermissions(principal.permissions, policy.permissions, policy.match);
 }
 
 export function withRbacMiddleware(
@@ -38,7 +41,7 @@ export function withRbacMiddleware(
   return async (request) => {
     const principal = await options.resolvePrincipal(request);
     if (!principal) return Response.json({ error: 'Authentication required' }, { status: 401 });
-    if (!isRbacAllowed(principal.roles, options)) {
+    if (!isRbacAllowed(principal, options)) {
       return Response.json({ error: 'Insufficient permissions' }, { status: 403 });
     }
     return handler(request);

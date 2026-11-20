@@ -1,4 +1,4 @@
-import { AdminPortalLayout } from '../../components/AdminPortalLayout';
+import { ADMIN_PERMISSIONS, AdminPortalLayout } from '../../components/AdminPortalLayout';
 import { AdminSchemaDetailPage } from '../../components/AdminSchemaDetailPage';
 
 interface SchemaDetailRouteProps {
@@ -10,7 +10,7 @@ export default async function SchemaDetailRoute({
 }: SchemaDetailRouteProps) {
   const { schemaId } = await params;
   return (
-    <AdminPortalLayout>
+    <AdminPortalLayout access={ADMIN_PERMISSIONS.olap}>
       <AdminSchemaDetailPage schemaId={schemaId} />
     </AdminPortalLayout>
   );

@@ -24,5 +24,11 @@ export interface KeycloakTokenClaims {
 
 export interface VerifiedToken {
   claims: KeycloakTokenClaims;
+  /** Portal roles: known DSS roles, plus realm roles mapped to one through configuration. */
   roles: DSSRole[];
+  /**
+   * Permissions of the catalog client (`resource_access.dss-permissions.roles`, IAM-014). An open set:
+   * a permission created from the admin portal reaches the BFF without a deployment.
+   */
+  permissions: string[];
 }

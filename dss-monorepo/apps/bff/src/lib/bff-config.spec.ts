@@ -6,6 +6,7 @@ import {
   getBffAuthConfig,
   getBffSessionConfig,
   getDwControlServiceConfig,
+  getPortalRoleMap,
   getPredictionServiceUrl,
 } from './bff-config';
 
@@ -86,6 +87,8 @@ describe('BFF server configuration', () => {
         realm: 'uatf-dss-realm',
         audience: 'uatf-auth-service',
         roleClientId: 'uatf-auth-service',
+        permissionsClientId: 'dss-permissions',
+        portalRoles: {},
       },
       oidc: {
         keycloakUrl: 'https://keycloak.example.edu/auth',
@@ -160,5 +163,16 @@ describe('BFF server configuration', () => {
         'BFF_DEFAULT_POST_LOGIN_REDIRECT_URI must use an origin in BFF_ALLOWED_ORIGINS',
       ),
     );
+  });
+
+  it('maps extra realm roles to a portal and rejects unknown portals (IAM-014)', () => {
+    expect(getPortalRoleMap({})).toEqual({});
+    expect(getPortalRoleMap({ KEYCLOAK_PORTAL_ROLES: ' {"VICERRECTOR":"RECTOR"} ' })).toEqual({ VICERRECTOR: 'RECTOR' });
+    for (const invalid of ['not-json', '[]', '{"X":"ADMIN"}', '{"X":3}']) {
+      expect(() => getPortalRoleMap({ KEYCLOAK_PORTAL_ROLES: invalid })).toThrow(BffConfigurationError);
+    }
+    expect(
+      getBffAuthConfig({ ...environment, KEYCLOAK_PERMISSIONS_CLIENT_ID: 'catalog' }).keycloak.permissionsClientId,
+    ).toBe('catalog');
   });
 });

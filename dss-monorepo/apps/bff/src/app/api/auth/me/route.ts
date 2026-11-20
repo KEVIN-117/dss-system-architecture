@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server';
-import { resolvePermissions } from '@dss-monorepo/rbac-server';
 
 import { authenticateRequest } from '../../_lib/auth-guard';
 import { withCors } from '../../../../lib/cors';
@@ -9,8 +8,8 @@ export const runtime = 'nodejs';
 /**
  * GET /api/auth/me
  *
- * Returns the local profile together with DSS roles extracted from a verified
- * Keycloak token. Browser calls use the encrypted BFF session cookie; the
+ * Returns the local profile together with the portal roles and the permissions
+ * (`dss-permissions`, IAM-014) of a verified Keycloak token. Browser calls use the encrypted BFF session cookie; the
  * bearer form remains available for trusted server-to-server callers.
  */
 export async function GET(request: Request): Promise<NextResponse> {
@@ -25,7 +24,7 @@ export async function GET(request: Request): Promise<NextResponse> {
       {
         user: authentication.value.user,
         roles: authentication.value.roles,
-        permissions: Array.from(resolvePermissions(authentication.value.roles)),
+        permissions: [...authentication.value.permissions],
       },
       { headers: { 'Cache-Control': 'no-store' } },
     ),

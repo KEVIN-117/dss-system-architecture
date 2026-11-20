@@ -1,5 +1,5 @@
-import type { AcademicContext, DSSRole } from '@dss-monorepo/auth-models';
-import { resolvePermissions } from '@dss-monorepo/rbac-server';
+import type { AcademicContext } from '@dss-monorepo/auth-models';
+import { hasPermission, type PermissionSet } from '@dss-monorepo/rbac-server';
 
 export interface AcademicScope {
   kind: 'global' | 'faculty' | 'career';
@@ -31,66 +31,52 @@ export class AcademicScopePolicyError extends Error {
   }
 }
 
-/** Resolves analytics access from verified roles and the Auth Service profile. */
+/**
+ * Resolves analytics access from the token permissions and the Auth Service profile (IAM-014).
+ *
+ * `analytics:read` is required. `analytics:global` is institution-wide. Otherwise the scope is the union of
+ * the user's contexts (IAM-009) of the broadest kind the permissions allow: every faculty context with
+ * `analytics:faculty`, or else every career context with `analytics:career`. One OLAP filter applies to one
+ * hierarchy, so a user holding both kinds of context sees the faculty ones (the safe, narrower choice).
+ */
 export function deriveAcademicScope(
-  roles: readonly DSSRole[],
+  permissions: PermissionSet,
   contexts: readonly AcademicContext[],
 ): AcademicScope {
-  const permissions = resolvePermissions(roles);
-  if (!permissions.has('analytics:read')) {
+  if (!hasPermission(permissions, 'analytics:read')) {
     throw new AcademicScopePolicyError(
       'Analytics access is not permitted',
       'FORBIDDEN',
     );
   }
-  if (roles.includes('RECTOR')) {
-    if (!permissions.has('analytics:global')) {
-      throw new AcademicScopePolicyError(
-        'Global analytics access is not permitted',
-        'FORBIDDEN',
-      );
-    }
+  if (hasPermission(permissions, 'analytics:global')) {
     return { kind: 'global', contexts: [] };
   }
-  if (roles.includes('DECANO')) {
-    if (!permissions.has('analytics:faculty')) {
-      throw new AcademicScopePolicyError(
-        'Faculty analytics access is not permitted',
-        'FORBIDDEN',
-      );
-    }
-    const scoped = contexts.filter(
+  const canFaculty = hasPermission(permissions, 'analytics:faculty');
+  const canCareer = hasPermission(permissions, 'analytics:career');
+  if (!canFaculty && !canCareer) {
+    throw new AcademicScopePolicyError(
+      'Analytics access is not permitted',
+      'FORBIDDEN',
+    );
+  }
+  if (canFaculty) {
+    const faculties = contexts.filter(
       (item) => item.facultyId !== null && item.careerId === null,
     );
-    if (!scoped.length) {
-      throw new AcademicScopePolicyError(
-        'Academic faculty context is required',
-        'ACADEMIC_CONTEXT_REQUIRED',
-      );
-    }
-    return { kind: 'faculty', contexts: scoped };
+    if (faculties.length) return { kind: 'faculty', contexts: faculties };
   }
-  if (roles.includes('DIRECTOR')) {
-    if (!permissions.has('analytics:career')) {
-      throw new AcademicScopePolicyError(
-        'Career analytics access is not permitted',
-        'FORBIDDEN',
-      );
-    }
-    const scoped = contexts.filter(
+  if (canCareer) {
+    const careers = contexts.filter(
       (item) => item.facultyId !== null && item.careerId !== null,
     );
-    if (!scoped.length) {
-      throw new AcademicScopePolicyError(
-        'Academic career context is required',
-        'ACADEMIC_CONTEXT_REQUIRED',
-      );
-    }
-    return { kind: 'career', contexts: scoped };
+    if (careers.length) return { kind: 'career', contexts: careers };
   }
   throw new AcademicScopePolicyError(
-    'Analytics access is not permitted',
-    'FORBIDDEN',
+    canFaculty
+      ? 'Academic faculty context is required'
+      : 'Academic career context is required',
+    'ACADEMIC_CONTEXT_REQUIRED',
   );
 }
 

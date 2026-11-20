@@ -8,7 +8,10 @@ El BFF es el límite servidor para OAuth/OIDC, sesión web y llamadas a auth/OLA
 | `KEYCLOAK_URL` | Sí | Origin HTTP(S) de Keycloak accesible al proceso BFF. |
 | `KEYCLOAK_REALM` | Sí | Realm OIDC. |
 | `KEYCLOAK_AUDIENCE` | Sí | Audiencia requerida al validar tokens. |
-| `KEYCLOAK_ROLE_CLIENT_ID` | Sí | Cliente cuyos roles reconoce el BFF. |
+| `KEYCLOAK_ROLE_CLIENT_ID` | Sí | Cliente cuyos roles antiguos de portal reconoce el BFF, además de los roles del realm. |
+| `KEYCLOAK_PERMISSIONS_CLIENT_ID` | Opcional | Cliente catálogo cuyos roles son los permisos; default `dss-permissions` (IAM-014). |
+| `KEYCLOAK_PORTAL_ROLES` | Opcional | JSON que asigna roles nuevos del realm a un portal, por ejemplo `{"VICERRECTOR":"RECTOR"}`. Solo admite `SUPERADMIN`, `RECTOR`, `DECANO` y `DIRECTOR` como destino; un valor inválido deja el BFF sin autenticación (500). |
+| `OLAP_LEGACY_ROLES_ENABLED`, `DW_CONTROL_LEGACY_ROLES_ENABLED` | Opcional | Convivencia: mientras no sean `false`, el BFF también acepta `OLAP_ADMIN` y los `DW_*` antiguos, igual que olap-service y dw-control-service. |
 | `KEYCLOAK_BFF_CLIENT_ID` | Sí | Cliente confidencial para Authorization Code callback. |
 | `KEYCLOAK_BFF_CLIENT_SECRET` | Sí, secreto | Credencial del cliente BFF. Debe coincidir con Keycloak. |
 | `KEYCLOAK_BFF_REDIRECT_URI` | Sí | Callback `/api/auth/callback` registrado exactamente en Keycloak. |

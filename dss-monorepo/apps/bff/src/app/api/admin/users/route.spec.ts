@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { authenticateRequest, requireRoles, listAdminUsers } = vi.hoisted(() => ({
+const { authenticateRequest, requirePermissions, listAdminUsers } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
-  requireRoles: vi.fn(),
+  requirePermissions: vi.fn(),
   listAdminUsers: vi.fn(),
 }));
 
-vi.mock('../../_lib/auth-guard', () => ({ authenticateRequest, requireRoles }));
+vi.mock('../../_lib/auth-guard', () => ({ authenticateRequest, requirePermissions }));
 vi.mock('@dss-monorepo/auth-connector', () => ({
   AuthServiceClientError: class AuthServiceClientError extends Error {
     constructor(public readonly status: number) { super('auth-service client error'); }
@@ -43,21 +43,21 @@ afterEach(() => {
 });
 
 describe('admin user directory BFF route', () => {
-  it('requires SUPERADMIN before querying auth-service', async () => {
+  it('requires iam:users:read before querying auth-service', async () => {
     authenticateRequest.mockResolvedValue(superadmin);
-    requireRoles.mockReturnValue(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
+    requirePermissions.mockReturnValue(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
 
     const response = await GET(new Request('http://bff/api/admin/users'));
 
     expect(response.status).toBe(403);
-    expect(requireRoles).toHaveBeenCalledWith(superadmin.value, ['SUPERADMIN']);
+    expect(requirePermissions).toHaveBeenCalledWith(superadmin.value, ['iam:users:read']);
     expect(listAdminUsers).not.toHaveBeenCalled();
   });
 
   it('forwards validated pagination and filters with the verified token', async () => {
     configureBff();
     authenticateRequest.mockResolvedValue(superadmin);
-    requireRoles.mockReturnValue(null);
+    requirePermissions.mockReturnValue(null);
     const page = { content: [], page: 1, size: 10, totalElements: 12, totalPages: 2 };
     listAdminUsers.mockResolvedValue(page);
 
@@ -76,7 +76,7 @@ describe('admin user directory BFF route', () => {
 
   it('rejects invalid query parameters before calling auth-service', async () => {
     authenticateRequest.mockResolvedValue(superadmin);
-    requireRoles.mockReturnValue(null);
+    requirePermissions.mockReturnValue(null);
 
     const response = await GET(new Request('http://bff/api/admin/users?page=-2&size=200'));
 

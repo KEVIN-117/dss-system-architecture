@@ -10,8 +10,8 @@ import {
   type OlapQueryRequest,
   type OlapServerConfig,
 } from '@dss-monorepo/olap-connector/server';
-import { resolvePermissions } from '@dss-monorepo/rbac-server';
-import type { AcademicContext, DSSRole } from '@dss-monorepo/auth-models';
+import { hasPermission, type PermissionSet } from '@dss-monorepo/rbac-server';
+import type { AcademicContext } from '@dss-monorepo/auth-models';
 import {
   AcademicScopePolicyError,
   buildAcademicScopeFilter,
@@ -45,6 +45,7 @@ export const analyticsTypeDefs = `#graphql
     username: String!
     displayName: String!
     roles: [String!]!
+    permissions: [String!]!
     academicScope: AcademicScope!
   }
   type OlapCube {
@@ -114,13 +115,14 @@ export function createAnalyticsResolvers() {
     JSON: JSONScalar,
     Query: {
       viewer: (_: unknown, __: unknown, context: { authentication: AuthenticatedRequest }) => {
-        const { user, roles } = context.authentication;
-        const scope = deriveScopeForGraphQL(roles, user.academicContexts ?? []);
+        const { user, roles, permissions } = context.authentication;
+        const scope = deriveScopeForGraphQL(permissions, user.academicContexts ?? []);
         return {
           id: user.id,
           username: user.username,
           displayName: [user.firstName, user.lastName].filter(Boolean).join(' '),
           roles,
+          permissions,
           academicScope: {
             kind: scope.kind,
             facultyIds: [...new Set(scope.contexts.flatMap((item) => item.facultyId === null ? [] : [item.facultyId]))],
@@ -129,12 +131,12 @@ export function createAnalyticsResolvers() {
         };
       },
       olapCubes: async (_: unknown, __: unknown, context: { authentication: AuthenticatedRequest }) => {
-        requireAnalyticsRead(context.authentication.roles);
+        requireAnalyticsRead(context.authentication.permissions);
         const cubes = await olapCall(() => listServerOlapCubes(serverConfig(context.authentication)));
         return cubes.map((cube) => ({ ...cube, cubeId: toCubeId(cube) }));
       },
       olapCubeSchema: async (_: unknown, args: { cubeId: string }, context: { authentication: AuthenticatedRequest }) => {
-        requireAnalyticsRead(context.authentication.roles);
+        requireAnalyticsRead(context.authentication.permissions);
         validateCubeId(args.cubeId);
         await requireVisibleCube(context.authentication, args.cubeId);
         const schema = await olapCall(() => getServerOlapCubeSchema(serverConfig(context.authentication), args.cubeId));
@@ -145,7 +147,7 @@ export function createAnalyticsResolvers() {
         args: { cubeId: string; dimension: string; hierarchy: string; level: string; limit?: number | null },
         context: { authentication: AuthenticatedRequest },
       ) => {
-        requireAnalyticsRead(context.authentication.roles);
+        requireAnalyticsRead(context.authentication.permissions);
         validateCubeId(args.cubeId);
         for (const value of [args.dimension, args.hierarchy, args.level]) {
           if (!validName(value)) throw new GraphQLError('A published cube dimension, hierarchy, and level are required', { extensions: { code: 'BAD_USER_INPUT' } });
@@ -175,7 +177,7 @@ export function createAnalyticsResolvers() {
       ) => {
         // Resolve the analytics role/scope from trusted Auth Service data first.
         // Prediction Service repeats the scope check against the selected program/cut.
-        const scope = deriveScopeForGraphQL(context.authentication.roles, context.authentication.user.academicContexts ?? []);
+        const scope = deriveScopeForGraphQL(context.authentication.permissions, context.authentication.user.academicContexts ?? []);
         if (!args.programRef.trim() || !args.cutId.trim()) {
           throw new GraphQLError('Program and academic cut are required', { extensions: { code: 'BAD_USER_INPUT' } });
         }
@@ -209,7 +211,7 @@ export function createAnalyticsResolvers() {
       },
       analyticQuery: async (_: unknown, args: { input: AnalyticQueryInput }, context: { authentication: AuthenticatedRequest }) => {
         const { authentication } = context;
-        const scope = deriveScopeForGraphQL(authentication.roles, authentication.user.academicContexts ?? []);
+        const scope = deriveScopeForGraphQL(authentication.permissions, authentication.user.academicContexts ?? []);
         validateAnalyticInput(args.input);
         const config = serverConfig(authentication);
         await requireVisibleCube(authentication, args.input.cubeId);
@@ -325,13 +327,13 @@ export interface AnalyticQueryInput {
   limit?: number | null;
 }
 
-function requireAnalyticsRead(roles: readonly DSSRole[]): void {
-  if (!resolvePermissions(roles).has('analytics:read')) throw authorizationError('Analytics access is not permitted', 'FORBIDDEN');
+function requireAnalyticsRead(permissions: PermissionSet): void {
+  if (!hasPermission(permissions, 'analytics:read')) throw authorizationError('Analytics access is not permitted', 'FORBIDDEN');
 }
 
-function deriveScopeForGraphQL(roles: readonly DSSRole[], contexts: readonly AcademicContext[]): AcademicScope {
+function deriveScopeForGraphQL(permissions: PermissionSet, contexts: readonly AcademicContext[]): AcademicScope {
   try {
-    return deriveAcademicScope(roles, contexts);
+    return deriveAcademicScope(permissions, contexts);
   } catch (error) {
     if (error instanceof AcademicScopePolicyError) {
       throw authorizationError(error.message, error.code);

@@ -10,7 +10,7 @@ import {
   getBffAuthConfig,
 } from '../../../../../../lib/bff-config';
 import { withCors } from '../../../../../../lib/cors';
-import { authenticateRequest, requireRoles } from '../../../../_lib/auth-guard';
+import { authenticateRequest, requirePermissions } from '../../../../_lib/auth-guard';
 
 export const runtime = 'nodejs';
 
@@ -34,7 +34,7 @@ export async function PUT(
     return withCors(request, authentication.response);
   }
 
-  const forbidden = requireRoles(authentication.value, ['SUPERADMIN']);
+  const forbidden = requirePermissions(authentication.value, ['iam:users:write']);
   if (forbidden) {
     return withCors(request, forbidden);
   }

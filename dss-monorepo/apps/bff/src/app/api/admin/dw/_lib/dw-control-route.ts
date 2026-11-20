@@ -13,10 +13,40 @@ import { withCors } from '../../../../../lib/cors';
 import {
   authenticateRequest,
   requireClientRoles,
+  requirePermissions,
   type AuthenticatedRequest,
 } from '../../../_lib/auth-guard';
 
 const DW_CONTROL_CLIENT_ID = 'dw-control-service';
+
+/** dss-permissions name of each DW capability (IAM-011/IAM-014). */
+export const DW_PERMISSIONS: Record<DwControlPermission, string> = {
+  DW_CLOSURE_READ: 'dw:closure:read',
+  DW_CLOSURE_MANAGE: 'dw:closure:manage',
+  DW_ETL_MONITOR_READ: 'dw:etl-monitor:read',
+};
+
+/**
+ * The `dw:*` permission of the token or, while `DW_CONTROL_LEGACY_ROLES_ENABLED` is not `false` (the
+ * same switch dw-control-service reads), the legacy `DW_*` role of the `dw-control-service` client.
+ */
+export function requireDwPermission(
+  authentication: AuthenticatedRequest,
+  permission: DwControlPermission,
+  environment: Readonly<Record<string, string | undefined>> = process.env,
+): NextResponse | null {
+  const denied = requirePermissions(authentication, [DW_PERMISSIONS[permission]]);
+  if (!denied) return null;
+  const legacyEnabled =
+    environment.DW_CONTROL_LEGACY_ROLES_ENABLED?.trim().toLowerCase() !== 'false';
+  if (
+    legacyEnabled &&
+    !requireClientRoles(authentication, DW_CONTROL_CLIENT_ID, [permission])
+  ) {
+    return null;
+  }
+  return denied;
+}
 
 export async function withDwControl<T>(
   request: Request,
@@ -32,11 +62,7 @@ export async function withDwControl<T>(
   if (!authentication.authenticated)
     return withCors(request, authentication.response);
 
-  const forbidden = requireClientRoles(
-    authentication.value,
-    DW_CONTROL_CLIENT_ID,
-    [permission],
-  );
+  const forbidden = requireDwPermission(authentication.value, permission);
   if (forbidden) return withCors(request, forbidden);
 
   try {

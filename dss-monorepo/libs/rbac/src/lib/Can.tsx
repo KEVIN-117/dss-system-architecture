@@ -25,7 +25,7 @@ export function Can({
   loadingFallback = null,
   ...check
 }: CanProps): ReactNode {
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user, permissions, isAuthenticated, isLoading } = useAuth();
 
   if (isLoading) {
     return loadingFallback;
@@ -34,7 +34,7 @@ export function Can({
     return fallback;
   }
 
-  const allowed = canAccess(user.roles, check);
+  const allowed = canAccess({ roles: user.roles, permissions }, check);
   if (typeof children === 'function') {
     return children(allowed);
   }

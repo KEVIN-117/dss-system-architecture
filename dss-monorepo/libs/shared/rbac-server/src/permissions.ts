@@ -3,7 +3,10 @@ import type { DSSRole } from '@dss-monorepo/auth-models';
 /** Determines whether every required role or any one of them is needed. */
 export type RoleMatch = 'all' | 'any';
 
-/** Academic hierarchy aligned with the Keycloak realm composites. */
+/**
+ * Portal hierarchy: which portal personas a role may present (a RECTOR may open the dean and director
+ * views). Presentation only; authorization uses the token permissions (IAM-014).
+ */
 export const ROLE_HIERARCHY: Record<DSSRole, readonly DSSRole[]> = {
   SUPERADMIN: ['SUPERADMIN'],
   RECTOR: ['RECTOR', 'DECANO', 'DIRECTOR'],

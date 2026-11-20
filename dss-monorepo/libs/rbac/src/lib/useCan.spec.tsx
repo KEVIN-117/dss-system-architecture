@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { useAuth } from '@dss-monorepo/auth';
 
-import { useHasPermission, useHasRole } from './useCan';
+import { useHasPermission, useHasRole, useMyPermissions } from './useCan';
 
 vi.mock('@dss-monorepo/auth', () => ({ useAuth: vi.fn() }));
 
@@ -21,21 +21,29 @@ describe('RBAC convenience hooks', () => {
     expect(result.current).toBe(false);
   });
 
-  it('evaluates effective permissions without giving academic analytics to SUPERADMIN', () => {
-    mockedUseAuth.mockReturnValue(authState(['SUPERADMIN']));
-    const { result, rerender } = renderHook(() => useHasPermission('analytics:global'));
-
+  it('reads permissions from the token, not from roles (IAM-014)', () => {
+    mockedUseAuth.mockReturnValue(authState(['SUPERADMIN'], true, ['pipelines:execute']));
+    const { result } = renderHook(() => useHasPermission('analytics:global'));
     expect(result.current).toBe(false);
-
-    mockedUseAuth.mockReturnValue(authState(['SUPERADMIN']));
-    rerender();
     expect(renderHook(() => useHasPermission('pipelines:execute')).result.current).toBe(true);
+
+    // A role alone grants nothing; a new permission works without a code change.
+    mockedUseAuth.mockReturnValue(authState(['RECTOR'], true, ['reports:export']));
+    expect(renderHook(() => useHasPermission('analytics:global')).result.current).toBe(false);
+    expect(renderHook(() => useHasPermission('reports:export')).result.current).toBe(true);
+    expect([...renderHook(() => useMyPermissions()).result.current]).toEqual(['reports:export']);
+  });
+
+  it('exposes no permissions without a session', () => {
+    mockedUseAuth.mockReturnValue({ ...authState([], false), permissions: ['analytics:read'] });
+    expect(renderHook(() => useMyPermissions()).result.current.size).toBe(0);
   });
 });
 
 function authState(
   roles: ('SUPERADMIN' | 'RECTOR' | 'DECANO' | 'DIRECTOR')[],
   isAuthenticated = true,
+  permissions: string[] = [],
 ) {
   return {
     isAuthenticated,
@@ -54,7 +62,7 @@ function authState(
     token: null,
     lastLogin: null,
     isInitialized: true,
-    permissions: [],
+    permissions,
     login: vi.fn(),
     logout: vi.fn(),
     register: vi.fn(),

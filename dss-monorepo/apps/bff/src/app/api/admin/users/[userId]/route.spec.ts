@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { authenticateRequest, requireRoles, getAdminUser } = vi.hoisted(() => ({
+const { authenticateRequest, requirePermissions, getAdminUser } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
-  requireRoles: vi.fn(),
+  requirePermissions: vi.fn(),
   getAdminUser: vi.fn(),
 }));
 
-vi.mock('../../../_lib/auth-guard', () => ({ authenticateRequest, requireRoles }));
+vi.mock('../../../_lib/auth-guard', () => ({ authenticateRequest, requirePermissions }));
 vi.mock('@dss-monorepo/auth-connector', () => ({
   AuthServiceClientError: class AuthServiceClientError extends Error {
     constructor(public readonly status: number) { super('auth-service client error'); }
@@ -28,9 +28,9 @@ afterEach(() => {
 });
 
 describe('admin user detail BFF route', () => {
-  it('requires SUPERADMIN', async () => {
+  it('requires iam:users:read', async () => {
     authenticateRequest.mockResolvedValue(superadmin);
-    requireRoles.mockReturnValue(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
+    requirePermissions.mockReturnValue(NextResponse.json({ error: 'Forbidden' }, { status: 403 }));
     const response = await GET(new Request('http://bff/api/admin/users/user-1'), {
       params: Promise.resolve({ userId: 'user-1' }),
     });
@@ -52,7 +52,7 @@ describe('admin user detail BFF route', () => {
     vi.stubEnv('BFF_ALLOWED_ORIGINS', 'http://portal');
     vi.stubEnv('BFF_SESSION_SECRET', 'test-session-secret-with-enough-entropy');
     authenticateRequest.mockResolvedValue(superadmin);
-    requireRoles.mockReturnValue(null);
+    requirePermissions.mockReturnValue(null);
     const user = { id: '6acb7476-663d-4c94-b3bd-9e5ac6db7f31', username: 'ana' };
     getAdminUser.mockResolvedValue(user);
 
