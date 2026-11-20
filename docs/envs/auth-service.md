@@ -24,6 +24,7 @@ Fuentes: `auth-service/src/main/resources/application.yaml`, `application-dev.ya
 | `KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET` | Sí, secreto | Secreto de ese cliente (el mismo que usa el import del realm). Compose lo exige. Si falta fuera de Compose, el servicio arranca pero toda operación de administración de identidad responde 503. Nunca se registra en logs. |
 | `KEYCLOAK_ADMIN_CONNECT_TIMEOUT`, `KEYCLOAK_ADMIN_READ_TIMEOUT` | Opcional | Timeouts hacia Keycloak; default `2s` y `5s`. |
 | `KEYCLOAK_ADMIN_MAX_RETRIES` | Opcional | Reintentos extra para llamadas idempotentes (GET/PUT/DELETE) ante errores de red o 502/503/504; default `2`. POST nunca se reintenta. |
+| `IAM_CLIENTS_REQUIRE_HTTPS` | Opcional | Exige `https` en las redirect URIs, las post-logout URIs y los web origins de las aplicaciones que se registran o editan (salvo loopback); default `false`. El perfil `prod` lo fija en `true`. |
 | `IAM_INVITATION_LIFESPAN` | Opcional | Vigencia de los enlaces del correo de invitación y de acciones requeridas (`app.iam.invitation-lifespan`); default `72h`. |
 
 ### Administración de identidad (Keycloak Admin REST API)
@@ -50,6 +51,10 @@ Traducción de errores de Keycloak a excepciones de dominio:
 ### Roles y permisos (IAM-007)
 
 `/api/v1/admin/iam/roles` y `/api/v1/admin/iam/permissions` crean, editan y eliminan roles del realm y permisos de `dss-permissions`, y definen qué permisos agrupa cada rol (`iam:roles:read` / `iam:roles:write`). No requieren variables nuevas: usan la cuenta de servicio de IAM-001, que necesita `manage-realm` para escribir roles del realm y `manage-clients` para los permisos.
+
+### Aplicaciones (IAM-008)
+
+`/api/v1/admin/iam/clients` registra y edita aplicaciones (clientes OAuth) y rota sus secretos (`iam:clients:read` / `iam:clients:write`). Usa la cuenta de servicio de IAM-001, con `manage-clients`. Los secretos se muestran una sola vez y nunca se guardan en la auditoría ni en los logs.
 
 ### Auditoría administrativa
 

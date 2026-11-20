@@ -57,10 +57,13 @@ final class KeycloakRepresentations {
             Boolean publicClient,
             Boolean bearerOnly,
             Boolean standardFlowEnabled,
+            Boolean implicitFlowEnabled,
+            Boolean directAccessGrantsEnabled,
             Boolean serviceAccountsEnabled,
             List<String> redirectUris,
             List<String> webOrigins,
-            String protocol) {
+            String protocol,
+            Map<String, String> attributes) {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)

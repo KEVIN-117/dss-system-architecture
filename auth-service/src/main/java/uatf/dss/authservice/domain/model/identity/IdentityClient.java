@@ -14,10 +14,12 @@ public record IdentityClient(
         boolean standardFlowEnabled,
         boolean serviceAccountsEnabled,
         List<String> redirectUris,
-        List<String> webOrigins) {
+        List<String> webOrigins,
+        List<String> postLogoutRedirectUris) {
 
     public IdentityClient {
         redirectUris = redirectUris == null ? List.of() : List.copyOf(redirectUris);
         webOrigins = webOrigins == null ? List.of() : List.copyOf(webOrigins);
+        postLogoutRedirectUris = postLogoutRedirectUris == null ? List.of() : List.copyOf(postLogoutRedirectUris);
     }
 }

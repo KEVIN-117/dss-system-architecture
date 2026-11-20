@@ -182,6 +182,17 @@ Reglas de `IamRoleAdministrationService` (los rechazos responden 409 y quedan au
 - **`PATCH` de rol:** conserva los demás atributos del rol y un `portal` vacío lo elimina.
 - **Propagación:** los cambios llegan a los usuarios en su próximo token. El test `newPermissionReachesTheNextToken` lo comprueba con un token real de `dss-bff`.
 
+## Flujo F: aplicaciones (clientes OAuth) (IAM-008)
+
+`IamClientController` (`/api/v1/admin/iam/clients`) lista, registra y edita las aplicaciones del realm y rota sus secretos. Las lecturas exigen `iam:clients:read` y las escrituras `iam:clients:write`. Las acciones de auditoría son `CLIENT_CREATED`, `CLIENT_UPDATED` y `CLIENT_SECRET_ROTATED`.
+
+Reglas de `IamClientAdministrationService` (los rechazos quedan auditados):
+
+- **Tipos:** `PUBLIC` no tiene secreto y usa código de autorización con PKCE S256; necesita al menos una redirect URI y no admite cuenta de servicio. `CONFIDENTIAL` recibe su primer secreto en la respuesta de alta. A ningún cliente nuevo se le habilitan los flujos implícito ni de contraseña. El tipo y el `clientId` no cambian después.
+- **URIs (`ClientUriPolicy`):** las redirect y post-logout URIs deben ser URLs `http(s)` absolutas. Solo se admite el comodín `/*` al final de la ruta; se rechazan `*`, hosts con comodín, usuario y contraseña en la URI y fragmentos. Los web origins son `esquema://host[:puerto]` o `+`. Con `IAM_CLIENTS_REQUIRE_HTTPS=true` (siempre en el perfil `prod`) solo se acepta `https`, salvo en loopback.
+- **Clientes del sistema** (`dss-bff`, `uatf-auth-service`, `olap-service`, `dw-control-service`, `dss-permissions` y los integrados de Keycloak) son de solo lectura. De `dss-bff` se pueden editar nombre, descripción y URIs, para desplegar en dominios nuevos, pero no se puede desactivar. Sus secretos no se rotan desde la API: los servicios los leen de su configuración y se rotan con el procedimiento de despliegue.
+- **Secretos:** se devuelven una sola vez, con `Cache-Control: no-store`. La auditoría solo registra `issuedOnce`/`rotated`; además, el sanitizador de IAM-005 enmascara cualquier clave que contenga `secret`. Los `toString()` de las respuestas lo enmascaran. El token `client_credentials` de la cuenta de servicio se envía como cuerpo en streaming (`ClientCredentialsForm`), así el log `DEBUG` de `RestClient` no imprime su secreto. Los tests comprueban que ni el secreto emitido ni el rotado aparecen en `admin_audit_log` ni en la salida de logs.
+
 ## Persistencia local
 
 Las migraciones observadas definen:
@@ -199,7 +210,7 @@ V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los c
 ## Rutas auxiliares y límites funcionales
 
 - Los roles locales sirven como snapshot consultado para reglas del contexto académico. La seguridad HTTP usa los roles presentes en el JWT.
-- Desde IAM-006, `auth-service` crea usuarios y concede o revoca roles y permisos en Keycloak (Flujo D). Desde IAM-007 también define roles, permisos y qué permisos agrupa cada rol (Flujo E). La gestión de clientes llega en IAM-008.
+- Desde IAM-006, `auth-service` crea usuarios y concede o revoca roles y permisos en Keycloak (Flujo D). Desde IAM-007 también define roles, permisos y qué permisos agrupa cada rol (Flujo E). Desde IAM-008 también registra y edita aplicaciones (clientes) y rota sus secretos (Flujo F).
 - El servicio no implementa autorización por facultad/programa sobre endpoints de analítica, no configura RLS y no propaga aquí un contexto de sesión al Data Warehouse.
 - `GET /auth/me` expone los contextos para que un cliente autorizado los consuma; la aplicación de ese alcance fuera de este servicio corresponde a otra capa.
 
