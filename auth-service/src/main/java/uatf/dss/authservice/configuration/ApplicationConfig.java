@@ -16,6 +16,12 @@ import uatf.dss.authservice.application.service.ListAcademicCatalogService;
 import uatf.dss.authservice.application.service.AdminUserDirectoryService;
 import uatf.dss.authservice.application.service.SyncUserService;
 import uatf.dss.authservice.application.service.SetUserAcademicContextsService;
+import uatf.dss.authservice.application.service.AdminAuditRecorder;
+import uatf.dss.authservice.application.service.ListAdminAuditService;
+import uatf.dss.authservice.application.port.in.ListAdminAuditUseCase;
+import uatf.dss.authservice.application.port.out.AdminAuditLogRepository;
+
+import java.time.Clock;
 
 @Configuration
 public class ApplicationConfig {
@@ -44,8 +50,20 @@ public class ApplicationConfig {
     public SetUserAcademicContextsUseCase setUserAcademicContextsUseCase(
             UserRepository userRepository,
             AcademicContextRepository contextRepository,
-            AcademicCatalogRepository catalogRepository) {
-        return new SetUserAcademicContextsService(userRepository, contextRepository, catalogRepository);
+            AcademicCatalogRepository catalogRepository,
+            AdminAuditRecorder adminAuditRecorder) {
+        return new SetUserAcademicContextsService(userRepository, contextRepository, catalogRepository,
+                adminAuditRecorder);
+    }
+
+    @Bean
+    public AdminAuditRecorder adminAuditRecorder(AdminAuditLogRepository auditLogRepository) {
+        return new AdminAuditRecorder(auditLogRepository, Clock.systemUTC());
+    }
+
+    @Bean
+    public ListAdminAuditUseCase listAdminAuditUseCase(AdminAuditLogRepository auditLogRepository) {
+        return new ListAdminAuditService(auditLogRepository);
     }
 
     @Bean

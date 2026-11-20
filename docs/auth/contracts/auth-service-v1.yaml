@@ -142,6 +142,34 @@ paths:
               schema: { $ref: '#/components/schemas/AcademicCatalog' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/iam/audit:
+    get:
+      tags: [Auditoría administrativa]
+      operationId: listAdminAudit
+      summary: Consulta la auditoría de operaciones administrativas
+      x-required-permission: iam:audit:read
+      description: >-
+        Registros de `admin_audit_log`, del más reciente al más antiguo. Todos los filtros son opcionales.
+        Responde con `Cache-Control: no-store`.
+      parameters:
+        - { name: actor, in: query, description: Keycloak id o username exacto del actor, schema: { type: string, maxLength: 255 } }
+        - { name: action, in: query, description: 'Acción exacta, por ejemplo USER_ACADEMIC_CONTEXTS_REPLACED', schema: { type: string, maxLength: 100 } }
+        - { name: targetType, in: query, schema: { type: string, enum: [USER, ROLE, PERMISSION, CLIENT] } }
+        - { name: targetId, in: query, schema: { type: string, maxLength: 255 } }
+        - { name: outcome, in: query, schema: { type: string, enum: [PENDING, SUCCESS, FAILURE] } }
+        - { name: from, in: query, description: Desde (incluido), ISO-8601, schema: { type: string, format: date-time } }
+        - { name: to, in: query, description: Hasta (excluido), ISO-8601, schema: { type: string, format: date-time } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de registros de auditoría.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAuditPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
 components:
   securitySchemes:
     bearerAuth:
@@ -224,6 +252,44 @@ components:
         content:
           type: array
           items: { $ref: '#/components/schemas/AdminUserDirectoryEntry' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
+    AdminAuditEntry:
+      type: object
+      required: [id, occurredAt, actor, action, targetType, outcome]
+      properties:
+        id: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        actor:
+          type: object
+          properties:
+            keycloakId: { type: [string, 'null'] }
+            username: { type: [string, 'null'] }
+            ipAddress: { type: [string, 'null'] }
+        action: { type: string }
+        targetType: { type: string, enum: [USER, ROLE, PERMISSION, CLIENT] }
+        targetId: { type: [string, 'null'] }
+        before:
+          type: [object, 'null']
+          description: Estado previo. Las claves con contraseñas, secretos, tokens o credenciales se guardan como `[REDACTED]`.
+        after:
+          type: [object, 'null']
+          description: Estado posterior, saneado igual que `before`.
+        outcome:
+          type: string
+          enum: [PENDING, SUCCESS, FAILURE]
+          description: PENDING solo en operaciones ejecutadas en Keycloak cuyo resultado aún no se confirmó.
+        failureReason: { type: [string, 'null'] }
+        completedAt: { type: [string, 'null'], format: date-time }
+    AdminAuditPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/AdminAuditEntry' }
         page: { type: integer }
         size: { type: integer }
         totalElements: { type: integer, format: int64 }

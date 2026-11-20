@@ -39,6 +39,10 @@ Traducción de errores de Keycloak a excepciones de dominio:
 | 401 tras renovar el token, 403 u otros 5xx | `IdentityProviderException` | 502 |
 | Timeout, conexión rechazada o secreto ausente | `IdentityProviderUnavailableException` | 503 |
 
+### Auditoría administrativa
+
+`GET /api/v1/admin/iam/audit` (permiso `iam:audit:read`) consulta `admin_audit_log`, de lo más reciente a lo más antiguo, con filtros opcionales `actor` (Keycloak id o username), `action`, `targetType`, `targetId`, `outcome`, `from`/`to` (ISO-8601; `from` incluido, `to` excluido) y paginación `page`/`size` (máximo 100). No requiere variables nuevas. El detalle de cómo se registra cada operación está en `auth-service/docs/auth-service-funcionamiento.md`.
+
 ### Endpoint interno de alcance académico
 
 `GET /api/v1/internal/users/{keycloakId}/academic-contexts` devuelve `{keycloakId, active, roles, contexts}` sin datos personales y con `Cache-Control: no-store`. Es solo servicio-a-servicio (backstop OLAP, ver `docs/olap/academic-scope-backstop-design.md`); el BFF no lo expone. Respuestas: 401 sin token, 403 sin el permiso `context:read` o con un `azp` no permitido, 404 si el usuario no está sincronizado.

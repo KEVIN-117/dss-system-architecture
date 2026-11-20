@@ -128,7 +128,7 @@ El caso de uso ejecuta, en este orden, las verificaciones relevantes:
 3. Exige cero contextos para `SUPERADMIN`/`RECTOR` y exactamente uno para `DECANO`/`DIRECTOR`.
 4. Valida la forma del contexto: rector y superadmin sin facultad/programa; decano con facultad y sin programa; director con facultad y programa.
 5. Comprueba que facultad y programa existan y estén activos en los catálogos locales; el programa debe pertenecer a la facultad indicada.
-6. Reemplaza el conjunto previo dentro de una transacción y registra `USER_ACADEMIC_CONTEXTS_REPLACED` con actor, objetivo, rol y cantidad de contextos.
+6. Reemplaza el conjunto previo dentro de una transacción y registra `USER_ACADEMIC_CONTEXTS_REPLACED` en `admin_audit_log` (misma transacción) con actor, IP, objetivo y los contextos antes y después. Si la operación falla, el registro `FAILURE` se escribe en una transacción independiente y sobrevive al rollback.
 
 Un `contexts: []` elimina los contextos previos y solo es válido para rector o superadmin. Si falta el snapshot local de roles reconocido, la operación falla con conflicto (`409`); la autenticación del actor no se basa en esa réplica, sino en el JWT.
 
@@ -150,9 +150,9 @@ Las migraciones observadas definen:
 - `academic_faculties` y `academic_programs`: catálogo académico local, consumido por la API de asignación.
 - `processed_keycloak_events`: inbox de idempotencia, con `event_id` como clave primaria y timestamp de procesamiento.
 - `example_users`: tabla de la antigua funcionalidad demostrativa. El código que la usaba se eliminó en IAM-004; la tabla se conserva para no borrar datos.
-- `revinfo` y `revchanges`: tablas preexistentes en la migración inicial.
+- `admin_audit_log`: auditoría persistente de operaciones administrativas (V7), con estado antes/después en `jsonb`.
 
-V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los cuatro roles de aplicación. V5 crea la tabla inbox de eventos. V6 da a `roles.id` una secuencia, amplía `name` a 255 caracteres y hace opcional `description`, para que la sincronización registre roles nuevos. Las tablas `revinfo`/`revchanges` no bastan para afirmar que el historial se registre: el `pom.xml` revisado no declara Hibernate Envers ni se encontraron entidades anotadas con `@Audited`.
+V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los cuatro roles de aplicación. V5 crea la tabla inbox de eventos. V6 da a `roles.id` una secuencia, amplía `name` a 255 caracteres y hace opcional `description`, para que la sincronización registre roles nuevos. V7 crea `admin_audit_log` y elimina `revinfo`/`revchanges`, que V1 había creado para Hibernate Envers sin que Envers llegara a usarse.
 
 ## Rutas auxiliares y límites funcionales
 
@@ -164,7 +164,12 @@ V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los c
 ## Errores, auditoría y operación
 
 - `GlobalExceptionHandler` transforma `UserNotFoundException` en `404 USER_NOT_SYNCED` y las excepciones de dominio en el código HTTP definido por cada excepción. Spring Security responde `401/403` para autenticación/autorización.
-- `AUDIT_LOGGER` produce eventos estructurados. La sincronización registra `USER_SYNCED`; la sustitución de contexto registra actor y objetivo.
+- `AUDIT_LOGGER` produce eventos estructurados. La sincronización registra `USER_SYNCED`; cada operación administrativa registra una línea con `event_type` igual a su acción, `audit_id`, `outcome`, actor, IP y objetivo.
+- **Auditoría persistente (IAM-005).** `AdminAuditRecorder` envuelve cada operación administrativa de escritura y deja una fila en `admin_audit_log`, que se consulta con `GET /api/v1/admin/iam/audit` (permiso `iam:audit:read`):
+  - *Operación local* (`recordLocal`): si sale bien, la fila se escribe en la misma transacción que el cambio; si falla, se escribe en una transacción independiente (`REQUIRES_NEW`).
+  - *Operación en Keycloak* (`recordRemote`, para IAM-006 a IAM-008): primero confirma una fila `PENDING`, después llama a Keycloak y la completa como `SUCCESS` o `FAILURE`. Si no puede escribir la fila `PENDING`, no llama a Keycloak. Una fila que queda en `PENDING` significa resultado desconocido.
+  - `AuditPayloadSanitizer` reemplaza por `[REDACTED]` cualquier clave del antes/después que contenga `password`, `secret`, `token`, `credential`, `apikey` o `privatekey`, en cualquier nivel.
+  - La IP se resuelve con `ClientIpResolver`, con las mismas reglas de proxy que el log de autenticación.
 - `AuditLoggingListener` observa eventos de autenticación asociados con `/auth/me`, roles e IP. La ruta servlet normalmente incluye el context path `/api/v1`, mientras que el listener compara el path completo con `/auth/me`; esa comparación parece no coincidir con el URI real y debe confirmarse en ejecución.
 - Cuando la conexión llega desde una dirección privada o loopback, la auditoría puede tomar IP de `X-Real-IP`, `Forwarded` o `X-Forwarded-For`. Estas cabeceras solo son fiables si el servicio está detrás de proxies confiables que las limpian y establecen.
 - Actuator expone `health`, `info` y `metrics`; el detalle de salud se limita a usuarios autorizados.

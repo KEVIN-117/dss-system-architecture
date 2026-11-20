@@ -1,5 +1,6 @@
 package uatf.dss.authservice.adapter.in.web;
 
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -17,7 +18,6 @@ import uatf.dss.authservice.application.port.in.SetUserAcademicContextsUseCase;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 
 import java.util.List;
-import java.util.Objects;
 import java.util.UUID;
 
 @RestController
@@ -38,15 +38,15 @@ public class AcademicContextAssignmentController {
     public ResponseEntity<List<UserAcademicContext>> replaceAcademicContexts(
             @PathVariable UUID userId,
             @Valid @RequestBody AcademicContextAssignmentRequest request,
-            JwtAuthenticationToken authentication) {
-        UUID actorKeycloakId = UUID.fromString(Objects.requireNonNull(authentication.getToken().getSubject()));
+            JwtAuthenticationToken authentication,
+            HttpServletRequest httpRequest) {
         List<SetUserAcademicContextsCommand.AcademicContextInput> contexts = request.contexts().stream()
                 .map(context -> new SetUserAcademicContextsCommand.AcademicContextInput(
                         context.facultyId(), context.careerId()))
                 .toList();
 
         List<UserAcademicContext> saved = useCase.execute(
-                new SetUserAcademicContextsCommand(actorKeycloakId, userId, contexts));
+                new SetUserAcademicContextsCommand(AuditActors.from(authentication, httpRequest), userId, contexts));
         return ResponseEntity.ok(saved);
     }
 }
