@@ -7,12 +7,6 @@ import {
   Input,
   Loader,
   Select,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetFooter,
-  SheetHeader,
-  SheetTitle,
   Table,
   TableBody,
   TableCell,
@@ -25,54 +19,61 @@ import {
   ChevronRight,
   RefreshCw,
   Search,
+  UserPlus,
   UserRoundCog,
 } from 'lucide-react';
+import { useHasPermission } from '@dss-monorepo/rbac';
 import {
   getAcademicCatalog,
   listAdminUsers,
-  replaceAdminUserContexts,
   type AcademicCatalog,
   type AdminUserDirectoryEntry,
-  type AcademicContextAssignment,
 } from '../data-access/auth-admin';
+import type { IamUser } from '../data-access/iam-users';
+import { CreateUserDialog } from './CreateUserDialog';
+import { UserManagementSheet, type UserManagementTab } from './UserManagementSheet';
+import { ROLE_PRECEDENCE, effectiveRole, personName } from './user-roles';
 
 const PAGE_SIZE = 20;
-const ROLE_PRECEDENCE = ['DIRECTOR', 'DECANO', 'RECTOR', 'SUPERADMIN'] as const;
 
-type ContextRole = (typeof ROLE_PRECEDENCE)[number];
-
-function effectiveRole(roles: string[]): ContextRole | null {
-  return (
-    [...ROLE_PRECEDENCE].reverse().find((role) => roles.includes(role)) ?? null
-  );
-}
-
-function personName(user: AdminUserDirectoryEntry): string {
-  return (
-    [user.firstName, user.lastName].filter(Boolean).join(' ').trim() ||
-    user.username
-  );
-}
-
-function contextSummary(
-  user: AdminUserDirectoryEntry,
+function contextLabel(
+  context: AdminUserDirectoryEntry['academicContexts'][number],
   catalog: AcademicCatalog | null,
 ): string {
-  const context = user.academicContexts[0];
-  if (!context) return 'Sin contexto asignado';
   if (context.facultyId === null) return 'Sin facultad asignada';
-  const faculty = catalog?.faculties.find(
-    (item) => item.id === context.facultyId,
-  );
+  const faculty = catalog?.faculties.find((item) => item.id === context.facultyId);
   const career = context.careerId
-    ? catalog?.careers.find(
-        (item) =>
-          item.id === context.careerId && item.facultyId === context.facultyId,
-      )
+    ? catalog?.careers.find((item) => item.id === context.careerId && item.facultyId === context.facultyId)
     : undefined;
   return context.careerId
     ? `${faculty?.name ?? `Facultad ${context.facultyId}`} · ${career?.name ?? `Carrera ${context.careerId}`}`
     : (faculty?.name ?? `Facultad ${context.facultyId}`);
+}
+
+/** Every context of the user (IAM-009), one per line. */
+function contextSummary(user: AdminUserDirectoryEntry, catalog: AcademicCatalog | null): React.ReactNode {
+  if (user.academicContexts.length === 0) return 'Sin contexto asignado';
+  return (
+    <ul className="space-y-0.5">
+      {user.academicContexts.map((context) => (
+        <li key={context.id}>{contextLabel(context, catalog)}</li>
+      ))}
+    </ul>
+  );
+}
+
+/** The directory row of a user just created in Keycloak, until the next reload. */
+function directoryEntry(user: IamUser): AdminUserDirectoryEntry {
+  return {
+    id: user.id,
+    username: user.username,
+    email: user.email,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    isActive: user.enabled,
+    roles: [],
+    academicContexts: [],
+  };
 }
 
 export function AdminUsersPage() {
@@ -86,17 +87,12 @@ export function AdminUsersPage() {
   const [totalPages, setTotalPages] = React.useState(0);
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
-  const [selectedUser, setSelectedUser] =
-    React.useState<AdminUserDirectoryEntry | null>(null);
-  const [facultyId, setFacultyId] = React.useState('');
-  const [careerId, setCareerId] = React.useState('');
-  const [academicCatalog, setAcademicCatalog] =
-    React.useState<AcademicCatalog | null>(null);
-  const [catalogLoading, setCatalogLoading] = React.useState(false);
-  const [catalogError, setCatalogError] = React.useState<string | null>(null);
-  const [saving, setSaving] = React.useState(false);
-  const [saveError, setSaveError] = React.useState<string | null>(null);
-  const [saveMessage, setSaveMessage] = React.useState<string | null>(null);
+  const canWrite = useHasPermission('iam:users:write');
+  const [managedUser, setManagedUser] = React.useState<AdminUserDirectoryEntry | null>(null);
+  const [managedTab, setManagedTab] = React.useState<UserManagementTab>('account');
+  const [creating, setCreating] = React.useState(false);
+  const [notice, setNotice] = React.useState<string | null>(null);
+  const [academicCatalog, setAcademicCatalog] = React.useState<AcademicCatalog | null>(null);
 
   const loadUsers = React.useCallback(
     async (signal?: AbortSignal) => {
@@ -139,31 +135,31 @@ export function AdminUsersPage() {
     return () => controller.abort();
   }, [loadUsers]);
 
-  const openContextEditor = (user: AdminUserDirectoryEntry) => {
-    const context = user.academicContexts[0];
-    setSelectedUser(user);
-    setFacultyId(
-      context?.facultyId === null || context?.facultyId === undefined
-        ? ''
-        : String(context.facultyId),
-    );
-    setCareerId(context?.careerId ?? '');
-    setSaveError(null);
-    setSaveMessage(null);
-    setCatalogError(null);
-    if (!academicCatalog) {
-      setCatalogLoading(true);
-      void getAcademicCatalog()
-        .then(setAcademicCatalog)
-        .catch((cause) =>
-          setCatalogError(
-            cause instanceof Error
-              ? cause.message
-              : 'No se pudo cargar el catálogo académico.',
-          ),
-        )
-        .finally(() => setCatalogLoading(false));
-    }
+  // Faculty and career names for the context column; the directory works without them.
+  React.useEffect(() => {
+    const controller = new AbortController();
+    getAcademicCatalog(controller.signal).then(setAcademicCatalog).catch(() => undefined);
+    return () => controller.abort();
+  }, []);
+
+  const manage = (user: AdminUserDirectoryEntry, tab: UserManagementTab = 'account') => {
+    setManagedTab(tab);
+    setManagedUser(user);
+  };
+
+  const applyChange = (change: Partial<AdminUserDirectoryEntry>) => {
+    if (!managedUser) return;
+    const id = managedUser.id;
+    setManagedUser((current) => (current ? { ...current, ...change } : current));
+    setUsers((current) => current.map((user) => (user.id === id ? { ...user, ...change } : user)));
+  };
+
+  const created = (user: IamUser) => {
+    setNotice(user.invitationSent === false
+      ? `Usuario @${user.username} creado, pero no se pudo enviar la invitación. Puedes reenviarla desde «Gestionar».`
+      : `Usuario @${user.username} creado.${user.invitationSent ? ' Se le envió la invitación por correo.' : ''}`);
+    void loadUsers();
+    manage(directoryEntry(user), 'roles');
   };
 
   const submitSearch = (event: React.FormEvent<HTMLFormElement>) => {
@@ -172,74 +168,8 @@ export function AdminUsersPage() {
     setQuery(searchInput.trim());
   };
 
-  const saveContext = async (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (!selectedUser) return;
-    const targetRole = effectiveRole(selectedUser.roles);
-    const selectedFaculty = academicCatalog?.faculties.find(
-      (item) => item.id === Number(facultyId),
-    );
-    if (!selectedFaculty) {
-      setSaveError('Selecciona una facultad del catálogo académico.');
-      return;
-    }
-    const selectedCareer =
-      targetRole === 'DIRECTOR'
-        ? academicCatalog?.careers.find(
-            (item) =>
-              item.id === careerId && item.facultyId === selectedFaculty.id,
-          )
-        : undefined;
-    if (targetRole === 'DIRECTOR' && !selectedCareer) {
-      setSaveError('Selecciona una carrera de la facultad elegida.');
-      return;
-    }
-
-    const contexts: AcademicContextAssignment[] = [
-      {
-        facultyId: selectedFaculty.id,
-        careerId: selectedCareer?.id ?? null,
-      },
-    ];
-    setSaving(true);
-    setSaveError(null);
-    setSaveMessage(null);
-    try {
-      const updatedContexts = await replaceAdminUserContexts(
-        selectedUser.id,
-        contexts,
-      );
-      setUsers((current) =>
-        current.map((user) =>
-          user.id === selectedUser.id
-            ? { ...user, academicContexts: updatedContexts }
-            : user,
-        ),
-      );
-      setSelectedUser((current) =>
-        current ? { ...current, academicContexts: updatedContexts } : current,
-      );
-      setSaveMessage('Contexto académico actualizado.');
-    } catch (cause) {
-      setSaveError(
-        cause instanceof Error
-          ? cause.message
-          : 'No se pudo guardar el contexto.',
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
   const start = totalElements === 0 ? 0 : page * PAGE_SIZE + 1;
   const end = Math.min((page + 1) * PAGE_SIZE, totalElements);
-  const selectedRole = selectedUser ? effectiveRole(selectedUser.roles) : null;
-  const canAssignContext =
-    selectedRole === 'DECANO' || selectedRole === 'DIRECTOR';
-  const availableCareers =
-    academicCatalog?.careers.filter(
-      (item) => item.facultyId === Number(facultyId),
-    ) ?? [];
 
   return (
     <section className="space-y-6" aria-labelledby="admin-users-title">
@@ -255,19 +185,34 @@ export function AdminUsersPage() {
             Usuarios
           </h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Consulta las identidades institucionales y asigna el contexto
-            académico requerido por su rol.
+            Crea e invita usuarios, activa o desactiva sus cuentas y asigna
+            roles, permisos y contextos académicos.
           </p>
         </div>
-        <Button
-          variant="outline"
-          onClick={() => void loadUsers()}
-          disabled={loading}
-        >
-          <RefreshCw aria-hidden="true" className="size-4" />
-          Actualizar
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            onClick={() => void loadUsers()}
+            disabled={loading}
+          >
+            <RefreshCw aria-hidden="true" className="size-4" />
+            Actualizar
+          </Button>
+          {canWrite && (
+            <Button onClick={() => setCreating(true)}>
+              <UserPlus aria-hidden="true" className="size-4" />
+              Nuevo usuario
+            </Button>
+          )}
+        </div>
       </header>
+
+      {notice && (
+        <div role="status" className="flex flex-wrap items-center justify-between gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
+          <p>{notice}</p>
+          <Button variant="ghost" size="sm" onClick={() => setNotice(null)}>Cerrar aviso</Button>
+        </div>
+      )}
 
       <div className="rounded-xl border border-border bg-card">
         <form
@@ -372,7 +317,6 @@ export function AdminUsersPage() {
             <TableBody>
               {users.map((user) => {
                 const role = effectiveRole(user.roles);
-                const eligible = role === 'DECANO' || role === 'DIRECTOR';
                 return (
                   <TableRow key={user.id}>
                     <TableCell className="min-w-48 font-sans">
@@ -416,17 +360,11 @@ export function AdminUsersPage() {
                         <Button
                           variant="outline"
                           size="sm"
-                          disabled={!eligible}
-                          aria-label={`Asignar contexto académico a ${user.username}`}
-                          onClick={() => openContextEditor(user)}
-                          title={
-                            eligible
-                              ? undefined
-                              : 'El rol no requiere contexto académico'
-                          }
+                          aria-label={`Gestionar a ${user.username}`}
+                          onClick={() => manage(user)}
                         >
                           <UserRoundCog aria-hidden="true" className="size-4" />
-                          Contexto
+                          {canWrite ? 'Gestionar' : 'Ver detalle'}
                         </Button>
                       </div>
                     </TableCell>
@@ -495,204 +433,14 @@ export function AdminUsersPage() {
         </nav>
       </div>
 
-      <Sheet
-        open={selectedUser !== null}
-        onOpenChange={(open) => {
-          if (!open && !saving) setSelectedUser(null);
-        }}
-      >
-        <SheetContent
-          side="right"
-          showCloseButton={false}
-          className="w-full overflow-y-auto sm:max-w-md"
-        >
-          <SheetHeader className="border-b border-border px-6 pt-6">
-            <SheetTitle>Contexto académico</SheetTitle>
-            <SheetDescription>
-              {selectedUser
-                ? `Asigna el alcance institucional para ${personName(selectedUser)} (@${selectedUser.username}).`
-                : 'Asigna el alcance institucional del usuario.'}
-            </SheetDescription>
-          </SheetHeader>
-          {selectedUser && (
-            <form
-              id="academic-context-form"
-              onSubmit={(event) => void saveContext(event)}
-              className="space-y-5 px-6"
-            >
-              {!canAssignContext ? (
-                <div
-                  className="rounded-lg border bg-muted/30 p-4 text-sm"
-                  role="status"
-                >
-                  <p className="font-medium">
-                    Este rol no utiliza contexto académico.
-                  </p>
-                  <p className="mt-1 text-muted-foreground">
-                    El servicio de autenticación requiere que Rector y Superadministrador no
-                    tengan contextos asignados.
-                  </p>
-                </div>
-              ) : (
-                <>
-                  <div className="rounded-lg border bg-muted/30 p-4 text-sm">
-                    <p className="font-medium">
-                      Alcance requerido: {selectedRole}
-                    </p>
-                    <p className="mt-1 text-muted-foreground">
-                      Elige la unidad académica por nombre. La asignación
-                      reemplazará el contexto actual de este usuario.
-                    </p>
-                  </div>
-                  {catalogLoading && (
-                    <Loader text="Cargando facultades y carreras…" fullScreen={false} className="min-h-32" />
-                  )}
-                  {catalogError && (
-                    <div
-                      role="alert"
-                      className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-                    >
-                      <p>
-                        No se pudo cargar el catálogo académico: {catalogError}
-                      </p>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setCatalogError(null);
-                          setCatalogLoading(true);
-                          void getAcademicCatalog()
-                            .then(setAcademicCatalog)
-                            .catch((cause) =>
-                              setCatalogError(
-                                cause instanceof Error
-                                  ? cause.message
-                                  : 'No se pudo cargar el catálogo académico.',
-                              ),
-                            )
-                            .finally(() => setCatalogLoading(false));
-                        }}
-                      >
-                        Reintentar
-                      </Button>
-                    </div>
-                  )}
-                  <div className="space-y-1.5">
-                    <label
-                      htmlFor="context-faculty-id"
-                      className="text-sm font-medium"
-                    >
-                      Facultad <span aria-hidden="true">*</span>
-                    </label>
-                    <Select
-                      id="context-faculty-id"
-                      required
-                      value={facultyId}
-                      disabled={catalogLoading || !academicCatalog}
-                      onChange={(event) => {
-                        setFacultyId(event.target.value);
-                        setCareerId('');
-                      }}
-                      aria-describedby="faculty-id-hint"
-                    >
-                      <option value="">Selecciona una facultad</option>
-                      {academicCatalog?.faculties.map((faculty) => (
-                        <option key={faculty.id} value={faculty.id}>
-                          {faculty.name} · ID {faculty.id}
-                        </option>
-                      ))}
-                    </Select>
-                    <p
-                      id="faculty-id-hint"
-                      className="text-xs text-muted-foreground"
-                    >
-                      Se muestran las facultades activas del catálogo
-                      académico del servicio de autenticación.
-                    </p>
-                  </div>
-                  {selectedRole === 'DIRECTOR' && (
-                    <div className="space-y-1.5">
-                      <label
-                        htmlFor="context-career-id"
-                        className="text-sm font-medium"
-                      >
-                        Carrera <span aria-hidden="true">*</span>
-                      </label>
-                      <Select
-                        id="context-career-id"
-                        required
-                        value={careerId}
-                        disabled={
-                          !facultyId || catalogLoading || !academicCatalog
-                        }
-                        onChange={(event) => setCareerId(event.target.value)}
-                        aria-describedby="career-id-hint"
-                      >
-                        <option value="">
-                          {facultyId
-                            ? 'Selecciona una carrera'
-                            : 'Primero selecciona una facultad'}
-                        </option>
-                        {availableCareers.map((career) => (
-                          <option
-                            key={`${career.facultyId}-${career.id}`}
-                            value={career.id}
-                          >
-                            {career.name} · {career.id}
-                          </option>
-                        ))}
-                      </Select>
-                      <p
-                        id="career-id-hint"
-                        className="text-xs text-muted-foreground"
-                      >
-                        La lista se filtra según la facultad seleccionada.
-                      </p>
-                    </div>
-                  )}
-                </>
-              )}
-              {saveError && (
-                <p
-                  role="alert"
-                  className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
-                >
-                  {saveError}
-                </p>
-              )}
-              {saveMessage && (
-                <p
-                  role="status"
-                  className="rounded-md border border-border bg-muted/30 p-3 text-sm"
-                >
-                  {saveMessage}
-                </p>
-              )}
-            </form>
-          )}
-          <SheetFooter className="border-t border-border px-6 pb-6">
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setSelectedUser(null)}
-              disabled={saving}
-            >
-              Cerrar
-            </Button>
-            {canAssignContext && (
-              <Button
-                type="submit"
-                form="academic-context-form"
-                loading={saving}
-                disabled={saving || catalogLoading || !academicCatalog}
-              >
-                Guardar contexto
-              </Button>
-            )}
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+      <UserManagementSheet
+        user={managedUser}
+        canWrite={canWrite}
+        initialTab={managedTab}
+        onClose={() => setManagedUser(null)}
+        onChanged={applyChange}
+      />
+      {canWrite && <CreateUserDialog open={creating} onOpenChange={setCreating} onCreated={created} />}
     </section>
   );
 }

@@ -9,7 +9,7 @@ El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio d
 | Sección | Servicio | Uso |
 | --- | --- | --- |
 | <Ui>Resumen general</Ui> | Todos | Estado de los servicios y actividad reciente. |
-| <Ui>Usuarios</Ui> | servicio de autenticación | Consultar usuarios y asignar su contexto académico. |
+| <Ui>Usuarios</Ui> | servicio de autenticación | Crear e invitar usuarios, activarlos o desactivarlos y asignar sus roles, permisos y contextos académicos. |
 | <Ui>Cierres académicos</Ui> | servicio de control del almacén de datos | Crear, autorizar y reabrir cortes de periodo. |
 | <Ui>Ejecuciones ETL</Ui> | servicio de control del almacén de datos | Revisar el historial y el detalle de las cargas. |
 | <Ui>Conexiones</Ui> | servicio OLAP | Registrar y mantener conexiones OLAP. |
@@ -20,17 +20,26 @@ El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio d
 
 <Ui>Estado de servicios</Ui> indica para servicio de autenticación, servicio de control del almacén de datos, servicio OLAP y servicio de aprendizaje automático si están **Disponible**, **Sin conexión** o **En desarrollo**. <Ui>Actividad administrativa reciente</Ui> lista los últimos cierres y ejecuciones ETL. Si ves «Una parte de servicio de control del almacén de datos no respondió», el resto del portal sigue funcionando; revisa ese servicio.
 
-## Usuarios y contexto académico
+## Usuarios
 
-El **Directorio de usuarios** se puede filtrar por texto (<Ui>Nombre, usuario o correo</Ui>), rol y estado (<Ui>Activo</Ui> o <Ui>Inactivo</Ui>). Las cuentas se crean y desactivan en Keycloak; este portal no cambia contraseñas ni roles.
+El **Directorio de usuarios** se puede filtrar por texto (<Ui>Nombre, usuario o correo</Ui>), rol y estado (<Ui>Activo</Ui> o <Ui>Inactivo</Ui>). Para consultar basta `iam:users:read`; los botones que modifican algo (<Ui>Nuevo usuario</Ui>, activar, roles, permisos, contextos) solo aparecen con `iam:users:write`. Sin ese permiso, <Ui>Ver detalle</Ui> muestra la misma información en modo de solo lectura.
 
-Para asignar el alcance de un Decano o un Director:
+### Crear e invitar un usuario
 
-1. Busca al usuario y abre la acción de **contexto académico**.
-2. Elige la facultad del catálogo académico. Para un Director, elige también la carrera de esa facultad (<Ui>Selecciona una carrera de la facultad elegida.</Ui>).
-3. Guarda. Verás «Contexto académico actualizado.»
+1. Pulsa <Ui>Nuevo usuario</Ui> e ingresa el usuario y el correo (los nombres son opcionales).
+2. Deja marcada <Ui>Enviar invitación por correo</Ui>: la persona recibe un enlace para definir su contraseña y verificar el correo. El portal nunca pide ni muestra contraseñas.
+3. Al crear, se abre el panel del usuario en la pestaña **Roles** para terminar de configurarlo. Si la invitación no se pudo enviar, el aviso lo indica y puedes reenviarla.
 
-Rector y Administrador no requieren contexto («El rol no requiere contexto académico»). El cambio reemplaza la lista completa de contextos del usuario y se aplica en su siguiente consulta.
+### Gestionar un usuario
+
+<Ui>Gestionar</Ui> abre un panel con cuatro pestañas:
+
+- **Cuenta**: <Ui>Desactivar usuario</Ui> / <Ui>Activar usuario</Ui> (pide confirmación; desactivar impide iniciar sesión y conserva roles y contextos), <Ui>Reenviar invitación</Ui> y <Ui>Restablecer contraseña</Ui> (envían el correo correspondiente). No puedes desactivarte a ti mismo ni dejar la plataforma sin un SUPERADMIN habilitado: el portal muestra la regla que se aplicó.
+- **Roles**: marca los roles asignados directamente. <Ui>Roles efectivos</Ui> muestra además los heredados de otros roles (con borde, no se quitan desde aquí).
+- **Permisos**: permisos sueltos para excepciones, además de los que dan los roles. Lo habitual es asignar un rol.
+- **Contextos**: el alcance académico. Un Decano puede tener varias facultades y un Director varias carreras, incluso de facultades distintas (por ejemplo, un decano interino). Usa <Ui>Agregar facultad</Ui> o <Ui>Agregar carrera</Ui> y <Ui>Guardar contextos</Ui>; la lista reemplaza la anterior y no admite repetidos. Rector y Superadministrador no llevan contexto.
+
+Los cambios de roles y permisos llegan al usuario en su siguiente inicio de sesión o renovación de sesión (unos minutos).
 
 ## Cierres académicos
 

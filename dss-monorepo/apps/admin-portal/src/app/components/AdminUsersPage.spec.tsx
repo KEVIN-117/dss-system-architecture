@@ -1,24 +1,33 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getAcademicCatalog, listAdminUsers, replaceAdminUserContexts } =
-  vi.hoisted(() => ({
-    getAcademicCatalog: vi.fn(),
-    listAdminUsers: vi.fn(),
-    replaceAdminUserContexts: vi.fn(),
-  }));
-
-vi.mock('../data-access/auth-admin', () => ({
-  getAcademicCatalog,
-  listAdminUsers,
-  replaceAdminUserContexts,
+const auth = vi.hoisted(() => ({
+  getAcademicCatalog: vi.fn(),
+  listAdminUsers: vi.fn(),
+  replaceAdminUserContexts: vi.fn(),
 }));
+const iam = vi.hoisted(() => ({
+  createIamUser: vi.fn(),
+  getIamUserPermissions: vi.fn(),
+  getIamUserRoles: vi.fn(),
+  listIamPermissions: vi.fn(),
+  listIamRoles: vi.fn(),
+  replaceIamUserPermissions: vi.fn(),
+  replaceIamUserRoles: vi.fn(),
+  sendIamActionsEmail: vi.fn(),
+  setIamUserEnabled: vi.fn(),
+}));
+const { useHasPermission } = vi.hoisted(() => ({ useHasPermission: vi.fn() }));
+
+vi.mock('../data-access/auth-admin', () => auth);
+vi.mock('../data-access/iam-users', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../data-access/iam-users')>()),
+  ...iam,
+}));
+vi.mock('@dss-monorepo/rbac', () => ({ useHasPermission }));
 
 import { AdminUsersPage } from './AdminUsersPage';
-import type {
-  AcademicCatalog,
-  AdminUserDirectoryEntry,
-} from '../data-access/auth-admin';
+import type { AcademicCatalog, AdminUserDirectoryEntry } from '../data-access/auth-admin';
 
 const director: AdminUserDirectoryEntry = {
   id: '123e4567-e89b-42d3-a456-426614174000',
@@ -29,12 +38,8 @@ const director: AdminUserDirectoryEntry = {
   isActive: true,
   roles: ['DIRECTOR'],
   academicContexts: [
-    {
-      id: 'context-1',
-      userId: '123e4567-e89b-42d3-a456-426614174000',
-      facultyId: 4,
-      careerId: '101',
-    },
+    { id: 'context-1', userId: '123e4567-e89b-42d3-a456-426614174000', facultyId: 4, careerId: '101' },
+    { id: 'context-2', userId: '123e4567-e89b-42d3-a456-426614174000', facultyId: 8, careerId: '202' },
   ],
 };
 
@@ -77,127 +82,124 @@ function pageResult(
 
 beforeEach(() => {
   vi.clearAllMocks();
-  listAdminUsers.mockResolvedValue(pageResult());
-  getAcademicCatalog.mockResolvedValue(catalog);
-  replaceAdminUserContexts.mockResolvedValue([
-    {
-      id: 'new-context',
-      userId: director.id,
-      facultyId: 8,
-      careerId: '202',
-    },
+  useHasPermission.mockReturnValue(true);
+  auth.listAdminUsers.mockResolvedValue(pageResult());
+  auth.getAcademicCatalog.mockResolvedValue(catalog);
+  iam.listIamRoles.mockResolvedValue([
+    { name: 'DECANO', description: 'Decano', portal: 'decano', system: true },
+    { name: 'DIRECTOR', description: 'Director', portal: 'director', system: true },
   ]);
+  iam.getIamUserRoles.mockResolvedValue({ direct: [], effective: [] });
 });
 
 describe('AdminUsersPage', () => {
-  it('loads users, context and actions in a paginated table', async () => {
-    listAdminUsers.mockResolvedValue(
-      pageResult([director, decano], { totalElements: 27, totalPages: 2 }),
-    );
+  it('loads users, every academic context and actions in a paginated table', async () => {
+    auth.listAdminUsers.mockResolvedValue(pageResult([director, decano], { totalElements: 27, totalPages: 2 }));
     render(<AdminUsersPage />);
 
     expect(await screen.findByText('Ana García')).toBeTruthy();
-    expect(screen.getByText('ana@example.edu')).toBeTruthy();
     const anaRow = screen.getByRole('row', { name: /Ana García/ });
     expect(within(anaRow).getByText('DIRECTOR')).toBeTruthy();
-    expect(within(anaRow).getByText('Facultad 4 · Carrera 101')).toBeTruthy();
+    expect(await within(anaRow).findByText('Ingeniería · Sistemas')).toBeTruthy();
+    expect(within(anaRow).getByText('Ciencias Empresariales · Auditoría')).toBeTruthy();
     expect(within(anaRow).getByText('Activo')).toBeTruthy();
-    const luisRow = screen.getByRole('row', { name: /Luis Mamani/ });
-    expect(within(luisRow).getByText('Inactivo')).toBeTruthy();
+    expect(within(screen.getByRole('row', { name: /Luis Mamani/ })).getByText('Inactivo')).toBeTruthy();
     expect(screen.getByText('Mostrando 1–20 de 27')).toBeTruthy();
-    expect(
-      screen.getByRole('navigation', { name: 'Paginación de usuarios' }),
-    ).toBeTruthy();
-    expect(
-      screen.getByRole('button', { name: 'Página siguiente' }).hasAttribute(
-        'disabled',
-      ),
-    ).toBe(false);
+    expect(screen.getByRole('button', { name: 'Página siguiente' }).hasAttribute('disabled')).toBe(false);
+    expect(screen.getByRole('button', { name: 'Gestionar a ana.directora' })).toBeTruthy();
   });
 
   it('applies search and role filters, then resets to the first page', async () => {
     render(<AdminUsersPage />);
     await screen.findByText('Ana García');
-    fireEvent.change(screen.getByLabelText('Buscar usuarios'), {
-      target: { value: 'luis' },
-    });
-    fireEvent.change(screen.getByLabelText('Rol'), {
-      target: { value: 'DECANO' },
-    });
+    fireEvent.change(screen.getByLabelText('Buscar usuarios'), { target: { value: 'luis' } });
+    fireEvent.change(screen.getByLabelText('Rol'), { target: { value: 'DECANO' } });
     fireEvent.click(screen.getByRole('button', { name: 'Buscar' }));
 
     await waitFor(() =>
-      expect(listAdminUsers).toHaveBeenLastCalledWith(
+      expect(auth.listAdminUsers).toHaveBeenLastCalledWith(
         { q: 'luis', role: 'DECANO', active: undefined, page: 0, size: 20 },
         expect.any(AbortSignal),
       ),
     );
   });
 
-  it('loads catalog names and updates a director context from the side panel', async () => {
+  it('hides every write action without iam:users:write', async () => {
+    useHasPermission.mockReturnValue(false);
     render(<AdminUsersPage />);
     await screen.findByText('Ana García');
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Asignar contexto académico a ana.directora',
-      }),
-    );
 
-    expect(await screen.findByRole('dialog')).toBeTruthy();
-    expect(screen.getByText('Alcance requerido: DIRECTOR')).toBeTruthy();
-    expect(await screen.findByRole('option', { name: 'Ingeniería · ID 4' })).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Facultad *'), {
-      target: { value: '8' },
-    });
-    fireEvent.change(screen.getByLabelText('Carrera *'), {
-      target: { value: '202' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar contexto' }));
-
-    await waitFor(() =>
-      expect(replaceAdminUserContexts).toHaveBeenCalledWith(director.id, [
-        { facultyId: 8, careerId: '202' },
-      ]),
-    );
-    expect(
-      await screen.findByText('Contexto académico actualizado.'),
-    ).toBeTruthy();
+    expect(useHasPermission).toHaveBeenCalledWith('iam:users:write');
+    expect(screen.queryByRole('button', { name: 'Nuevo usuario' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Gestionar a ana.directora' }));
+    expect(await screen.findByText(/Vista de solo lectura/)).toBeTruthy();
+    expect(screen.queryByRole('button', { name: 'Desactivar usuario' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Reenviar invitación' })).toBeNull();
   });
 
-  it('assigns a faculty-only scope to a dean', async () => {
-    listAdminUsers.mockResolvedValue(pageResult([decano]));
-    render(<AdminUsersPage />);
-    await screen.findByText('Luis Mamani');
-    fireEvent.click(
-      screen.getByRole('button', {
-        name: 'Asignar contexto académico a luis.decano',
-      }),
-    );
-
-    expect(await screen.findByText('Alcance requerido: DECANO')).toBeTruthy();
-    fireEvent.change(screen.getByLabelText('Facultad *'), {
-      target: { value: '6' },
+  it('creates a user and opens its roles to finish the set-up', async () => {
+    iam.createIamUser.mockResolvedValue({
+      id: '323e4567-e89b-42d3-a456-426614174000', username: 'nuevo.usuario', email: 'nuevo@uatf.edu.bo',
+      firstName: 'Nuevo', lastName: 'Usuario', enabled: true, emailVerified: false, createdAt: null, invitationSent: true,
     });
-    fireEvent.click(screen.getByRole('button', { name: 'Guardar contexto' }));
-    await waitFor(() =>
-      expect(replaceAdminUserContexts).toHaveBeenCalledWith(decano.id, [
-        { facultyId: 6, careerId: null },
-      ]),
-    );
+    render(<AdminUsersPage />);
+    await screen.findByText('Ana García');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo usuario' }));
+    const form = within(await screen.findByRole('dialog', { name: 'Nuevo usuario' }));
+    fireEvent.change(form.getByLabelText(/^Usuario/), { target: { value: 'nuevo.usuario' } });
+    fireEvent.change(form.getByLabelText(/^Correo electrónico/), { target: { value: 'nuevo@uatf.edu.bo' } });
+    fireEvent.change(form.getByLabelText('Nombres'), { target: { value: 'Nuevo' } });
+    fireEvent.click(form.getByRole('button', { name: 'Crear usuario' }));
+
+    await waitFor(() => expect(iam.createIamUser).toHaveBeenCalledWith({
+      username: 'nuevo.usuario', email: 'nuevo@uatf.edu.bo', firstName: 'Nuevo', lastName: '', sendInvitation: true,
+    }));
+    expect(await screen.findByText('Usuario @nuevo.usuario creado. Se le envió la invitación por correo.')).toBeTruthy();
+    expect(await screen.findByRole('checkbox', { name: 'DIRECTOR' })).toBeTruthy();
+    expect(iam.getIamUserRoles).toHaveBeenCalledWith('323e4567-e89b-42d3-a456-426614174000', expect.any(AbortSignal));
+    expect(auth.listAdminUsers).toHaveBeenCalledTimes(2);
+  });
+
+  it('warns when the user was created but the invitation could not be sent', async () => {
+    iam.createIamUser.mockResolvedValue({
+      id: '323e4567-e89b-42d3-a456-426614174000', username: 'sin.correo', email: 'x@uatf.edu.bo',
+      firstName: null, lastName: null, enabled: true, emailVerified: false, createdAt: null, invitationSent: false,
+    });
+    render(<AdminUsersPage />);
+    await screen.findByText('Ana García');
+    fireEvent.click(screen.getByRole('button', { name: 'Nuevo usuario' }));
+    const form = within(await screen.findByRole('dialog', { name: 'Nuevo usuario' }));
+    fireEvent.change(form.getByLabelText(/^Usuario/), { target: { value: 'sin.correo' } });
+    fireEvent.change(form.getByLabelText(/^Correo electrónico/), { target: { value: 'x@uatf.edu.bo' } });
+    fireEvent.click(form.getByRole('button', { name: 'Crear usuario' }));
+
+    expect(await screen.findByText(/no se pudo enviar la invitación/)).toBeTruthy();
+  });
+
+  it('updates the row when the account is deactivated from the panel', async () => {
+    iam.setIamUserEnabled.mockResolvedValue({ ...director, enabled: false });
+    render(<AdminUsersPage />);
+    await screen.findByText('Ana García');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Gestionar a ana.directora' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Desactivar usuario' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Desactivar' }));
+
+    await waitFor(() => expect(iam.setIamUserEnabled).toHaveBeenCalledWith(director.id, false));
+    // The modal sheet hides the table from the accessibility tree while it is open.
+    const row = screen.getByRole('row', { name: /Ana García/, hidden: true });
+    await waitFor(() => expect(within(row).getByText('Inactivo')).toBeTruthy());
   });
 
   it('shows empty and error states accessibly', async () => {
-    listAdminUsers.mockResolvedValueOnce(pageResult([], { totalElements: 0, totalPages: 0 }));
+    auth.listAdminUsers.mockResolvedValueOnce(pageResult([], { totalElements: 0, totalPages: 0 }));
     const { unmount } = render(<AdminUsersPage />);
-    expect(
-      await screen.findByText('No hay usuarios que coincidan con estos filtros.'),
-    ).toBeTruthy();
+    expect(await screen.findByText('No hay usuarios que coincidan con estos filtros.')).toBeTruthy();
     unmount();
 
-    listAdminUsers.mockRejectedValueOnce(new Error('Auth Service no disponible'));
+    auth.listAdminUsers.mockRejectedValueOnce(new Error('Auth Service no disponible'));
     render(<AdminUsersPage />);
-    expect((await screen.findByRole('alert')).textContent).toContain(
-      'Auth Service no disponible',
-    );
+    expect((await screen.findByRole('alert')).textContent).toContain('Auth Service no disponible');
   });
 });
