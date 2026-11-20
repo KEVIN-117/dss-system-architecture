@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.2.0...docs-portal-v1.3.0) (2026-11-20)
+
+
+### Features
+
+* **Admin-portal:** gestión de roles y permisos ([#330](https://github.com/KEVIN-117/dss-system-architecture/issues/330)) ([7a74b91](https://github.com/KEVIN-117/dss-system-architecture/commit/7a74b9192561bafdf2b35696e84e3444d71bfe39))
+
 ## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.1.0...docs-portal-v1.2.0) (2026-11-20)
 
 
