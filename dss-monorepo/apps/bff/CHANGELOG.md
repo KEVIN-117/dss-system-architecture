@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.8.0...bff-v1.9.0) (2026-11-20)
+
+
+### Features
+
+* **bff:** rutas /api/admin/iam/** hacia auth-service ([#321](https://github.com/KEVIN-117/dss-system-architecture/issues/321)) ([f477342](https://github.com/KEVIN-117/dss-system-architecture/commit/f477342cb27785500148ffa60ebbb3c74360d6de))
+
 ## [1.8.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.7.0...bff-v1.8.0) (2026-11-20)
 
 
