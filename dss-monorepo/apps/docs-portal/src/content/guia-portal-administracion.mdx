@@ -2,7 +2,7 @@ export const metadata = { title: 'Portal de administración', audience: ['admini
 
 ## Acceso
 
-El portal de administración requiere una sesión institucional con el rol `SUPERADMIN`. Cada operación vuelve a validarse en el servicio correspondiente: el BFF comprueba el rol y servicio de autenticación, DW Control, OLAP o Prediction Service aplican sus propios permisos. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso de cliente necesario aunque tenga el rol.
+El portal de administración muestra cada sección según los permisos de tu cuenta: **Usuarios** requiere `iam:users:read`, **Servicio OLAP** `olap:admin`, **Aprendizaje automático** `prediction:train`, y los cierres y ejecuciones ETL `dw:closure:read`/`dw:etl-monitor:read`. Los permisos se asignan desde este mismo portal, directamente o a través de un rol. Cada operación vuelve a validarse en el BFF y en el servicio correspondiente. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso necesario.
 
 El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio de autenticación**, **servicio OLAP**, **servicio de control del almacén de datos** y **servicio de aprendizaje automático**.
 
@@ -40,7 +40,7 @@ Un **cierre académico** autoriza que los datos de una gestión y periodo se con
 2. <Ui>Autorizar cierre académico</Ui>: indica la fecha y hora efectiva y el motivo, y pulsa <Ui>Confirmar cierre</Ui>.
 3. <Ui>Reabrir cierre académico</Ui>: requiere un motivo y <Ui>Confirmar reapertura</Ui>.
 
-<Ui>Ver detalle</Ui> muestra versión, quién creó y autorizó el cierre, la ejecución ETL asociada y el historial de auditoría. Crear y transicionar cierres requiere el permiso `DW_CLOSURE_MANAGE`; consultarlos, `DW_CLOSURE_READ`.
+<Ui>Ver detalle</Ui> muestra versión, quién creó y autorizó el cierre, la ejecución ETL asociada y el historial de auditoría. Crear y transicionar cierres requiere el permiso `dw:closure:manage`; consultarlos, `dw:closure:read`.
 
 <Callout title="DW Control no ejecuta el ETL" tone="warning">
   Autorizar un cierre no inicia ni reintenta cargas. Las ejecuciones las realiza Apache Hop; aquí solo se registran y consultan.
@@ -48,7 +48,7 @@ Un **cierre académico** autoriza que los datos de una gestión y periodo se con
 
 ## Ejecuciones ETL
 
-El **Historial de ejecuciones** se filtra por estado, tipo, gestión, periodo e ID de cierre. El detalle muestra solicitud, duración, pasos, métricas e incidencias. Requiere `DW_ETL_MONITOR_READ`.
+El **Historial de ejecuciones** se filtra por estado, tipo, gestión, periodo e ID de cierre. El detalle muestra solicitud, duración, pasos, métricas e incidencias. Requiere `dw:etl-monitor:read`.
 
 ## Conexiones OLAP
 

@@ -1,17 +1,26 @@
 import { NextResponse } from 'next/server';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { authenticateRequest, requireClientRoles } = vi.hoisted(() => ({
+const { authenticateRequest, requireClientRoles, requirePermissions } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
   requireClientRoles: vi.fn(),
+  // IAM-014: the dw:* permission is checked first; these tests use the legacy DW_* role path.
+  requirePermissions: vi.fn(),
 }));
 
 vi.mock('../../../_lib/auth-guard', () => ({
   authenticateRequest,
   requireClientRoles,
+  requirePermissions,
 }));
 
-import { withDwControl } from './dw-control-route';
+beforeEach(() => {
+  requirePermissions.mockReturnValue(
+    NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }),
+  );
+});
+
+import { requireDwPermission, withDwControl } from './dw-control-route';
 
 const authenticatedRequest = {
   authenticated: true as const,
@@ -98,5 +107,22 @@ describe('DW control BFF route boundary', () => {
     expect(body).not.toContain('private-value');
     expect(body).toContain('DW_CONTROL_UNAVAILABLE');
     errorSpy.mockRestore();
+  });
+
+  it('accepts the dw:* permission and, during the coexistence only, the legacy DW_* role (IAM-014)', () => {
+    const value = authenticatedRequest.value as never;
+    requirePermissions.mockReturnValueOnce(null);
+    expect(requireDwPermission(value, 'DW_CLOSURE_MANAGE', {})).toBeNull();
+    expect(requirePermissions).toHaveBeenLastCalledWith(value, ['dw:closure:manage']);
+    expect(requireClientRoles).not.toHaveBeenCalled();
+
+    requireClientRoles.mockReturnValue(null);
+    expect(requireDwPermission(value, 'DW_CLOSURE_READ', {})).toBeNull();
+    expect(requireClientRoles).toHaveBeenLastCalledWith(value, 'dw-control-service', ['DW_CLOSURE_READ']);
+
+    requireClientRoles.mockClear();
+    expect(requireDwPermission(value, 'DW_CLOSURE_READ', { DW_CONTROL_LEGACY_ROLES_ENABLED: 'false' })?.status)
+      .toBe(403);
+    expect(requireClientRoles).not.toHaveBeenCalled();
   });
 });

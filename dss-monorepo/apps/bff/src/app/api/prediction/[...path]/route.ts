@@ -14,7 +14,7 @@ import {
   getPredictionServiceUrl,
 } from '../../../../lib/bff-config';
 import { withCors } from '../../../../lib/cors';
-import { authenticateRequest, requireRoles } from '../../_lib/auth-guard';
+import { authenticateRequest, requirePermissions } from '../../_lib/auth-guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -82,10 +82,10 @@ async function handle(
   }
 
   // Model training changes the candidate registry and consumes worker capacity.
-  // Keep it behind the technical administrator role; academic roles only read
-  // predictions and publications through the separate routes.
+  // It requires prediction:train (IAM-014), the same permission prediction-service
+  // enforces; academic users only read predictions through the separate routes.
   if (isTrainingCollection || isTrainingItem || isDatasetCollection || isDatasetUpload || isModelCollection || isModelAction) {
-    const forbidden = requireRoles(authentication.value, ['SUPERADMIN']);
+    const forbidden = requirePermissions(authentication.value, ['prediction:train']);
     if (forbidden) return withCors(request, forbidden);
   }
 

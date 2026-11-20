@@ -6,14 +6,14 @@ El BFF es el único punto de integración de los portales con Keycloak y `auth-s
 
 - `GET /api/auth/login`: crea una transacción cifrada con `state`, `nonce` y PKCE; después redirige a Keycloak. Acepta `returnTo` solo para orígenes de `BFF_ALLOWED_ORIGINS` y `action=register` cuando el realm permita registro.
 - `GET /api/auth/callback`: valida `state`, intercambia el código, valida ID token y access token, consulta el perfil activo y emite `dss_session`.
-- `GET /api/auth/me`: devuelve perfil, roles y permisos efectivos desde una sesión BFF válida.
+- `GET /api/auth/me`: devuelve el perfil, los roles de portal y los permisos del token (`resource_access.dss-permissions.roles`) desde una sesión BFF válida.
 - `POST /api/auth/refresh`: heartbeat de actividad de los portales; extiende la ventana de inactividad y devuelve los vencimientos de la sesión.
 - `GET /api/auth/logout`: elimina la sesión BFF y redirige al logout OIDC si tiene un ID token disponible.
-- `PUT /api/admin/users/:userId/academic-contexts`: reemplaza los contextos académicos del usuario. Requiere `SUPERADMIN` en el BFF y conserva la validación `ROLE_SUPERADMIN` de `auth-service` como segunda barrera.
-- `/api/admin/dw/academic-closures*`: fachada autenticada de cierres académicos, historial y transiciones. Requiere el rol correspondiente (`DW_CLOSURE_READ` o `DW_CLOSURE_MANAGE`) del cliente `dw-control-service`; el BFF reenvía el JWT verificado y el servicio conserva el `sub` para auditoría.
-- `/api/admin/dw/etl/executions*`: consulta paginada y detalle de ejecuciones ETL. Requiere `DW_ETL_MONITOR_READ` del cliente `dw-control-service`. El BFF valida y normaliza respuestas y no propaga cuerpos de error del servicio.
+- `PUT /api/admin/users/:userId/academic-contexts`: reemplaza los contextos académicos del usuario. Requiere `iam:users:write` en el BFF, y `auth-service` vuelve a exigir el mismo permiso como segunda barrera. Las lecturas de `/api/admin/users*` y `/api/admin/academic-catalog` requieren `iam:users:read`.
+- `/api/admin/dw/academic-closures*`: fachada autenticada de cierres académicos, historial y transiciones. Requiere `dw:closure:read` o `dw:closure:manage`; mientras `DW_CONTROL_LEGACY_ROLES_ENABLED` no sea `false`, también sirve el rol antiguo `DW_CLOSURE_READ`/`DW_CLOSURE_MANAGE` del cliente `dw-control-service`. El BFF reenvía el JWT verificado y el servicio conserva el `sub` para auditoría.
+- `/api/admin/dw/etl/executions*`: consulta paginada y detalle de ejecuciones ETL. Requiere `dw:etl-monitor:read` (o, durante la convivencia, `DW_ETL_MONITOR_READ` del cliente `dw-control-service`). El BFF valida y normaliza respuestas y no propaga cuerpos de error del servicio.
 - `GET|POST /api/graphql`: endpoint Apollo Server protegido por la misma sesión BFF o Bearer token. Expone identidad y alcance académicos, catálogo/metadatos OLAP, `analyticQuery` y `predictionPublication` para consultar la publicación vigente del Prediction Service. Los resolvers llaman a los servicios con el token validado; los tokens nunca forman parte de la respuesta.
-- `/api/olap/rest/saiku/*`: proxy autenticado a `olap-service`, incluido su endpoint GraphQL real en `/api/olap/rest/saiku/api/graphql`. El BFF valida la sesión y reenvía el access token; las rutas `/rest/saiku/admin/*` requieren además el rol `SUPERADMIN`. Keycloak debe incluir la audiencia `olap-service` en los tokens solicitados por `dss-bff`.
+- `/api/olap/rest/saiku/*`: proxy autenticado a `olap-service`, incluido su endpoint GraphQL real en `/api/olap/rest/saiku/api/graphql`. El BFF valida la sesión y reenvía el access token; las rutas `/rest/saiku/admin/*` requieren además `olap:admin` (o `OLAP_ADMIN` de `olap-service` durante la convivencia). Keycloak debe incluir la audiencia `olap-service` en los tokens solicitados por `dss-bff`.
 - `/api/prediction/v1/predictions`, `/api/prediction/v1/training-jobs*`, `/api/prediction/v1/prediction-batches*`, `/api/prediction/v1/prediction-publications` y `/api/prediction/v1/academic-options`: fachada autenticada para inferencia, entrenamiento, publicación y carga de programas/cierres autorizados. El BFF valida la sesión y reenvía el token a Prediction Service; el servicio vuelve a validar identidad, permiso y ámbito académico. El navegador no accede al worker ni al DW.
 
 La cookie de sesión es `HttpOnly`, `SameSite=Lax`, `Secure` en producción y contiene un JWE comprimido que solo puede descifrar el BFF, con el access token, el ID token y el refresh token de Keycloak.
@@ -24,7 +24,7 @@ La cookie de sesión es `HttpOnly`, `SameSite=Lax`, `Secure` en producción y co
 - La sesión vence por inactividad (`BFF_SESSION_IDLE_TIMEOUT_SECONDS`, 30 min) o por duración absoluta (`BFF_SESSION_MAX_LIFETIME_SECONDS`, 10 h), lo que ocurra primero, y nunca después del vencimiento del refresh token de Keycloak.
 - Solo `POST /api/auth/refresh` cuenta como actividad. `AuthProvider` (`@dss-monorepo/auth`) lo envía al cargar la página y, como máximo una vez por minuto, cuando detecta teclado, puntero, rueda o scroll en cualquier pestaña del portal. Las llamadas de datos en segundo plano no mantienen viva la sesión.
 - Dos minutos antes de vencer, `AuthProvider` muestra un aviso con cuenta regresiva (personalizable con `renderSessionWarning`, desactivable con `sessionTimeout={false}`); al vencer ejecuta el logout, que también cierra la sesión SSO.
-- Si Keycloak rechaza el refresh token, el BFF borra la cookie y responde 401; si Keycloak no está disponible, la sesión sigue mientras el access token sea válido y después responde 503 sin borrarla. Las rutas vuelven a validar el access token, issuer, audiencia y perfil activo; los endpoints de negocio deben además aplicar `requireRoles()` o `requirePermissions()`.
+- Si Keycloak rechaza el refresh token, el BFF borra la cookie y responde 401; si Keycloak no está disponible, la sesión sigue mientras el access token sea válido y después responde 503 sin borrarla. Las rutas vuelven a validar el access token, issuer, audiencia y perfil activo; los endpoints de negocio deben además aplicar `requirePermissions()`. `requireRoles()` queda solo para decisiones de portal.
 
 El JWE stateless es la implementación inicial y funciona sin una base de sesiones. Para despliegues con varias instancias o revocación inmediata se puede evolucionar a un identificador opaco respaldado por Redis o una base de datos; esa migración no cambia el contrato de los portales. En producción se deben rotar `BFF_SESSION_SECRET` y `KEYCLOAK_BFF_CLIENT_SECRET`, usar HTTPS y mantener una lista explícita de orígenes.
 
@@ -32,11 +32,30 @@ El JWE stateless es la implementación inicial y funciona sin una base de sesion
 
 Configura `apps/bff/.env` a partir de `.env.example`:
 
+## Permisos (IAM-014)
+
+Los permisos salen del token (`resource_access.dss-permissions.roles`); el BFF ya no tiene un mapa fijo rol → permisos. Qué rol concede qué permiso se decide en Keycloak desde el admin-portal, así que un permiso nuevo funciona sin desplegar el BFF ni los portales.
+
+| Ruta | Permiso |
+|---|---|
+| `GET /api/admin/users*`, `GET /api/admin/academic-catalog` | `iam:users:read` |
+| `PUT /api/admin/users/:userId/academic-contexts` | `iam:users:write` |
+| `/api/admin/dw/academic-closures*` | `dw:closure:read` / `dw:closure:manage` (o `DW_*` en convivencia) |
+| `/api/admin/dw/etl/executions*` | `dw:etl-monitor:read` (o `DW_ETL_MONITOR_READ` en convivencia) |
+| `/api/olap/rest/saiku/admin/*` | `olap:admin` (o `OLAP_ADMIN` en convivencia) |
+| Resto de `/api/olap/**` y GraphQL de analítica | `analytics:read` + alcance (`analytics:global`/`faculty`/`career`), salvo `olap:admin` |
+| Entrenamiento, datasets y modelos en `/api/prediction/**` | `prediction:train` |
+
+Los **roles** solo deciden el portal (qué dashboard abre cada usuario). Un rol nuevo del realm no se descarta: se asigna a un portal con `KEYCLOAK_PORTAL_ROLES`. En los portales, `<Can permission…>`, `useCan` y `useMyPermissions` leen los permisos del token; `RoleGuard` y `usePermission` siguen basados en roles porque representan el portal.
+
 ```dotenv
 KEYCLOAK_URL=http://localhost:8080
 KEYCLOAK_REALM=uatf-dss-realm
 KEYCLOAK_AUDIENCE=uatf-auth-service
 KEYCLOAK_ROLE_CLIENT_ID=uatf-auth-service
+KEYCLOAK_PERMISSIONS_CLIENT_ID=dss-permissions
+# Opcional: roles nuevos del realm que abren un portal, por ejemplo {"VICERRECTOR":"RECTOR"}
+KEYCLOAK_PORTAL_ROLES=
 KEYCLOAK_BFF_CLIENT_ID=dss-bff
 KEYCLOAK_BFF_CLIENT_SECRET=<secreto-no-versionado>
 KEYCLOAK_BFF_REDIRECT_URI=http://localhost:3006/api/auth/callback
@@ -72,9 +91,9 @@ Las consultas con ámbito de facultad o carrera requieren configurar `OLAP_ACADE
 
 El esquema Mondrian usa la tabla de hechos `dw.fact_cursado` y las dimensiones `dw.dim_programa` y `dw.dim_periodo_academico`. El descriptor sin credenciales está en [`infra/olap/datasources/uatf-dw.sds`](../../../infra/olap/datasources/uatf-dw.sds). Para que Saiku resuelva el catálogo, el despliegue instala el XML y el descriptor en `<saiku-home>/repository/data/unknown/datasources/` y suministra las credenciales JDBC por `<saiku-home>/conf/datasources.properties`. El inicializador Compose mantiene estos archivos y construye la URL JDBC a partir de `POSTGRES_DW_NAME` en el volumen persistente. La definición del cubo no carga datos ni crea las tablas del DW.
 
-El BFF deriva el alcance desde los roles y `academicContexts` validados, agrega el filtro de seguridad al servidor y rechaza argumentos que pretendan seleccionar la jerarquía protegida. Rector usa alcance institucional. No se declaran nombres de indicadores ni medidas ficticios: el catálogo y el schema se obtienen del OLAP activo y la consulta solo admite las medidas/campos que el propio servicio valida. Predicciones y ML siguen fuera de esta integración.
+El BFF deriva el alcance desde los permisos del token (`analytics:read` más `analytics:global`, `analytics:faculty` o `analytics:career`) y los `academicContexts` validados, agrega el filtro de seguridad al servidor y rechaza argumentos que pretendan seleccionar la jerarquía protegida. Rector usa alcance institucional. No se declaran nombres de indicadores ni medidas ficticios: el catálogo y el schema se obtienen del OLAP activo y la consulta solo admite las medidas/campos que el propio servicio valida. Predicciones y ML siguen fuera de esta integración.
 
-El proxy de Saiku aplica la misma política al OLAP Workspace: Rector consulta globalmente; Decano queda limitado a sus facultades y Director a sus carreras, siempre desde el perfil de Auth Service. Los perfiles académicos solo pueden leer el descubrimiento y metadatos de sus cubos y ejecutar consultas estructuradas; el BFF incorpora el miembro de alcance en el eje `FILTER`, rechaza MDX libre, filtros que intenten reemplazar ese alcance y operaciones alternas de consulta/dashboard. La medida interna `Conteo de privacidad` se oculta y no puede solicitarse desde portales. Sin contexto o con una configuración de alcance inválida, el BFF deniega la consulta. `SUPERADMIN` conserva acceso administrativo a Saiku.
+El proxy de Saiku aplica la misma política al OLAP Workspace: Rector consulta globalmente; Decano queda limitado a sus facultades y Director a sus carreras, siempre desde el perfil de Auth Service. Los perfiles académicos solo pueden leer el descubrimiento y metadatos de sus cubos y ejecutar consultas estructuradas; el BFF incorpora el miembro de alcance en el eje `FILTER`, rechaza MDX libre, filtros que intenten reemplazar ese alcance y operaciones alternas de consulta/dashboard. La medida interna `Conteo de privacidad` se oculta y no puede solicitarse desde portales. Sin contexto o con una configuración de alcance inválida, el BFF deniega la consulta. El acceso administrativo a Saiku sigue al permiso `olap:admin`, que no queda limitado a un alcance académico; `SUPERADMIN` sin `olap:admin` ni permisos `analytics:*` no tiene acceso a datos (D4).
 
 Rectoría, Decanato y Dirección incorporan el explorador OLAP en la ruta `/analisis-olap` de cada portal. El BFF aplica el alcance académico correspondiente al usuario autenticado.
 

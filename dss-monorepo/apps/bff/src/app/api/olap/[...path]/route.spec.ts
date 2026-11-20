@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { authenticateRequest, requireRoles } = vi.hoisted(() => ({
+const { authenticateRequest, requirePermissions } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
-  requireRoles: vi.fn(),
+  requirePermissions: vi.fn(() => null),
 }));
 vi.mock('../../_lib/auth-guard', () => ({
   authenticateRequest,
-  requireRoles,
+  requirePermissions,
 }));
 
 import { GET, POST } from './route';
@@ -30,6 +30,8 @@ const authentication = {
       roles: ['DIRECTOR'],
     },
     roles: ['DIRECTOR'],
+    permissions: ['analytics:read', 'analytics:career'],
+    clientRoles: {},
   },
 };
 
@@ -256,7 +258,7 @@ describe('OLAP BFF proxy route', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requireRoles).not.toHaveBeenCalled();
+    expect(requirePermissions).not.toHaveBeenCalled();
   });
 
   it('forwards OLAP admin operations only after the olap:admin guard passes', async () => {
@@ -288,7 +290,7 @@ describe('OLAP BFF proxy route', () => {
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
 
-  it('keeps ordinary OLAP paths available to authenticated non-admin roles', async () => {
+  it('keeps ordinary OLAP paths available to users with analytics:read', async () => {
     authenticateRequest.mockResolvedValue(authentication);
     vi.stubEnv('OLAP_ACADEMIC_SCOPE_FILTERS', JSON.stringify({
       career: {
@@ -328,10 +330,8 @@ describe('OLAP BFF proxy route', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requireRoles).toHaveBeenCalledWith(authentication.value, [
-      'RECTOR',
-      'DECANO',
-      'DIRECTOR',
+    expect(requirePermissions).toHaveBeenCalledWith(authentication.value, [
+      'analytics:read',
     ]);
     const upstreamOptions = fetchMock.mock.calls[0][1] as RequestInit;
     expect(JSON.parse(String(upstreamOptions.body))).toMatchObject({
@@ -348,5 +348,31 @@ describe('OLAP BFF proxy route', () => {
         },
       },
     });
+  });
+
+  it('gives SUPERADMIN no implicit data access and lets olap:admin skip the academic scope (IAM-014)', async () => {
+    vi.stubEnv('OLAP_SERVICE_URL', 'http://olap-service:8080');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ ok: true })));
+    const graphql = () =>
+      POST(
+        new Request('http://bff/api/olap/rest/saiku/api/graphql', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ query: '{ ping }' }),
+        }),
+        { params: Promise.resolve({ path: ['rest', 'saiku', 'api', 'graphql'] }) },
+      );
+
+    authenticateRequest.mockResolvedValue(superadminWithoutOlapAdmin);
+    requirePermissions.mockReturnValueOnce(
+      NextResponse.json({ error: 'Insufficient permissions' }, { status: 403 }) as never,
+    );
+    expect((await graphql()).status).toBe(403);
+    expect(requirePermissions).toHaveBeenCalledWith(superadminWithoutOlapAdmin.value, ['analytics:read']);
+
+    requirePermissions.mockClear();
+    authenticateRequest.mockResolvedValue(adminAuthentication);
+    expect((await graphql()).status).toBe(200);
+    expect(requirePermissions).not.toHaveBeenCalled();
   });
 });

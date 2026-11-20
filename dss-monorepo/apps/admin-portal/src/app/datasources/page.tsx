@@ -1,9 +1,9 @@
 import { AdminDatasourcesPage } from '../components/AdminDatasourcesPage';
-import { AdminPortalLayout } from '../components/AdminPortalLayout';
+import { ADMIN_PERMISSIONS, AdminPortalLayout } from '../components/AdminPortalLayout';
 
 export default function DatasourcesRoute() {
   return (
-    <AdminPortalLayout>
+    <AdminPortalLayout access={ADMIN_PERMISSIONS.olap}>
       <AdminDatasourcesPage />
     </AdminPortalLayout>
   );

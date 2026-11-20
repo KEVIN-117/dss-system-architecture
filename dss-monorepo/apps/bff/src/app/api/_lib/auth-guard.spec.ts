@@ -67,6 +67,7 @@ describe('BFF authentication guard', () => {
         exp: 2_000_000_000,
       },
       roles: ['DIRECTOR'],
+      permissions: ['analytics:read', 'analytics:career'],
     });
     vi.mocked(fetchUserProfile).mockResolvedValue(profile);
 
@@ -81,6 +82,7 @@ describe('BFF authentication guard', () => {
       value: {
         token: 'access-token',
         roles: ['DIRECTOR'],
+        permissions: ['analytics:read', 'analytics:career'],
         clientRoles: {},
         user: { ...profile, roles: ['DIRECTOR'] },
       },
@@ -90,6 +92,8 @@ describe('BFF authentication guard', () => {
       realm: 'uatf-dss-realm',
       audience: 'uatf-auth-service',
       roleClientId: 'uatf-auth-service',
+      permissionsClientId: 'dss-permissions',
+      portalRoles: {},
     });
     expect(fetchUserProfile).toHaveBeenCalledWith(
       'http://auth-service:8000',
@@ -106,6 +110,7 @@ describe('BFF authentication guard', () => {
         exp: 2_000_000_000,
       },
       roles: ['DIRECTOR'],
+      permissions: ['analytics:read', 'analytics:career'],
     });
     vi.mocked(fetchUserProfile).mockResolvedValue(profile);
     const session = await sealSession({ accessToken: 'access-token' });
@@ -132,6 +137,7 @@ describe('BFF authentication guard', () => {
         exp: 2_000_000_000,
       },
       roles: ['DIRECTOR'],
+      permissions: ['analytics:read', 'analytics:career'],
     });
     vi.mocked(fetchUserProfile).mockResolvedValue({
       ...profile,
@@ -157,6 +163,7 @@ describe('BFF authentication guard', () => {
         exp: 2_000_000_000,
       },
       roles: ['DIRECTOR'],
+      permissions: ['analytics:read', 'analytics:career'],
     });
     vi.mocked(fetchUserProfile).mockRejectedValue(
       new AuthServiceClientError(504),
@@ -197,10 +204,11 @@ describe('BFF authentication guard', () => {
     expect(denied?.status).toBe(403);
   });
 
-  it('uses shared permissions without granting academic analytics to SUPERADMIN', () => {
+  it('requires permissions of the token and never derives them from roles (IAM-014)', () => {
     const authentication = {
       token: 'access-token',
       roles: ['SUPERADMIN'] as const,
+      permissions: ['pipelines:execute', 'iam:users:read'],
       clientRoles: {},
       user: { ...profile, roles: ['SUPERADMIN'] as const },
     };
@@ -211,12 +219,23 @@ describe('BFF authentication guard', () => {
     expect(
       requirePermissions(authentication, ['analytics:global'])?.status,
     ).toBe(403);
+    expect(
+      requirePermissions({ ...authentication, roles: ['RECTOR'] as const, permissions: [] }, ['analytics:global'])
+        ?.status,
+    ).toBe(403);
+    expect(
+      requirePermissions({ ...authentication, permissions: ['reports:export'] }, ['reports:export']),
+    ).toBeNull();
+    expect(
+      requirePermissions(authentication, ['iam:users:read', 'iam:users:write'], 'all')?.status,
+    ).toBe(403);
   });
 
   it('requires the requested permission from the verified service client roles', () => {
     const authentication = {
       token: 'access-token',
       roles: ['SUPERADMIN'] as const,
+      permissions: [],
       clientRoles: { 'dw-control-service': ['DW_CLOSURE_READ'] },
       user: { ...profile, roles: ['SUPERADMIN'] as const },
     };

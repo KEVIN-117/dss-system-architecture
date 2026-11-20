@@ -18,8 +18,15 @@ export interface KeycloakJwtVerificationOptions {
   realm: string;
   /** Expected audience of tokens consumed by the BFF. */
   audience: string;
-  /** Client whose resource roles carry the DSS authorities. */
+  /** Client whose legacy resource roles may still carry DSS portal roles. */
   roleClientId: string;
+  /** Catalog client whose roles are the permissions (`dss-permissions`, IAM-014). */
+  permissionsClientId?: string;
+  /**
+   * Realm roles that open a portal besides the four known ones, as `{ role: portalRole }`
+   * (for example `{ "VICERRECTOR": "RECTOR" }`). New roles are mapped, not discarded.
+   */
+  portalRoles?: Readonly<Record<string, DSSRole>>;
   /** Keycloak uses RS256 by default; override only when the realm is configured differently. */
   algorithms?: readonly JWSAlgorithm[];
 }
@@ -71,7 +78,11 @@ export async function verifyKeycloakJwt(
 
     return {
       claims,
-      roles: extractDssRoles(claims, options.roleClientId),
+      roles: extractDssRoles(claims, options.roleClientId, options.portalRoles),
+      permissions: extractPermissions(
+        claims,
+        options.permissionsClientId ?? DEFAULT_PERMISSIONS_CLIENT_ID,
+      ),
     };
   } catch (error) {
     if (error instanceof JwtVerificationError) {
@@ -110,14 +121,32 @@ export async function verifyKeycloakIdToken(
   }
 }
 
+export const DEFAULT_PERMISSIONS_CLIENT_ID = 'dss-permissions';
+
+/**
+ * Portal roles of the token: the known DSS roles among realm roles and the legacy client roles, plus
+ * realm roles mapped to a portal role through `portalRoles`.
+ */
 export function extractDssRoles(
   claims: Pick<KeycloakTokenClaims, 'realm_access' | 'resource_access'>,
   roleClientId: string,
+  portalRoles: Readonly<Record<string, DSSRole>> = {},
 ): DSSRole[] {
   const realmRoles = claims.realm_access?.roles ?? [];
   const clientRoles = claims.resource_access?.[roleClientId]?.roles ?? [];
+  const mapped = realmRoles.flatMap((role) =>
+    Object.prototype.hasOwnProperty.call(portalRoles, role) ? [portalRoles[role]] : [],
+  );
 
-  return [...new Set([...realmRoles, ...clientRoles])].filter(isDSSRole);
+  return [...new Set([...realmRoles, ...clientRoles, ...mapped])].filter(isDSSRole);
+}
+
+/** `resource_access.<permissionsClientId>.roles`; roles of any other client are not permissions. */
+export function extractPermissions(
+  claims: Pick<KeycloakTokenClaims, 'resource_access'>,
+  permissionsClientId: string = DEFAULT_PERMISSIONS_CLIENT_ID,
+): string[] {
+  return [...new Set(claims.resource_access?.[permissionsClientId]?.roles ?? [])];
 }
 
 function getJwks(uri: URL): ReturnType<typeof createRemoteJWKSet> {

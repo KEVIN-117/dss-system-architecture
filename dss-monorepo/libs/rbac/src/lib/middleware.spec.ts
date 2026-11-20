@@ -27,7 +27,7 @@ describe('server RBAC middleware', () => {
     const middleware = withRbacMiddleware(
       {
         roles: ['RECTOR'],
-        resolvePrincipal: () => ({ roles: ['DIRECTOR'] }),
+        resolvePrincipal: () => ({ roles: ['DIRECTOR'], permissions: [] }),
       },
       handler,
     );
@@ -38,15 +38,19 @@ describe('server RBAC middleware', () => {
     expect(handler).not.toHaveBeenCalled();
   });
 
-  it('allows inherited role and permission policies while keeping SUPERADMIN technical', async () => {
-    expect(isRbacAllowed(['RECTOR'], { roles: ['DIRECTOR'] })).toBe(true);
-    expect(isRbacAllowed(['SUPERADMIN'], { permissions: ['analytics:global'] })).toBe(false);
+  it('checks portal roles through the hierarchy and permissions from the token only', async () => {
+    expect(isRbacAllowed({ roles: ['RECTOR'], permissions: [] }, { roles: ['DIRECTOR'] })).toBe(true);
+    // IAM-014: a role grants no permission by itself.
+    expect(isRbacAllowed({ roles: ['RECTOR'], permissions: [] }, { permissions: ['analytics:global'] })).toBe(false);
+    expect(
+      isRbacAllowed({ roles: ['SUPERADMIN'], permissions: ['iam:users:read'] }, { permissions: ['analytics:global'] }),
+    ).toBe(false);
 
     const handler = vi.fn(() => new Response('allowed'));
     const middleware = withRbacMiddleware(
       {
         permissions: ['pipelines:execute'],
-        resolvePrincipal: () => ({ roles: ['SUPERADMIN'] }),
+        resolvePrincipal: () => ({ roles: [], permissions: ['pipelines:execute'] }),
       },
       handler,
     );

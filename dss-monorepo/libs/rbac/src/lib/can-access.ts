@@ -4,6 +4,7 @@ import {
   hasPermission,
   hasRequiredPermissions,
   type DSSPermission,
+  type PermissionSet,
 } from './permission-map';
 import {
   hasRequiredRoles,
@@ -50,14 +51,22 @@ export type CanCheck =
   | CanPermissionCheck
   | CanPermissionsCheck;
 
+/** What the authenticated user holds: portal roles and token permissions (IAM-014). */
+export interface CanSubject {
+  roles: readonly DSSRole[];
+  permissions: PermissionSet;
+}
+
 /**
- * Evaluates the shared Can contract. Positive role checks honor hierarchy;
- * negative role checks intentionally use exact membership.
+ * Evaluates the shared Can contract. Role checks are for portal personas: positive
+ * ones honor the portal hierarchy, negative ones use exact membership. Permission
+ * checks read the permissions of the token, never a role-to-permission map.
  */
 export function canAccess(
-  userRoles: readonly DSSRole[],
+  subject: CanSubject,
   check: CanCheck,
 ): boolean {
+  const userRoles = subject.roles;
   const match = check.match ?? 'any';
   const negative = check.not ?? false;
 
@@ -79,14 +88,14 @@ export function canAccess(
   }
 
   if (check.permission !== undefined) {
-    const allowed = hasPermission(userRoles, check.permission);
+    const allowed = hasPermission(subject.permissions, check.permission);
     return negative ? !allowed : allowed;
   }
 
   if (check.permissions === undefined || check.permissions.length === 0) {
     return false;
   }
-  const allowed = hasRequiredPermissions(userRoles, check.permissions, match);
+  const allowed = hasRequiredPermissions(subject.permissions, check.permissions, match);
   return negative ? !allowed : allowed;
 }
 

@@ -1,9 +1,9 @@
 import { AdminUsersPage } from '../components/AdminUsersPage';
-import { AdminPortalLayout } from '../components/AdminPortalLayout';
+import { ADMIN_PERMISSIONS, AdminPortalLayout } from '../components/AdminPortalLayout';
 
 export default function UsersRoute() {
   return (
-    <AdminPortalLayout>
+    <AdminPortalLayout access={ADMIN_PERMISSIONS.users}>
       <AdminUsersPage />
     </AdminPortalLayout>
   );

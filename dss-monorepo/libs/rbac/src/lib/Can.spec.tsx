@@ -29,7 +29,7 @@ describe('Can', () => {
   });
 
   it('renders children for granted permissions and fallbacks for denied permissions', () => {
-    mockedUseAuth.mockReturnValue(authState({ roles: ['RECTOR'] }));
+    mockedUseAuth.mockReturnValue(authState({ roles: ['RECTOR'], permissions: ['analytics:read', 'analytics:global'] }));
     const { rerender } = render(
       <Can permission="analytics:global">
         <p>Métricas institucionales</p>
@@ -37,7 +37,7 @@ describe('Can', () => {
     );
     expect(screen.getByText('Métricas institucionales')).toBeTruthy();
 
-    mockedUseAuth.mockReturnValue(authState({ roles: ['SUPERADMIN'] }));
+    mockedUseAuth.mockReturnValue(authState({ roles: ['SUPERADMIN'], permissions: ['iam:users:read'] }));
     rerender(
       <Can permission="analytics:global" fallback={<p>Sin analítica</p>}>
         <p>Métricas institucionales</p>
@@ -61,10 +61,12 @@ function authState({
   isAuthenticated = true,
   isLoading = false,
   roles = ['DIRECTOR'],
+  permissions = [],
 }: {
   isAuthenticated?: boolean;
   isLoading?: boolean;
   roles?: ('SUPERADMIN' | 'RECTOR' | 'DECANO' | 'DIRECTOR')[];
+  permissions?: string[];
 }) {
   return {
     isAuthenticated,
@@ -83,7 +85,7 @@ function authState({
     token: 'access-token',
     lastLogin: new Date(),
     isInitialized: true,
-    permissions: [],
+    permissions,
     login: vi.fn(),
     logout: vi.fn(),
     register: vi.fn(),

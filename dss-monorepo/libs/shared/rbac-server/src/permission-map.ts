@@ -1,56 +1,55 @@
-import type { DSSRole } from '@dss-monorepo/auth-models';
-
 import type { RoleMatch } from './permissions.js';
 
+/**
+ * Permissions the DSS applications check today. They live in Keycloak as roles of the catalog client
+ * `dss-permissions` (IAM-002) and reach the token in `resource_access.dss-permissions.roles`; which roles
+ * grant them is data managed from the admin portal, not code (IAM-014). The list only names the known
+ * ones for autocompletion: any other permission string is valid, so a permission created from the admin
+ * portal works without deploying the frontend.
+ */
 export const DSS_PERMISSIONS = [
   'analytics:read', 'analytics:global', 'analytics:faculty', 'analytics:career',
   'connectors:read', 'connectors:write', 'pipelines:read', 'pipelines:execute',
-  'users:read', 'users:write',
+  'prediction:train', 'prediction:publish',
+  'olap:admin', 'olap:user',
+  'dw:closure:read', 'dw:closure:manage', 'dw:etl-monitor:read',
+  'iam:users:read', 'iam:users:write', 'iam:roles:read', 'iam:roles:write',
+  'iam:clients:read', 'iam:clients:write', 'iam:audit:read',
 ] as const;
 
-export type DSSPermission = (typeof DSS_PERMISSIONS)[number];
+export type KnownDSSPermission = (typeof DSS_PERMISSIONS)[number];
+/** A known permission, or any other `resource:action` created from the admin portal. */
+export type DSSPermission = KnownDSSPermission | (string & {});
 
-const DIRECTOR_PERMISSIONS = ['analytics:read', 'analytics:career'] as const satisfies readonly DSSPermission[];
-const DECANO_PERMISSIONS = [...DIRECTOR_PERMISSIONS, 'analytics:faculty', 'pipelines:read'] as const satisfies readonly DSSPermission[];
-const RECTOR_PERMISSIONS = [...DECANO_PERMISSIONS, 'analytics:global', 'connectors:read'] as const satisfies readonly DSSPermission[];
-const SUPERADMIN_PERMISSIONS = [
-  'connectors:read', 'connectors:write', 'pipelines:read', 'pipelines:execute', 'users:read', 'users:write',
-] as const satisfies readonly DSSPermission[];
+/** The permissions a principal holds, as granted by the token. */
+export type PermissionSet = ReadonlySet<string> | readonly string[];
 
-/** SUPERADMIN is technical and has no academic analytics permissions. */
-export const ROLE_PERMISSIONS: Record<DSSRole, readonly DSSPermission[]> = {
-  DIRECTOR: DIRECTOR_PERMISSIONS,
-  DECANO: DECANO_PERMISSIONS,
-  RECTOR: RECTOR_PERMISSIONS,
-  SUPERADMIN: SUPERADMIN_PERMISSIONS,
-};
-
-export function resolvePermissions(roles: readonly DSSRole[]): ReadonlySet<DSSPermission> {
-  return new Set(roles.flatMap((role) => ROLE_PERMISSIONS[role]));
+function toSet(permissions: PermissionSet): ReadonlySet<string> {
+  return permissions instanceof Set ? permissions : new Set(permissions);
 }
 
-export function hasPermission(roles: readonly DSSRole[], permission: DSSPermission): boolean {
-  return resolvePermissions(roles).has(permission);
+export function hasPermission(permissions: PermissionSet, permission: DSSPermission): boolean {
+  return toSet(permissions).has(permission);
 }
 
-export function hasAnyPermissions(roles: readonly DSSRole[], required: readonly DSSPermission[]): boolean {
+export function hasAnyPermissions(permissions: PermissionSet, required: readonly DSSPermission[]): boolean {
   if (required.length === 0) return false;
-  const permissions = resolvePermissions(roles);
-  return required.some((permission) => permissions.has(permission));
+  const granted = toSet(permissions);
+  return required.some((permission) => granted.has(permission));
 }
 
-export function hasAllPermissions(roles: readonly DSSRole[], required: readonly DSSPermission[]): boolean {
+export function hasAllPermissions(permissions: PermissionSet, required: readonly DSSPermission[]): boolean {
   if (required.length === 0) return false;
-  const permissions = resolvePermissions(roles);
-  return required.every((permission) => permissions.has(permission));
+  const granted = toSet(permissions);
+  return required.every((permission) => granted.has(permission));
 }
 
 export function hasRequiredPermissions(
-  roles: readonly DSSRole[],
+  permissions: PermissionSet,
   required: readonly DSSPermission[],
   match: RoleMatch = 'any',
 ): boolean {
   return match === 'all'
-    ? hasAllPermissions(roles, required)
-    : hasAnyPermissions(roles, required);
+    ? hasAllPermissions(permissions, required)
+    : hasAnyPermissions(permissions, required);
 }

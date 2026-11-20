@@ -1,9 +1,9 @@
 import { AdminMlOperationsPage } from '../components/AdminMlOperationsPage';
-import { AdminPortalLayout } from '../components/AdminPortalLayout';
+import { ADMIN_PERMISSIONS, AdminPortalLayout } from '../components/AdminPortalLayout';
 
 export default function MlOperationsRoute() {
   return (
-    <AdminPortalLayout>
+    <AdminPortalLayout access={ADMIN_PERMISSIONS.ml}>
       <AdminMlOperationsPage />
     </AdminPortalLayout>
   );

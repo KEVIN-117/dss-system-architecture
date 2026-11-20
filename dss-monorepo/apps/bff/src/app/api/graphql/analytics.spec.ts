@@ -34,6 +34,7 @@ const academicContext = {
 const auth = {
   token: 'validated-access-token',
   roles: ['DIRECTOR'] as const,
+  permissions: ['analytics:read', 'analytics:career'],
   user: {
     id: academicContext.userId,
     username: 'director', firstName: 'Ana', lastName: 'Pérez',
@@ -94,26 +95,30 @@ describe('BFF analytic GraphQL resolvers', () => {
     vi.stubGlobal('fetch', fetchMock);
 
     await expect(resolver().predictionPublication({}, { programRef: '025', cutId: '2020-2' }, ctx({
-      ...auth, roles: ['SUPERADMIN'] as never,
+      ...auth, roles: ['SUPERADMIN'] as never, permissions: ['iam:users:read', 'prediction:train'],
     }))).rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('derives director scope only from Auth Service contexts', () => {
-    expect(deriveAcademicScope(['DIRECTOR'], [academicContext])).toEqual({ kind: 'career', contexts: [academicContext] });
-    expect(() => deriveAcademicScope(['DIRECTOR'], [])).toThrowError(/career context is required/i);
-    expect(() => deriveAcademicScope(['SUPERADMIN'], [academicContext])).toThrowError(/not permitted/i);
+    expect(deriveAcademicScope(auth.permissions, [academicContext])).toEqual({ kind: 'career', contexts: [academicContext] });
+    expect(() => deriveAcademicScope(auth.permissions, [])).toThrowError(/career context is required/i);
+    expect(() => deriveAcademicScope(['iam:users:read'], [academicContext])).toThrowError(/not permitted/i);
   });
 
-  it('keeps dean and rector scopes at their role level even when realm composites include lower roles', () => {
+  it('keeps dean and rector scopes at their permission level even when composites include lower ones', () => {
     const deanContext = { ...academicContext, careerId: null };
-    expect(deriveAcademicScope(['DECANO', 'DIRECTOR'], [deanContext])).toEqual({ kind: 'faculty', contexts: [deanContext] });
-    expect(deriveAcademicScope(['RECTOR', 'DECANO', 'DIRECTOR'], [])).toEqual({ kind: 'global', contexts: [] });
+    expect(deriveAcademicScope(['analytics:read', 'analytics:career', 'analytics:faculty'], [deanContext]))
+      .toEqual({ kind: 'faculty', contexts: [deanContext] });
+    expect(deriveAcademicScope(['analytics:read', 'analytics:career', 'analytics:faculty', 'analytics:global'], []))
+      .toEqual({ kind: 'global', contexts: [] });
   });
 
   it('returns validated identity and academic scopes without accepting client scope arguments', async () => {
     const viewer = await resolver().viewer({}, {}, ctx()) as Record<string, unknown>;
-    expect(viewer).toMatchObject({ id: auth.user.id, username: 'director', roles: ['DIRECTOR'] });
+    expect(viewer).toMatchObject({
+      id: auth.user.id, username: 'director', roles: ['DIRECTOR'], permissions: ['analytics:read', 'analytics:career'],
+    });
     expect(viewer.academicScope).toEqual({ kind: 'career', facultyIds: [12], careerIds: ['025'] });
   });
 

@@ -1,9 +1,9 @@
 import { AdminModelRegistryPage } from '../components/AdminModelRegistryPage';
-import { AdminPortalLayout } from '../components/AdminPortalLayout';
+import { ADMIN_PERMISSIONS, AdminPortalLayout } from '../components/AdminPortalLayout';
 
 export default function MlRegistryRoute() {
   return (
-    <AdminPortalLayout>
+    <AdminPortalLayout access={ADMIN_PERMISSIONS.ml}>
       <AdminModelRegistryPage />
     </AdminPortalLayout>
   );

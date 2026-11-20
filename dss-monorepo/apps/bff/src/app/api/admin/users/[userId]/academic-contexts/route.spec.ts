@@ -1,16 +1,16 @@
 import { NextResponse } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { authenticateRequest, requireRoles, replaceUserAcademicContexts } =
+const { authenticateRequest, requirePermissions, replaceUserAcademicContexts } =
   vi.hoisted(() => ({
     authenticateRequest: vi.fn(),
-    requireRoles: vi.fn(),
+    requirePermissions: vi.fn(),
     replaceUserAcademicContexts: vi.fn(),
   }));
 
 vi.mock('../../../../_lib/auth-guard', () => ({
   authenticateRequest,
-  requireRoles,
+  requirePermissions,
 }));
 vi.mock('@dss-monorepo/auth-connector', () => ({
   AuthServiceClientError: class AuthServiceClientError extends Error {
@@ -61,12 +61,12 @@ function configureBff() {
 }
 
 describe('admin academic-contexts BFF route', () => {
-  it('requires SUPERADMIN and never calls auth-service for other roles', async () => {
+  it('requires iam:users:write and never calls auth-service for other roles', async () => {
     authenticateRequest.mockResolvedValue({
       authenticated: true,
       value: { token: 'token', user: { id: 'director' }, roles: ['DIRECTOR'] },
     });
-    requireRoles.mockReturnValue(
+    requirePermissions.mockReturnValue(
       NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
     );
 
@@ -79,16 +79,14 @@ describe('admin academic-contexts BFF route', () => {
     );
 
     expect(response.status).toBe(403);
-    expect(requireRoles).toHaveBeenCalledWith(expect.anything(), [
-      'SUPERADMIN',
-    ]);
+    expect(requirePermissions).toHaveBeenCalledWith(expect.anything(), ['iam:users:write']);
     expect(replaceUserAcademicContexts).not.toHaveBeenCalled();
   });
 
   it('passes the verified token and validated assignment to the auth connector', async () => {
     configureBff();
     authenticateRequest.mockResolvedValue(superadmin);
-    requireRoles.mockReturnValue(null);
+    requirePermissions.mockReturnValue(null);
     const body = { contexts: [{ facultyId: 4, careerId: 'INF' }] };
     replaceUserAcademicContexts.mockResolvedValue([
       { id: 'ctx-1', ...body.contexts[0] },

@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { authenticateRequest, requireRoles, predict } = vi.hoisted(() => ({
+const { authenticateRequest, requirePermissions, predict } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
-  requireRoles: vi.fn(() => null),
+  requirePermissions: vi.fn(() => null),
   predict: vi.fn(),
 }));
 
-vi.mock('../../_lib/auth-guard', () => ({ authenticateRequest, requireRoles }));
+vi.mock('../../_lib/auth-guard', () => ({ authenticateRequest, requirePermissions }));
 vi.mock('@dss-monorepo/ml-connector', () => ({
   getTrainingJob: vi.fn(),
   isPredictionRequest: (value: unknown) =>
@@ -147,17 +147,17 @@ describe('Prediction BFF route', () => {
     expect(new Headers(options.headers).get('authorization')).toBe('Bearer verified-access-token');
   });
 
-  it('keeps the model registry behind the SUPERADMIN role', async () => {
+  it('keeps the model registry behind the prediction:train permission', async () => {
     process.env.PREDICTION_SERVICE_URL = 'http://prediction-service:8000';
     authenticateRequest.mockResolvedValue(authentication);
-    requireRoles.mockReturnValueOnce(NextResponse.json({ error: 'Forbidden' }, { status: 403 }) as never);
+    requirePermissions.mockReturnValueOnce(NextResponse.json({ error: 'Forbidden' }, { status: 403 }) as never);
     const upstream = vi.fn();
     vi.stubGlobal('fetch', upstream);
     const response = await GET(new Request('http://localhost:3006/api/prediction/v1/models'), {
       params: Promise.resolve({ path: ['v1', 'models'] }),
     });
     expect(response.status).toBe(403);
-    expect(requireRoles).toHaveBeenCalledWith(authentication.value, ['SUPERADMIN']);
+    expect(requirePermissions).toHaveBeenCalledWith(authentication.value, ['prediction:train']);
     expect(upstream).not.toHaveBeenCalled();
   });
 

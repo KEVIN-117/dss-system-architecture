@@ -21,7 +21,10 @@ import { readSessionCookie, unsealSession } from './session-cookie';
 
 export interface AuthenticatedRequest {
   user: AuthUser;
+  /** Portal roles; for persona/portal decisions only. */
   roles: readonly DSSRole[];
+  /** Permissions from the verified token (`resource_access.dss-permissions.roles`, IAM-014). */
+  permissions: readonly string[];
   clientRoles: Readonly<Record<string, readonly string[]>>;
   token: string;
 }
@@ -56,6 +59,7 @@ export async function authenticateRequest(
       value: {
         user: { ...profile, roles: verified.roles },
         roles: verified.roles,
+        permissions: verified.permissions,
         clientRoles: Object.fromEntries(
           Object.entries(verified.claims.resource_access ?? {}).map(
             ([clientId, access]) => [clientId, [...access.roles]],
@@ -120,7 +124,7 @@ export function requireRoles(
   requiredRoles: readonly DSSRole[],
   match: RoleMatch = 'any',
 ): NextResponse | null {
-  if (isRbacAllowed(authentication.roles, { roles: requiredRoles, match })) {
+  if (isRbacAllowed(authentication, { roles: requiredRoles, match })) {
     return null;
   }
 
@@ -150,14 +154,17 @@ export function requireClientRoles(
   );
 }
 
-/** Applies the shared DSS permission map and fails closed without permissions. */
+/**
+ * Requires permissions of the verified token (IAM-014). They are data managed from the admin portal,
+ * so a new permission needs no BFF deployment. Fails closed without permissions.
+ */
 export function requirePermissions(
   authentication: AuthenticatedRequest,
   requiredPermissions: readonly DSSPermission[],
   match: RoleMatch = 'any',
 ): NextResponse | null {
   if (
-    isRbacAllowed(authentication.roles, {
+    isRbacAllowed(authentication, {
       permissions: requiredPermissions,
       match,
     })
