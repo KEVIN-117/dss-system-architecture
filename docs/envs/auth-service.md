@@ -17,6 +17,26 @@ Fuentes: `auth-service/src/main/resources/application.yaml`, `application-dev.ya
 | `AUTH_CORS_ALLOWED_ORIGINS` | Sí en prod | Lista coma-separada de orígenes permitidos; el perfil prod exige HTTPS. Dev tiene fallback localhost. |
 | `AUTH_API_DOCS_ENABLED` | Opcional | Habilita Swagger/OpenAPI; base false, dev true, prod false. |
 | `AUTH_CONTEXT_READER_CLIENTS` | Opcional | Lista coma-separada de clientes Keycloak (claim `azp`) que pueden llamar `GET /internal/users/{keycloakId}/academic-contexts`; default `olap-service`. Además del `azp`, el token debe traer el rol de cliente `uatf-auth-service: CONTEXT_READER`. |
+| `KEYCLOAK_ADMIN_BASE_URL` | Sí en Compose/prod | URL de Keycloak para la Admin REST API, sin realm (`http://keycloak:8080` en Compose; default del YAML `http://localhost:8080`). Compose toma `AUTH_KEYCLOAK_ADMIN_BASE_URL`. |
+| `KEYCLOAK_ADMIN_REALM` | Opcional | Realm que se administra; default `uatf-dss-realm`. Compose toma `AUTH_KEYCLOAK_ADMIN_REALM`. |
+| `KEYCLOAK_AUTH_SERVICE_CLIENT_ID` | Opcional | Cliente confidencial cuya cuenta de servicio llama a la Admin API; default `uatf-auth-service`. |
+| `KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET` | Sí, secreto | Secreto de ese cliente (el mismo que usa el import del realm). Compose lo exige. Si falta fuera de Compose, el servicio arranca pero toda operación de administración de identidad responde 503. Nunca se registra en logs. |
+| `KEYCLOAK_ADMIN_CONNECT_TIMEOUT`, `KEYCLOAK_ADMIN_READ_TIMEOUT` | Opcional | Timeouts hacia Keycloak; default `2s` y `5s`. |
+| `KEYCLOAK_ADMIN_MAX_RETRIES` | Opcional | Reintentos extra para llamadas idempotentes (GET/PUT/DELETE) ante errores de red o 502/503/504; default `2`. POST nunca se reintenta. |
+
+### Administración de identidad (Keycloak Admin REST API)
+
+Desde IAM-003, auth-service obtiene un token `client_credentials` de `uatf-auth-service` y lo cachea hasta 30 s antes de su expiración. Con ese token llama a `/admin/realms/{realm}/...` a través del adaptador `adapter/out/keycloak`, que implementa los puertos `IdentityUserAdminPort`, `IdentityRoleAdminPort`, `IdentityRoleMappingPort` e `IdentityClientAdminPort`. Los privilegios de la cuenta de servicio están en `docs/envs/keycloak.md`, y la elección de `RestClient` frente a `keycloak-admin-client` en `docs/auth/adr-001-keycloak-admin-rest-client.md`.
+
+Traducción de errores de Keycloak a excepciones de dominio:
+
+| Respuesta de Keycloak | Excepción | HTTP |
+|---|---|---|
+| 400 | `IdentityRequestRejectedException` | 400 |
+| 404 | `IdentityResourceNotFoundException` | 404 |
+| 409 | `IdentityResourceConflictException` | 409 |
+| 401 tras renovar el token, 403 u otros 5xx | `IdentityProviderException` | 502 |
+| Timeout, conexión rechazada o secreto ausente | `IdentityProviderUnavailableException` | 503 |
 
 ### Endpoint interno de alcance académico
 

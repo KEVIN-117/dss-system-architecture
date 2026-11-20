@@ -178,6 +178,8 @@ out/
 !auth-service/src/main/java/uatf/dss/authservice/adapter/out/**
 !auth-service/src/main/java/uatf/dss/authservice/application/port/out/
 !auth-service/src/main/java/uatf/dss/authservice/application/port/out/**
+!auth-service/src/test/java/uatf/dss/authservice/adapter/out/
+!auth-service/src/test/java/uatf/dss/authservice/adapter/out/**
 dist/
 **/dist/
 build/
