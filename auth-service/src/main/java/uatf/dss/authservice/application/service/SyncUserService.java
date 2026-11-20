@@ -7,7 +7,6 @@ import uatf.dss.authservice.application.port.in.SyncUserCommand;
 import uatf.dss.authservice.application.port.in.SyncUserUseCase;
 import uatf.dss.authservice.application.port.out.UserRepository;
 import uatf.dss.authservice.domain.model.User;
-import uatf.dss.authservice.domain.model.RoleType;
 
 import java.util.Locale;
 import java.util.Set;
@@ -18,6 +17,9 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
 public class SyncUserService implements SyncUserUseCase {
 
     private static final Logger AUDIT_LOGGER = LoggerFactory.getLogger("AUDIT_LOGGER");
+    /** Realm roles Keycloak assigns to every user; they say nothing about the user's institutional role. */
+    private static final Set<String> KEYCLOAK_BUILT_IN_ROLES = Set.of("offline_access", "uma_authorization");
+    private static final String DEFAULT_ROLES_PREFIX = "default-roles-";
     private final UserRepository userRepository;
 
     public SyncUserService(UserRepository userRepository) {
@@ -74,18 +76,19 @@ public class SyncUserService implements SyncUserUseCase {
         return savedUser;
     }
 
+    /**
+     * Keeps every realm role exactly as Keycloak names it (roles are data since IAM-004, not an enum), except the
+     * roles Keycloak gives every user. Returns {@code null} for roles that must not be stored.
+     */
     private static String normalizeApplicationRole(String roleName) {
         if (roleName == null || roleName.isBlank()) {
             return null;
         }
-        String normalized = roleName.trim().toUpperCase(Locale.ROOT);
-        if (normalized.startsWith("ROLE_")) {
-            normalized = normalized.substring("ROLE_".length());
-        }
-        try {
-            return RoleType.valueOf(normalized).name();
-        } catch (IllegalArgumentException ignored) {
+        String normalized = roleName.trim();
+        String lower = normalized.toLowerCase(Locale.ROOT);
+        if (KEYCLOAK_BUILT_IN_ROLES.contains(lower) || lower.startsWith(DEFAULT_ROLES_PREFIX)) {
             return null;
         }
+        return normalized;
     }
 }

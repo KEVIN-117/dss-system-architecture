@@ -54,7 +54,7 @@ public class InternalAcademicScopeController {
 
     @GetMapping("/{keycloakId}/academic-contexts")
     @Operation(summary = "Alcance académico de un usuario (solo cuentas de servicio)")
-    @PreAuthorize("hasAuthority('ROLE_CONTEXT_READER')")
+    @PreAuthorize("hasAuthority('context:read')")
     public ResponseEntity<UserAcademicScope> getAcademicScope(
             @PathVariable UUID keycloakId,
             JwtAuthenticationToken authentication) {

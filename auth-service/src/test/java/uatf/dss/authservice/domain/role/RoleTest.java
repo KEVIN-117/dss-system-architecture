@@ -16,7 +16,7 @@ class RoleTest {
     @DisplayName("Should instantiate Role record properly")
     void shouldCreateRoleProperly() {
         Integer id = 1;
-        RoleType name = RoleType.RECTOR;
+        String name = "RECTOR";
         String description = "Máxima autoridad universitaria con acceso global a las métricas";
 
         Role role = new Role(id, name, description);
@@ -41,12 +41,28 @@ class RoleTest {
     @Test
     @DisplayName("Should verify Role equality semantics")
     void shouldVerifyEquality() {
-        Role role1 = new Role(1, RoleType.DECANO, "Decano");
-        Role role2 = new Role(1, RoleType.DECANO, "Decano");
-        Role role3 = new Role(2, RoleType.DIRECTOR, "Director");
+        Role role1 = new Role(1, "DECANO", "Decano");
+        Role role2 = new Role(1, "DECANO", "Decano");
+        Role role3 = new Role(2, "DIRECTOR", "Director");
 
         assertEquals(role1, role2);
         assertEquals(role1.hashCode(), role2.hashCode());
         assertNotEquals(role1, role3);
+    }
+
+    @Test
+    @DisplayName("Should accept roles created in Keycloak that are not institutional RoleType values")
+    void shouldAcceptRolesDefinedInKeycloak() {
+        Role role = new Role(7, "COORDINADOR_ACADEMICO", null);
+
+        assertEquals("COORDINADOR_ACADEMICO", role.name());
+        assertNull(role.description());
+    }
+
+    @Test
+    @DisplayName("Should reject blank role names")
+    void shouldRejectBlankNames() {
+        assertThrows(RuntimeException.class, () -> new Role(1, " ", null));
+        assertThrows(RuntimeException.class, () -> new Role(1, null, null));
     }
 }

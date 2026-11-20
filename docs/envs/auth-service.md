@@ -16,7 +16,8 @@ Fuentes: `auth-service/src/main/resources/application.yaml`, `application-dev.ya
 | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `RABBITMQ_VHOST` | Sí fuera de defaults local | Conexión al broker; host `localhost`, port 5672, credenciales guest y vhost `/` como fallback del YAML. En Compose usa credenciales default inyectadas. |
 | `AUTH_CORS_ALLOWED_ORIGINS` | Sí en prod | Lista coma-separada de orígenes permitidos; el perfil prod exige HTTPS. Dev tiene fallback localhost. |
 | `AUTH_API_DOCS_ENABLED` | Opcional | Habilita Swagger/OpenAPI; base false, dev true, prod false. |
-| `AUTH_CONTEXT_READER_CLIENTS` | Opcional | Lista coma-separada de clientes Keycloak (claim `azp`) que pueden llamar `GET /internal/users/{keycloakId}/academic-contexts`; default `olap-service`. Además del `azp`, el token debe traer el rol de cliente `uatf-auth-service: CONTEXT_READER`. |
+| `AUTH_CONTEXT_READER_CLIENTS` | Opcional | Lista coma-separada de clientes Keycloak (claim `azp`) que pueden llamar `GET /internal/users/{keycloakId}/academic-contexts`; default `olap-service`. Además del `azp`, el token debe traer el permiso `dss-permissions: context:read`. |
+| `KEYCLOAK_PERMISSIONS_CLIENT_ID` | Opcional | Cliente catálogo cuyos roles de cliente son permisos (`recurso:acción`); default `dss-permissions`. `JwtConverter` los convierte en authorities sin prefijo. |
 | `KEYCLOAK_ADMIN_BASE_URL` | Sí en Compose/prod | URL de Keycloak para la Admin REST API, sin realm (`http://keycloak:8080` en Compose; default del YAML `http://localhost:8080`). Compose toma `AUTH_KEYCLOAK_ADMIN_BASE_URL`. |
 | `KEYCLOAK_ADMIN_REALM` | Opcional | Realm que se administra; default `uatf-dss-realm`. Compose toma `AUTH_KEYCLOAK_ADMIN_REALM`. |
 | `KEYCLOAK_AUTH_SERVICE_CLIENT_ID` | Opcional | Cliente confidencial cuya cuenta de servicio llama a la Admin API; default `uatf-auth-service`. |
@@ -40,7 +41,7 @@ Traducción de errores de Keycloak a excepciones de dominio:
 
 ### Endpoint interno de alcance académico
 
-`GET /api/v1/internal/users/{keycloakId}/academic-contexts` devuelve `{keycloakId, active, roles, contexts}` sin datos personales y con `Cache-Control: no-store`. Es solo servicio-a-servicio (backstop OLAP, ver `docs/olap/academic-scope-backstop-design.md`); el BFF no lo expone. Respuestas: 401 sin token, 403 sin `CONTEXT_READER` o con un `azp` no permitido, 404 si el usuario no está sincronizado.
+`GET /api/v1/internal/users/{keycloakId}/academic-contexts` devuelve `{keycloakId, active, roles, contexts}` sin datos personales y con `Cache-Control: no-store`. Es solo servicio-a-servicio (backstop OLAP, ver `docs/olap/academic-scope-backstop-design.md`); el BFF no lo expone. Respuestas: 401 sin token, 403 sin el permiso `context:read` o con un `azp` no permitido, 404 si el usuario no está sincronizado.
 
 ### Diferencias por perfil
 

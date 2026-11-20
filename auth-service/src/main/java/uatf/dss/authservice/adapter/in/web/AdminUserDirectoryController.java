@@ -40,8 +40,8 @@ public class AdminUserDirectoryController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAuthority('ROLE_SUPERADMIN')")
-    @Operation(summary = "Listar usuarios para administración", description = "Directorio paginado y filtrable. Requiere el rol SUPERADMIN.")
+    @PreAuthorize("hasAuthority('iam:users:read')")
+    @Operation(summary = "Listar usuarios para administración", description = "Directorio paginado y filtrable. Requiere el permiso iam:users:read.")
     public ResponseEntity<AdminUserDirectoryPage> listUsers(
             @Parameter(description = "Búsqueda parcial por username, correo, nombre o apellido")
             @RequestParam(required = false) @Size(max = 120) String q,
@@ -56,7 +56,7 @@ public class AdminUserDirectoryController {
     }
 
     @GetMapping("/{userId}")
-    @PreAuthorize("hasAuthority('ROLE_SUPERADMIN')")
+    @PreAuthorize("hasAuthority('iam:users:read')")
     @Operation(summary = "Obtener el detalle administrativo de un usuario", description = "Identifica el usuario por su UUID local. No expone credenciales ni identificadores del proveedor de identidad.")
     public ResponseEntity<AdminUserDirectoryEntry> getUser(@PathVariable UUID userId) {
         return ResponseEntity.ok(getUser.execute(userId));

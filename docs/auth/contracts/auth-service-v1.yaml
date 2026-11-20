@@ -5,9 +5,10 @@ info:
   description: >-
     Contrato documental de las operaciones REST de auth-service redactado a partir
     de los controladores `UserProfileController`, `AdminUserDirectoryController`,
-    `AcademicCatalogController` y `AcademicContextAssignmentController`. Los
-    endpoints de demostración (`/demo/*`, `/example-user`) y las rutas internas
-    servidor a servidor no forman parte de este contrato. Springdoc puede generar
+    `AcademicCatalogController` y `AcademicContextAssignmentController`. Las rutas
+    internas servidor a servidor no forman parte de este contrato. Desde IAM-004 la
+    autorización usa permisos de `resource_access.dss-permissions.roles`
+    (`x-required-permission`), no roles. Springdoc puede generar
     el esquema en tiempo de ejecución con `AUTH_API_DOCS_ENABLED=true`; ante una
     diferencia, prevalece la implementación y este archivo debe corregirse.
 servers:
@@ -45,7 +46,7 @@ paths:
       tags: [Directorio administrativo]
       operationId: listAdminUsers
       summary: Lista el directorio de usuarios
-      x-required-permission: ROLE_SUPERADMIN
+      x-required-permission: iam:users:read
       description: Directorio paginado con filtros opcionales por texto, estado, rol y ámbito académico.
       parameters:
         - name: q
@@ -86,7 +87,7 @@ paths:
       tags: [Directorio administrativo]
       operationId: getAdminUser
       summary: Obtiene el detalle de un usuario
-      x-required-permission: ROLE_SUPERADMIN
+      x-required-permission: iam:users:read
       parameters:
         - $ref: '#/components/parameters/UserId'
       responses:
@@ -103,7 +104,7 @@ paths:
       tags: [Directorio administrativo]
       operationId: replaceAcademicContexts
       summary: Reemplaza los contextos académicos de un usuario
-      x-required-permission: ROLE_SUPERADMIN
+      x-required-permission: iam:users:write
       description: >-
         Sustituye la lista completa de contextos académicos. Una carrera requiere
         su facultad; `facultyId` no puede ser negativo y `careerId` tiene tres
@@ -132,7 +133,7 @@ paths:
       tags: [Catálogo académico]
       operationId: getAcademicCatalog
       summary: Obtiene el catálogo de facultades y carreras
-      x-required-permission: ROLE_SUPERADMIN
+      x-required-permission: iam:users:read
       responses:
         '200':
           description: Catálogo activo.
@@ -163,7 +164,7 @@ components:
     Unauthorized:
       description: Token ausente, inválido o vencido.
     Forbidden:
-      description: El token no incluye `ROLE_SUPERADMIN`.
+      description: El token no incluye el permiso requerido (`x-required-permission`) en `resource_access.dss-permissions.roles`.
     NotFound:
       description: Usuario inexistente.
       content:

@@ -10,7 +10,6 @@ import uatf.dss.authservice.adapter.out.persistence.role.RoleEntity;
 import uatf.dss.authservice.adapter.out.persistence.role.SpringDataRoleRepository;
 import uatf.dss.authservice.application.port.out.UserRepository;
 import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
-import uatf.dss.authservice.domain.exception.notfound.RoleNotFoundException;
 import uatf.dss.authservice.domain.model.User;
 import java.util.Optional;
 import java.util.List;
@@ -82,14 +81,17 @@ public class UserRepositoryAdapter implements UserRepository {
     public void replaceRoleSnapshot(UUID userId, Set<String> roleNames) {
         UserEntity user = springDataRepository.findById(userId).orElseThrow(UserNotFoundException::new);
         Set<String> requestedNames = roleNames == null ? Set.of() : Set.copyOf(roleNames);
-        Set<RoleEntity> resolvedRoles = requestedNames.isEmpty()
-                ? new HashSet<>()
-                : new HashSet<>(springDataRoleRepository.findAllByNameIn(requestedNames));
-        Set<String> resolvedNames = resolvedRoles.stream()
-                .map(RoleEntity::getName)
-                .collect(Collectors.toSet());
-        if (!resolvedNames.equals(requestedNames)) {
-            throw new RoleNotFoundException();
+        if (requestedNames.isEmpty()) {
+            user.setRoles(new HashSet<>());
+            return;
+        }
+        // Roles are data owned by Keycloak (IAM-004): a role seen for the first time is registered, never rejected.
+        Set<RoleEntity> resolvedRoles = new HashSet<>(springDataRoleRepository.findAllByNameIn(requestedNames));
+        Set<String> missing = new HashSet<>(requestedNames);
+        resolvedRoles.forEach(role -> missing.remove(role.getName()));
+        if (!missing.isEmpty()) {
+            missing.forEach(springDataRoleRepository::insertIfAbsent);
+            resolvedRoles = new HashSet<>(springDataRoleRepository.findAllByNameIn(requestedNames));
         }
         user.setRoles(resolvedRoles);
     }

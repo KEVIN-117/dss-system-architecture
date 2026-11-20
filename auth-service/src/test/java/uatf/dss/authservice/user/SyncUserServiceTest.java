@@ -183,4 +183,32 @@ public class SyncUserServiceTest {
 
         verify(userRepository, never()).replaceRoleSnapshot(any(), any());
     }
+
+    @Test
+    public void shouldKeepRealmRolesCreatedInKeycloakAndDropBuiltInsAndClientRoles() {
+        UUID keycloakId = UUID.randomUUID();
+        UUID localId = UUID.randomUUID();
+        SyncUserCommand command = new SyncUserCommand(
+                keycloakId,
+                "coordinador",
+                "coordinador@uatf.edu.bo",
+                "Coordinación",
+                "Académica",
+                true,
+                List.of(new KeycloakRoleSnapshot("COORDINADOR_ACADEMICO", false),
+                        new KeycloakRoleSnapshot(" DECANO ", false),
+                        new KeycloakRoleSnapshot("offline_access", false),
+                        new KeycloakRoleSnapshot("uma_authorization", false),
+                        new KeycloakRoleSnapshot("default-roles-uatf-dss-realm", false),
+                        new KeycloakRoleSnapshot("analytics:faculty", true),
+                        new KeycloakRoleSnapshot("", false)));
+        User existingUser = User.create(localId, keycloakId, "coordinador", "coordinador@uatf.edu.bo",
+                "Coordinación", "Académica", true);
+        when(userRepository.findByKeycloakId(keycloakId)).thenReturn(Optional.of(existingUser));
+        when(userRepository.save(any(User.class))).thenReturn(existingUser);
+
+        syncUserService.sync(command);
+
+        verify(userRepository).replaceRoleSnapshot(localId, Set.of("COORDINADOR_ACADEMICO", "DECANO"));
+    }
 }

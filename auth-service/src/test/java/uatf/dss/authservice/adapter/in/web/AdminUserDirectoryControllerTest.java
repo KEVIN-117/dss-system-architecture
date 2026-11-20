@@ -37,8 +37,14 @@ class AdminUserDirectoryControllerTest extends BaseWebMvcTest {
     }
 
     @Test
-    void listRequiresSuperadmin() throws Exception {
+    void listRequiresUsersReadPermission() throws Exception {
         mockMvc.perform(get("/admin/users").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_DIRECTOR"))))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void legacySuperadminRoleWithoutPermissionIsForbidden() throws Exception {
+        mockMvc.perform(get("/admin/users").with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SUPERADMIN"))))
                 .andExpect(status().isForbidden());
     }
 
@@ -117,6 +123,6 @@ class AdminUserDirectoryControllerTest extends BaseWebMvcTest {
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor superadmin() {
-        return jwt().authorities(new SimpleGrantedAuthority("ROLE_SUPERADMIN"));
+        return jwt().authorities(new SimpleGrantedAuthority("iam:users:read"));
     }
 }

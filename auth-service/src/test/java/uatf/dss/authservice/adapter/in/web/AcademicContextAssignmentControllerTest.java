@@ -34,9 +34,18 @@ class AcademicContextAssignmentControllerTest extends BaseWebMvcTest {
     }
 
     @Test
-    void callerWithoutSuperadminAuthorityIsForbidden() throws Exception {
+    void callerWithoutUsersWritePermissionIsForbidden() throws Exception {
         mockMvc.perform(put("/admin/users/{id}/academic-contexts", UUID.randomUUID())
                         .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_DIRECTOR")))
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"contexts\":[]}"))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    void legacySuperadminRoleWithoutPermissionIsForbidden() throws Exception {
+        mockMvc.perform(put("/admin/users/{id}/academic-contexts", UUID.randomUUID())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_SUPERADMIN"),
+                                new SimpleGrantedAuthority("iam:users:read")))
                         .contentType(MediaType.APPLICATION_JSON).content("{\"contexts\":[]}"))
                 .andExpect(status().isForbidden());
     }
@@ -50,7 +59,7 @@ class AcademicContextAssignmentControllerTest extends BaseWebMvcTest {
 
         mockMvc.perform(put("/admin/users/{id}/academic-contexts", targetId)
                         .with(jwt().jwt(token -> token.subject(actorId.toString()))
-                                .authorities(new SimpleGrantedAuthority("ROLE_SUPERADMIN")))
+                                .authorities(new SimpleGrantedAuthority("iam:users:write")))
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"contexts\":[{\"facultyId\":10,\"careerId\":\"025\"}]}"))
                 .andExpect(status().isOk())

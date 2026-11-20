@@ -34,7 +34,7 @@ public class AcademicContextAssignmentController {
 
     @PutMapping("/{userId}/academic-contexts")
     @Operation(summary = "Reemplazar el contexto académico de un usuario")
-    @PreAuthorize("hasAuthority('ROLE_SUPERADMIN')")
+    @PreAuthorize("hasAuthority('iam:users:write')")
     public ResponseEntity<List<UserAcademicContext>> replaceAcademicContexts(
             @PathVariable UUID userId,
             @Valid @RequestBody AcademicContextAssignmentRequest request,

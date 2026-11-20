@@ -81,7 +81,6 @@ public class ArchitectureTest {
         ArchRule rule = classes()
                 .that().resideInAPackage("..adapter.in.web..")
                 .and().haveSimpleNameEndingWith("Controller")
-                .and().haveSimpleNameNotStartingWith("Demo")
                 .should().dependOnClassesThat()
                 .resideInAnyPackage("..application.port.in..");
 
