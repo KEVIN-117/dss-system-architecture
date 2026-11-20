@@ -49,16 +49,39 @@ final class KeycloakMappers {
                 role.attributes());
     }
 
+    /** Keycloak stores post-logout redirect URIs in this attribute, separated by {@code ##}. */
+    static final String POST_LOGOUT_ATTRIBUTE = "post.logout.redirect.uris";
+    static final String PKCE_ATTRIBUTE = "pkce.code.challenge.method";
+    private static final String URI_SEPARATOR = "##";
+
     static IdentityClient toDomain(KeycloakRepresentations.ClientRepresentation client) {
+        String postLogout = client.attributes() == null ? null : client.attributes().get(POST_LOGOUT_ATTRIBUTE);
+        List<String> postLogoutUris = postLogout == null || postLogout.isBlank()
+                ? List.of()
+                : java.util.Arrays.stream(postLogout.split(URI_SEPARATOR)).filter(uri -> !uri.isBlank()).toList();
         return new IdentityClient(client.id(), client.clientId(), client.name(), client.description(),
                 Boolean.TRUE.equals(client.enabled()), Boolean.TRUE.equals(client.publicClient()),
                 Boolean.TRUE.equals(client.bearerOnly()), Boolean.TRUE.equals(client.standardFlowEnabled()),
-                Boolean.TRUE.equals(client.serviceAccountsEnabled()), client.redirectUris(), client.webOrigins());
+                Boolean.TRUE.equals(client.serviceAccountsEnabled()), client.redirectUris(), client.webOrigins(),
+                postLogoutUris);
     }
 
-    static KeycloakRepresentations.ClientRepresentation toRepresentation(IdentityClientDraft client, String protocol) {
+    /**
+     * {@code creating} adds the secure defaults of a new client: no implicit or password grant, and PKCE S256 for
+     * public clients. On update only the given fields are sent; Keycloak merges attributes key by key.
+     */
+    static KeycloakRepresentations.ClientRepresentation toRepresentation(IdentityClientDraft client, boolean creating) {
+        java.util.Map<String, String> attributes = new java.util.HashMap<>();
+        if (client.postLogoutRedirectUris() != null) {
+            attributes.put(POST_LOGOUT_ATTRIBUTE, String.join(URI_SEPARATOR, client.postLogoutRedirectUris()));
+        }
+        if (creating && Boolean.TRUE.equals(client.publicClient())) {
+            attributes.put(PKCE_ATTRIBUTE, "S256");
+        }
         return new KeycloakRepresentations.ClientRepresentation(null, client.clientId(), client.name(),
                 client.description(), client.enabled(), client.publicClient(), null, client.standardFlowEnabled(),
-                client.serviceAccountsEnabled(), client.redirectUris(), client.webOrigins(), protocol);
+                creating ? Boolean.FALSE : null, creating ? Boolean.FALSE : null, client.serviceAccountsEnabled(),
+                client.redirectUris(), client.webOrigins(), creating ? "openid-connect" : null,
+                attributes.isEmpty() ? null : attributes);
     }
 }

@@ -30,6 +30,9 @@ import uatf.dss.authservice.application.port.out.IdentityRoleMappingPort;
 import uatf.dss.authservice.application.port.out.IdentityUserAdminPort;
 import uatf.dss.authservice.application.service.IamUserAdministrationService;
 import uatf.dss.authservice.application.service.IamRoleAdministrationService;
+import uatf.dss.authservice.application.service.IamClientAdministrationService;
+import uatf.dss.authservice.application.port.in.IamClientAdministrationUseCase;
+import uatf.dss.authservice.application.port.out.IdentityClientAdminPort;
 import uatf.dss.authservice.application.port.in.IamRoleAdministrationUseCase;
 
 @Configuration
@@ -95,6 +98,14 @@ public class ApplicationConfig {
             AdminAuditRecorder adminAuditRecorder,
             @Value("${jwt.auth.converter.permissions-client-id:dss-permissions}") String permissionsClientId) {
         return new IamRoleAdministrationService(identityRoles, adminAuditRecorder, permissionsClientId);
+    }
+
+    @Bean
+    public IamClientAdministrationUseCase iamClientAdministrationUseCase(
+            IdentityClientAdminPort identityClients,
+            AdminAuditRecorder adminAuditRecorder,
+            @Value("${app.iam.clients.require-https:false}") boolean requireHttps) {
+        return new IamClientAdministrationService(identityClients, adminAuditRecorder, requireHttps);
     }
 
     @Bean

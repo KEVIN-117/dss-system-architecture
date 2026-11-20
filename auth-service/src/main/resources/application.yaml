@@ -70,6 +70,9 @@ app:
   iam:
     # Validity of the invitation / required-actions e-mail links sent from the admin portal. IAM-006.
     invitation-lifespan: ${IAM_INVITATION_LIFESPAN:72h}
+    clients:
+      # Client redirect/post-logout URIs and web origins must use https (loopback excepted). IAM-008.
+      require-https: ${IAM_CLIENTS_REQUIRE_HTTPS:false}
   keycloak:
     # Keycloak Admin REST API with the uatf-auth-service service account (client_credentials). IAM-003.
     admin:

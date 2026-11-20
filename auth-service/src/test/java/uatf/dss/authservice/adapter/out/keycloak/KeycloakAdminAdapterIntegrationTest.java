@@ -225,19 +225,22 @@ class KeycloakAdminAdapterIntegrationTest {
 
         String clientId = unique("iam003-app");
         module.clients().createClient(new IdentityClientDraft(clientId, "Aplicación de prueba", "Descripción",
-                true, false, false, true, List.of(), List.of()));
+                true, false, false, true, List.of(), List.of(), null));
         assertThatThrownBy(() -> module.clients().createClient(new IdentityClientDraft(clientId, null, null,
-                true, false, false, true, null, null)))
+                true, false, false, true, null, null, null)))
                 .isInstanceOf(IdentityResourceConflictException.class);
 
         module.clients().updateClient(clientId, new IdentityClientDraft(null, "Aplicación renombrada", null,
-                null, null, true, null, List.of("https://app.uatf.test/callback"), List.of("https://app.uatf.test")));
+                null, null, true, null, List.of("https://app.uatf.test/callback"), List.of("https://app.uatf.test"),
+                List.of("https://app.uatf.test/", "https://app.uatf.test/adios")));
         IdentityClient updated = module.clients().findClient(clientId).orElseThrow();
         assertThat(updated.name()).isEqualTo("Aplicación renombrada");
         assertThat(updated.description()).isEqualTo("Descripción");
         assertThat(updated.standardFlowEnabled()).isTrue();
         assertThat(updated.serviceAccountsEnabled()).isTrue();
         assertThat(updated.redirectUris()).containsExactly("https://app.uatf.test/callback");
+        assertThat(updated.postLogoutRedirectUris())
+                .containsExactly("https://app.uatf.test/", "https://app.uatf.test/adios");
 
         String secret = module.clients().regenerateClientSecret(clientId);
         assertThat(secret).isNotBlank();

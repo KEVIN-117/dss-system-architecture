@@ -19,7 +19,6 @@ class KeycloakClientAdminAdapter implements IdentityClientAdminPort {
     private static final ParameterizedTypeReference<List<KeycloakRepresentations.ClientRepresentation>> CLIENTS =
             new ParameterizedTypeReference<>() {
             };
-    private static final String OPENID_CONNECT = "openid-connect";
 
     private final KeycloakAdminHttpClient http;
     private final KeycloakClientIdResolver clients;
@@ -57,7 +56,7 @@ class KeycloakClientAdminAdapter implements IdentityClientAdminPort {
     @Override
     public String createClient(IdentityClientDraft client) {
         String internalId = http.create(Call.of(HttpMethod.POST, "crear cliente " + client.clientId(), "/clients")
-                .body(KeycloakMappers.toRepresentation(client, OPENID_CONNECT)));
+                .body(KeycloakMappers.toRepresentation(client, true)));
         clients.forget(client.clientId());
         return internalId;
     }
@@ -66,10 +65,11 @@ class KeycloakClientAdminAdapter implements IdentityClientAdminPort {
     public void updateClient(String clientId, IdentityClientDraft changes) {
         IdentityClientDraft withoutRename = new IdentityClientDraft(clientId, changes.name(), changes.description(),
                 changes.enabled(), changes.publicClient(), changes.standardFlowEnabled(),
-                changes.serviceAccountsEnabled(), changes.redirectUris(), changes.webOrigins());
+                changes.serviceAccountsEnabled(), changes.redirectUris(), changes.webOrigins(),
+                changes.postLogoutRedirectUris());
         clients.withInternalId(clientId, internalId -> {
             http.send(Call.of(HttpMethod.PUT, "actualizar cliente " + clientId, "/clients/{client}", internalId)
-                    .body(KeycloakMappers.toRepresentation(withoutRename, null)));
+                    .body(KeycloakMappers.toRepresentation(withoutRename, false)));
             return null;
         });
     }

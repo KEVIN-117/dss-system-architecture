@@ -3,8 +3,6 @@ package uatf.dss.authservice.adapter.out.keycloak;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
-import org.springframework.util.LinkedMultiValueMap;
-import org.springframework.util.MultiValueMap;
 import org.springframework.web.client.ResourceAccessException;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientResponseException;
@@ -59,15 +57,12 @@ public class KeycloakAdminTokenProvider {
             throw new IdentityProviderUnavailableException(
                     "La administración de identidad no está configurada: falta KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET.");
         }
-        MultiValueMap<String, String> form = new LinkedMultiValueMap<>();
-        form.add("grant_type", "client_credentials");
-        form.add("client_id", properties.clientId());
-        form.add("client_secret", properties.clientSecret());
+        ClientCredentialsForm form = new ClientCredentialsForm(properties.clientId(), properties.clientSecret());
         try {
             KeycloakRepresentations.TokenResponse response = restClient.post()
                     .uri("/realms/{realm}/protocol/openid-connect/token", properties.realm())
                     .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                    .body(form)
+                    .body(form.body())
                     .retrieve()
                     .body(KeycloakRepresentations.TokenResponse.class);
             if (response == null || response.accessToken() == null || response.accessToken().isBlank()) {

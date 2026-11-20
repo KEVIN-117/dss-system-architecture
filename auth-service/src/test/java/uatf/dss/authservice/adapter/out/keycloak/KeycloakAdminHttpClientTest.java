@@ -2,6 +2,8 @@ package uatf.dss.authservice.adapter.out.keycloak;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
@@ -36,6 +38,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
+@org.junit.jupiter.api.extension.ExtendWith(OutputCaptureExtension.class)
 class KeycloakAdminHttpClientTest {
 
     private static final String BASE = "http://keycloak.test";
@@ -236,11 +239,31 @@ class KeycloakAdminHttpClientTest {
     }
 
     @Test
+    void serviceAccountSecretIsNotLoggedEvenWithSpringHttpDebugLogging(CapturedOutput output) {
+        ch.qos.logback.classic.Logger springHttp = (ch.qos.logback.classic.Logger)
+                org.slf4j.LoggerFactory.getLogger("org.springframework.web.client");
+        ch.qos.logback.classic.Level previous = springHttp.getLevel();
+        springHttp.setLevel(ch.qos.logback.classic.Level.DEBUG);
+        try {
+            expectToken("t1", 300);
+            server.expect(requestTo(ADMIN + "/roles/DIRECTOR")).andRespond(withSuccess(ROLE_JSON, MediaType.APPLICATION_JSON));
+
+            http.fetch(getRole(), KeycloakRepresentations.RoleRepresentation.class);
+
+            server.verify();
+            assertThat(output.getAll()).doesNotContain("s3cr3t");
+        } finally {
+            springHttp.setLevel(previous);
+        }
+    }
+
+    @Test
     void secretsAreNeverPrinted() {
         assertThat(properties("s3cr3t").toString()).doesNotContain("s3cr3t").contains("clientSecret=****");
         assertThat(properties(null).toString()).contains("clientSecret=<unset>");
         assertThat(new KeycloakRepresentations.TokenResponse("eyJ.secret.token", 60L).toString()).doesNotContain("eyJ");
         assertThat(new KeycloakRepresentations.CredentialRepresentation("secret", "abc").toString()).doesNotContain("abc");
+        assertThat(new ClientCredentialsForm("uatf-auth-service", "s3cr3t").toString()).doesNotContain("s3cr3t");
     }
 
     @Test
