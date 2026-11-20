@@ -65,3 +65,16 @@ app:
     context-reader:
       # Keycloak clients (token azp) allowed to call /internal/users/{id}/academic-contexts.
       allowed-clients: ${AUTH_CONTEXT_READER_CLIENTS:olap-service}
+  keycloak:
+    # Keycloak Admin REST API with the uatf-auth-service service account (client_credentials). IAM-003.
+    admin:
+      base-url: ${KEYCLOAK_ADMIN_BASE_URL:http://localhost:8080}
+      realm: ${KEYCLOAK_ADMIN_REALM:uatf-dss-realm}
+      client-id: ${KEYCLOAK_AUTH_SERVICE_CLIENT_ID:uatf-auth-service}
+      # Without it the service starts, but identity-administration calls answer 503.
+      client-secret: ${KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET:}
+      connect-timeout: ${KEYCLOAK_ADMIN_CONNECT_TIMEOUT:2s}
+      read-timeout: ${KEYCLOAK_ADMIN_READ_TIMEOUT:5s}
+      max-retries: ${KEYCLOAK_ADMIN_MAX_RETRIES:2}
+      retry-backoff: 200ms
+      token-expiry-skew: 30s
