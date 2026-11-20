@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-control-service-v1.2.1...dw-control-service-v1.3.0) (2026-11-20)
+
+
+### Features
+
+* **dw-control-service:** authorization with dss-permissions ([#308](https://github.com/KEVIN-117/dss-system-architecture/issues/308)) ([efdd8d2](https://github.com/KEVIN-117/dss-system-architecture/commit/efdd8d2ce1e17c97d04beff2bca795c329dbb7f1))
+
 ## [1.2.1](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-control-service-v1.2.0...dw-control-service-v1.2.1) (2026-11-18)
 
 
