@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.6.0...auth-service-v1.7.0) (2026-11-20)
+
+
+### Features
+
+* **auth-service:** completed event handler keycloak-webhook ([#307](https://github.com/KEVIN-117/dss-system-architecture/issues/307)) ([9069bc8](https://github.com/KEVIN-117/dss-system-architecture/commit/9069bc84de1d4a4c0f49ea7db24ae0889f1fd0a7))
+
 ## [1.6.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.5.0...auth-service-v1.6.0) (2026-11-20)
 
 
