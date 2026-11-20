@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.1.0...auth-service-v1.2.0) (2026-11-20)
+
+
+### Features
+
+* implemented keycloak admin api adapter ([#294](https://github.com/KEVIN-117/dss-system-architecture/issues/294)) ([3186665](https://github.com/KEVIN-117/dss-system-architecture/commit/31866659b8e0f9f76b195d75d71cf904d5b85904))
+
 ## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.0.0...auth-service-v1.1.0) (2026-10-22)
 
 
