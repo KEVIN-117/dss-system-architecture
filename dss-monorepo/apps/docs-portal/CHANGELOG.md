@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.1.0...docs-portal-v1.2.0) (2026-11-20)
+
+
+### Features
+
+* **Admin-portal:** users management ([#327](https://github.com/KEVIN-117/dss-system-architecture/issues/327)) ([638d675](https://github.com/KEVIN-117/dss-system-architecture/commit/638d675395f2156bf4766543c5ee187cd9d7e30c))
+
 ## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.0.1...docs-portal-v1.1.0) (2026-11-20)
 
 
