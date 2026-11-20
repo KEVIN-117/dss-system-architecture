@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.1](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.9.0...bff-v1.9.1) (2026-11-20)
+
+
+### Bug Fixes
+
+* **bff:** permitir desactivar el atributo Secure de las cookies con BFF_COOKIE_SECURE ([#325](https://github.com/KEVIN-117/dss-system-architecture/issues/325)) ([f47dd45](https://github.com/KEVIN-117/dss-system-architecture/commit/f47dd45496a648d0ef18ef8190cea87b63d1bbf3))
+
 ## [1.9.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.8.0...bff-v1.9.0) (2026-11-20)
 
 
