@@ -64,6 +64,17 @@ describe('AdminPortalLayout', () => {
     expect(screen.getByText('Cierres académicos')).toBeTruthy();
   });
 
+  it('opens roles, permissions and the matrix with iam:roles:read alone', () => {
+    useAuth.mockReturnValue(session([], ['iam:roles:read']));
+    render(<AdminPortalLayout access={ADMIN_PERMISSIONS.roles}><p>roles</p></AdminPortalLayout>);
+
+    expect(screen.getByText('roles')).toBeTruthy();
+    expect(screen.getByText('Roles')).toBeTruthy();
+    expect(screen.getByText('Permisos')).toBeTruthy();
+    expect(screen.getByText('Matriz de acceso')).toBeTruthy();
+    expect(screen.queryByText('Usuarios')).toBeNull();
+  });
+
   it('denies a page to SUPERADMIN when the token lacks its permission', () => {
     useAuth.mockReturnValue(session(['SUPERADMIN'], ['iam:users:read']));
     render(<AdminPortalLayout access={ADMIN_PERMISSIONS.ml}><p>modelos</p></AdminPortalLayout>);

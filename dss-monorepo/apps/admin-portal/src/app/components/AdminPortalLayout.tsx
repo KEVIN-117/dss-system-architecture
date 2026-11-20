@@ -9,8 +9,11 @@ import {
   Cable,
   CalendarClock,
   Database,
+  Grid3x3,
+  KeyRound,
   LayoutDashboard,
   ServerCog,
+  ShieldCheck,
   Users,
 } from 'lucide-react';
 import { LandingLoginRedirect, ProtectedRoute, useAuth } from '@dss-monorepo/auth';
@@ -33,6 +36,7 @@ import {
  */
 export const ADMIN_PERMISSIONS = {
   users: ['iam:users:read'],
+  roles: ['iam:roles:read'],
   olap: ['olap:admin'],
   ml: ['prediction:train'],
 } as const satisfies Record<string, readonly DSSPermission[]>;
@@ -40,6 +44,7 @@ export const ADMIN_PERMISSIONS = {
 /** Any administration permission opens the overview. */
 export const ANY_ADMIN_PERMISSION: readonly DSSPermission[] = [
   ...ADMIN_PERMISSIONS.users,
+  ...ADMIN_PERMISSIONS.roles,
   ...ADMIN_PERMISSIONS.olap,
   ...ADMIN_PERMISSIONS.ml,
 ];
@@ -61,6 +66,7 @@ export function AdminPortalLayout({
   useEffect(() => setNavigationReady(true), []);
   const granted = navigationReady && user ? permissions : [];
   const canUsers = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.users);
+  const canRoles = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.roles);
   const canOlap = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.olap);
   const canMl = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.ml);
   const canOverview = hasRequiredPermissions(granted, ANY_ADMIN_PERMISSION);
@@ -86,8 +92,15 @@ export function AdminPortalLayout({
     ...group(canOverview, 'Plataforma', [
       navigationItem('Resumen general', '/', <LayoutDashboard aria-hidden="true" />),
     ]),
-    ...group(canUsers, 'Servicio de autenticación', [
-      navigationItem('Usuarios', '/users', <Users aria-hidden="true" />),
+    ...group(canUsers || canRoles, 'Servicio de autenticación', [
+      ...(canUsers ? [navigationItem('Usuarios', '/users', <Users aria-hidden="true" />)] : []),
+      ...(canRoles
+        ? [
+            navigationItem('Roles', '/roles', <ShieldCheck aria-hidden="true" />),
+            navigationItem('Permisos', '/permissions', <KeyRound aria-hidden="true" />),
+            navigationItem('Matriz de acceso', '/access-matrix', <Grid3x3 aria-hidden="true" />),
+          ]
+        : []),
     ]),
     ...group(canOlap, 'Servicio OLAP', [
       navigationItem('Conexiones', '/datasources', <Cable aria-hidden="true" />),

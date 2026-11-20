@@ -65,8 +65,9 @@ export class IamRequestError extends Error {
 
 const BFF_BASE_URL = process.env.NEXT_PUBLIC_BFF_URL?.trim().replace(/\/$/, '') ?? '';
 
-async function iam<T>(
-  method: 'GET' | 'POST' | 'PUT' | 'PATCH',
+/** One call to `/api/admin/iam/<path>`; failures become an {@link IamRequestError} with the domain message. */
+export async function iamRequest<T>(
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   path: string,
   fallback: string,
   body?: unknown,
@@ -107,7 +108,7 @@ async function iamError(response: Response, fallback: string): Promise<IamReques
 const user = (id: string) => `users/${encodeURIComponent(id)}`;
 
 export function createIamUser(request: CreateIamUser, signal?: AbortSignal): Promise<IamUser> {
-  return iam('POST', 'users', 'No se pudo crear el usuario', {
+  return iamRequest('POST', 'users', 'No se pudo crear el usuario', {
     username: request.username.trim(),
     email: request.email.trim(),
     ...(request.firstName?.trim() ? { firstName: request.firstName.trim() } : {}),
@@ -117,7 +118,7 @@ export function createIamUser(request: CreateIamUser, signal?: AbortSignal): Pro
 }
 
 export function setIamUserEnabled(userId: string, enabled: boolean, signal?: AbortSignal): Promise<IamUser> {
-  return iam('PATCH', user(userId), enabled ? 'No se pudo activar el usuario' : 'No se pudo desactivar el usuario',
+  return iamRequest('PATCH', user(userId), enabled ? 'No se pudo activar el usuario' : 'No se pudo desactivar el usuario',
     { enabled }, signal);
 }
 
@@ -126,19 +127,19 @@ export function sendIamActionsEmail(
   actions: IamRequiredAction[],
   signal?: AbortSignal,
 ): Promise<void> {
-  return iam('POST', `${user(userId)}/actions-email`, 'No se pudo enviar el correo', { actions }, signal);
+  return iamRequest('POST', `${user(userId)}/actions-email`, 'No se pudo enviar el correo', { actions }, signal);
 }
 
 export function getIamUserRoles(userId: string, signal?: AbortSignal): Promise<IamAssignments> {
-  return iam('GET', `${user(userId)}/roles`, 'No se pudieron cargar los roles', undefined, signal);
+  return iamRequest('GET', `${user(userId)}/roles`, 'No se pudieron cargar los roles', undefined, signal);
 }
 
 export function replaceIamUserRoles(userId: string, roles: string[], signal?: AbortSignal): Promise<IamAssignments> {
-  return iam('PUT', `${user(userId)}/roles`, 'No se pudieron guardar los roles', { roles }, signal);
+  return iamRequest('PUT', `${user(userId)}/roles`, 'No se pudieron guardar los roles', { roles }, signal);
 }
 
 export function getIamUserPermissions(userId: string, signal?: AbortSignal): Promise<IamAssignments> {
-  return iam('GET', `${user(userId)}/permissions`, 'No se pudieron cargar los permisos', undefined, signal);
+  return iamRequest('GET', `${user(userId)}/permissions`, 'No se pudieron cargar los permisos', undefined, signal);
 }
 
 export function replaceIamUserPermissions(
@@ -146,13 +147,13 @@ export function replaceIamUserPermissions(
   permissions: string[],
   signal?: AbortSignal,
 ): Promise<IamAssignments> {
-  return iam('PUT', `${user(userId)}/permissions`, 'No se pudieron guardar los permisos', { permissions }, signal);
+  return iamRequest('PUT', `${user(userId)}/permissions`, 'No se pudieron guardar los permisos', { permissions }, signal);
 }
 
 export function listIamRoles(signal?: AbortSignal): Promise<IamRole[]> {
-  return iam('GET', 'roles', 'No se pudo cargar el catálogo de roles', undefined, signal);
+  return iamRequest('GET', 'roles', 'No se pudo cargar el catálogo de roles', undefined, signal);
 }
 
 export function listIamPermissions(signal?: AbortSignal): Promise<IamPermission[]> {
-  return iam('GET', 'permissions', 'No se pudo cargar el catálogo de permisos', undefined, signal);
+  return iamRequest('GET', 'permissions', 'No se pudo cargar el catálogo de permisos', undefined, signal);
 }
