@@ -24,6 +24,7 @@ Fuentes: `auth-service/src/main/resources/application.yaml`, `application-dev.ya
 | `KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET` | Sí, secreto | Secreto de ese cliente (el mismo que usa el import del realm). Compose lo exige. Si falta fuera de Compose, el servicio arranca pero toda operación de administración de identidad responde 503. Nunca se registra en logs. |
 | `KEYCLOAK_ADMIN_CONNECT_TIMEOUT`, `KEYCLOAK_ADMIN_READ_TIMEOUT` | Opcional | Timeouts hacia Keycloak; default `2s` y `5s`. |
 | `KEYCLOAK_ADMIN_MAX_RETRIES` | Opcional | Reintentos extra para llamadas idempotentes (GET/PUT/DELETE) ante errores de red o 502/503/504; default `2`. POST nunca se reintenta. |
+| `IAM_INVITATION_LIFESPAN` | Opcional | Vigencia de los enlaces del correo de invitación y de acciones requeridas (`app.iam.invitation-lifespan`); default `72h`. |
 
 ### Administración de identidad (Keycloak Admin REST API)
 
@@ -38,6 +39,13 @@ Traducción de errores de Keycloak a excepciones de dominio:
 | 409 | `IdentityResourceConflictException` | 409 |
 | 401 tras renovar el token, 403 u otros 5xx | `IdentityProviderException` | 502 |
 | Timeout, conexión rechazada o secreto ausente | `IdentityProviderUnavailableException` | 503 |
+
+### Administración de usuarios (IAM-006)
+
+`/api/v1/admin/iam/users` crea usuarios en Keycloak, los actualiza o desactiva, reenvía invitaciones y reemplaza sus roles y permisos directos. Las lecturas exigen `iam:users:read` y las escrituras `iam:users:write`. Requisitos del entorno:
+
+- La cuenta de servicio de `uatf-auth-service` con los roles de `realm-management` de IAM-001 y `KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET` configurado.
+- **SMTP configurado en el realm** (Realm settings → Email) para que lleguen las invitaciones y los correos de restablecimiento. Sin SMTP, crear usuarios funciona, pero `invitationSent` vuelve `false` y `actions-email` responde 502.
 
 ### Auditoría administrativa
 

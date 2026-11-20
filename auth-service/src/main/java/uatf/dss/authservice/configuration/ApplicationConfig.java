@@ -22,6 +22,13 @@ import uatf.dss.authservice.application.port.in.ListAdminAuditUseCase;
 import uatf.dss.authservice.application.port.out.AdminAuditLogRepository;
 
 import java.time.Clock;
+import java.time.Duration;
+import org.springframework.beans.factory.annotation.Value;
+import uatf.dss.authservice.application.port.in.IamUserAdministrationUseCase;
+import uatf.dss.authservice.application.port.out.IdentityRoleAdminPort;
+import uatf.dss.authservice.application.port.out.IdentityRoleMappingPort;
+import uatf.dss.authservice.application.port.out.IdentityUserAdminPort;
+import uatf.dss.authservice.application.service.IamUserAdministrationService;
 
 @Configuration
 public class ApplicationConfig {
@@ -64,6 +71,20 @@ public class ApplicationConfig {
     @Bean
     public ListAdminAuditUseCase listAdminAuditUseCase(AdminAuditLogRepository auditLogRepository) {
         return new ListAdminAuditService(auditLogRepository);
+    }
+
+    @Bean
+    public IamUserAdministrationUseCase iamUserAdministrationUseCase(
+            IdentityUserAdminPort identityUsers,
+            IdentityRoleAdminPort identityRoles,
+            IdentityRoleMappingPort identityRoleMappings,
+            UserRepository userRepository,
+            SyncUserUseCase syncUserUseCase,
+            AdminAuditRecorder adminAuditRecorder,
+            @Value("${jwt.auth.converter.permissions-client-id:dss-permissions}") String permissionsClientId,
+            @Value("${app.iam.invitation-lifespan:72h}") Duration invitationLifespan) {
+        return new IamUserAdministrationService(identityUsers, identityRoles, identityRoleMappings, userRepository,
+                syncUserUseCase, adminAuditRecorder, permissionsClientId, invitationLifespan);
     }
 
     @Bean

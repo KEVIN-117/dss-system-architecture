@@ -140,6 +140,27 @@ El diagrama de validación y reemplazo transaccional está centralizado en [Diag
 
 La secuencia de sincronización del catálogo está centralizada en [Diagramas de secuencia — auth-service](../../docs/sequence-diagrams/auth-service.md#flujo-integrado--sincronizacion-del-catalogo-por-apache-hop). El [README de Apache Hop](../../etl-layer/apache-hop/README.md) describe la configuración y operación del workflow.
 
+## Flujo D: administración de usuarios en Keycloak (IAM-006)
+
+`IamUserController` expone `/api/v1/admin/iam/users`. `{userId}` es siempre el UUID local que muestra `/admin/users`; el servicio lo traduce al id de Keycloak y nunca lo devuelve.
+
+| Ruta | Permiso | Acción de auditoría | Función |
+|---|---|---|---|
+| `POST /admin/iam/users` | `iam:users:write` | `USER_CREATED` (+ `USER_ACTIONS_EMAIL_SENT`) | Crea el usuario sin contraseña y, salvo `sendInvitation: false`, envía el correo UPDATE_PASSWORD + VERIFY_EMAIL. Responde `201` con `Location: /admin/users/{id}`. |
+| `PATCH /admin/iam/users/{userId}` | `iam:users:write` | `USER_UPDATED` | Cambia correo, nombre, apellido o `enabled`; los campos omitidos no cambian. |
+| `POST /admin/iam/users/{userId}/actions-email` | `iam:users:write` | `USER_ACTIONS_EMAIL_SENT` | Reenvía la invitación o pide restablecer la contraseña. Responde `202`. |
+| `GET`/`PUT /admin/iam/users/{userId}/roles` | `iam:users:read` / `iam:users:write` | `USER_ROLES_REPLACED` | Roles del realm directos y efectivos; el `PUT` reemplaza los directos. |
+| `GET`/`PUT /admin/iam/users/{userId}/permissions` | `iam:users:read` / `iam:users:write` | `USER_PERMISSIONS_REPLACED` | Permisos de `dss-permissions` directos y heredados; el `PUT` reemplaza los directos. |
+
+Reglas de `IamUserAdministrationService`:
+
+- **Auditoría:** cada escritura pasa por `AdminAuditRecorder.recordRemote`. Las reglas institucionales se evalúan dentro de la operación auditada, así un rechazo también queda como `FAILURE`.
+- **Reglas institucionales (409 `IamRuleViolationException`):** nadie puede desactivar su propia cuenta, y el último SUPERADMIN habilitado no puede perder el rol ni ser desactivado.
+- **Roles integrados:** `offline_access`, `uma_authorization` y `default-roles-*` (`KeycloakBuiltInRoles`) no se muestran, no se pueden pedir (400) y el `PUT` nunca los quita.
+- **Cambios mínimos:** el `PUT` de roles y de permisos solo asigna o quita la diferencia con lo actual. Un nombre inexistente en Keycloak devuelve 404.
+- **Copia local inmediata:** después de crear, actualizar o cambiar roles se ejecuta `SyncUserUseCase` con los datos y roles directos leídos de Keycloak. El evento que llega después por RabbitMQ es idempotente.
+- **Invitación al crear:** si el correo falla (por ejemplo, el realm no tiene SMTP), el usuario se conserva, la respuesta trae `invitationSent: false` y el fallo queda auditado. La vigencia del enlace es `IAM_INVITATION_LIFESPAN` (72 h por defecto).
+
 ## Persistencia local
 
 Las migraciones observadas definen:
@@ -157,7 +178,7 @@ V2 transforma `career_id` a `CHAR(3)` con ceros a la izquierda. V4 siembra los c
 ## Rutas auxiliares y límites funcionales
 
 - Los roles locales sirven como snapshot consultado para reglas del contexto académico. La seguridad HTTP usa los roles presentes en el JWT.
-- No hay un endpoint en `auth-service` para conceder o revocar roles en Keycloak; el servicio recibe y replica snapshots de roles, pero la administración de esos roles ocurre en Keycloak.
+- Desde IAM-006, `auth-service` crea usuarios y concede o revoca roles y permisos en Keycloak (Flujo D). La definición de roles, permisos y clientes todavía se hace en Keycloak (IAM-007 e IAM-008).
 - El servicio no implementa autorización por facultad/programa sobre endpoints de analítica, no configura RLS y no propaga aquí un contexto de sesión al Data Warehouse.
 - `GET /auth/me` expone los contextos para que un cliente autorizado los consuma; la aplicación de ese alcance fuera de este servicio corresponde a otra capa.
 

@@ -6,9 +6,9 @@ import org.slf4j.LoggerFactory;
 import uatf.dss.authservice.application.port.in.SyncUserCommand;
 import uatf.dss.authservice.application.port.in.SyncUserUseCase;
 import uatf.dss.authservice.application.port.out.UserRepository;
+import uatf.dss.authservice.domain.model.KeycloakBuiltInRoles;
 import uatf.dss.authservice.domain.model.User;
 
-import java.util.Locale;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -17,9 +17,6 @@ import static net.logstash.logback.argument.StructuredArguments.kv;
 public class SyncUserService implements SyncUserUseCase {
 
     private static final Logger AUDIT_LOGGER = LoggerFactory.getLogger("AUDIT_LOGGER");
-    /** Realm roles Keycloak assigns to every user; they say nothing about the user's institutional role. */
-    private static final Set<String> KEYCLOAK_BUILT_IN_ROLES = Set.of("offline_access", "uma_authorization");
-    private static final String DEFAULT_ROLES_PREFIX = "default-roles-";
     private final UserRepository userRepository;
 
     public SyncUserService(UserRepository userRepository) {
@@ -85,10 +82,6 @@ public class SyncUserService implements SyncUserUseCase {
             return null;
         }
         String normalized = roleName.trim();
-        String lower = normalized.toLowerCase(Locale.ROOT);
-        if (KEYCLOAK_BUILT_IN_ROLES.contains(lower) || lower.startsWith(DEFAULT_ROLES_PREFIX)) {
-            return null;
-        }
-        return normalized;
+        return KeycloakBuiltInRoles.isBuiltIn(normalized) ? null : normalized;
     }
 }
