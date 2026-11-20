@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.1.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.0.1...docs-portal-v1.1.0) (2026-11-20)
+
+
+### Features
+
+* **bff:** resolver permisos desde el token y eliminar el modelo fijo ([#316](https://github.com/KEVIN-117/dss-system-architecture/issues/316)) ([5a054b2](https://github.com/KEVIN-117/dss-system-architecture/commit/5a054b26b22a2333757f1ad641043b18b0724a4e))
+
 ## [1.0.1](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.0.0...docs-portal-v1.0.1) (2026-11-18)
 
 
