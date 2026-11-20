@@ -2,7 +2,7 @@ export const metadata = { title: 'Portal de administración', audience: ['admini
 
 ## Acceso
 
-El portal de administración muestra cada sección según los permisos de tu cuenta: **Usuarios** requiere `iam:users:read`, **Servicio OLAP** `olap:admin`, **Aprendizaje automático** `prediction:train`, y los cierres y ejecuciones ETL `dw:closure:read`/`dw:etl-monitor:read`. Los permisos se asignan desde este mismo portal, directamente o a través de un rol. Cada operación vuelve a validarse en el BFF y en el servicio correspondiente. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso necesario.
+El portal de administración muestra cada sección según los permisos de tu cuenta: **Usuarios** requiere `iam:users:read`, **Roles**, **Permisos** y **Matriz de acceso** `iam:roles:read`, **Servicio OLAP** `olap:admin`, **Aprendizaje automático** `prediction:train`, y los cierres y ejecuciones ETL `dw:closure:read`/`dw:etl-monitor:read`. Los permisos se asignan desde este mismo portal, directamente o a través de un rol. Cada operación vuelve a validarse en el BFF y en el servicio correspondiente. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso necesario.
 
 El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio de autenticación**, **servicio OLAP**, **servicio de control del almacén de datos** y **servicio de aprendizaje automático**.
 
@@ -10,6 +10,9 @@ El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio d
 | --- | --- | --- |
 | <Ui>Resumen general</Ui> | Todos | Estado de los servicios y actividad reciente. |
 | <Ui>Usuarios</Ui> | servicio de autenticación | Crear e invitar usuarios, activarlos o desactivarlos y asignar sus roles, permisos y contextos académicos. |
+| <Ui>Roles</Ui> | servicio de autenticación | Crear, describir y eliminar roles y elegir a qué portal entra cada uno. |
+| <Ui>Permisos</Ui> | servicio de autenticación | Catálogo de permisos `recurso:acción`, agrupados por recurso. |
+| <Ui>Matriz de acceso</Ui> | servicio de autenticación | Decidir qué permisos agrupa cada rol, revisando los cambios antes de guardarlos. |
 | <Ui>Cierres académicos</Ui> | servicio de control del almacén de datos | Crear, autorizar y reabrir cortes de periodo. |
 | <Ui>Ejecuciones ETL</Ui> | servicio de control del almacén de datos | Revisar el historial y el detalle de las cargas. |
 | <Ui>Conexiones</Ui> | servicio OLAP | Registrar y mantener conexiones OLAP. |
@@ -40,6 +43,16 @@ El **Directorio de usuarios** se puede filtrar por texto (<Ui>Nombre, usuario o 
 - **Contextos**: el alcance académico. Un Decano puede tener varias facultades y un Director varias carreras, incluso de facultades distintas (por ejemplo, un decano interino). Usa <Ui>Agregar facultad</Ui> o <Ui>Agregar carrera</Ui> y <Ui>Guardar contextos</Ui>; la lista reemplaza la anterior y no admite repetidos. Rector y Superadministrador no llevan contexto.
 
 Los cambios de roles y permisos llegan al usuario en su siguiente inicio de sesión o renovación de sesión (unos minutos).
+
+## Roles, permisos y matriz de acceso
+
+Un **permiso** autoriza una acción concreta y se escribe `recurso:acción` en minúsculas (por ejemplo `reports:export` o `dw:closure:read`; el recurso puede tener varios niveles). Un **rol** agrupa permisos y decide a qué portal entra quien lo tiene. Para consultar estas pantallas basta `iam:roles:read`; crear, editar, eliminar y guardar la matriz requieren `iam:roles:write`.
+
+- <Ui>Roles</Ui>: <Ui>Nuevo rol</Ui> pide un nombre en MAYÚSCULAS (no se puede cambiar después), una descripción y, opcionalmente, el **portal** (`rector`, `decano`, `director`…). Sin portal, el rol solo aporta permisos. Los roles marcados **Sistema** (SUPERADMIN, RECTOR, DECANO, DIRECTOR) se pueden editar pero no eliminar.
+- <Ui>Permisos</Ui>: <Ui>Nuevo permiso</Ui> pide el nombre y una descripción obligatoria. Un permiso nuevo llega al token de quien lo recibe sin desplegar nada, pero solo tiene efecto cuando un servicio lo exige. Los permisos `iam:*` y `context:read` son del sistema y no se eliminan.
+- <Ui>Matriz de acceso</Ui>: cada fila es un permiso (agrupado por recurso) y cada columna un rol. Marca o desmarca las casillas; las celdas cambiadas se resaltan. <Ui>Revisar cambios</Ui> muestra, por rol, qué permisos **agrega** y cuáles **quita**; <Ui>Guardar cambios</Ui> los aplica rol por rol y, si alguno falla, ese rol queda pendiente con el motivo. <Ui>Descartar</Ui> vuelve al estado guardado. SUPERADMIN siempre conserva los permisos `iam:*`.
+
+**Eliminar algo en uso.** Si un rol está asignado a usuarios, o un permiso lo agrupa un rol o lo tiene un usuario, el servicio se niega a eliminarlo y el diálogo muestra dónde se usa. Solo <Ui>Eliminar de todas formas</Ui> lo borra, quitándolo de todos los roles y usuarios. No se puede deshacer.
 
 ## Cierres académicos
 
