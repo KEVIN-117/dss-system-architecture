@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/KEVIN-117/dss-system-architecture/compare/keycloak-v1.4.0...keycloak-v1.5.0) (2026-11-20)
+
+
+### Features
+
+* **prediction-service:** authorization with permission and many academic context ([#314](https://github.com/KEVIN-117/dss-system-architecture/issues/314)) ([df0136a](https://github.com/KEVIN-117/dss-system-architecture/commit/df0136aae1984d0a99d48c84a66681b3839bf507))
+
 ## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/keycloak-v1.3.0...keycloak-v1.4.0) (2026-11-19)
 
 
