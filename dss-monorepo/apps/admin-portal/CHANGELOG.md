@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.6.0...admin-portal-v1.7.0) (2026-11-21)
+
+
+### Features
+
+* **Admin-portal:** gestión de clientes y vista de auditoría ([#332](https://github.com/KEVIN-117/dss-system-architecture/issues/332)) ([e7a9f55](https://github.com/KEVIN-117/dss-system-architecture/commit/e7a9f553650e45d816b500bb6f5412802fd7747b))
+
 ## [1.6.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.5.0...admin-portal-v1.6.0) (2026-11-20)
 
 
