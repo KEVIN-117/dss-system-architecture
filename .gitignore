@@ -122,6 +122,9 @@ docker-compose.override.yml
 # auth-service Java packages named "audit" (IAM-005) are source code, not Hop runtime output.
 !auth-service/src/**/audit/
 !auth-service/src/**/audit/**
+# admin-portal route /audit (IAM-018) is source code too.
+!dss-monorepo/apps/admin-portal/src/app/audit/
+!dss-monorepo/apps/admin-portal/src/app/audit/**
 **/.hop/
 **/hop-audit/
 *.hpl.cache
