@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import {
   Activity,
+  AppWindow,
   BarChart3,
   BrainCircuit,
   Cable,
@@ -12,6 +13,7 @@ import {
   Grid3x3,
   KeyRound,
   LayoutDashboard,
+  ScrollText,
   ServerCog,
   ShieldCheck,
   Users,
@@ -37,6 +39,8 @@ import {
 export const ADMIN_PERMISSIONS = {
   users: ['iam:users:read'],
   roles: ['iam:roles:read'],
+  clients: ['iam:clients:read'],
+  audit: ['iam:audit:read'],
   olap: ['olap:admin'],
   ml: ['prediction:train'],
 } as const satisfies Record<string, readonly DSSPermission[]>;
@@ -45,6 +49,8 @@ export const ADMIN_PERMISSIONS = {
 export const ANY_ADMIN_PERMISSION: readonly DSSPermission[] = [
   ...ADMIN_PERMISSIONS.users,
   ...ADMIN_PERMISSIONS.roles,
+  ...ADMIN_PERMISSIONS.clients,
+  ...ADMIN_PERMISSIONS.audit,
   ...ADMIN_PERMISSIONS.olap,
   ...ADMIN_PERMISSIONS.ml,
 ];
@@ -67,6 +73,8 @@ export function AdminPortalLayout({
   const granted = navigationReady && user ? permissions : [];
   const canUsers = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.users);
   const canRoles = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.roles);
+  const canClients = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.clients);
+  const canAudit = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.audit);
   const canOlap = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.olap);
   const canMl = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.ml);
   const canOverview = hasRequiredPermissions(granted, ANY_ADMIN_PERMISSION);
@@ -92,7 +100,7 @@ export function AdminPortalLayout({
     ...group(canOverview, 'Plataforma', [
       navigationItem('Resumen general', '/', <LayoutDashboard aria-hidden="true" />),
     ]),
-    ...group(canUsers || canRoles, 'Servicio de autenticación', [
+    ...group(canUsers || canRoles || canClients || canAudit, 'Servicio de autenticación', [
       ...(canUsers ? [navigationItem('Usuarios', '/users', <Users aria-hidden="true" />)] : []),
       ...(canRoles
         ? [
@@ -101,6 +109,8 @@ export function AdminPortalLayout({
             navigationItem('Matriz de acceso', '/access-matrix', <Grid3x3 aria-hidden="true" />),
           ]
         : []),
+      ...(canClients ? [navigationItem('Aplicaciones', '/clients', <AppWindow aria-hidden="true" />)] : []),
+      ...(canAudit ? [navigationItem('Auditoría', '/audit', <ScrollText aria-hidden="true" />)] : []),
     ]),
     ...group(canOlap, 'Servicio OLAP', [
       navigationItem('Conexiones', '/datasources', <Cable aria-hidden="true" />),
