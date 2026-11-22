@@ -22,4 +22,4 @@ El [informe de cierre del Req. 6](hop-req-6-progress.md) registra la implementac
 
 ## Load Manager (operación desde el admin-portal)
 
-El [esquema del Load Manager](load-manager-schema.md) define el catálogo de procesos, los lanzamientos y las programaciones que opera dw-control-service (LM-002, épica #356). No reactiva el servicio Go pausado descrito arriba: la ejecución ocurre en Hop Server.
+El [esquema del Load Manager](load-manager-schema.md) define el catálogo de procesos, los lanzamientos y las programaciones que opera dw-control-service (LM-002, épica #356). No reactiva el servicio Go pausado descrito arriba: la ejecución ocurre en Hop Server. El [Load Manager en dw-control-service](load-manager-service.md) describe cómo el servicio lanza, detiene y monitorea esas ejecuciones (LM-003).

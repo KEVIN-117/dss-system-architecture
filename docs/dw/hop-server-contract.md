@@ -1,6 +1,6 @@
 # Contrato HTTP de Hop Server (Load Manager)
 
-Estado: implementado en LM-001 (#349). Lo consume dw-control-service a partir de LM-003 (#351).
+Estado: implementado en LM-001 (#349). dw-control-service lo consume desde LM-003 (#351) mediante `HopServerClient` (`dw-control-service/src/main/java/chronos/dw/admin/adapter/out/hop`).
 
 ## Rol
 
@@ -20,8 +20,10 @@ Todas las rutas requieren Basic Auth. Una petición anónima recibe `401`.
 | Registrar una ejecución | `POST /hop/registerWorkflow/?xml=Y`, cuerpo `text/xml` `<workflow_configuration>` | `<webresult>` con `<id>` (UUID de la ejecución) |
 | Iniciar | `GET /hop/startWorkflow/?name=<workflow>&id=<id>&xml=Y` | `<result>OK</result>`; vuelve al instante (~150 ms) |
 | Estado y log | `GET /hop/workflowStatus/?name=<workflow>&id=<id>&json=Y` | `statusDescription`, `errorDescription`, `actionStatusList[].result` y `loggingString` (gzip + base64) |
-| Detener | `GET /hop/stopWorkflow/?name=<workflow>&id=<id>&xml=Y` | Se valida en LM-003 |
+| Detener | `GET /hop/stopWorkflow/?name=<workflow>&id=<id>&xml=Y` | `<result>OK</result>`; la ejecución pasa a `Stopped` en segundos (verificado en LM-003) |
 | Liberar memoria | `GET /hop/removeWorkflow/?name=<workflow>&id=<id>&xml=Y` | Opcional; si no se llama, el servidor purga las ejecuciones a las 24 h (`HOP_SERVER_MAX_OBJECT_TIMEOUT=1440`) |
+
+Si se consulta un id que Hop ya no conoce (porque lo purgó o porque el servidor se reinició), Hop responde **HTTP 200 con una página HTML** que dice *could not be found*, no un 404. El cliente lo reconoce y lo trata como `NOT_FOUND`.
 
 `/hop/execWorkflow` existe, pero **no se usa**: no devuelve el id de la ejecución y es síncrono. Una carga larga mantendría abierta la petición HTTP.
 
@@ -30,7 +32,7 @@ Todas las rutas requieren Basic Auth. Una petición anónima recibe `401`.
 dw-control-service no tiene los archivos `.hwf`. Para cada ejecución registra un **workflow lanzador** mínimo con una sola acción `WORKFLOW` cuyo `filename` es `${P_TARGET_WORKFLOW}`. La acción tiene `wait_until_finished=Y` y `pass_all_parameters=Y`.
 
 - El servidor resuelve esa ruta dentro de su propio proyecto (`/files/project/workflows/<archivo>.hwf`).
-- Los parámetros del proceso viajan en `workflow_execution_configuration/parameters`. El lanzador declara cada parámetro que va a pasar al workflow hijo.
+- Los parámetros del proceso viajan en `workflow_execution_configuration/parameters`. El lanzador declara cada parámetro que va a pasar al workflow hijo. En LM-003 se verificó que `P_RUN_ID` llega al workflow hijo: si llegara vacío, PostgreSQL rechazaría el `::uuid`, y en cambio la función de publicación recibió el valor enviado.
 - `metastore_json` va vacío: `{}` comprimido con gzip y codificado en base64. Las conexiones salen de la metadata del proyecto del servidor. Si se omite este bloque, `registerWorkflow` falla con *metadata plugin for key null*.
 
 Esquema del cuerpo (referencia ejecutable: `infra/dw-integration/tests/test_hop_server_catalog.sh`):

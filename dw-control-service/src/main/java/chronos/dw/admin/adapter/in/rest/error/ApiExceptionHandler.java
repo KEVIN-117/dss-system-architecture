@@ -2,7 +2,13 @@ package chronos.dw.admin.adapter.in.rest.error;
 
 import chronos.dw.admin.domain.exception.AcademicClosureNotFoundException;
 import chronos.dw.admin.domain.exception.EtlExecutionNotFoundException;
+import chronos.dw.admin.domain.exception.EtlLaunchConflictException;
+import chronos.dw.admin.domain.exception.EtlLaunchNotFoundException;
+import chronos.dw.admin.domain.exception.EtlProcessNotFoundException;
+import chronos.dw.admin.domain.exception.HopRequestRejectedException;
+import chronos.dw.admin.domain.exception.HopUnavailableException;
 import chronos.dw.admin.domain.exception.InvalidClosureTransitionException;
+import chronos.dw.admin.domain.exception.InvalidEtlLaunchRequestException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.sql.SQLException;
@@ -84,6 +90,68 @@ public class ApiExceptionHandler {
                 "Conflicto",
                 "La transición no es válida para el estado actual del cierre.",
                 "CONFLICT",
+                request);
+    }
+
+    @ExceptionHandler(EtlProcessNotFoundException.class)
+    public ResponseEntity<ApiProblemResponse> processNotFound(
+            EtlProcessNotFoundException exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.NOT_FOUND,
+                "No encontrado",
+                "No se encontró el proceso ETL solicitado.",
+                "NOT_FOUND",
+                request);
+    }
+
+    @ExceptionHandler(EtlLaunchNotFoundException.class)
+    public ResponseEntity<ApiProblemResponse> launchNotFound(
+            EtlLaunchNotFoundException exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.NOT_FOUND,
+                "No encontrado",
+                "No se encontró el lanzamiento ETL solicitado.",
+                "NOT_FOUND",
+                request);
+    }
+
+    @ExceptionHandler(EtlLaunchConflictException.class)
+    public ResponseEntity<ApiProblemResponse> launchConflict(
+            EtlLaunchConflictException exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.CONFLICT,
+                "Conflicto",
+                "Ya hay una ejecución activa de este proceso o su estado no permite la operación.",
+                "CONFLICT",
+                request);
+    }
+
+    /** Messages are authored by LaunchEtlService and describe the missing or invalid launch input. */
+    @ExceptionHandler(InvalidEtlLaunchRequestException.class)
+    public ResponseEntity<ApiProblemResponse> invalidLaunch(
+            InvalidEtlLaunchRequestException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, "Solicitud inválida", exception.getMessage(), "BAD_REQUEST", request);
+    }
+
+    @ExceptionHandler(HopUnavailableException.class)
+    public ResponseEntity<ApiProblemResponse> hopUnavailable(
+            HopUnavailableException exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.SERVICE_UNAVAILABLE,
+                "Servicio no disponible",
+                "Hop Server no está disponible temporalmente.",
+                "HOP_UNAVAILABLE",
+                request);
+    }
+
+    @ExceptionHandler(HopRequestRejectedException.class)
+    public ResponseEntity<ApiProblemResponse> hopRejected(
+            HopRequestRejectedException exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.BAD_GATEWAY,
+                "Error de Hop Server",
+                "Hop Server rechazó la solicitud.",
+                "HOP_REJECTED",
                 request);
     }
 

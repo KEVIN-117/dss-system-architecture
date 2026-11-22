@@ -282,6 +282,9 @@ services:
     depends_on:
       auth-catalog-fixture:
         condition: service_healthy
+    # Loopback only, for the dw-control-service integration test (LM-003).
+    ports:
+      - "127.0.0.1:${DW_INTEGRATION_HOP_SERVER_PORT:-58080}:8080"
     environment:
       HOP_ENVIRONMENT_NAME: integration-test
       HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/integration-test.example.json
