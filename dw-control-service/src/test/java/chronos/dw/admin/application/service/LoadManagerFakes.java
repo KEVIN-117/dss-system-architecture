@@ -235,6 +235,32 @@ final class LoadManagerFakes {
         }
 
         @Override
+        public EtlLaunch recordSkipped(UUID launchId, long scheduleId, String actor, String reason) {
+            EtlLaunch launch = new EtlLaunch(
+                    launchId,
+                    "SCHEDULED",
+                    EtlLaunchTrigger.SCHEDULED,
+                    scheduleId,
+                    null,
+                    null,
+                    Map.of(),
+                    EtlLaunchStatus.SKIPPED,
+                    null,
+                    actor,
+                    clock.instant(),
+                    null,
+                    null,
+                    clock.instant(),
+                    null,
+                    null,
+                    reason,
+                    null,
+                    1);
+            rows.put(launchId, launch);
+            return launch;
+        }
+
+        @Override
         public Optional<EtlLaunch> findById(UUID launchId) {
             return Optional.ofNullable(rows.get(launchId));
         }

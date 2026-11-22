@@ -68,3 +68,16 @@ app:
       not-found-grace: 2m
       queued-grace: 5m
       log-excerpt-max-chars: 65536
+    # DSA operating hours (LM-004): scheduled DW updates must run outside this window.
+    operating-window:
+      days: ${DW_CONTROL_DSA_OPERATING_DAYS:MONDAY,TUESDAY,WEDNESDAY,THURSDAY,FRIDAY}
+      start: ${DW_CONTROL_DSA_OPERATING_START:08:00}
+      end: ${DW_CONTROL_DSA_OPERATING_END:18:00}
+      zone: ${DW_CONTROL_DSA_OPERATING_ZONE:America/La_Paz}
+    scheduler:
+      # Fires due schedules; several instances are safe (claim lease in etl_control).
+      enabled: ${DW_CONTROL_ETL_SCHEDULER_ENABLED:true}
+      interval-ms: ${DW_CONTROL_ETL_SCHEDULER_INTERVAL_MS:30000}
+      lease-seconds: 300
+      min-interval: 1h
+      validation-occurrences: 20

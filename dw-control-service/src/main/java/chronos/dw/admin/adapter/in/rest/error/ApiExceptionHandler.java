@@ -5,10 +5,13 @@ import chronos.dw.admin.domain.exception.EtlExecutionNotFoundException;
 import chronos.dw.admin.domain.exception.EtlLaunchConflictException;
 import chronos.dw.admin.domain.exception.EtlLaunchNotFoundException;
 import chronos.dw.admin.domain.exception.EtlProcessNotFoundException;
+import chronos.dw.admin.domain.exception.EtlScheduleConflictException;
+import chronos.dw.admin.domain.exception.EtlScheduleNotFoundException;
 import chronos.dw.admin.domain.exception.HopRequestRejectedException;
 import chronos.dw.admin.domain.exception.HopUnavailableException;
 import chronos.dw.admin.domain.exception.InvalidClosureTransitionException;
 import chronos.dw.admin.domain.exception.InvalidEtlLaunchRequestException;
+import chronos.dw.admin.domain.exception.InvalidEtlScheduleException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.ConstraintViolationException;
 import java.sql.SQLException;
@@ -131,6 +134,35 @@ public class ApiExceptionHandler {
     public ResponseEntity<ApiProblemResponse> invalidLaunch(
             InvalidEtlLaunchRequestException exception, HttpServletRequest request) {
         return response(HttpStatus.BAD_REQUEST, "Solicitud inválida", exception.getMessage(), "BAD_REQUEST", request);
+    }
+
+    /** Messages are authored by ScheduleService/OperatingWindowPolicy (cron, zone, frequency, DSA window). */
+    @ExceptionHandler(InvalidEtlScheduleException.class)
+    public ResponseEntity<ApiProblemResponse> invalidSchedule(
+            InvalidEtlScheduleException exception, HttpServletRequest request) {
+        return response(HttpStatus.BAD_REQUEST, "Solicitud inválida", exception.getMessage(), "BAD_REQUEST", request);
+    }
+
+    @ExceptionHandler(EtlScheduleNotFoundException.class)
+    public ResponseEntity<ApiProblemResponse> scheduleNotFound(
+            EtlScheduleNotFoundException exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.NOT_FOUND,
+                "No encontrado",
+                "No se encontró la programación solicitada.",
+                "NOT_FOUND",
+                request);
+    }
+
+    @ExceptionHandler(EtlScheduleConflictException.class)
+    public ResponseEntity<ApiProblemResponse> scheduleConflict(
+            EtlScheduleConflictException exception, HttpServletRequest request) {
+        return response(
+                HttpStatus.CONFLICT,
+                "Conflicto",
+                "La programación cambió, está disparándose o su nombre ya existe. Vuelve a cargarla.",
+                "CONFLICT",
+                request);
     }
 
     @ExceptionHandler(HopUnavailableException.class)

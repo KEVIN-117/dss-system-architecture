@@ -1,6 +1,7 @@
 package chronos.dw.admin.adapter.out.persistence.closure;
 
 import chronos.dw.admin.application.model.ClosurePage;
+import chronos.dw.admin.application.port.out.FindPendingClosurePort;
 import chronos.dw.admin.application.port.out.LoadAcademicClosuresPort;
 import chronos.dw.admin.application.port.out.ManageAcademicClosuresPort;
 import chronos.dw.admin.application.port.out.QueryAcademicClosurePort;
@@ -21,7 +22,10 @@ import org.springframework.transaction.annotation.Transactional;
 /** Read-only PostgreSQL adapter for the academic closure calendar. */
 @Repository
 public class JdbcAcademicClosureRepository
-        implements LoadAcademicClosuresPort, QueryAcademicClosurePort, ManageAcademicClosuresPort {
+        implements LoadAcademicClosuresPort,
+                QueryAcademicClosurePort,
+                ManageAcademicClosuresPort,
+                FindPendingClosurePort {
 
     private static final String SELECT_COLUMNS =
             """
@@ -61,6 +65,17 @@ public class JdbcAcademicClosureRepository
 
         long totalPages = totalElements / size + (totalElements % size == 0 ? 0 : 1);
         return new ClosurePage<>(items, page, size, totalElements, totalPages);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<AcademicPeriodClosure> findOldestClosedPendingProcessing() {
+        return jdbcTemplate
+                .query(
+                        SELECT_COLUMNS + " WHERE status = 'CERRADO' ORDER BY gestion, periodo, closure_id LIMIT 1",
+                        rowMapper)
+                .stream()
+                .findFirst();
     }
 
     @Override
