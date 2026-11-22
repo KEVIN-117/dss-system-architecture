@@ -64,6 +64,8 @@ services:
         psql -v ON_ERROR_STOP=1 -f /tests/hop_execution_gates_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/hop_atomic_publisher_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/hop_atomic_publisher_rollback_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/etl_load_manager_test.sql
+        tr -d '\r' < /tests/etl_schedule_claim_concurrency_test.sh | sh
         tr -d '\r' < /tests/execution_lock_concurrency_test.sh | sh
         tr -d '\r' < /tests/legacy_migration_checksum_test.sh | sh
     restart: "no"
