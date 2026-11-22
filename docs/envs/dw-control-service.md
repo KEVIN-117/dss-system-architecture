@@ -127,6 +127,8 @@ its audited command functions, never direct DML.
 | `DW_CONTROL_HOP_SERVER_URL` | `http://hop-server:8080` | Hop Server API on the private network. Never a public URL. |
 | `HOP_SERVER_USER` / `HOP_SERVER_PASS` | empty | Basic Auth credentials; the same values as the `hop-server` container. Without them every launch fails with `503`. |
 | `DW_CONTROL_HOP_CONNECT_TIMEOUT` / `DW_CONTROL_HOP_READ_TIMEOUT` | `5s` / `30s` | HTTP timeouts. Hop calls are short: executions run asynchronously. |
+| `DW_CONTROL_ETL_SCHEDULER_ENABLED` | `true` | Fires due schedules every `DW_CONTROL_ETL_SCHEDULER_INTERVAL_MS` (`30000`). Several instances are safe: each fire is claimed with a lease in `etl_control`. Keep it on in at least one instance. |
+| `DW_CONTROL_DSA_OPERATING_DAYS` / `_START` / `_END` / `_ZONE` | `MONDAY`–`FRIDAY`, `08:00`, `18:00`, `America/La_Paz` | DSA operating hours (LM-004). A schedule is rejected when any of its next 20 runs falls inside them or when runs are less than 1 h apart. A fire that comes due inside them is recorded as skipped. |
 | `DW_CONTROL_ETL_MONITORING_ENABLED` | `true` | Runs the monitor that syncs active launches with Hop every `DW_CONTROL_ETL_MONITORING_INTERVAL_MS` (`5000`). Keep it on in at least one instance. Several instances are safe. |
 
 The root `docker-compose.yml` passes `HOP_SERVER_USER` and `HOP_SERVER_PASS` from the ignored root `.env` to

@@ -102,13 +102,17 @@ public class LaunchEtlService implements LaunchEtlProcessUseCase {
         try {
             hopExecutionId = hop.submit(process.workflowFile(), launch.parameters());
         } catch (HopUnavailableException exception) {
-            launches.transition(
+            EtlLaunch failed = launches.transition(
                     launch.id(),
                     EtlLaunchStatus.SUBMIT_FAILED,
                     SYSTEM_ACTOR,
                     null,
                     "Hop Server no está disponible; la ejecución no se envió",
                     null);
+            if (launch.scheduleId() != null) {
+                // The scheduler records the failed fire with this launch instead of an HTTP error.
+                return failed;
+            }
             throw exception;
         } catch (HopRequestRejectedException exception) {
             return launches.transition(

@@ -101,6 +101,18 @@ public class JdbcEtlLaunchRepository implements EtlLaunchPort {
     }
 
     @Override
+    public EtlLaunch recordSkipped(UUID launchId, long scheduleId, String actor, String reason) {
+        return single(() -> jdbcTemplate.query(
+                "SELECT " + COLUMNS + " FROM etl_control.record_skipped_etl_launch("
+                        + "?::uuid, ?::bigint, ?::varchar, ?::text)",
+                rowMapper,
+                launchId,
+                scheduleId,
+                actor,
+                reason));
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public Optional<EtlLaunch> findById(UUID launchId) {
         return jdbcTemplate

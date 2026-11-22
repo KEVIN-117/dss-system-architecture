@@ -32,6 +32,9 @@ public interface EtlLaunchPort {
 
     EtlLaunch requestStop(UUID launchId, String actor);
 
+    /** Records a scheduled fire that had nothing to run as a SKIPPED launch (OMITIDA) with its reason. */
+    EtlLaunch recordSkipped(UUID launchId, long scheduleId, String actor, String reason);
+
     Optional<EtlLaunch> findById(UUID launchId);
 
     /** Active launches (QUEUED, SUBMITTED, RUNNING), oldest first. */
