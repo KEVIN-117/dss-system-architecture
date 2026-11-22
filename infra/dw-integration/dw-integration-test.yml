@@ -271,6 +271,65 @@ services:
     entrypoint: ["/bin/sh", "-c", "psql -X -v ON_ERROR_STOP=1 -f /tests/assert_hop_academic_catalog.sql"]
     restart: "no"
 
+  # LM-001: packaged Hop Server (Load Manager execution engine). Runs the
+  # same catalog sync as above, submitted over the server HTTP API.
+  hop-server:
+    image: dss-apache-hop-server:integration-test
+    build:
+      context: ../../etl-layer/apache-hop
+      dockerfile: Dockerfile.server
+    profiles: ["hop-server"]
+    depends_on:
+      auth-catalog-fixture:
+        condition: service_healthy
+    environment:
+      HOP_ENVIRONMENT_NAME: integration-test
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/integration-test.example.json
+      # Synthetic credentials for this disposable network only.
+      HOP_SERVER_USER: hop-integration
+      HOP_SERVER_PASS: hop-integration-test-only
+      HOP_OPTIONS: >-
+        -DDB_DW_HOST=postgres-dw
+        -DDB_DW_PORT=5432
+        -DDB_DW_NAME=dw_integration
+        -DDB_TX_HOST=jachasun-fixture
+        -DDB_TX_PORT=5432
+        -DDB_TX_NAME=jachasun_test
+    restart: "no"
+
+  hop-server-catalog-test:
+    image: apache/hop:2.19.0
+    profiles: ["hop-server"]
+    depends_on:
+      hop-server:
+        condition: service_healthy
+    volumes:
+      - ../../etl-layer/apache-hop/projects/dss-uatf-etl/workflows:/files/project/workflows:ro
+      - ./tests/test_hop_server_catalog.sh:/tests/test_hop_server_catalog.sh:ro
+    environment:
+      HOP_SERVER_URL: http://hop-server:8080
+      HOP_SERVER_USER: hop-integration
+      HOP_SERVER_PASS: hop-integration-test-only
+    entrypoint: ["/bin/bash", "/tests/test_hop_server_catalog.sh"]
+    restart: "no"
+
+  hop-server-catalog-assert:
+    image: postgres:15-alpine
+    profiles: ["hop-server"]
+    depends_on:
+      auth-catalog-fixture:
+        condition: service_healthy
+    environment:
+      PGHOST: auth-catalog-fixture
+      PGPORT: "5432"
+      PGDATABASE: auth_catalog_test
+      PGUSER: auth_test_admin
+      PGPASSWORD: auth_test_admin
+    volumes:
+      - ./tests/assert_hop_academic_catalog.sql:/tests/assert_hop_academic_catalog.sql:ro
+    entrypoint: ["/bin/sh", "-c", "psql -X -v ON_ERROR_STOP=1 -f /tests/assert_hop_academic_catalog.sql"]
+    restart: "no"
+
   hop-source-query-contract-test:
     image: postgres:15-alpine
     profiles: ["dw-req6-sources"]

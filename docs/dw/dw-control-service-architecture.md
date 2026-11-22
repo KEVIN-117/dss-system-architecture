@@ -10,7 +10,7 @@
 | --- | --- | --- |
 | Portal administrador | Interfaz, formularios y acciones permitidas al usuario. | Acceso directo al DW. |
 | BFF | Sesión del portal, propagación de identidad y agregación de respuestas. | Ser la única capa que aplica autorización. |
-| `dw-control-service` | API privada, autorización funcional, validación, consultas y comandos administrativos auditables. | Ejecutar o reintentar pipelines. |
+| `dw-control-service` | API privada, autorización funcional, validación, consultas y comandos administrativos auditables. A partir del Load Manager (LM-003) también solicita, sigue y detiene ejecuciones en Hop Server. | Ejecutar la lógica ETL por sí mismo o acceder a las fuentes OLTP. |
 | PostgreSQL DW (`etl_control`) | Fuente de verdad de cierres, transiciones, bitácora y estado de ejecuciones. | Decidir roles de usuario de Keycloak. |
 | Apache Hop | Orquestar la extracción, transformación y publicación; registrar evidencia técnica mediante sus funciones autorizadas. | Autorizar cierres en nombre de DSA. |
 | `olap-service` | Consultas analíticas sobre los datos publicados. | Administrar cierres y controles ETL. |
@@ -42,7 +42,7 @@ El borrador OpenAPI está en [`contracts/dw-control-service-v1.yaml`](contracts/
 | `GET /api/v1/etl/executions` | `dw:etl-monitor:read` | Lista ejecuciones con filtros y paginación. |
 | `GET /api/v1/etl/executions/{runId}` | `dw:etl-monitor:read` | Detalle con pasos, métricas y errores saneados. |
 
-No habrá operaciones HTTP para iniciar, cancelar o reintentar cargas en esta entrega. Esas operaciones pertenecen al contrato de orquestación de Hop y requieren una decisión posterior.
+Esta entrega no incluye operaciones HTTP para iniciar, cancelar o reintentar cargas. La épica Load Manager (#356) las añade. La ejecución ocurre en Hop Server (LM-001, ver [contrato HTTP de Hop Server](hop-server-contract.md)) y dw-control-service será su único cliente (LM-003 a LM-005). Hasta entonces esta tabla describe el contrato vigente.
 
 ### Reglas comunes
 

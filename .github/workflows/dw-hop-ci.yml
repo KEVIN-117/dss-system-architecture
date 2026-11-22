@@ -56,6 +56,9 @@ jobs:
       - name: Build Apache Hop Web image
         run: docker build --tag dss-apache-hop:${{ github.sha }} etl-layer/apache-hop
 
+      - name: Build Apache Hop Server image
+        run: docker build --file etl-layer/apache-hop/Dockerfile.server --tag dss-apache-hop-server:${{ github.sha }} etl-layer/apache-hop
+
       - name: Build DW migrator image
         run: >-
           docker build
@@ -84,6 +87,25 @@ jobs:
             test ! -f /files/project/environments/prod-env.json &&
             test ! -f /files/project/environments/dev-env.json
           '
+          docker run --rm --entrypoint /bin/bash dss-apache-hop-server:${{ github.sha }} -ec '
+            test -f /files/project/project-config.json &&
+            test -f /files/project/workflows/wf_vertical_uatf_datos_smoke.hwf &&
+            test -f /files/project/workflows/wf_sync_academic_catalog.hwf &&
+            test -f /files/project/workflows/wf_hop_publish_staged_run.hwf &&
+            test -x /files/scripts/start-hop-server.sh &&
+            test -f /files/jdbc-drivers/postgresql-42.7.11.jar &&
+            test ! -f /files/project/environments/prod-env.json &&
+            test ! -f /files/project/environments/dev-env.json
+          '
+          # The server must refuse the upstream default credentials.
+          if docker run --rm \
+              -e HOP_ENVIRONMENT_NAME=integration-test \
+              -e HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS=/files/project/environments/integration-test.example.json \
+              -e HOP_SERVER_USER=cluster -e HOP_SERVER_PASS=cluster \
+              dss-apache-hop-server:${{ github.sha }}; then
+            echo "Hop Server started with cluster/cluster credentials" >&2
+            exit 1
+          fi
 
       - name: Validate Compose configuration
         env:
@@ -111,6 +133,20 @@ jobs:
         if: always()
         run: docker compose -p dss-dw-source-contract -f infra/dw-integration/dw-integration-test.yml down --volumes --remove-orphans
 
+      - name: Run Hop Server contract regression
+        run: |
+          docker compose -p dss-dw-hop-server -f infra/dw-integration/dw-integration-test.yml --profile hop-server up -d --build --wait jachasun-fixture auth-catalog-fixture hop-server
+          docker compose -p dss-dw-hop-server -f infra/dw-integration/dw-integration-test.yml --profile hop-server run --rm --no-deps hop-server-catalog-test
+          docker compose -p dss-dw-hop-server -f infra/dw-integration/dw-integration-test.yml --profile hop-server run --rm --no-deps hop-server-catalog-assert
+
+      - name: Show Hop Server logs on failure
+        if: failure()
+        run: docker compose -p dss-dw-hop-server -f infra/dw-integration/dw-integration-test.yml --profile hop-server logs --no-color hop-server auth-catalog-fixture
+
+      - name: Stop Hop Server fixtures before next suite
+        if: always()
+        run: docker compose -p dss-dw-hop-server -f infra/dw-integration/dw-integration-test.yml --profile hop-server down --volumes --remove-orphans
+
       - name: Run Hop vertical workflow regression
         run: docker compose -p dss-dw-vertical -f infra/dw-integration/dw-integration-test.yml --profile dw-vertical run --rm hop-vertical-assert
 
@@ -132,7 +168,7 @@ jobs:
       - name: Stop Hop regression containers
         if: always()
         run: |
-          for project in dss-dw-source-contract dss-dw-vertical dss-dw-publish; do
+          for project in dss-dw-source-contract dss-dw-hop-server dss-dw-vertical dss-dw-publish; do
             docker compose -p "$project" -f infra/dw-integration/dw-integration-test.yml down --volumes --remove-orphans
           done
 

@@ -2,7 +2,7 @@
 
 La issue #133 está implementada, fusionada en `main` y cerrada. La arquitectura entregada del MVP es **Jachasun → Apache Hop → dw**, con `etl_control` como control lateral. La [base consolidada](mvp-direct-hop.md) es el punto de entrada para alcance, arquitectura y estado final.
 
-El [contrato de ejecución Hop](hop-execution-contract.md) define parámetros y la API/gates SQL. El flujo vertical completo —nueve fuentes, cinco dimensiones, tres hechos y publicación atómica— fue ejecutado con éxito en el entorno de integración Docker y sus regresiones están en CI. Esto valida el MVP con fixtures; no equivale a una carga productiva ni a autorización para operar contra producción.
+El [contrato de ejecución Hop](hop-execution-contract.md) define parámetros y la API/gates SQL. El [contrato HTTP de Hop Server](hop-server-contract.md) define cómo el Load Manager lanza y sigue workflows. El flujo vertical completo —nueve fuentes, cinco dimensiones, tres hechos y publicación atómica— fue ejecutado con éxito en el entorno de integración Docker y sus regresiones están en CI. Esto valida el MVP con fixtures; no equivale a una carga productiva ni a autorización para operar contra producción.
 
 El [informe de cierre del Req. 6](hop-req-6-progress.md) registra la implementación y evidencia de integración. Las tareas futuras de activación productiva se administran como operación/despliegue, no como trabajo pendiente para completar la issue #133.
 
