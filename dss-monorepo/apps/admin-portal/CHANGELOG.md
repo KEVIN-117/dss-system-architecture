@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.8.0...admin-portal-v1.9.0) (2026-11-22)
+
+
+### Features
+
+* **load-manager:** Implementado Hop Server como motor de ejecución del proyecto ETL ([#357](https://github.com/KEVIN-117/dss-system-architecture/issues/357)) ([285b9e4](https://github.com/KEVIN-117/dss-system-architecture/commit/285b9e408de4d764ae0763152bac0bfdd2693410))
+* **ui-ux:** ui mejorado ([c056617](https://github.com/KEVIN-117/dss-system-architecture/commit/c0566170e0ff228d12531b1ee987482a239b6c78))
+
 ## [1.8.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.7.0...admin-portal-v1.8.0) (2026-11-22)
 
 
