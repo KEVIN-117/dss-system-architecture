@@ -154,6 +154,13 @@ All notable changes to Saiku are documented here. This project follows
   `securityContext: { runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001 }` on
   the pod so the mounted volume is group-owned by the runtime user.
 
+## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/olap-service-v1.2.0...olap-service-v1.3.0) (2026-11-22)
+
+
+### Features
+
+* **iam:** Documentación y limpieza del modelo IAM ([#335](https://github.com/KEVIN-117/dss-system-architecture/issues/335)) ([3b559ef](https://github.com/KEVIN-117/dss-system-architecture/commit/3b559ef12c283d7d67c88de4b845817278f0528e))
+
 ## [1.2.0](https://github.com/KEVIN-117/dss-system-architecture/compare/olap-service-v1.1.0...olap-service-v1.2.0) (2026-11-20)
 
 
