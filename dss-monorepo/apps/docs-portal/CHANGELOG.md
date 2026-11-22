@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.5.0...docs-portal-v1.6.0) (2026-11-22)
+
+
+### Features
+
+* **dw-control-service:** API REST del Load Manager y permisos en Keycloak ([#365](https://github.com/KEVIN-117/dss-system-architecture/issues/365)) ([81919b4](https://github.com/KEVIN-117/dss-system-architecture/commit/81919b43b9e71437263529a3055f7d70adb3af0b))
+
 ## [1.5.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.4.0...docs-portal-v1.5.0) (2026-11-22)
 
 
