@@ -10,6 +10,10 @@ const buttonVariants = cva(
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary/80',
         primary: 'bg-primary text-primary-foreground hover:bg-primary/80',
+        /* The gateway CTA: cyan→blue gradient, navy text (>= 7:1), soft glow and
+           a sheen that sweeps once on hover. One per view, for the main action. */
+        brand:
+          'relative overflow-hidden bg-(image:--gradient-brand) font-semibold text-dss-navy-950 shadow-glow-accent transition-[transform,filter,box-shadow] duration-(--dur-fast) ease-out-expo hover:-translate-y-px hover:brightness-110 hover:shadow-[0_14px_36px_-10px_color-mix(in_srgb,var(--dss-cyan-400)_90%,transparent)] focus-visible:border-transparent focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background active:not-aria-[haspopup]:translate-y-0 active:not-aria-[haspopup]:scale-[0.98] after:pointer-events-none after:absolute after:inset-y-0 after:left-0 after:w-2/5 after:-translate-x-[160%] after:skew-x-[-20deg] after:bg-white/35 after:transition-transform after:duration-700 after:ease-out-expo hover:after:translate-x-[320%] motion-reduce:after:hidden',
         outline:
           'border-border bg-background hover:bg-muted hover:text-foreground aria-expanded:bg-muted aria-expanded:text-foreground dark:border-input dark:bg-input/30 dark:hover:bg-input/50',
         secondary:

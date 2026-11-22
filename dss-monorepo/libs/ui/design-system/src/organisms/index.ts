@@ -7,5 +7,4 @@ export * from './olap';
 export * from './dashboard';
 export * from './app-builder';
 export * from './admin';
-export * from './sidebar';
 export * from './cube-designer';

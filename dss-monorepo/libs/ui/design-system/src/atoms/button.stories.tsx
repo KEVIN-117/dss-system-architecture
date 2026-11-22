@@ -13,6 +13,7 @@ const meta: Meta<typeof Button> = {
       options: [
         'default',
         'primary',
+        'brand',
         'destructive',
         'outline',
         'secondary',
@@ -50,6 +51,27 @@ export const Default: Story = {
   play: async ({ args, canvas, userEvent }) => {
     await userEvent.click(canvas.getByRole('button', { name: 'Botón Primario' }));
     await expect(args.onClick).toHaveBeenCalledOnce();
+  },
+};
+
+export const Brand: Story = {
+  args: {
+    children: 'Calcular y publicar',
+    variant: 'brand',
+    size: 'lg',
+  },
+};
+
+export const LoadingOutline: Story = {
+  args: {
+    children: 'Actualizando…',
+    variant: 'outline',
+    loading: true,
+  },
+  play: async ({ canvas }) => {
+    const button = canvas.getByRole('button', { name: 'Actualizando…' });
+    await expect(button).toBeDisabled();
+    await expect(button).toHaveAttribute('aria-busy', 'true');
   },
 };
 

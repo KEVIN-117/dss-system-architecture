@@ -21,14 +21,14 @@ const typographyVariants = cva('text-foreground', {
       small: 'text-sm font-medium leading-none',
       muted: 'text-sm text-muted-foreground',
       // Cyberpunk specific
-      neon: 'text-primary drop-shadow-[0_0_8px_theme(colors.primary.DEFAULT/60%)] font-heading tracking-widest uppercase',
+      neon: 'text-primary drop-shadow-[0_0_8px_color-mix(in_srgb,var(--primary)_60%,transparent)] font-heading tracking-widest uppercase',
     },
     color: {
       default: '',
       primary: 'text-primary',
       secondary: 'text-secondary-foreground',
       destructive:
-        'text-destructive drop-shadow-[0_0_5px_theme(colors.destructive.DEFAULT/40%)]',
+        'text-destructive drop-shadow-[0_0_5px_color-mix(in_srgb,var(--destructive)_40%,transparent)]',
       muted: 'text-muted-foreground',
     },
     align: {

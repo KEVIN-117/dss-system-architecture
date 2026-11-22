@@ -10,9 +10,9 @@ const alertVariants = cva(
         default:
           'bg-background/50 backdrop-blur-sm text-foreground border-primary/20',
         destructive:
-          'border-destructive/50 text-destructive bg-destructive/10 backdrop-blur-sm dark:border-destructive [&>svg]:text-destructive shadow-[0_0_15px_theme(colors.destructive.DEFAULT/15%)] border-l-4 border-l-destructive',
+          'border-destructive/50 text-destructive bg-destructive/10 backdrop-blur-sm dark:border-destructive [&>svg]:text-destructive shadow-[0_0_15px_color-mix(in_srgb,var(--destructive)_15%,transparent)] border-l-4 border-l-destructive',
         system:
-          'border-primary/40 text-primary bg-primary/5 backdrop-blur-sm [&>svg]:text-primary shadow-[0_0_15px_theme(colors.primary.DEFAULT/15%)] border-l-4 border-l-primary font-mono',
+          'border-primary/40 text-primary bg-primary/5 backdrop-blur-sm [&>svg]:text-primary shadow-[0_0_15px_color-mix(in_srgb,var(--primary)_15%,transparent)] border-l-4 border-l-primary font-mono',
       },
     },
     defaultVariants: {
