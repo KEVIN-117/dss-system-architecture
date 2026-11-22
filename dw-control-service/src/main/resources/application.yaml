@@ -50,3 +50,21 @@ app:
       audience: ${KEYCLOAK_DW_CONTROL_AUDIENCE:dw-control-service}
       # Catalog client of the permissions dw:closure:read, dw:closure:manage and dw:etl-monitor:read (IAM-011).
       permissions-client-id: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:dss-permissions}
+  # Load Manager (LM-003): Hop Server execution engine (docs/dw/hop-server-contract.md).
+  etl:
+    hop:
+      base-url: ${DW_CONTROL_HOP_SERVER_URL:http://hop-server:8080}
+      # Same credentials as the hop-server container (HOP_SERVER_USER / HOP_SERVER_PASS).
+      username: ${HOP_SERVER_USER:}
+      password: ${HOP_SERVER_PASS:}
+      connect-timeout: ${DW_CONTROL_HOP_CONNECT_TIMEOUT:5s}
+      read-timeout: ${DW_CONTROL_HOP_READ_TIMEOUT:30s}
+      project-home: /files/project
+    monitoring:
+      # Disable to run an API-only instance; at least one instance must keep it on.
+      enabled: ${DW_CONTROL_ETL_MONITORING_ENABLED:true}
+      interval-ms: ${DW_CONTROL_ETL_MONITORING_INTERVAL_MS:5000}
+      batch-size: 20
+      not-found-grace: 2m
+      queued-grace: 5m
+      log-excerpt-max-chars: 65536

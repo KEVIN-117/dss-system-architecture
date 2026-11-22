@@ -114,6 +114,24 @@ GRANT dw_control_service TO dw_control_runtime;
 The `\password` command prompts for the secret instead of embedding it in a SQL file or shell
 history. Do not use the cluster administrator or `dw_control_operator` credentials in the service.
 
+### Load Manager: Hop Server (LM-003)
+
+The service launches, monitors and stops ETL workflows on Hop Server (LM-001). The contract is
+in [`docs/dw/hop-server-contract.md`](../dw/hop-server-contract.md) and the schema in
+[`docs/dw/load-manager-schema.md`](../dw/load-manager-schema.md). Migrations `0062`–`0065` must be
+applied: they give `dw_control_service` read access to the Load Manager tables and `EXECUTE` on
+its audited command functions, never direct DML.
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `DW_CONTROL_HOP_SERVER_URL` | `http://hop-server:8080` | Hop Server API on the private network. Never a public URL. |
+| `HOP_SERVER_USER` / `HOP_SERVER_PASS` | empty | Basic Auth credentials; the same values as the `hop-server` container. Without them every launch fails with `503`. |
+| `DW_CONTROL_HOP_CONNECT_TIMEOUT` / `DW_CONTROL_HOP_READ_TIMEOUT` | `5s` / `30s` | HTTP timeouts. Hop calls are short: executions run asynchronously. |
+| `DW_CONTROL_ETL_MONITORING_ENABLED` | `true` | Runs the monitor that syncs active launches with Hop every `DW_CONTROL_ETL_MONITORING_INTERVAL_MS` (`5000`). Keep it on in at least one instance. Several instances are safe. |
+
+The root `docker-compose.yml` passes `HOP_SERVER_USER` and `HOP_SERVER_PASS` from the ignored root `.env` to
+both `hop-server` and this service.
+
 ## UATF / Dokploy Compose
 
 Use [`dw-control-service/compose.uatf.yml`](../../dw-control-service/compose.uatf.yml) for a

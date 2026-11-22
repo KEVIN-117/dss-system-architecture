@@ -115,6 +115,10 @@ services:
       KEYCLOAK_JWK_SET_URI: ${AUTH_KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs}
       KEYCLOAK_DW_CONTROL_AUDIENCE: ${KEYCLOAK_DW_CONTROL_AUDIENCE:-dw-control-service}
       KEYCLOAK_PERMISSIONS_CLIENT_ID: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:-dss-permissions}
+      # Load Manager (LM-003): Hop Server is the only execution engine; same credentials as hop-server.
+      DW_CONTROL_HOP_SERVER_URL: http://hop-server:8080
+      HOP_SERVER_USER: ${HOP_SERVER_USER:-dw-control}
+      HOP_SERVER_PASS: ${HOP_SERVER_PASS:-}
     ports:
       - "127.0.0.1:${DW_CONTROL_PORT:-8090}:8090"
     networks:

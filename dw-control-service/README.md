@@ -2,6 +2,10 @@
 
 API administrativa para consultar cierres académicos y, en los alcances previstos, supervisar ejecuciones ETL. La API valida tokens JWT y autoriza cada operación mediante permisos del cliente `dw-control-service`.
 
+## Load Manager
+
+Desde LM-003 el servicio también lanza, detiene y monitorea workflows ETL en Hop Server (`adapter/out/hop`, `application/service/*Etl*`). El monitor sincroniza cada 5 s los lanzamientos activos con `etl_control`. El diseño está en [`docs/dw/load-manager-service.md`](../docs/dw/load-manager-service.md) y las variables (`DW_CONTROL_HOP_SERVER_URL`, `HOP_SERVER_USER`, `HOP_SERVER_PASS`) en [`docs/envs/dw-control-service.md`](../docs/envs/dw-control-service.md).
+
 ## Requisitos
 
 - Java 21. El proyecto incluye Gradle Wrapper; no necesitas instalar Gradle por separado.
