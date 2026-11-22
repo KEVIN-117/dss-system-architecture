@@ -3,7 +3,11 @@
 export type DwControlPermission =
   | 'DW_CLOSURE_READ'
   | 'DW_CLOSURE_MANAGE'
-  | 'DW_ETL_MONITOR_READ';
+  | 'DW_ETL_MONITOR_READ'
+  /** LM-005: launch and stop Load Manager executions. */
+  | 'DW_ETL_EXECUTE'
+  /** LM-005: create, edit, pause and delete Load Manager schedules. */
+  | 'DW_ETL_SCHEDULE_MANAGE';
 
 export interface DwControlServiceConfig {
   baseUrl: string;
@@ -122,6 +126,11 @@ export class DwControlClientError extends Error {
     public readonly status: number,
     public readonly code: string,
     message = 'dw-control-service request failed',
+    /**
+     * Reason authored by dw-control-service for a rejected request (400/409), for example why a schedule
+     * falls inside the DSA operating hours. Only set after passing {@link isSafeUpstreamDetail}.
+     */
+    public readonly detail?: string,
   ) {
     super(message);
     this.name = 'DwControlClientError';
@@ -378,7 +387,8 @@ async function requestJson<T>(
       redirect: 'manual',
       signal,
     });
-    if (!response.ok) throw upstreamError(response.status);
+    if (!response.ok) throw await upstreamError(response);
+    if (response.status === 204) return parse(null);
     let body: unknown;
     try {
       body = await response.json();
@@ -409,7 +419,78 @@ async function requestJson<T>(
   }
 }
 
-function upstreamError(status: number): DwControlClientError {
+/** Upstream problem codes that keep their meaning for the portal (LM-005 Load Manager). */
+const PASS_THROUGH_CODES: Record<number, readonly string[]> = {
+  502: ['HOP_REJECTED'],
+  503: ['HOP_UNAVAILABLE'],
+};
+
+async function upstreamError(response: Response): Promise<DwControlClientError> {
+  const status = response.status;
+  const problem = await readProblem(response);
+  const passThrough = PASS_THROUGH_CODES[status];
+  if (passThrough && problem?.code && passThrough.includes(problem.code))
+    return new DwControlClientError(status, problem.code);
+  const error = upstreamErrorCode(status);
+  const detail =
+    (status === 400 || status === 409 || status === 422) &&
+    isSafeUpstreamDetail(problem?.detail)
+      ? problem.detail
+      : undefined;
+  return detail === undefined
+    ? error
+    : new DwControlClientError(status, error.code, error.message, detail);
+}
+
+/** Reads `{code, detail}` from an RFC 9457 problem body; anything else is ignored. */
+async function readProblem(
+  response: Response,
+): Promise<{ code?: string; detail?: string } | null> {
+  const type = response.headers.get('content-type') ?? '';
+  if (!/application\/(problem\+)?json/i.test(type)) return null;
+  try {
+    const body: unknown = await response.json();
+    if (typeof body !== 'object' || body === null || Array.isArray(body))
+      return null;
+    const value = body as Record<string, unknown>;
+    return {
+      ...(typeof value.code === 'string' && /^[A-Z][A-Z0-9_]{0,63}$/.test(value.code)
+        ? { code: value.code }
+        : {}),
+      ...(typeof value.detail === 'string' ? { detail: value.detail } : {}),
+    };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * dw-control-service details for 400/409 are authored messages (for example "La ejecución del lunes ... cae dentro
+ * del horario operativo de la DSA"). They are still bounded and screened for anything that looks like an internal
+ * leak before reaching the browser.
+ */
+export function isSafeUpstreamDetail(value: unknown): value is string {
+  return (
+    typeof value === 'string' &&
+    value.trim().length > 0 &&
+    value.length <= 500 &&
+    !hasControlCharacters(value) &&
+    !/(password|passwd|secret|token|authorization|bearer|jdbc|sqlstate|exception|stack\s*trace|https?:\/\/)/i.test(
+      value,
+    )
+  );
+}
+
+/** Control characters other than tab and line feed. */
+function hasControlCharacters(value: string): boolean {
+  for (let index = 0; index < value.length; index++) {
+    const code = value.charCodeAt(index);
+    if ((code < 0x20 && code !== 0x09 && code !== 0x0a) || code === 0x7f) return true;
+  }
+  return false;
+}
+
+function upstreamErrorCode(status: number): DwControlClientError {
   const code =
     status === 401
       ? 'DW_CONTROL_UNAUTHORIZED'
@@ -750,4 +831,623 @@ function invalidRequest(message: string): DwControlClientError {
 }
 function invalidResponse(): DwControlClientError {
   return new DwControlClientError(502, 'DW_CONTROL_INVALID_RESPONSE');
+}
+
+// ---------------------------------------------------------------------------
+// Load Manager (LM-005 API, docs/dw/load-manager-service.md)
+// ---------------------------------------------------------------------------
+
+export type EtlProcessCode = 'VERTICAL_LOAD' | 'CATALOG_SYNC' | 'PUBLISH_STAGED';
+export type EtlLaunchStatus =
+  | 'QUEUED'
+  | 'SUBMITTED'
+  | 'RUNNING'
+  | 'SUCCEEDED'
+  | 'FAILED'
+  | 'STOPPED'
+  | 'SKIPPED'
+  | 'SUBMIT_FAILED';
+export type EtlLaunchTrigger = 'MANUAL' | 'SCHEDULED';
+export type EtlScheduleMode = 'AUTO_PENDING_CLOSURES' | 'NO_PARAMETERS';
+
+export interface LoadManagerHealth {
+  hopOnline: boolean;
+  hopStatus: string | null;
+  monitoringEnabled: boolean;
+  schedulerEnabled: boolean;
+  operatingWindow: string;
+  checkedAt: string;
+}
+export interface EtlProcess {
+  code: string;
+  displayName: string;
+  description: string;
+  workflowFile: string;
+  parameterNames: string[];
+  schedulable: boolean;
+  scheduleMode: EtlScheduleMode | null;
+  enabled: boolean;
+}
+export interface EtlLaunch {
+  id: string;
+  processCode: string;
+  trigger: EtlLaunchTrigger;
+  scheduleId: number | null;
+  closureId: number | null;
+  runId: string | null;
+  parameters: Record<string, string>;
+  status: EtlLaunchStatus;
+  active: boolean;
+  hopExecutionId: string | null;
+  requestedBy: string;
+  requestedAt: string;
+  submittedAt: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  stopRequestedBy: string | null;
+  stopRequestedAt: string | null;
+  resultSummary: string | null;
+  rowVersion: number;
+}
+export interface EtlLaunchLog {
+  launchId: string;
+  status: EtlLaunchStatus;
+  active: boolean;
+  log: string;
+}
+export interface EtlStatus {
+  running: boolean;
+  active: EtlLaunch[];
+}
+export interface EtlSchedule {
+  id: number;
+  processCode: string;
+  name: string;
+  cronExpression: string;
+  timezone: string;
+  mode: EtlScheduleMode;
+  enabled: boolean;
+  nextFireAt: string | null;
+  lastFiredAt: string | null;
+  lastLaunchId: string | null;
+  firing: boolean;
+  createdBy: string;
+  createdAt: string;
+  updatedBy: string;
+  updatedAt: string;
+  rowVersion: number;
+}
+export interface SchedulePreview {
+  cronExpression: string;
+  timezone: string;
+  operatingWindow: string;
+  valid: boolean;
+  validationMessage: string | null;
+  occurrences: { at: string; insideOperatingWindow: boolean }[];
+}
+export interface LaunchListQuery {
+  processCode?: string;
+  status?: EtlLaunchStatus;
+  trigger?: EtlLaunchTrigger;
+  scheduleId?: number;
+  page?: number;
+  size?: number;
+}
+/**
+ * VERTICAL_LOAD: executionKind CIERRE_ACADEMICO with closureId, or REPROCESO with retryOfRunId.
+ * PUBLISH_STAGED: runId. CATALOG_SYNC: nothing else.
+ */
+export interface LaunchEtlInput {
+  processCode: string;
+  executionKind?: 'CIERRE_ACADEMICO' | 'REPROCESO';
+  closureId?: number;
+  retryOfRunId?: string;
+  runId?: string;
+}
+export interface CreateScheduleInput {
+  processCode: string;
+  name: string;
+  cronExpression: string;
+  timezone?: string;
+  enabled?: boolean;
+}
+export interface UpdateScheduleInput {
+  name: string;
+  cronExpression: string;
+  timezone?: string;
+  rowVersion: number;
+}
+
+export const ETL_LAUNCH_STATUSES = [
+  'QUEUED',
+  'SUBMITTED',
+  'RUNNING',
+  'SUCCEEDED',
+  'FAILED',
+  'STOPPED',
+  'SKIPPED',
+  'SUBMIT_FAILED',
+] as const;
+export const ETL_LAUNCH_TRIGGERS = ['MANUAL', 'SCHEDULED'] as const;
+const SCHEDULE_MODES = ['AUTO_PENDING_CLOSURES', 'NO_PARAMETERS'] as const;
+const PROCESS_CODE = /^[A-Z][A-Z0-9_]{1,31}$/;
+const PARAMETER_NAME = /^P_[A-Z0-9_]{1,60}$/;
+const CRON = /^\S+( \S+){5}$/;
+const TIMEZONE = /^[A-Za-z][A-Za-z0-9_+\-/]{0,63}$/;
+const MAX_LOG_LENGTH = 70_000;
+
+export function getLoadManagerHealth(
+  config: DwControlServiceConfig,
+  signal?: AbortSignal,
+): Promise<LoadManagerHealth> {
+  return requestJson(config, '/api/v1/etl/health', { method: 'GET' }, parseHealth, signal);
+}
+
+export function getEtlStatus(
+  config: DwControlServiceConfig,
+  signal?: AbortSignal,
+): Promise<EtlStatus> {
+  return requestJson(config, '/api/v1/etl/status', { method: 'GET' }, parseStatus, signal);
+}
+
+export function listEtlProcesses(
+  config: DwControlServiceConfig,
+  signal?: AbortSignal,
+): Promise<EtlProcess[]> {
+  return requestJson(
+    config,
+    '/api/v1/etl/processes',
+    { method: 'GET' },
+    (value) => array(value).map(parseProcess),
+    signal,
+  );
+}
+
+export function listEtlLaunches(
+  config: DwControlServiceConfig,
+  query: LaunchListQuery = {},
+  signal?: AbortSignal,
+): Promise<Page<EtlLaunch>> {
+  validatePage(query);
+  if (query.processCode !== undefined && !PROCESS_CODE.test(query.processCode))
+    throw invalidRequest('Invalid process filter');
+  if (query.status !== undefined && !oneOf(query.status, ETL_LAUNCH_STATUSES))
+    throw invalidRequest('Invalid launch status filter');
+  if (query.trigger !== undefined && !oneOf(query.trigger, ETL_LAUNCH_TRIGGERS))
+    throw invalidRequest('Invalid launch trigger filter');
+  if (query.scheduleId !== undefined && !positiveInteger(query.scheduleId))
+    throw invalidRequest('Invalid schedule filter');
+  return getPage(config, '/api/v1/etl/launches', query, parseLaunch, signal);
+}
+
+export function getEtlLaunch(
+  config: DwControlServiceConfig,
+  launchId: string,
+  signal?: AbortSignal,
+): Promise<EtlLaunch> {
+  if (!isUuid(launchId)) throw invalidRequest('Invalid launch ID');
+  return requestJson(
+    config,
+    `/api/v1/etl/launches/${encodeURIComponent(launchId)}`,
+    { method: 'GET' },
+    parseLaunch,
+    signal,
+  );
+}
+
+export function getEtlLaunchLogs(
+  config: DwControlServiceConfig,
+  launchId: string,
+  signal?: AbortSignal,
+): Promise<EtlLaunchLog> {
+  if (!isUuid(launchId)) throw invalidRequest('Invalid launch ID');
+  return requestJson(
+    config,
+    `/api/v1/etl/launches/${encodeURIComponent(launchId)}/logs`,
+    { method: 'GET' },
+    parseLaunchLog,
+    signal,
+  );
+}
+
+export function launchEtlProcess(
+  config: DwControlServiceConfig,
+  input: LaunchEtlInput,
+  signal?: AbortSignal,
+): Promise<EtlLaunch> {
+  if (
+    !PROCESS_CODE.test(input.processCode) ||
+    (input.executionKind !== undefined &&
+      !oneOf(input.executionKind, ['CIERRE_ACADEMICO', 'REPROCESO'] as const)) ||
+    (input.closureId !== undefined && !positiveInteger(input.closureId)) ||
+    (input.retryOfRunId !== undefined && !isUuid(input.retryOfRunId)) ||
+    (input.runId !== undefined && !isUuid(input.runId))
+  )
+    throw invalidRequest('Invalid launch request');
+  return postJson(
+    config,
+    '/api/v1/etl/launches',
+    {
+      processCode: input.processCode,
+      ...(input.executionKind === undefined ? {} : { executionKind: input.executionKind }),
+      ...(input.closureId === undefined ? {} : { closureId: input.closureId }),
+      ...(input.retryOfRunId === undefined ? {} : { retryOfRunId: input.retryOfRunId }),
+      ...(input.runId === undefined ? {} : { runId: input.runId }),
+    },
+    parseLaunch,
+    signal,
+  );
+}
+
+export function stopEtlLaunch(
+  config: DwControlServiceConfig,
+  launchId: string,
+  signal?: AbortSignal,
+): Promise<EtlLaunch> {
+  if (!isUuid(launchId)) throw invalidRequest('Invalid launch ID');
+  return requestJson(
+    config,
+    `/api/v1/etl/launches/${encodeURIComponent(launchId)}/stop`,
+    { method: 'POST' },
+    parseLaunch,
+    signal,
+  );
+}
+
+export function listEtlSchedules(
+  config: DwControlServiceConfig,
+  signal?: AbortSignal,
+): Promise<EtlSchedule[]> {
+  return requestJson(
+    config,
+    '/api/v1/etl/schedules',
+    { method: 'GET' },
+    (value) => array(value).map(parseSchedule),
+    signal,
+  );
+}
+
+export function getEtlSchedule(
+  config: DwControlServiceConfig,
+  scheduleId: number,
+  signal?: AbortSignal,
+): Promise<EtlSchedule> {
+  validateScheduleId(scheduleId);
+  return requestJson(
+    config,
+    `/api/v1/etl/schedules/${scheduleId}`,
+    { method: 'GET' },
+    parseSchedule,
+    signal,
+  );
+}
+
+export function previewEtlSchedule(
+  config: DwControlServiceConfig,
+  query: { cronExpression: string; timezone?: string; count?: number },
+  signal?: AbortSignal,
+): Promise<SchedulePreview> {
+  if (
+    !validCron(query.cronExpression) ||
+    (query.timezone !== undefined && !TIMEZONE.test(query.timezone)) ||
+    (query.count !== undefined && !integerBetween(query.count, 1, 50))
+  )
+    throw invalidRequest('Invalid schedule preview request');
+  const params = new URLSearchParams({ cronExpression: query.cronExpression.trim() });
+  if (query.timezone !== undefined) params.set('timezone', query.timezone);
+  if (query.count !== undefined) params.set('count', String(query.count));
+  return requestJson(
+    config,
+    `/api/v1/etl/schedules/preview?${params}`,
+    { method: 'GET' },
+    parsePreview,
+    signal,
+  );
+}
+
+export function createEtlSchedule(
+  config: DwControlServiceConfig,
+  input: CreateScheduleInput,
+  signal?: AbortSignal,
+): Promise<EtlSchedule> {
+  if (
+    !PROCESS_CODE.test(input.processCode) ||
+    !validScheduleName(input.name) ||
+    !validCron(input.cronExpression) ||
+    (input.timezone !== undefined && !TIMEZONE.test(input.timezone)) ||
+    (input.enabled !== undefined && typeof input.enabled !== 'boolean')
+  )
+    throw invalidRequest('Invalid schedule request');
+  return postJson(
+    config,
+    '/api/v1/etl/schedules',
+    {
+      processCode: input.processCode,
+      name: input.name.trim(),
+      cronExpression: input.cronExpression.trim(),
+      ...(input.timezone === undefined ? {} : { timezone: input.timezone }),
+      ...(input.enabled === undefined ? {} : { enabled: input.enabled }),
+    },
+    parseSchedule,
+    signal,
+  );
+}
+
+export function updateEtlSchedule(
+  config: DwControlServiceConfig,
+  scheduleId: number,
+  input: UpdateScheduleInput,
+  signal?: AbortSignal,
+): Promise<EtlSchedule> {
+  validateScheduleId(scheduleId);
+  if (
+    !validScheduleName(input.name) ||
+    !validCron(input.cronExpression) ||
+    (input.timezone !== undefined && !TIMEZONE.test(input.timezone)) ||
+    !positiveInteger(input.rowVersion)
+  )
+    throw invalidRequest('Invalid schedule request');
+  return requestJson(
+    config,
+    `/api/v1/etl/schedules/${scheduleId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify({
+        name: input.name.trim(),
+        cronExpression: input.cronExpression.trim(),
+        ...(input.timezone === undefined ? {} : { timezone: input.timezone }),
+        rowVersion: input.rowVersion,
+      }),
+    },
+    parseSchedule,
+    signal,
+  );
+}
+
+export function setEtlScheduleEnabled(
+  config: DwControlServiceConfig,
+  scheduleId: number,
+  enabled: boolean,
+  rowVersion: number,
+  signal?: AbortSignal,
+): Promise<EtlSchedule> {
+  validateScheduleId(scheduleId);
+  if (typeof enabled !== 'boolean' || !positiveInteger(rowVersion))
+    throw invalidRequest('Invalid schedule request');
+  return postJson(
+    config,
+    `/api/v1/etl/schedules/${scheduleId}/${enabled ? 'enable' : 'disable'}`,
+    { rowVersion },
+    parseSchedule,
+    signal,
+  );
+}
+
+export function deleteEtlSchedule(
+  config: DwControlServiceConfig,
+  scheduleId: number,
+  rowVersion: number,
+  signal?: AbortSignal,
+): Promise<null> {
+  validateScheduleId(scheduleId);
+  if (!positiveInteger(rowVersion)) throw invalidRequest('Invalid schedule request');
+  return requestJson(
+    config,
+    `/api/v1/etl/schedules/${scheduleId}?rowVersion=${rowVersion}`,
+    { method: 'DELETE' },
+    () => null,
+    signal,
+  );
+}
+
+function parseHealth(value: unknown): LoadManagerHealth {
+  const v = record(value);
+  if (
+    typeof v.hopOnline !== 'boolean' ||
+    !nullableBoundedString(v.hopStatus, 200) ||
+    typeof v.monitoringEnabled !== 'boolean' ||
+    typeof v.schedulerEnabled !== 'boolean' ||
+    !boundedString(v.operatingWindow, 300) ||
+    !date(v.checkedAt)
+  )
+    throw invalidResponse();
+  return {
+    hopOnline: v.hopOnline,
+    hopStatus: v.hopStatus,
+    monitoringEnabled: v.monitoringEnabled,
+    schedulerEnabled: v.schedulerEnabled,
+    operatingWindow: v.operatingWindow,
+    checkedAt: v.checkedAt,
+  };
+}
+
+function parseStatus(value: unknown): EtlStatus {
+  const v = record(value);
+  if (typeof v.running !== 'boolean') throw invalidResponse();
+  return { running: v.running, active: array(v.active).map(parseLaunch) };
+}
+
+function parseProcess(value: unknown): EtlProcess {
+  const v = record(value);
+  if (
+    !string(v.code) ||
+    !PROCESS_CODE.test(v.code) ||
+    !boundedString(v.displayName, 120) ||
+    !boundedString(v.description, 2000) ||
+    !boundedString(v.workflowFile, 255) ||
+    !Array.isArray(v.parameterNames) ||
+    !v.parameterNames.every((name) => string(name) && PARAMETER_NAME.test(name)) ||
+    typeof v.schedulable !== 'boolean' ||
+    !nullableOneOf(v.scheduleMode, SCHEDULE_MODES) ||
+    typeof v.enabled !== 'boolean'
+  )
+    throw invalidResponse();
+  return {
+    code: v.code,
+    displayName: v.displayName,
+    description: v.description,
+    workflowFile: v.workflowFile,
+    parameterNames: v.parameterNames as string[],
+    schedulable: v.schedulable,
+    scheduleMode: v.scheduleMode,
+    enabled: v.enabled,
+  };
+}
+
+function parseLaunch(value: unknown): EtlLaunch {
+  const v = record(value);
+  if (
+    !isUuid(v.id) ||
+    !string(v.processCode) ||
+    !PROCESS_CODE.test(v.processCode) ||
+    !oneOf(v.trigger, ETL_LAUNCH_TRIGGERS) ||
+    !nullablePositiveInteger(v.scheduleId) ||
+    !nullablePositiveInteger(v.closureId) ||
+    !nullableUuid(v.runId) ||
+    !oneOf(v.status, ETL_LAUNCH_STATUSES) ||
+    typeof v.active !== 'boolean' ||
+    !nullableUuid(v.hopExecutionId) ||
+    !boundedString(v.requestedBy, 255) ||
+    !date(v.requestedAt) ||
+    !nullableDate(v.submittedAt) ||
+    !nullableDate(v.startedAt) ||
+    !nullableDate(v.finishedAt) ||
+    !nullableBoundedString(v.stopRequestedBy, 255) ||
+    !nullableDate(v.stopRequestedAt) ||
+    !nullableBoundedString(v.resultSummary, 2000) ||
+    !positiveInteger(v.rowVersion)
+  )
+    throw invalidResponse();
+  return {
+    id: v.id,
+    processCode: v.processCode,
+    trigger: v.trigger,
+    scheduleId: v.scheduleId,
+    closureId: v.closureId,
+    runId: v.runId,
+    parameters: parseParameters(v.parameters),
+    status: v.status,
+    active: v.active,
+    hopExecutionId: v.hopExecutionId,
+    requestedBy: v.requestedBy,
+    requestedAt: v.requestedAt,
+    submittedAt: v.submittedAt,
+    startedAt: v.startedAt,
+    finishedAt: v.finishedAt,
+    stopRequestedBy: v.stopRequestedBy,
+    stopRequestedAt: v.stopRequestedAt,
+    resultSummary: v.resultSummary,
+    rowVersion: v.rowVersion,
+  };
+}
+
+function parseParameters(value: unknown): Record<string, string> {
+  const v = record(value);
+  const parameters: Record<string, string> = {};
+  for (const [name, parameter] of Object.entries(v)) {
+    if (!PARAMETER_NAME.test(name) || !boundedString(parameter, 255)) throw invalidResponse();
+    parameters[name] = parameter;
+  }
+  return parameters;
+}
+
+function parseLaunchLog(value: unknown): EtlLaunchLog {
+  const v = record(value);
+  if (
+    !isUuid(v.launchId) ||
+    !oneOf(v.status, ETL_LAUNCH_STATUSES) ||
+    typeof v.active !== 'boolean' ||
+    !string(v.log) ||
+    v.log.length > MAX_LOG_LENGTH
+  )
+    throw invalidResponse();
+  return { launchId: v.launchId, status: v.status, active: v.active, log: v.log };
+}
+
+function parseSchedule(value: unknown): EtlSchedule {
+  const v = record(value);
+  if (
+    !positiveInteger(v.id) ||
+    !string(v.processCode) ||
+    !PROCESS_CODE.test(v.processCode) ||
+    !boundedString(v.name, 120) ||
+    !boundedString(v.cronExpression, 120) ||
+    !boundedString(v.timezone, 64) ||
+    !oneOf(v.mode, SCHEDULE_MODES) ||
+    typeof v.enabled !== 'boolean' ||
+    !nullableDate(v.nextFireAt) ||
+    !nullableDate(v.lastFiredAt) ||
+    !nullableUuid(v.lastLaunchId) ||
+    typeof v.firing !== 'boolean' ||
+    !boundedString(v.createdBy, 255) ||
+    !date(v.createdAt) ||
+    !boundedString(v.updatedBy, 255) ||
+    !date(v.updatedAt) ||
+    !positiveInteger(v.rowVersion)
+  )
+    throw invalidResponse();
+  return {
+    id: v.id,
+    processCode: v.processCode,
+    name: v.name,
+    cronExpression: v.cronExpression,
+    timezone: v.timezone,
+    mode: v.mode,
+    enabled: v.enabled,
+    nextFireAt: v.nextFireAt,
+    lastFiredAt: v.lastFiredAt,
+    lastLaunchId: v.lastLaunchId,
+    firing: v.firing,
+    createdBy: v.createdBy,
+    createdAt: v.createdAt,
+    updatedBy: v.updatedBy,
+    updatedAt: v.updatedAt,
+    rowVersion: v.rowVersion,
+  };
+}
+
+function parsePreview(value: unknown): SchedulePreview {
+  const v = record(value);
+  if (
+    !boundedString(v.cronExpression, 120) ||
+    !boundedString(v.timezone, 64) ||
+    !boundedString(v.operatingWindow, 300) ||
+    typeof v.valid !== 'boolean' ||
+    !(v.validationMessage === null || isSafeUpstreamDetail(v.validationMessage))
+  )
+    throw invalidResponse();
+  const occurrences = array(v.occurrences).map((occurrence) => {
+    const item = record(occurrence);
+    if (!date(item.at) || typeof item.insideOperatingWindow !== 'boolean')
+      throw invalidResponse();
+    return { at: item.at, insideOperatingWindow: item.insideOperatingWindow };
+  });
+  return {
+    cronExpression: v.cronExpression,
+    timezone: v.timezone,
+    operatingWindow: v.operatingWindow,
+    valid: v.valid,
+    validationMessage: v.validationMessage,
+    occurrences,
+  };
+}
+
+function array(value: unknown): unknown[] {
+  if (!Array.isArray(value)) throw invalidResponse();
+  return value;
+}
+function boundedString(value: unknown, max: number): value is string {
+  return string(value) && value.length <= max;
+}
+function nullableBoundedString(value: unknown, max: number): value is string | null {
+  return value === null || boundedString(value, max);
+}
+function validCron(value: unknown): value is string {
+  return string(value) && value.trim().length <= 120 && CRON.test(value.trim());
+}
+function validScheduleName(value: unknown): value is string {
+  return string(value) && value.trim().length > 0 && value.trim().length <= 120;
+}
+function validateScheduleId(value: number): void {
+  if (!positiveInteger(value)) throw invalidRequest('Invalid schedule ID');
 }

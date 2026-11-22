@@ -12,7 +12,7 @@ export const DSS_PERMISSIONS = [
   'connectors:read', 'connectors:write', 'pipelines:read', 'pipelines:execute',
   'prediction:train', 'prediction:publish',
   'olap:admin', 'olap:user',
-  'dw:closure:read', 'dw:closure:manage', 'dw:etl-monitor:read',
+  'dw:closure:read', 'dw:closure:manage', 'dw:etl-monitor:read', 'dw:etl:execute', 'dw:etl-schedule:manage',
   'iam:users:read', 'iam:users:write', 'iam:roles:read', 'iam:roles:write',
   'iam:clients:read', 'iam:clients:write', 'iam:audit:read',
 ] as const;

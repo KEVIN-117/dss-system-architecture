@@ -24,6 +24,9 @@ export const DW_PERMISSIONS: Record<DwControlPermission, string> = {
   DW_CLOSURE_READ: 'dw:closure:read',
   DW_CLOSURE_MANAGE: 'dw:closure:manage',
   DW_ETL_MONITOR_READ: 'dw:etl-monitor:read',
+  // Load Manager (LM-005/LM-006).
+  DW_ETL_EXECUTE: 'dw:etl:execute',
+  DW_ETL_SCHEDULE_MANAGE: 'dw:etl-schedule:manage',
 };
 
 /** The `dw:*` permission of the token, the same rule dw-control-service enforces. */
@@ -58,6 +61,14 @@ export async function withDwControl<T>(
       authentication.value,
       request.signal,
     );
+    if (successStatus === 204)
+      return withCors(
+        request,
+        new NextResponse(null, {
+          status: 204,
+          headers: { 'Cache-Control': 'no-store' },
+        }),
+      );
     return withCors(
       request,
       NextResponse.json(result, {
@@ -85,6 +96,17 @@ export function mapDwControlError(error: unknown): NextResponse {
     );
   }
   if (error instanceof DwControlClientError) {
+    // LM-006: Hop Server outages and rejections keep their own code so the portal can explain them.
+    if (error.code === 'HOP_UNAVAILABLE')
+      return NextResponse.json(
+        { error: 'Hop Server is unavailable', code: error.code },
+        { status: 503 },
+      );
+    if (error.code === 'HOP_REJECTED')
+      return NextResponse.json(
+        { error: 'Hop Server rejected the request', code: error.code },
+        { status: 502 },
+      );
     const status =
       error.status === 504
         ? 504
@@ -113,7 +135,18 @@ export function mapDwControlError(error: unknown): NextResponse {
                   : status === 504
                     ? 'DW control service timed out'
                     : 'DW control service is unavailable';
-    return NextResponse.json({ error: message, code: error.code }, { status });
+    // `detail` is the reason dw-control-service gave for a 400/409 (for example a schedule inside the DSA
+    // operating hours); the connector only keeps it after screening it for internal data.
+    return NextResponse.json(
+      {
+        error: message,
+        code: error.code,
+        ...(error.detail && (status === 400 || status === 409 || status === 422)
+          ? { detail: error.detail }
+          : {}),
+      },
+      { status },
+    );
   }
   console.error(
     '[bff-dw-control] unexpected dw-control-service failure',

@@ -12,6 +12,7 @@ El BFF es el único punto de integración de los portales con Keycloak y `auth-s
 - `PUT /api/admin/users/:userId/academic-contexts`: reemplaza los contextos académicos del usuario. Requiere `iam:users:write` en el BFF, y `auth-service` vuelve a exigir el mismo permiso como segunda barrera. Las lecturas de `/api/admin/users*` y `/api/admin/academic-catalog` requieren `iam:users:read`.
 - `/api/admin/dw/academic-closures*`: fachada autenticada de cierres académicos, historial y transiciones. Requiere `dw:closure:read` o `dw:closure:manage` de `dss-permissions`. El BFF reenvía el JWT verificado y el servicio conserva el `sub` para auditoría.
 - `/api/admin/dw/etl/executions*`: consulta paginada y detalle de ejecuciones ETL. Requiere `dw:etl-monitor:read`. El BFF valida y normaliza respuestas y no propaga cuerpos de error del servicio.
+- `/api/admin/dw/etl/{health,status,processes,launches*,schedules*}`: Load Manager (LM-006). Leer requiere `dw:etl-monitor:read`; lanzar y detener, `dw:etl:execute`; administrar programaciones, `dw:etl-schedule:manage`. Los cuerpos llegan con una allowlist de campos y las respuestas se validan en el connector. Hay dos excepciones a la regla de no propagar errores. Un 400 o 409 lleva `detail` con el motivo que dio dw-control-service, por ejemplo una programación dentro del horario de la DSA; el connector antes lo revisa en busca de datos internos. Un Hop Server caído responde 503 `HOP_UNAVAILABLE`.
 - `/api/admin/iam/**`: administración IAM (usuarios, roles, permisos, aplicaciones y auditoría) hacia `auth-service` `/api/v1/admin/iam/**`. Ver [Administración IAM (IAM-015)](#administración-iam-iam-015).
 - `GET|POST /api/graphql`: endpoint Apollo Server protegido por la misma sesión BFF o Bearer token. Expone identidad y alcance académicos, catálogo/metadatos OLAP, `analyticQuery` y `predictionPublication` para consultar la publicación vigente del Prediction Service. Los resolvers llaman a los servicios con el token validado; los tokens nunca forman parte de la respuesta.
 - `/api/olap/rest/saiku/*`: proxy autenticado a `olap-service`, incluido su endpoint GraphQL real en `/api/olap/rest/saiku/api/graphql`. El BFF valida la sesión y reenvía el access token; las rutas `/rest/saiku/admin/*` requieren además el permiso `olap:admin`. Keycloak debe incluir la audiencia `olap-service` en los tokens solicitados por `dss-bff`.
@@ -77,6 +78,9 @@ Los permisos salen del token (`resource_access.dss-permissions.roles`); el BFF y
 | `PUT /api/admin/users/:userId/academic-contexts` | `iam:users:write` |
 | `/api/admin/dw/academic-closures*` | `dw:closure:read` / `dw:closure:manage` |
 | `/api/admin/dw/etl/executions*` | `dw:etl-monitor:read` |
+| `GET /api/admin/dw/etl/{health,status,processes,launches*,schedules*}` | `dw:etl-monitor:read` |
+| `POST /api/admin/dw/etl/launches`, `POST .../launches/{id}/stop` | `dw:etl:execute` |
+| `POST/PUT/DELETE /api/admin/dw/etl/schedules*` | `dw:etl-schedule:manage` |
 | `/api/olap/rest/saiku/admin/*` | `olap:admin` |
 | Resto de `/api/olap/**` y GraphQL de analítica | `analytics:read` + alcance (`analytics:global`/`faculty`/`career`), salvo `olap:admin` |
 | Entrenamiento, datasets y modelos en `/api/prediction/**` | `prediction:train` |
