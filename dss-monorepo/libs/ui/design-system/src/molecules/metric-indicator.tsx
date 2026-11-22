@@ -25,9 +25,9 @@ export const MetricIndicator = React.forwardRef<
         ref={ref}
         className={cn(
           'group relative flex flex-col gap-2 rounded-xl bg-card/40 backdrop-blur-md p-6 border border-primary/20 overflow-hidden',
-          'shadow-[0_4px_20px_theme(colors.primary.DEFAULT/5%)] transition-all hover:border-primary/50 hover:bg-card/60',
+          'shadow-[0_4px_20px_color-mix(in_srgb,var(--primary)_5%,transparent)] transition-all hover:border-primary/50 hover:bg-card/60',
           isCritical &&
-            'border-destructive/50 shadow-[0_4px_30px_theme(colors.destructive.DEFAULT/15%)]',
+            'border-destructive/50 shadow-[0_4px_30px_color-mix(in_srgb,var(--destructive)_15%,transparent)]',
           className,
         )}
         {...props}
@@ -81,8 +81,8 @@ export const MetricIndicator = React.forwardRef<
             className={cn(
               'border-none pb-0 text-5xl tracking-tighter',
               isCritical
-                ? 'text-destructive drop-shadow-[0_0_8px_theme(colors.destructive.DEFAULT/50%)]'
-                : 'text-foreground drop-shadow-[0_0_8px_theme(colors.primary.DEFAULT/20%)]',
+                ? 'text-destructive drop-shadow-[0_0_8px_color-mix(in_srgb,var(--destructive)_50%,transparent)]'
+                : 'text-foreground drop-shadow-[0_0_8px_color-mix(in_srgb,var(--primary)_20%,transparent)]',
             )}
           >
             {value}

@@ -105,7 +105,7 @@ export const CyberpunkTerminal: Story = {
 
       <Alert
         variant="system"
-        className="border-primary/50 shadow-[0_0_20px_theme(colors.primary.DEFAULT/20%)]"
+        className="border-primary/50 shadow-[0_0_20px_color-mix(in_srgb,var(--primary)_20%,transparent)]"
       >
         <Cpu className="size-4 text-primary animate-pulse" />
         <AlertTitle className="tracking-widest uppercase font-mono text-xs">
@@ -119,7 +119,7 @@ export const CyberpunkTerminal: Story = {
 
       <Alert
         variant="destructive"
-        className="border-destructive/60 shadow-[0_0_25px_theme(colors.destructive.DEFAULT/25%)]"
+        className="border-destructive/60 shadow-[0_0_25px_color-mix(in_srgb,var(--destructive)_25%,transparent)]"
       >
         <ShieldAlert className="size-4 text-destructive animate-pulse" />
         <AlertTitle className="tracking-widest uppercase font-mono text-xs">

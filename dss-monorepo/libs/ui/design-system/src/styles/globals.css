@@ -3,6 +3,7 @@
 @import 'tw-animate-css';
 @import 'shadcn/tailwind.css';
 @import '@fontsource-variable/geist';
+@import '@fontsource-variable/geist-mono';
 
 @custom-variant dark (&:is(.dark *));
 
@@ -73,6 +74,18 @@
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
   --radius-4xl: calc(var(--radius) * 2.6);
+  /* Glass material, elevation and motion (section 3). */
+  --font-mono: 'Geist Mono Variable', ui-monospace, 'SFMono-Regular', Consolas, monospace;
+  --shadow-glass: var(--glass-shadow);
+  --shadow-raised: var(--raised-shadow);
+  --shadow-glow-accent: var(--glow-accent);
+  --ease-out-expo: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out-quart: cubic-bezier(0.65, 0, 0.35, 1);
+  --animate-ds-fade: ds-fade var(--dur-base) var(--ease-out-expo) both;
+  --animate-ds-rise: ds-rise var(--dur-slow) var(--ease-out-expo) both;
+  --animate-ds-sweep: ds-sweep 1.4s var(--ease-in-out-quart) infinite;
+  --animate-ds-spin: ds-spin 1.4s linear infinite;
+  --animate-ds-shimmer: ds-shimmer 1.6s linear infinite;
 }
 
 /* ==========================================================================
@@ -277,9 +290,162 @@
   --sidebar-primary-foreground: var(--dss-navy-950);
 }
 
+/* ==========================================================================
+   3. GLASS MATERIAL, ELEVATION AND MOTION
+   The frosted-glass language of the landing gateway, as tokens. Data
+   surfaces stay >= 86% opaque so body text keeps AA contrast over the
+   ambient backdrop; the strongest blur is reserved for chrome and overlays.
+   Glass tokens are declared again under .dark because they are derived from
+   --card/--popover and must resolve on the element that carries .dark.
+   ========================================================================== */
+:root {
+  --glass-chrome: color-mix(in srgb, var(--card) 72%, transparent);
+  --glass-surface: color-mix(in srgb, var(--card) 86%, transparent);
+  --glass-overlay: color-mix(in srgb, var(--popover) 94%, transparent);
+  --glass-border: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --glass-highlight: color-mix(in srgb, #ffffff 90%, transparent);
+  --glass-track: color-mix(in srgb, var(--foreground) 7%, transparent);
+  --blur-chrome: 20px;
+  --blur-surface: 14px;
+  --blur-overlay: 28px;
+  --gradient-brand: linear-gradient(90deg, var(--dss-cyan-400), var(--dss-blue-500));
+  --gradient-hairline: linear-gradient(90deg, transparent, color-mix(in srgb, var(--dss-cyan-400) 70%, transparent), transparent);
+  --glass-shadow: 0 1px 0 0 var(--glass-highlight) inset, 0 24px 60px -30px rgb(11 26 56 / 0.28);
+  --raised-shadow: 0 30px 80px -30px rgb(11 26 56 / 0.35);
+  --glow-accent: 0 10px 30px -10px color-mix(in srgb, var(--dss-cyan-400) 70%, transparent);
+  --orb-primary: color-mix(in srgb, var(--dss-blue-700) 16%, transparent);
+  --orb-role: color-mix(in srgb, var(--role-accent) 14%, transparent);
+  --dur-instant: 100ms;
+  --dur-fast: 160ms;
+  --dur-base: 220ms;
+  --dur-slow: 400ms;
+  --dur-scene: 700ms;
+  --dss-header-offset: 4.5rem;
+}
+
+.dark {
+  --glass-chrome: color-mix(in srgb, var(--card) 58%, transparent);
+  --glass-surface: color-mix(in srgb, var(--card) 82%, transparent);
+  --glass-overlay: color-mix(in srgb, var(--popover) 92%, transparent);
+  --glass-border: color-mix(in srgb, #ffffff 9%, transparent);
+  --glass-highlight: color-mix(in srgb, #ffffff 7%, transparent);
+  --glass-track: color-mix(in srgb, #ffffff 8%, transparent);
+  --glass-shadow: 0 1px 0 0 var(--glass-highlight) inset, 0 24px 60px -24px rgb(0 0 0 / 0.6);
+  --raised-shadow: 0 30px 80px -20px rgb(6 11 20 / 0.9);
+  --orb-primary: color-mix(in srgb, var(--dss-blue-700) 28%, transparent);
+  --orb-role: color-mix(in srgb, var(--role-accent) 16%, transparent);
+}
+
+/* Role themes can sit on a wrapper (Storybook, embeds): follow their accent. */
+[data-theme] {
+  --orb-role: color-mix(in srgb, var(--role-accent) 14%, transparent);
+}
+
+.dark[data-theme],
+.dark [data-theme],
+[data-theme].dark,
+[data-theme] .dark {
+  --orb-role: color-mix(in srgb, var(--role-accent) 16%, transparent);
+}
+
+@utility glass-chrome {
+  background-color: var(--card);
+  background-color: var(--glass-chrome);
+  -webkit-backdrop-filter: blur(var(--blur-chrome)) saturate(140%);
+  backdrop-filter: blur(var(--blur-chrome)) saturate(140%);
+}
+
+@utility glass-surface {
+  background-color: var(--card);
+  background-color: var(--glass-surface);
+  -webkit-backdrop-filter: blur(var(--blur-surface)) saturate(140%);
+  backdrop-filter: blur(var(--blur-surface)) saturate(140%);
+}
+
+@utility glass-overlay {
+  background-color: var(--popover);
+  background-color: var(--glass-overlay);
+  -webkit-backdrop-filter: blur(var(--blur-overlay)) saturate(140%);
+  backdrop-filter: blur(var(--blur-overlay)) saturate(140%);
+}
+
+/* A 1px gradient line on the top edge. The element must be positioned. */
+@utility hairline-top {
+  &::before {
+    content: '';
+    position: absolute;
+    inset-inline: 0;
+    top: 0;
+    height: 1px;
+    pointer-events: none;
+    background: var(--gradient-hairline);
+  }
+}
+
+@media (prefers-reduced-transparency: reduce) {
+  .glass-chrome,
+  .glass-surface {
+    background-color: var(--card);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+
+  .glass-overlay {
+    background-color: var(--popover);
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+@media (forced-colors: active) {
+  .glass-chrome,
+  .glass-surface,
+  .glass-overlay {
+    background-color: Canvas;
+    border: 1px solid CanvasText;
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
+
+/* Promoted from the landing gateway (gateway-fade, gateway-sweep, …). */
+@keyframes ds-fade {
+  from { opacity: 0; transform: translateY(6px); filter: blur(4px); }
+}
+@keyframes ds-rise {
+  from { opacity: 0; transform: translateY(16px) scale(0.985); filter: blur(6px); }
+}
+@keyframes ds-sweep {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(250%); }
+}
+@keyframes ds-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes ds-shimmer {
+  from { background-position: 200% 0; }
+  to { background-position: -200% 0; }
+}
+
+/* Portals opt into a global reduced-motion reset with data-dss-portal. */
+@media (prefers-reduced-motion: reduce) {
+  [data-dss-portal] *,
+  [data-dss-portal] *::before,
+  [data-dss-portal] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @layer base {
   * {
     @apply border-border outline-ring/50;
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--role-accent) 28%, transparent);
   }
 
   body {
@@ -342,16 +508,16 @@
    opaque so text and focus indicators remain readable over changing content. */
 [data-sidebar-material='frosted'] {
   background-color: var(--sidebar);
-  background-color: color-mix(in srgb, var(--sidebar) 90%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(112%);
-  backdrop-filter: blur(16px) saturate(112%);
+  background-color: color-mix(in srgb, var(--sidebar) 78%, transparent);
+  -webkit-backdrop-filter: blur(var(--blur-chrome, 20px)) saturate(140%);
+  backdrop-filter: blur(var(--blur-chrome, 20px)) saturate(140%);
 }
 
 [data-dashboard-material='frosted'] {
   background-color: var(--card);
-  background-color: color-mix(in srgb, var(--card) 90%, transparent);
-  -webkit-backdrop-filter: blur(16px) saturate(112%);
-  backdrop-filter: blur(16px) saturate(112%);
+  background-color: var(--glass-chrome);
+  -webkit-backdrop-filter: blur(var(--blur-chrome, 20px)) saturate(140%);
+  backdrop-filter: blur(var(--blur-chrome, 20px)) saturate(140%);
 }
 
 @media (prefers-reduced-transparency: reduce) {
@@ -365,29 +531,4 @@
   [data-dashboard-material='frosted'] {
     background-color: var(--card);
   }
-}
-
-@keyframes dss-loader-spin { to { transform: rotate(360deg); } }
-@keyframes dss-loader-reverse { to { transform: rotate(-360deg); } }
-@keyframes dss-loader-pulse { 50% { transform: scale(1.08); opacity: .45; } }
-@keyframes dss-loader-float { 50% { transform: translateY(-3px); } }
-@keyframes dss-loader-dot { 50% { transform: translateY(-3px); opacity: .4; } }
-@keyframes dss-loader-shimmer { to { background-position: -200% center; } }
-.dss-loader-spin { animation: dss-loader-spin 2.5s linear infinite; }
-.dss-loader-reverse { animation: dss-loader-reverse 1.8s linear infinite; }
-.dss-loader-pulse { animation: dss-loader-pulse 2s ease-in-out infinite; }
-.dss-loader-float { animation: dss-loader-float 2s ease-in-out infinite; }
-.dss-loader-dot { animation: dss-loader-dot 1.4s ease-in-out infinite; }
-@supports (background-clip: text) {
-  .dss-loader-text {
-    background-image: linear-gradient(90deg, var(--muted-foreground), var(--foreground), var(--muted-foreground));
-    background-size: 200% auto;
-    background-clip: text;
-    color: transparent;
-    animation: dss-loader-shimmer 2.5s ease-in-out infinite;
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .dss-loader-spin, .dss-loader-reverse, .dss-loader-pulse, .dss-loader-float, .dss-loader-dot, .dss-loader-text { animation: none; }
-  .dss-loader-text { background: none; color: var(--foreground); }
 }

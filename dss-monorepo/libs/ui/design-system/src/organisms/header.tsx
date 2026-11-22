@@ -34,6 +34,8 @@ export interface HeaderProps extends React.HTMLAttributes<HTMLElement> {
   onProfileClick?: () => void;
   onSignIn?: () => void;
   onDisconnect?: () => void;
+  /** Rendered before the theme toggle, e.g. an AcademicContextBadge. */
+  contextSlot?: React.ReactNode;
 }
 
 export function Header({
@@ -50,6 +52,7 @@ export function Header({
   onProfileClick,
   onSignIn,
   onDisconnect,
+  contextSlot,
   ...props
 }: HeaderProps) {
   const [searchQuery, setSearchQuery] = React.useState('');
@@ -138,6 +141,7 @@ export function Header({
       )}
 
       <div className="flex min-w-0 items-center justify-end gap-2 md:order-3">
+        {contextSlot ? <div className="min-w-0 shrink">{contextSlot}</div> : null}
         <ThemeToggle />
         {onNotificationsClick && (
           <Button

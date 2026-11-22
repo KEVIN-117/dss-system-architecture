@@ -160,7 +160,7 @@ export const CyberpunkTerminal: Story = {
         </FormField>
       </div>
 
-      <Button className="w-full font-mono uppercase tracking-wider text-xs shadow-[0_0_20px_theme(colors.primary.DEFAULT/30%)]">
+      <Button className="w-full font-mono uppercase tracking-wider text-xs shadow-[0_0_20px_color-mix(in_srgb,var(--primary)_30%,transparent)]">
         &gt; INITIATE SECURE HANDSHAKE
       </Button>
     </div>

@@ -15,7 +15,7 @@ function Avatar({
       data-size={size}
       className={cn(
         'group/avatar relative flex size-8 shrink-0 rounded-full select-none',
-        'after:absolute after:inset-0 after:rounded-full after:border-2 after:border-primary/40 after:mix-blend-lighten after:shadow-[0_0_10px_theme(colors.primary.DEFAULT/30%)]',
+        'after:absolute after:inset-0 after:rounded-full after:border-2 after:border-primary/40 after:mix-blend-lighten after:shadow-[0_0_10px_color-mix(in_srgb,var(--primary)_30%,transparent)]',
         'data-[size=lg]:size-10 data-[size=sm]:size-6',
         className,
       )}

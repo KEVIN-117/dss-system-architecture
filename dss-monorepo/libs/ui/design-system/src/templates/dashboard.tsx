@@ -48,6 +48,10 @@ export interface DashboardTemplateProps
   onSearch?: (query: string) => void;
   onDisconnect?: () => void;
   onNavigate?: (href: string) => void;
+  /** Rendered in the header before the theme toggle (AcademicContextBadge). */
+  headerContext?: React.ReactNode;
+  /** Text at the bottom of the sidebar. */
+  sidebarFooter?: React.ReactNode;
 }
 
 function toNavigationIdSegment(value: string): string {
@@ -68,12 +72,14 @@ export function DashboardTemplate({
   sidebarLogo,
   navItems = [],
   navGroups,
-  surfaceMaterial = 'solid',
+  surfaceMaterial = 'frosted',
   user,
   onMenuClick,
   onSearch,
   onDisconnect,
   onNavigate,
+  headerContext,
+  sidebarFooter,
   className,
   ...props
 }: DashboardTemplateProps) {
@@ -93,6 +99,8 @@ export function DashboardTemplate({
           onSearch={onSearch}
           onDisconnect={onDisconnect}
           onNavigate={onNavigate}
+          headerContext={headerContext}
+          sidebarFooter={sidebarFooter}
           {...props}
         >
           {children}
@@ -115,6 +123,8 @@ function DashboardTemplateFrame({
   onSearch,
   onDisconnect,
   onNavigate,
+  headerContext,
+  sidebarFooter = 'Sistema de decisiones académicas',
   className,
   ...props
 }: DashboardTemplateProps) {
@@ -144,9 +154,17 @@ function DashboardTemplateFrame({
 
   return (
     <div
-      className={cn('flex min-h-svh w-full bg-background', className)}
+      data-dss-portal=""
+      className={cn('relative isolate flex min-h-svh w-full bg-background', className)}
       {...props}
     >
+      <a
+        href="#contenido"
+        className="sr-only z-50 rounded-lg bg-background px-4 py-2 text-sm font-medium text-foreground shadow-raised ring-2 ring-ring focus:not-sr-only focus:fixed focus:top-3 focus:left-3"
+      >
+        Saltar al contenido
+      </a>
+      {surfaceMaterial === 'frosted' ? <PortalBackdrop /> : null}
       <Sidebar
         material={surfaceMaterial}
         collapsible="icon"
@@ -282,7 +300,7 @@ function DashboardTemplateFrame({
           <SidebarSeparator className="mt-auto group-data-[collapsible=icon]:hidden" />
           <SidebarFooter className="px-3 py-3 group-data-[collapsible=icon]:hidden">
             <p className="text-xs leading-5 text-muted-foreground">
-              Sistema de decisiones académicas
+              {sidebarFooter}
             </p>
           </SidebarFooter>
         </SidebarContent>
@@ -301,11 +319,42 @@ function DashboardTemplateFrame({
           onSearch={onSearch}
           showSearch={Boolean(onSearch)}
           onDisconnect={onDisconnect}
+          contextSlot={headerContext}
           data-dashboard-material={surfaceMaterial}
-          className="sticky top-0 z-30 border-b border-border"
+          className={cn(
+            'sticky top-0 z-30 border-b',
+            surfaceMaterial === 'frosted'
+              ? 'border-(--glass-border) hairline-top'
+              : 'border-border',
+          )}
         />
-        <div className="w-full flex-1 p-4 sm:p-6 lg:p-8">{children}</div>
+        <div
+          id="contenido"
+          tabIndex={-1}
+          className="w-full flex-1 p-4 outline-none sm:p-6 lg:p-8"
+        >
+          {children}
+        </div>
       </main>
+    </div>
+  );
+}
+
+/**
+ * Static ambient light behind the frosted chrome: two blurred orbs (brand blue
+ * and the role accent) and a faint top glow. Nothing animates, so it costs one
+ * paint and never competes with the data.
+ */
+function PortalBackdrop() {
+  return (
+    <div
+      aria-hidden="true"
+      data-slot="portal-backdrop"
+      className="pointer-events-none fixed inset-0 -z-10 overflow-hidden"
+    >
+      <div className="absolute -top-48 -left-32 size-[36rem] rounded-full bg-(--orb-primary) blur-[110px]" />
+      <div className="absolute top-32 -right-24 size-[28rem] rounded-full bg-(--orb-role) blur-[120px]" />
+      <div className="absolute inset-x-0 top-0 h-64 bg-[radial-gradient(ellipse_at_top,color-mix(in_srgb,var(--foreground)_4%,transparent),transparent_70%)]" />
     </div>
   );
 }
