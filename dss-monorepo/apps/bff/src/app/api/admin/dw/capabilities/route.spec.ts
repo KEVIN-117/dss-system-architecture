@@ -30,6 +30,8 @@ describe('GET /api/admin/dw/capabilities', () => {
       canReadClosures: true,
       canManageClosures: false,
       canReadEtlExecutions: true,
+      canExecuteEtl: false,
+      canManageEtlSchedules: false,
     });
     expect(response.headers.get('cache-control')).toBe('no-store');
   });
@@ -51,6 +53,27 @@ describe('GET /api/admin/dw/capabilities', () => {
       canReadClosures: false,
       canManageClosures: false,
       canReadEtlExecutions: false,
+      canExecuteEtl: false,
+      canManageEtlSchedules: false,
+    });
+  });
+
+  it('reports the Load Manager permissions (LM-006)', async () => {
+    authenticateRequest.mockResolvedValue({
+      authenticated: true,
+      value: {
+        permissions: ['dw:etl-monitor:read', 'dw:etl:execute', 'dw:etl-schedule:manage'],
+      },
+    });
+
+    const response = await GET(
+      new Request('http://bff/api/admin/dw/capabilities'),
+    );
+
+    expect(await response.json()).toMatchObject({
+      canReadEtlExecutions: true,
+      canExecuteEtl: true,
+      canManageEtlSchedules: true,
     });
   });
 

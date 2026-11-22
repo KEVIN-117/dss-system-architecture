@@ -85,7 +85,7 @@ El siguiente disparo se calcula desde el momento actual, así que las ocurrencia
 
 ## API REST (LM-005)
 
-El contrato completo está en [`docs/dw/contracts/dw-control-service-v1.yaml`](contracts/dw-control-service-v1.yaml). El docs-portal guarda una copia idéntica en `apps/docs-portal/openapi`. El actor de cada operación es el `sub` del JWT.
+El contrato completo está en [`docs/dw/contracts/dw-control-service-v1.yaml`](contracts/dw-control-service-v1.yaml). El admin-portal no llama al servicio directamente: usa las rutas `/api/admin/dw/etl/*` del BFF (LM-006, `docs/bff/contracts/bff-v1.yaml`). Esas rutas reenvían el JWT verificado y solo aceptan los campos permitidos. Además devuelven el `detail` de un 400 o 409 y responden `HOP_UNAVAILABLE` cuando Hop no está disponible. El docs-portal guarda una copia idéntica en `apps/docs-portal/openapi`. El actor de cada operación es el `sub` del JWT.
 
 | Método y ruta | Permiso | Respuesta |
 |---|---|---|

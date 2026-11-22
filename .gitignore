@@ -287,6 +287,8 @@ $RECYCLE.BIN/
 *.log.*
 logs/
 **/logs/
+# LM-006: BFF route of the Load Manager launch logs, not a log directory.
+!dss-monorepo/apps/bff/src/app/api/admin/dw/etl/launches/\[launchId\]/logs/
 
 # Temporales y caches generales
 *.tmp

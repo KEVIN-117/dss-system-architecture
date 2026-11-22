@@ -19,6 +19,7 @@ tags:
   - name: Sesión
   - name: Administración de usuarios
   - name: Data Warehouse
+  - name: Load Manager
   - name: Proxies de servicios
 paths:
   /health:
@@ -200,6 +201,8 @@ paths:
                   canReadClosures: { type: boolean }
                   canManageClosures: { type: boolean }
                   canReadEtlExecutions: { type: boolean }
+                  canExecuteEtl: { type: boolean, description: 'dw:etl:execute (LM-006).' }
+                  canManageEtlSchedules: { type: boolean, description: 'dw:etl-schedule:manage (LM-006).' }
         '401': { $ref: '#/components/responses/Unauthorized' }
   /admin/dw/academic-closures:
     get:
@@ -344,6 +347,218 @@ paths:
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
         '404': { description: Ejecución inexistente. }
+  /admin/dw/etl/health:
+    get:
+      tags: [Load Manager]
+      operationId: loadManagerHealth
+      summary: Disponibilidad de Hop Server y estado del monitor y del scheduler
+      x-required-permission: dw:etl-monitor:read
+      responses:
+        '200': { description: 'hopOnline, hopStatus, monitoringEnabled, schedulerEnabled, operatingWindow (ver contrato de DW Control).' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/dw/etl/status:
+    get:
+      tags: [Load Manager]
+      operationId: etlStatus
+      summary: Indica si hay algún ETL en curso (indicador del header del admin-portal)
+      x-required-permission: dw:etl-monitor:read
+      responses:
+        '200': { description: 'running y lanzamientos activos (ver contrato de DW Control).' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/dw/etl/processes:
+    get:
+      tags: [Load Manager]
+      operationId: listEtlProcesses
+      summary: Catálogo de procesos que se pueden ejecutar o programar
+      x-required-permission: dw:etl-monitor:read
+      responses:
+        '200': { description: 'Procesos del catálogo (ver contrato de DW Control).' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/dw/etl/launches:
+    get:
+      tags: [Load Manager]
+      operationId: listEtlLaunches
+      summary: Historial de lanzamientos; scheduleId da el historial de disparos de una programación
+      x-required-permission: dw:etl-monitor:read
+      parameters:
+        - { name: processCode, in: query, schema: { type: string } }
+        - { name: status, in: query, schema: { type: string, enum: [QUEUED, SUBMITTED, RUNNING, SUCCEEDED, FAILED, STOPPED, SKIPPED, SUBMIT_FAILED] } }
+        - { name: trigger, in: query, schema: { type: string, enum: [MANUAL, SCHEDULED] } }
+        - { name: scheduleId, in: query, schema: { type: integer, minimum: 1 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100 } }
+      responses:
+        '200': { description: 'Página de lanzamientos (ver contrato de DW Control).' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Load Manager]
+      operationId: launchEtlProcess
+      summary: Lanza un proceso en Hop Server
+      description: >-
+        Cuerpo con processCode y, según el proceso, executionKind + closureId,
+        retryOfRunId o runId. Campos desconocidos responden 400 sin llamar al
+        servicio.
+      x-required-permission: dw:etl:execute
+      responses:
+        '201': { description: 'Lanzamiento registrado; puede venir ya SUBMIT_FAILED.' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/HopUnavailable' }
+  /admin/dw/etl/launches/{launchId}:
+    get:
+      tags: [Load Manager]
+      operationId: getEtlLaunch
+      summary: Obtiene un lanzamiento
+      x-required-permission: dw:etl-monitor:read
+      parameters:
+        - { name: launchId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: 'Lanzamiento (ver contrato de DW Control).' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Lanzamiento inexistente. }
+  /admin/dw/etl/launches/{launchId}/logs:
+    get:
+      tags: [Load Manager]
+      operationId: getEtlLaunchLogs
+      summary: Cola saneada del log de Hop del lanzamiento
+      x-required-permission: dw:etl-monitor:read
+      parameters:
+        - { name: launchId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '200': { description: 'launchId, status, active y log (hasta 64 KiB).' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Lanzamiento inexistente. }
+  /admin/dw/etl/launches/{launchId}/stop:
+    post:
+      tags: [Load Manager]
+      operationId: stopEtlLaunch
+      summary: Pide detener un lanzamiento activo
+      x-required-permission: dw:etl:execute
+      parameters:
+        - { name: launchId, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        '202': { description: Detención solicitada; pasa a STOPPED cuando el monitor lo observa. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '503': { $ref: '#/components/responses/HopUnavailable' }
+  /admin/dw/etl/schedules:
+    get:
+      tags: [Load Manager]
+      operationId: listEtlSchedules
+      summary: Programaciones vigentes
+      x-required-permission: dw:etl-monitor:read
+      responses:
+        '200': { description: 'Programaciones (ver contrato de DW Control).' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Load Manager]
+      operationId: createEtlSchedule
+      summary: Crea una programación fuera del horario operativo de la DSA
+      description: >-
+        Cuerpo processCode, name, cronExpression (6 campos), timezone y enabled
+        opcionales. Si dw-control-service la rechaza, el 400 incluye detail con
+        el motivo (por ejemplo, una ejecución dentro del horario de la DSA).
+      x-required-permission: dw:etl-schedule:manage
+      responses:
+        '201': { description: 'Programación creada.' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/dw/etl/schedules/preview:
+    get:
+      tags: [Load Manager]
+      operationId: previewEtlSchedule
+      summary: Próximas ejecuciones de un cron y si se aceptaría
+      x-required-permission: dw:etl-monitor:read
+      parameters:
+        - { name: cronExpression, in: query, required: true, schema: { type: string } }
+        - { name: timezone, in: query, schema: { type: string } }
+        - { name: count, in: query, schema: { type: integer, minimum: 1, maximum: 50 } }
+      responses:
+        '200': { description: 'valid, validationMessage y ocurrencias marcadas contra el horario DSA.' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/dw/etl/schedules/{scheduleId}:
+    get:
+      tags: [Load Manager]
+      operationId: getEtlSchedule
+      summary: Obtiene una programación
+      x-required-permission: dw:etl-monitor:read
+      parameters:
+        - { name: scheduleId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: 'Programación (ver contrato de DW Control).' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Programación inexistente. }
+    put:
+      tags: [Load Manager]
+      operationId: updateEtlSchedule
+      summary: Edita nombre, cron y zona con el rowVersion cargado
+      x-required-permission: dw:etl-schedule:manage
+      parameters:
+        - { name: scheduleId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: Programación actualizada. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+    delete:
+      tags: [Load Manager]
+      operationId: deleteEtlSchedule
+      summary: Borrado lógico de una programación
+      x-required-permission: dw:etl-schedule:manage
+      parameters:
+        - { name: scheduleId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+        - { name: rowVersion, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '204': { description: Programación eliminada (sin cuerpo). }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/dw/etl/schedules/{scheduleId}/enable:
+    post:
+      tags: [Load Manager]
+      operationId: enableEtlSchedule
+      summary: Reactiva una programación (se vuelve a validar contra el horario DSA)
+      x-required-permission: dw:etl-schedule:manage
+      parameters:
+        - { name: scheduleId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: Programación activa. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+  /admin/dw/etl/schedules/{scheduleId}/disable:
+    post:
+      tags: [Load Manager]
+      operationId: disableEtlSchedule
+      summary: Pausa una programación
+      x-required-permission: dw:etl-schedule:manage
+      parameters:
+        - { name: scheduleId, in: path, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        '200': { description: Programación pausada. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
   /graphql:
     post:
       tags: [Proxies de servicios]
@@ -440,6 +655,16 @@ components:
           schema: { $ref: '#/components/schemas/Error' }
     Forbidden:
       description: La sesión no tiene el rol o permiso requerido.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    Conflict:
+      description: Estado incompatible (proceso ya en ejecución, versión obsoleta o nombre duplicado).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/Error' }
+    HopUnavailable:
+      description: Hop Server no está disponible (code HOP_UNAVAILABLE).
       content:
         application/json:
           schema: { $ref: '#/components/schemas/Error' }
