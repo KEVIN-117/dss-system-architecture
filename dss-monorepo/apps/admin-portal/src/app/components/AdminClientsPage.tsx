@@ -92,8 +92,6 @@ export function AdminClientsPage() {
     return () => controller.abort();
   }, [load]);
 
-  console.log(clients);
-
   return (
     <section className="space-y-6" aria-labelledby="admin-clients-title">
       <header className="flex flex-wrap items-end justify-between gap-4">

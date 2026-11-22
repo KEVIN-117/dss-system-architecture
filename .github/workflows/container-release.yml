@@ -400,6 +400,28 @@ jobs:
           cache-to: type=gha,mode=max,scope=apache-hop
           sbom: true
           provenance: mode=max
+      # Hop Server (LM-001) ships the same project and shares the Hop release.
+      - uses: docker/metadata-action@v5
+        id: meta-server
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/dss-apache-hop-server
+          tags: |
+            type=raw,value=${{ needs.release-please.outputs.hop_version }}
+            type=raw,value=${{ needs.release-please.outputs.hop_major }}
+            type=raw,value=${{ needs.release-please.outputs.hop_major }}.${{ needs.release-please.outputs.hop_minor }}
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+      - uses: docker/build-push-action@v6
+        with:
+          context: etl-layer/apache-hop
+          file: etl-layer/apache-hop/Dockerfile.server
+          push: true
+          tags: ${{ steps.meta-server.outputs.tags }}
+          labels: ${{ steps.meta-server.outputs.labels }}
+          cache-from: type=gha,scope=apache-hop-server
+          cache-to: type=gha,mode=max,scope=apache-hop-server
+          sbom: true
+          provenance: mode=max
 
   publish-dw-migrator:
     name: Publish DW migrator

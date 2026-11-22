@@ -219,6 +219,39 @@ services:
         -DDB_TX_NAME=${POSTGRES_TX_NAME}
     networks:
       - dss-net
+  # Load Manager execution engine (LM-001). Not published on the host:
+  # only dw-control-service calls its API over dss-net.
+  hop-server:
+    image: ${DOCKERHUB_USERNAME:-local}/dss-apache-hop-server:${APACHE_HOP_VERSION:-local}
+    build:
+      context: ./etl-layer/apache-hop
+      dockerfile: Dockerfile.server
+    container_name: dss-hop-server
+    restart: unless-stopped
+    depends_on:
+      dw-migrator:
+        condition: service_completed_successfully
+    expose:
+      - "8080"
+    volumes:
+      # Read-only: the server executes what Hop Web saves in the project.
+      - ./etl-layer/apache-hop/projects/dss-uatf-etl:/files/project:ro
+    environment:
+      HOP_ENVIRONMENT_NAME: ${HOP_ENVIRONMENT_NAME:-dev}
+      HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS: /files/project/environments/${HOP_ENVIRONMENT_NAME:-dev}-env.json
+      HOP_SERVER_USER: ${HOP_SERVER_USER:-dw-control}
+      # Empty on purpose when unset: start-hop-server.sh stops this container
+      # with a clear error instead of breaking the whole stack.
+      HOP_SERVER_PASS: ${HOP_SERVER_PASS:-}
+      HOP_OPTIONS: >-
+        -DDB_DW_HOST=${DB_DW_HOST:-host.docker.internal}
+        -DDB_DW_PORT=${DB_DW_PORT:-5434}
+        -DDB_DW_NAME=${POSTGRES_DW_NAME}
+        -DDB_TX_HOST=${DB_TX_HOST:-host.docker.internal}
+        -DDB_TX_PORT=${DB_TX_PORT:-5432}
+        -DDB_TX_NAME=${POSTGRES_TX_NAME}
+    networks:
+      - dss-net
   # ==========================================
   # MICROSERVICIOS PROPIOS
   # ==========================================

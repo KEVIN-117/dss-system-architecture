@@ -14,6 +14,7 @@ Esta guía cubre el despliegue de las cuatro imágenes publicadas por el proyect
 | Proveedor de identidad | `kevin117rodriguez/dss-keycloak:1.0.0` | `1.0.0` |
 | API OLAP / Saiku | `kevin117rodriguez/dss-olap-service:1.0.0` | `1.0.0` |
 | Apache Hop Web + proyecto ETL UATF | `kevin117rodriguez/dss-apache-hop:1.0.0` | `1.0.0` |
+| Apache Hop Server + proyecto ETL UATF (Load Manager) | `kevin117rodriguez/dss-apache-hop-server:<versión de Hop>` | Primera publicación con el próximo release de `apache-hop` |
 
 Las imágenes se publican en [Docker Hub](https://hub.docker.com/u/kevin117rodriguez). El tag de release es el recomendado para un despliegue reproducible; no usar `latest` como referencia operativa. Confirmar la versión aprobada en el release de GitHub y en la pestaña **Tags** de cada repositorio antes de cada instalación.
 
@@ -271,6 +272,24 @@ El wrapper falla al iniciar si el JSON seleccionado no existe. No incluir `dev`/
 Permisos del archivo del host: dueño del servicio, modo `0600`; volumen `:ro`. No guardar contraseña dentro de la imagen ni en argumentos de línea de comando. Proteger Hop Web con proxy autenticado y restringir su acceso a administradores ETL autorizados: Hop Web puede editar y ejecutar pipelines. No exponer el puerto 8080 directamente a redes públicas.
 
 El volumen del proyecto en el Compose local existe para desarrollo y permite modificar archivos; para producción el proyecto está empaquetado en la imagen. Montar solo el archivo de ambiente y cualquier estado requerido de forma explícita, no reemplazar todo `/files/project` accidentalmente.
+
+#### 5.6.1 Hop Server (motor del Load Manager)
+
+La imagen `dss-apache-hop-server:<versión>` (`etl-layer/apache-hop/Dockerfile.server`) incluye Apache Hop 2.19.0 en modo servidor, el mismo proyecto y el driver PostgreSQL. Se publica junto con la imagen de Hop Web y tiene la misma versión. dw-control-service es su único cliente; ver `docs/dw/hop-server-contract.md`.
+
+- Montar el mismo `prod-env.json` en `/files/project/environments/prod-env.json:ro`. El servidor no escribe en el proyecto.
+- No publicar puertos. Conectarlo solo a la red privada en la que corre dw-control-service (`dokploy-network`), con `expose: 8080`.
+- Healthcheck incluido en la imagen: `GET /hop/status/?json=Y` con las credenciales del contenedor.
+
+```dotenv
+HOP_ENVIRONMENT_NAME=prod
+HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS=/files/project/environments/prod-env.json
+HOP_SERVER_USER=dw-control
+HOP_SERVER_PASS=<secreto aleatorio, mínimo 16 caracteres>
+HOP_OPTIONS=-DDB_DW_HOST=<host DW> -DDB_DW_PORT=<puerto> -DDB_DW_NAME=<base> -DDB_TX_HOST=<host OLTP> -DDB_TX_PORT=<puerto> -DDB_TX_NAME=<base>
+```
+
+El contenedor no arranca si faltan las credenciales, si son `cluster/cluster` (el valor por defecto de la imagen upstream) o si falta el archivo de ambiente. `HOP_SERVER_USER` y `HOP_SERVER_PASS` se guardan como secretos en Dokploy. Son los mismos valores que dw-control-service usará para llamar al servidor (LM-003).
 
 ### 5.7 OLAP / Saiku
 

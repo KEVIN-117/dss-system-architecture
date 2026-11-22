@@ -72,7 +72,7 @@ El login de Hop no debe recibir DML directo sobre tablas de control o DW. `dw_ho
 
 ## Límite con otras issues
 
-DW-004 define la entidad lock; 0010 añade lease con adquisición, renovación, liberación y recuperación de expirados. 0011 revalida y bloquea el lease dentro de la transacción de publicación; 0012 audita la salida fallida y libera el lease mediante token. No depende del coordinador Go. Cron, API/BFF y Load Manager quedan fuera del MVP.
+DW-004 define la entidad lock; 0010 añade lease con adquisición, renovación, liberación y recuperación de expirados. 0011 revalida y bloquea el lease dentro de la transacción de publicación; 0012 audita la salida fallida y libera el lease mediante token. No depende del coordinador Go. Cron, API/BFF y Load Manager quedaron fuera del MVP. La épica Load Manager (#356) los incorpora: Hop Server como motor de ejecución (LM-001, [contrato](hop-server-contract.md)), programaciones fuera del horario operativo de la DSA y operación desde el admin-portal.
 
 El gate SQL Hop comprueba los nueve manifiestos y los reintentos usan otro `run_id`. El publisher sustituye hechos/dimensiones dentro de una sola transacción; un rechazo revierte la publicación completa y mantiene visible la versión anterior. Las pruebas SQL y la integración Hop cubren éxito, fallos, auditoría y preservación de la publicación previa. El flujo integral ya no es un requerimiento pendiente.
 

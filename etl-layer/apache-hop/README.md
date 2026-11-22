@@ -55,6 +55,32 @@ Las URLs aprobadas en los archivos de ambiente usan `host.docker.internal:5434` 
 
 Para `prod`, parte de `environments/prod-env.example.json` y entrega el archivo local `prod-env.json` mediante el gestor de secretos aprobado; la plantilla no inventa hosts ni credenciales. Establece `HOP_ENVIRONMENT_NAME=prod`, configura `HOP_ENVIRONMENT_CONFIG_FILE_NAME_PATHS=/files/project/environments/prod-env.json`, deja `HOP_ADDITIONAL_ENVIRONMENT_NAMES` vacío y limita el acceso de red. Monta el archivo de ambiente en esa ruta, no un directorio completo de solo lectura: Hop Web debe poder crear archivos auxiliares de conexión en `environments/`. La imagen deja el proyecto bajo la propiedad de `hop` para esos cambios. Protege el acceso de edición con autenticación y controles de acceso; Hop Web no debe estar expuesto públicamente sin autenticación/TLS y controles de acceso configurados en el proxy o contenedor.
 
+## Hop Server (motor del Load Manager)
+
+`Dockerfile.server` empaqueta Apache Hop 2.19.0 en modo servidor con el mismo proyecto y el driver PostgreSQL 42.7.11 en `/files/jdbc-drivers`. El portal no ejecuta nada en Hop Web: dw-control-service lanza, sigue y detiene los workflows por la API HTTP de este servidor. Hop Web queda para editar. El contrato está en [`docs/dw/hop-server-contract.md`](../../docs/dw/hop-server-contract.md).
+
+`scripts/start-hop-server.sh` es el entrypoint. Comprueba las credenciales y el archivo de ambiente y después delega en el entrypoint oficial de la imagen (`/opt/hop/load-and-execute.sh`), que registra el proyecto y el ambiente y genera `hop-server.xml`. El contenedor se detiene con un error claro en estos casos:
+
+- falta `HOP_SERVER_USER` o `HOP_SERVER_PASS`;
+- las credenciales son las de fábrica `cluster/cluster`;
+- la contraseña tiene menos de 16 caracteres;
+- falta el JSON del ambiente.
+
+La autenticación Basic queda siempre activa.
+
+En el Compose raíz el servicio `hop-server` usa el ambiente `HOP_ENVIRONMENT_NAME` y monta el proyecto en solo lectura. No publica puertos: solo es accesible dentro de `dss-net`. Define la contraseña en el `.env` ignorado:
+
+```dotenv
+HOP_SERVER_USER=dw-control
+HOP_SERVER_PASS=<aleatoria, 16+ caracteres>
+```
+
+Para comprobar el contrato contra los fixtures de integración:
+
+```bash
+bash infra/dw-integration/run-local-hop-server.sh
+```
+
 ## Metadata y drivers
 
 Las conexiones de `metadata/rdbms` son `OLTP db`, `DSS DW` y `Auth Service DB`. Sus objetos usan, respectivamente, `OLTP_DB_*`, `DSS_DW_*` y `AUTH_CATALOG_DB_*`. El usuario de Hop para `Auth Service DB` debe tener privilegios mínimos para sincronizar el catálogo académico; sus credenciales se guardan en el archivo local ignorado o en el gestor de secretos aprobado, nunca en los ejemplos versionados. Los ambientes que ejecuten pipelines que usen esta conexión deben definir las seis variables del catálogo. `integration-test.example.json` mantiene credenciales sintéticas exclusivas del smoke Docker y debe apuntar a una base de catálogo de prueba disponible en esa red antes de ejecutar pipelines que la utilicen. El layout `metadata/rdbms` es el formato estándar del metadata relacional de Hop. La imagen de runtime fija el driver PostgreSQL 42.7.11; no cambiarlo sin validar su compatibilidad.

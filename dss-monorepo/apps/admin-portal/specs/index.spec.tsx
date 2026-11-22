@@ -3,6 +3,12 @@ import { render } from '@testing-library/react';
 import { AuthProvider } from '@dss-monorepo/auth';
 import Page from '../src/app/page';
 
+vi.mock('next/navigation', () => ({
+  usePathname: () => '/',
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn(), refresh: vi.fn(), back: vi.fn(), prefetch: vi.fn() }),
+  useSearchParams: () => new URLSearchParams(),
+}));
+
 beforeAll(() => {
   Object.defineProperty(window, 'matchMedia', {
     writable: true,

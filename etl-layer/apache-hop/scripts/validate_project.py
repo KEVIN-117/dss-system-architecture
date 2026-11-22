@@ -63,6 +63,16 @@ REQUIRED_DIRS = (
     "pipelines/quality",
     "datasets",
 )
+# Workflows the Load Manager may launch on Hop Server (LM-001), with the exact
+# parameters dw-control-service sends. Renaming a file or a parameter breaks
+# the service contract in docs/dw/hop-server-contract.md.
+EXECUTABLE_WORKFLOWS = {
+    "wf_vertical_uatf_datos_smoke.hwf": (
+        "P_RUN_ID", "P_REQUESTED_PERIODO", "P_REQUESTED_GESTION", "P_EXECUTION_KIND", "P_RETRY_OF_RUN_ID",
+    ),
+    "wf_sync_academic_catalog.hwf": (),
+    "wf_hop_publish_staged_run.hwf": ("P_RUN_ID",),
+}
 SOURCE_QUERIES = {
     "public.uatf_datos": ("select_uatf_datos_vertical.sql", "id_ra ASC"),
     "academico.alumnos": ("select_alumnos.sql", "id_alumno ASC"),
@@ -174,7 +184,7 @@ def validate() -> list[str]:
     compose_path = PROJECT.parents[3] / "docker-compose.yml"
     if compose_path.is_file():
         compose = compose_path.read_text(encoding="utf-8")
-        hop_service = compose.split("  hop-web:", 1)[-1].split("  # ====", 1)[0]
+        hop_service = compose.split("  hop-web:", 1)[-1].split("  # ====", 1)[0].split("\n  hop-server:", 1)[0]
         if ":/files/project:rw" not in hop_service:
             errors.append("docker-compose.yml must mount the Hop project read-write")
         if "/files/scripts/start-hop-web.sh" not in hop_service:
@@ -199,6 +209,47 @@ def validate() -> list[str]:
             errors.append("Hop Web startup wrapper must register each available lifecycle environment separately")
         if "Required Hop environment config is missing" not in startup:
             errors.append("Hop Web startup wrapper must fail fast when the selected environment config is absent")
+
+    server_script = PROJECT.parents[1] / "scripts" / "start-hop-server.sh"
+    if not server_script.is_file():
+        errors.append("Missing Hop Server startup wrapper: scripts/start-hop-server.sh")
+    else:
+        server_startup = server_script.read_text(encoding="utf-8")
+        if "default cluster/cluster credentials" not in server_startup:
+            errors.append("Hop Server startup wrapper must reject the upstream default credentials")
+        if "export HOP_SERVER_AUTH=true" not in server_startup:
+            errors.append("Hop Server startup wrapper must force Basic authentication")
+        if "required Hop environment config is missing" not in server_startup:
+            errors.append("Hop Server startup wrapper must fail fast when the selected environment config is absent")
+    if compose_path.is_file():
+        compose_text = compose_path.read_text(encoding="utf-8")
+        server_match = re.search(r"\n  hop-server:\n(?P<body>(?:    .*\n|\n)+)", compose_text)
+        if not server_match:
+            errors.append("docker-compose.yml must declare the hop-server service")
+        else:
+            server_service = server_match.group("body")
+            if re.search(r"^    ports:", server_service, re.M):
+                errors.append("hop-server must not publish ports on the host; only dw-control-service calls it")
+            if "Dockerfile.server" not in server_service:
+                errors.append("hop-server must be built from etl-layer/apache-hop/Dockerfile.server")
+
+    for workflow_file, expected_parameters in EXECUTABLE_WORKFLOWS.items():
+        workflow_path = PROJECT / "workflows" / workflow_file
+        if not workflow_path.is_file():
+            errors.append(f"Missing Load Manager executable workflow: workflows/{workflow_file}")
+            continue
+        try:
+            workflow_root = ET.parse(workflow_path).getroot()
+        except ET.ParseError:
+            continue  # reported by the XML parse check below
+        if workflow_root.findtext("name") != workflow_path.stem:
+            errors.append(f"{workflow_file}: workflow name must match its file name for Hop Server status lookups")
+        declared = tuple(item.findtext("name") for item in workflow_root.findall("parameters/parameter"))
+        if sorted(declared) != sorted(expected_parameters):
+            errors.append(
+                f"{workflow_file}: parameters {sorted(declared)} differ from the Load Manager contract "
+                f"{sorted(expected_parameters)}"
+            )
 
     # Parse every Hop artifact before publishing it to Hop Web or hop-run.
     for artifact in (*PROJECT.glob("workflows/**/*.hwf"), *PROJECT.glob("pipelines/**/*.hpl")):

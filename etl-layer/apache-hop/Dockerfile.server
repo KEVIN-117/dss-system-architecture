@@ -1,0 +1,32 @@
+# syntax=docker/dockerfile:1.7
+# DSS Hop Server: execution engine of the Load Manager. dw-control-service is
+# its only client (HTTP + Basic Auth on the internal network). Hop Web
+# (Dockerfile) remains the editor.
+ARG HOP_VERSION=2.19.0
+FROM apache/hop:${HOP_VERSION}
+
+LABEL org.opencontainers.image.title="DSS Apache Hop Server" \
+      org.opencontainers.image.description="DSS UATF ETL project bundled with Apache Hop Server"
+
+# The server only reads the project. Executions write to the DW, not here.
+COPY --chown=hop:hop projects/dss-uatf-etl/ /files/project/
+COPY --chmod=0755 scripts/start-hop-server.sh /files/scripts/start-hop-server.sh
+COPY jdbc/postgresql-42.7.11.jar /files/jdbc-drivers/postgresql-42.7.11.jar
+
+ENV HOP_PROJECT_NAME=dss-uatf-etl \
+    HOP_PROJECT_FOLDER=/files/project \
+    HOP_PROJECT_CONFIG_FILE_NAME=project-config.json \
+    HOP_SHARED_JDBC_FOLDERS=/files/jdbc-drivers \
+    HOP_SERVER_PORT=8080 \
+    HOP_SERVER_USER= \
+    HOP_SERVER_PASS= \
+    HOP_SERVER_PASSWORD=
+
+EXPOSE 8080
+
+# Credentials come from the environment; read them inside the container so
+# they never appear in the image config or in `docker inspect` health output.
+HEALTHCHECK --interval=15s --timeout=5s --start-period=60s --retries=5 \
+  CMD curl -fsS -o /dev/null -u "${HOP_SERVER_USER}:${HOP_SERVER_PASS}" "http://127.0.0.1:${HOP_SERVER_PORT}/hop/status/?json=Y" || exit 1
+
+ENTRYPOINT ["/bin/bash", "/files/scripts/start-hop-server.sh"]
