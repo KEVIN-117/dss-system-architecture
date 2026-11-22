@@ -38,7 +38,6 @@ debug: true
 jwt:
   auth:
     converter:
-      resource-id: uatf-auth-service
       principal-attribute: preferred_username
 
 app:

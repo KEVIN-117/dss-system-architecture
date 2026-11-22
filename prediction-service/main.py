@@ -629,11 +629,10 @@ def _authenticate_ml_operator(authorization: str | None) -> Principal:
     """Verify the bearer JWT in this service; the BFF check is not the only gate."""
     if not authorization or not authorization.startswith("Bearer ") or not authorization[7:].strip():
         raise InferenceFailure("INVALID_TOKEN", 401, "A bearer access token is required.")
-    # prediction:train, or a PREDICTION_TRAINING_ROLES role during the coexistence (IAM-013).
-    legacy_roles = access_policy.legacy_training_roles()
+    # prediction:train from dss-permissions (IAM-013).
     identity = getattr(app.state, "identity_provider", None) or KeycloakIdentityProvider()
     principal = identity.authenticate(authorization[7:].strip())
-    if not access_policy.has_permission(principal, access_policy.PREDICTION_TRAIN, legacy_roles):
+    if not access_policy.has_permission(principal, access_policy.PREDICTION_TRAIN):
         raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The account cannot operate model training or datasets.")
     return principal
 

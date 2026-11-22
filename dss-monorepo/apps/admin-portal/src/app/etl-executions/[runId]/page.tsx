@@ -1,5 +1,5 @@
 import { AdminEtlExecutionDetailPage } from '../../components/AdminEtlExecutionDetailPage';
-import { AdminPortalLayout } from '../../components/AdminPortalLayout';
+import { ADMIN_PERMISSIONS, AdminPortalLayout } from '../../components/AdminPortalLayout';
 
 export default async function EtlExecutionDetailRoute({
   params,
@@ -8,7 +8,7 @@ export default async function EtlExecutionDetailRoute({
 }) {
   const { runId } = await params;
   return (
-    <AdminPortalLayout access="authenticated">
+    <AdminPortalLayout access={ADMIN_PERMISSIONS.etl}>
       <AdminEtlExecutionDetailPage runId={decodeURIComponent(runId)} />
     </AdminPortalLayout>
   );

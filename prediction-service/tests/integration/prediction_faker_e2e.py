@@ -90,7 +90,8 @@ class IntegrationIdentity:
         if token != "faker-integration-token":
             from inference import InferenceFailure
             raise InferenceFailure("INVALID_TOKEN", 401, "The access token is invalid or expired.")
-        return Principal("faker-integration-test", frozenset({"RECTOR"}), ())
+        return Principal("faker-integration-test", frozenset({"RECTOR"}), (),
+                         frozenset({"analytics:read", "analytics:global"}))
 
 
 def _sample(database_url: str) -> tuple[str, str, str, str, str]:
@@ -181,7 +182,6 @@ def main() -> None:
         }
         registry = ModelRegistry(root)
         data = DwPredictionDataProvider(database_url)
-        os.environ["PREDICTION_ALLOWED_ROLES"] = '["RECTOR"]'
         service = PredictionService(registry, IntegrationIdentity(), data, ConfiguredAcademicPolicy())
         app.state.prediction_service = service
         try:

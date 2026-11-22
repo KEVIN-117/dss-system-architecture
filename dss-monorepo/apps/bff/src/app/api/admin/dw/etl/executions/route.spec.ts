@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { authenticateRequest, requireClientRoles, requirePermissions } = vi.hoisted(() => ({
+const { authenticateRequest, requirePermissions } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
-  requireClientRoles: vi.fn(),
-  // IAM-014: the dw:* permission is checked first; these tests use the legacy DW_* role path.
+  // IAM-011/IAM-019: only the dw:* permission of the token opens DW routes.
   requirePermissions: vi.fn(),
 }));
 
 vi.mock('../../../../_lib/auth-guard', () => ({
   authenticateRequest,
-  requireClientRoles,
   requirePermissions,
 }));
 
@@ -28,7 +26,7 @@ const authenticatedRequest = {
     token: 'verified-jwt',
     user: { sub: 'authorized-subject' },
     roles: [],
-    clientRoles: { 'dw-control-service': ['DW_ETL_MONITOR_READ'] },
+    permissions: ['dw:etl-monitor:read'],
   },
 };
 
@@ -42,7 +40,7 @@ describe('GET /api/admin/dw/etl/executions BFF-service contract', () => {
   it('forwards validated filters and the verified JWT, then returns the normalized page', async () => {
     vi.stubEnv('DW_CONTROL_SERVICE_URL', 'http://dw-control-service:8090');
     authenticateRequest.mockResolvedValue(authenticatedRequest);
-    requireClientRoles.mockReturnValue(null);
+    requirePermissions.mockReturnValue(null);
     const fetchMock = vi
       .fn()
       .mockResolvedValue(
@@ -70,10 +68,9 @@ describe('GET /api/admin/dw/etl/executions BFF-service contract', () => {
       totalElements: 0,
       totalPages: 0,
     });
-    expect(requireClientRoles).toHaveBeenCalledWith(
+    expect(requirePermissions).toHaveBeenCalledWith(
       authenticatedRequest.value,
-      'dw-control-service',
-      ['DW_ETL_MONITOR_READ'],
+      ['dw:etl-monitor:read'],
     );
     const [url, init] = fetchMock.mock.calls[0] as [URL, RequestInit];
     expect(url.toString()).toBe(
@@ -87,7 +84,7 @@ describe('GET /api/admin/dw/etl/executions BFF-service contract', () => {
 
   it('rejects unsupported filters before contacting dw-control-service', async () => {
     authenticateRequest.mockResolvedValue(authenticatedRequest);
-    requireClientRoles.mockReturnValue(null);
+    requirePermissions.mockReturnValue(null);
     const fetchMock = vi.fn();
     vi.stubGlobal('fetch', fetchMock);
 
@@ -103,7 +100,7 @@ describe('GET /api/admin/dw/etl/executions BFF-service contract', () => {
 
   it('checks authorization before making service requests', async () => {
     authenticateRequest.mockResolvedValue(authenticatedRequest);
-    requireClientRoles.mockReturnValue(
+    requirePermissions.mockReturnValue(
       Response.json({ error: 'Insufficient permissions' }, { status: 403 }),
     );
     const fetchMock = vi.fn();

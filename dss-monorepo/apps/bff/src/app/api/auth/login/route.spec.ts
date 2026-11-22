@@ -7,7 +7,6 @@ function configureEnvironment() {
   vi.stubEnv('KEYCLOAK_URL', 'http://keycloak:8080');
   vi.stubEnv('KEYCLOAK_REALM', 'uatf-dss-realm');
   vi.stubEnv('KEYCLOAK_AUDIENCE', 'uatf-auth-service');
-  vi.stubEnv('KEYCLOAK_ROLE_CLIENT_ID', 'uatf-auth-service');
   vi.stubEnv('KEYCLOAK_BFF_CLIENT_ID', 'dss-bff');
   vi.stubEnv('KEYCLOAK_BFF_CLIENT_SECRET', 'a-confidential-client-secret-that-is-not-committed');
   vi.stubEnv('KEYCLOAK_BFF_REDIRECT_URI', 'http://localhost:3006/api/auth/callback');

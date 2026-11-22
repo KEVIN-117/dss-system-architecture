@@ -47,7 +47,6 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `PREDICTION_CUSTOM_DATASET_ROOT` | `/app/custom-datasets` | Almacén compartido de datasets subidos: lectura-escritura en la API, solo lectura en el worker (volumen `prediction_custom_datasets`). |
 | `PREDICTION_DATASET_UPLOAD_MAX_BYTES` | `52428800` | Tamaño máximo del `.zip` subido; se rechaza con `413` sin cargarlo completo en memoria. |
 | `PREDICTION_DATASET_MAX_UNCOMPRESSED_BYTES` | `209715200` | Tamaño máximo descomprimido de `manifest.json` + `rows.jsonl` (protección contra zip bombs). |
-| `PREDICTION_TRAINING_ROLES` | `["SUPERADMIN"]` | **Convivencia.** Roles que además de `prediction:train` pueden entrenar y gestionar datasets. Inválida o vacía bloquea esos endpoints con `503`. Se ignora con `PREDICTION_LEGACY_ROLES_ENABLED=false`. |
 | `PREDICTION_CONFIG_ROOT` | `/app/configurations` (worker) | Catálogo de configuraciones versionadas; Compose lo monta en solo lectura. |
 | `PREDICTION_OUTBOX_POLL_SECONDS` | `5` | Intervalo de recuperación de mensajes pendientes en outbox. |
 | `PREDICTION_MAX_QUEUED_JOBS` | `4` | Jobs de entrenamiento en cola admitidos además de `WORKER_MAX_CONCURRENT_JOBS` en ejecución; al superarse responde `429 JOB_CAPACITY`. |
@@ -56,13 +55,9 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `KEYCLOAK_REALM` | *(sin configurar)* | Realm usado para validar firma e issuer del bearer token. |
 | `KEYCLOAK_AUDIENCE` | *(sin configurar)* | Audience requerido en el access token. |
 | `KEYCLOAK_PERMISSIONS_CLIENT_ID` | `dss-permissions` | Cliente catálogo cuyos roles son los permisos (`analytics:*`, `prediction:publish`, `prediction:train`). |
-| `KEYCLOAK_ROLE_CLIENT_ID` | *(sin configurar)* | Opcional. Cliente de los roles antiguos que se leen además de los roles del realm, solo para la convivencia. |
-| `PREDICTION_LEGACY_ROLES_ENABLED` | `true` | Convivencia: también acepta las listas de roles `PREDICTION_ALLOWED_ROLES`, `PREDICTION_BATCH_SUBMITTER_ROLES` y `PREDICTION_TRAINING_ROLES`. Con `false`, solo los permisos. Un valor que no sea `true`/`false` bloquea con `503`. |
 | `KEYCLOAK_ISSUER_URI` | Derivado de URL + realm | Emisor exacto que debe coincidir con el claim `iss`; admite hostname externo distinto. |
 | `KEYCLOAK_JWKS_URL` | Derivado del issuer | URL para descargar claves de firma; permite hostname interno del contenedor. |
 | `AUTH_SERVICE_URL` | `http://auth-service:8000` | Servicio que devuelve el perfil activo y sus `academicContexts` confiables. |
-| `PREDICTION_ALLOWED_ROLES` | *(sin configurar)* | **Convivencia.** Roles académicos que siguen valiendo como permisos: `RECTOR` = `analytics:read` + `analytics:global`, `DECANO` = `analytics:faculty`, `DIRECTOR` = `analytics:career`. Sin configurar no acepta ningún rol; inválida bloquea con `503`. |
-| `PREDICTION_BATCH_SUBMITTER_ROLES` | `[]` | **Convivencia.** Roles que además de `prediction:publish` pueden iniciar el scoring poblacional. Vacía no acepta ningún rol (responde `403`); inválida bloquea con `503`. |
 
 ### Variables del Worker y Broker
 
@@ -105,14 +100,14 @@ Los permisos vienen del token (`resource_access.dss-permissions.roles`) y se ges
 
 El alcance es la **unión** de todos los contextos académicos que devuelve auth-service (IAM-009) y de todos los permisos de alcance: por ejemplo, un decano interino con dos facultades ve ambas, y un usuario con `analytics:faculty` y `analytics:career` ve su facultad y además su carrera de otra facultad. SUPERADMIN no tiene permisos `analytics:*` y, por lo tanto, no tiene acceso académico.
 
-Durante la convivencia (`PREDICTION_LEGACY_ROLES_ENABLED=true`), las listas de roles siguen valiendo y se traducen a los mismos permisos. Antes de poner `false`, asigna `prediction:publish` y `prediction:train` a quien los necesite: SUPERADMIN ya incluye `prediction:train`, pero ningún rol incluye `prediction:publish`.
+Las listas de roles de la convivencia (`PREDICTION_ALLOWED_ROLES`, `PREDICTION_BATCH_SUBMITTER_ROLES`, `PREDICTION_TRAINING_ROLES`, `PREDICTION_LEGACY_ROLES_ENABLED` y `KEYCLOAK_ROLE_CLIENT_ID`) se retiraron en IAM-019 y se ignoran. SUPERADMIN incluye `prediction:train`; ningún rol incluye `prediction:publish`, que se asigna por usuario desde el admin-portal.
 
 ## Endpoints de la API
 
 - `GET /`: Health check básico del servicio.
 - `POST /predict`: ruta heredada deshabilitada para scoring. Devuelve `503` si no hay modelo aprobado; con uno activo informa que falta el adaptador confiable de features DW. Nunca fabrica una predicción ni acepta features del cliente como datos institucionales.
 - `POST /v1/predictions`: inferencia puntual. `event_type=program_dropout` predice abandono de programa; `event_type=course_abandonment` requiere además `course_ref`. Requiere bearer JWT, estudiante/programa/corte y bundle aprobado para el evento y cadencia correspondientes. La población abarca los tres primeros años académicos (tres cortes anuales o seis semestrales). El cliente no puede enviar features.
-- `POST /v1/prediction-batches`: crea un lote asíncrono de abandono de programa para programa/corte, con idempotencia y modelo aprobado fijado al aceptar el trabajo. Requiere el permiso `prediction:publish` (o un rol de `PREDICTION_BATCH_SUBMITTER_ROLES` durante la convivencia) y, además, ámbito académico sobre el programa.
+- `POST /v1/prediction-batches`: crea un lote asíncrono de abandono de programa para programa/corte, con idempotencia y modelo aprobado fijado al aceptar el trabajo. Requiere el permiso `prediction:publish` y, además, ámbito académico sobre el programa.
 - `GET /v1/prediction-batches/{batch_id}`: consulta estado e historial; devuelve filas únicamente tras `PUBLISHED` y si el solicitante conserva ámbito para el programa/corte.
 - `GET /v1/prediction-publications?program_ref=…&cut_id=…`: obtiene la publicación completa vigente; devuelve `publication: null` si aún no existe. Los lotes históricos se consultan por `batch_id`.
 - `GET /v1/academic-options`: devuelve programas activos y cierres procesados visibles para el usuario autenticado; filtra las opciones por permisos y ámbito académico.
@@ -122,7 +117,7 @@ Durante la convivencia (`PREDICTION_LEGACY_ROLES_ENABLED=true`), las listas de r
 - `GET /v1/datasets`: lista fixtures y datasets subidos o provisionados.
 - `POST /v1/datasets/upload`: recibe un `.zip` con un único `manifest.json` y un único `rows.jsonl`, aplica límites de tamaño, valida el contrato y registra el dataset de forma **inmutable** (`409` si el `dataset_id` ya existe). Guarda `upload.json` con el `sub` del operador, la fecha y el SHA-256 del archivo. El worker lo resuelve como `custom:<dataset_id>`.
 
-Los cuatro endpoints de entrenamiento y datasets validan el JWT de Keycloak dentro del propio servicio (no dependen solo del BFF) y exigen un rol de `PREDICTION_TRAINING_ROLES`: `401` sin token válido, `403` sin rol de operador ML.
+Los cuatro endpoints de entrenamiento y datasets validan el JWT de Keycloak dentro del propio servicio (no dependen solo del BFF) y exigen el permiso `prediction:train`: `401` sin token válido, `403` sin el permiso.
 
 ## Contrato de features (paridad entrenamiento/servicio)
 
@@ -164,7 +159,7 @@ La inferencia institucional requiere configuración aprobada para Keycloak, Auth
 
 La migración `0034_prediction_publications.sql` crea `ml_workspace.prediction_batch`, su outbox y las filas de `prediction_result`. El lote y sus resultados pasan a `PUBLISHED` en una transacción; `v_published_prediction` oculta los demás estados. Las predicciones nunca se insertan en `fact_retencion_desercion` y las tablas no se otorgan a `dw_reader`, `dw_ml_writer` ni `dw_prediction_reader`. El API aplica permisos y ámbito antes de devolver resultados. Las recalculaciones crean lotes nuevos e inmutables; la consulta vigente selecciona el último lote publicado para el mismo programa/corte.
 
-El worker comprueba que el modelo activo todavía coincida con el fijado al crear el lote. Si cambió antes de puntuar, falla el lote y debe enviarse una solicitud nueva. Mantén `PREDICTION_BATCH_SUBMITTER_ROLES` separado de los roles de consulta: iniciar un scoring poblacional requiere asignación explícita de IAM/DSA. Configura el worker con `PREDICTION_DW_DATABASE_URL` de solo lectura y su conexión de publicación con los grants necesarios de `dw_prediction_runtime`.
+El worker comprueba que el modelo activo todavía coincida con el fijado al crear el lote. Si cambió antes de puntuar, falla el lote y debe enviarse una solicitud nueva. Mantén `prediction:publish` separado de los permisos de consulta: iniciar un scoring poblacional requiere asignación explícita de IAM/DSA. Configura el worker con `PREDICTION_DW_DATABASE_URL` de solo lectura y su conexión de publicación con los grants necesarios de `dw_prediction_runtime`.
 
 Detalles de implementación, cobertura y pendientes de aprobación: [PRED-006 — Inferencia puntual](../docs/prediction/PRED-006-implementation.md).
 
@@ -198,6 +193,6 @@ docker compose up --build -d postgres-dw dw-migrator rabbitmq prediction-service
 docker compose run --rm --no-deps -e PREDICTION_TEST_OPERATOR_TOKEN prediction-worker python /app/tests/integration/stack_smoke.py
 ```
 
-`PREDICTION_TEST_OPERATOR_TOKEN` debe contener un access token con un rol de `PREDICTION_TRAINING_ROLES`; la API rechaza los envíos de entrenamiento sin él.
+`PREDICTION_TEST_OPERATOR_TOKEN` debe contener un access token con el permiso `prediction:train`; la API rechaza los envíos de entrenamiento sin él.
 
 La prueba crea trabajos sintéticos y comprueba la ruta API → PostgreSQL/outbox → RabbitMQ → worker, el reintento del outbox, la recuperación de una lease vencida y el digest del artefacto. No usa datos institucionales.

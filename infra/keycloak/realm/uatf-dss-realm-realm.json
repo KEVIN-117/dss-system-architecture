@@ -55,10 +55,6 @@
         "composite": true,
         "composites": {
           "client": {
-            "uatf-auth-service": [
-              "DECANO",
-              "DIRECTOR"
-            ],
             "dss-permissions": [
               "analytics:read",
               "analytics:career",
@@ -78,11 +74,6 @@
         "composite": true,
         "composites": {
           "client": {
-            "uatf-auth-service": [
-              "DECANO",
-              "DIRECTOR",
-              "RECTOR"
-            ],
             "dss-permissions": [
               "analytics:read",
               "analytics:career",
@@ -134,9 +125,6 @@
         "composite": true,
         "composites": {
           "client": {
-            "uatf-auth-service": [
-              "SUPERADMIN"
-            ],
             "dss-permissions": [
               "connectors:read",
               "connectors:write",
@@ -164,9 +152,6 @@
         "composite": true,
         "composites": {
           "client": {
-            "uatf-auth-service": [
-              "DIRECTOR"
-            ],
             "dss-permissions": [
               "analytics:read",
               "analytics:career"
@@ -437,76 +422,11 @@
           "attributes": {}
         }
       ],
-      "uatf-auth-service": [
-        {
-          "id": "3c6f8513-6fd0-4f60-a95f-2166dd80c39c",
-          "name": "DECANO",
-          "description": "Máxima autoridad de una Facultad. Permite el acceso consolidado de todas las carreras y programas que pertenezcan única y exclusivamente a su Facultad asignada.",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
-          "attributes": {}
-        },
-        {
-          "id": "f9699c59-5198-481c-81b7-bbcf4735e549",
-          "name": "SUPERADMIN",
-          "description": "Rol de administración técnica global del sistema. Permite la gestión de usuarios, roles, clientes y la visualización de auditorías del sistema.",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
-          "attributes": {}
-        },
-        {
-          "id": "d49acacb-994c-421d-8cdb-b193ed1a8ada",
-          "name": "DIRECTOR",
-          "description": "Autoridad ejecutiva de una carrera o programa académico. Permite el acceso consolidado a nivel de la carrera bajo su administración.",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
-          "attributes": {}
-        },
-        {
-          "id": "a16d5353-a3fa-43e5-96f6-db3e588dfccf",
-          "name": "RECTOR",
-          "description": "Máxima autoridad ejecutiva de la universidad UATF. Permite el acceso consolidado a métricas, reportes y dashboards a nivel institucional total.",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
-          "attributes": {}
-        },
-        {
-          "id": "b6b2ab9b-0340-4f0a-9c5d-5d46be746bbb",
-          "name": "CONTEXT_READER",
-          "description": "Lectura servicio-a-servicio del alcance académico (GET /internal/users/{id}/academic-contexts). Solo para cuentas de servicio; nunca asignar a usuarios humanos.",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "753edb77-9a49-4c40-98b4-8857e733ffb0",
-          "attributes": {}
-        }
-      ],
+      "uatf-auth-service": [],
       "security-admin-console": [],
       "admin-cli": [],
       "account-console": [],
-      "olap-service": [
-        {
-          "id": "6297d9a2-280b-4e36-9887-ca58a13b95bc",
-          "name": "OLAP_ADMIN",
-          "description": "Administra fuentes de datos y operaciones OLAP administrativas.",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "987f2715-bcb8-467c-827d-2d9bfed09fde",
-          "attributes": {}
-        },
-        {
-          "id": "fab8625c-bc27-4b0c-8b67-bce5cc66799b",
-          "name": "OLAP_USER",
-          "description": "Acceso de usuario a las operaciones OLAP autorizadas.",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "987f2715-bcb8-467c-827d-2d9bfed09fde",
-          "attributes": {}
-        }
-      ],
+      "olap-service": [],
       "broker": [
         {
           "id": "20e7f31b-601a-4fec-9ca1-d2201421485e",
@@ -607,35 +527,7 @@
         }
       ],
       "dss-bff": [],
-      "dw-control-service": [
-        {
-          "id": "a71ac3c5-27ac-4e47-a081-bf7f9486e8a1",
-          "name": "DW_CLOSURE_READ",
-          "description": "Read academic closure records and events.",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "c0d94e51-6e3c-4b7c-9210-6d4767cdce7c",
-          "attributes": {}
-        },
-        {
-          "id": "3d3dc348-f050-4b59-8d98-0e7d0ebfcb7b",
-          "name": "DW_CLOSURE_MANAGE",
-          "description": "Create and manage academic period closures.",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "c0d94e51-6e3c-4b7c-9210-6d4767cdce7c",
-          "attributes": {}
-        },
-        {
-          "id": "4b45895a-f71d-4416-9e8f-ef1985d28c3d",
-          "name": "DW_ETL_MONITOR_READ",
-          "description": "Read ETL execution monitoring data.",
-          "composite": false,
-          "clientRole": true,
-          "containerId": "c0d94e51-6e3c-4b7c-9210-6d4767cdce7c",
-          "attributes": {}
-        }
-      ],
+      "dw-control-service": [],
       "dss-permissions": [
         {
           "id": "4d8a9960-34de-5726-99a7-949d4dd7faf6",
@@ -945,9 +837,6 @@
         "default-roles-uatf-dss-realm"
       ],
       "clientRoles": {
-        "uatf-auth-service": [
-          "CONTEXT_READER"
-        ],
         "dss-permissions": [
           "context:read"
         ]
@@ -1407,7 +1296,22 @@
         "offline_access",
         "microprofile-jwt"
       ],
-      "secret": "${KEYCLOAK_OLAP_CLIENT_SECRET}"
+      "secret": "${KEYCLOAK_OLAP_CLIENT_SECRET}",
+      "protocolMappers": [
+        {
+          "id": "2f4a4e21-56cb-435b-afb6-a36e06762fe9",
+          "name": "audience-auth-service",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "uatf-auth-service",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "false"
+          }
+        }
+      ]
     },
     {
       "id": "49f25cf9-cf44-40dc-bc05-4a08d0a1a567",

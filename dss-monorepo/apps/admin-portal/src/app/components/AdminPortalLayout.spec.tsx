@@ -61,7 +61,7 @@ describe('AdminPortalLayout', () => {
     expect(screen.getByText('Resumen general')).toBeTruthy();
     expect(screen.queryByText('Conexiones')).toBeNull();
     expect(screen.queryByText('Operaciones ML')).toBeNull();
-    expect(screen.getByText('Cierres académicos')).toBeTruthy();
+    expect(screen.queryByText('Cierres académicos')).toBeNull();
   });
 
   it('opens roles, permissions and the matrix with iam:roles:read alone', () => {
@@ -102,11 +102,20 @@ describe('AdminPortalLayout', () => {
     expect(screen.queryByText('Usuarios')).toBeNull();
   });
 
-  it('leaves DW pages to the service for any authenticated user', () => {
-    useAuth.mockReturnValue(session([], []));
-    render(<AdminPortalLayout access="authenticated"><p>cierres</p></AdminPortalLayout>);
+  it('opens DW pages with their dw:* permissions only (IAM-019)', () => {
+    useAuth.mockReturnValue(session([], ['dw:etl-monitor:read']));
+    const { unmount } = render(<AdminPortalLayout access={ADMIN_PERMISSIONS.etl}><p>ejecuciones</p></AdminPortalLayout>);
 
-    expect(screen.getByText('cierres')).toBeTruthy();
-    expect(screen.queryByText('Resumen general')).toBeNull();
+    expect(screen.getByText('ejecuciones')).toBeTruthy();
+    expect(screen.getByText('Ejecuciones ETL')).toBeTruthy();
+    expect(screen.queryByText('Cierres académicos')).toBeNull();
+    expect(screen.getByText('Resumen general')).toBeTruthy();
+    unmount();
+
+    // Without the permission the page is denied: the retired DW_* roles no longer exist to fall back on.
+    useAuth.mockReturnValue(session(['SUPERADMIN'], ['iam:users:read']));
+    render(<AdminPortalLayout access={ADMIN_PERMISSIONS.closures}><p>cierres</p></AdminPortalLayout>);
+    expect(screen.getByText('Acceso restringido')).toBeTruthy();
+    expect(screen.queryByText('cierres')).toBeNull();
   });
 });

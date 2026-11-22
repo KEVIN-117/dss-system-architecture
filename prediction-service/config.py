@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import logging
 import os
 from dataclasses import dataclass
@@ -95,7 +94,6 @@ class Settings:
             missing.append("PREDICTION_DW_DATABASE_URL")
 
         # Keycloak settings
-        # KEYCLOAK_ROLE_CLIENT_ID is optional since IAM-013: it only names the client of legacy roles.
         for key in ("KEYCLOAK_URL", "KEYCLOAK_REALM", "KEYCLOAK_AUDIENCE"):
             if not os.getenv(key, "").strip():
                 missing.append(key)
@@ -104,42 +102,6 @@ class Settings:
         auth_url = os.getenv("AUTH_SERVICE_URL", "").strip()
         if not auth_url:
             missing.append("AUTH_SERVICE_URL")
-
-        # Access comes from dss-permissions (IAM-013). The legacy role lists below are optional and
-        # only read while PREDICTION_LEGACY_ROLES_ENABLED is true; when present they must be valid.
-        legacy_flag = os.getenv("PREDICTION_LEGACY_ROLES_ENABLED", "true").strip().lower()
-        if legacy_flag not in {"true", "false", "1", "0", "yes", "no", ""}:
-            missing.append("PREDICTION_LEGACY_ROLES_ENABLED (must be true or false)")
-
-        allowed_roles_raw = os.getenv("PREDICTION_ALLOWED_ROLES", "").strip()
-        if allowed_roles_raw:
-            try:
-                roles = json.loads(allowed_roles_raw)
-                valid = {"DIRECTOR", "DECANO", "RECTOR"}
-                if not isinstance(roles, list) or not roles or any(r not in valid for r in roles):
-                    missing.append("PREDICTION_ALLOWED_ROLES (invalid role format)")
-            except Exception:
-                missing.append("PREDICTION_ALLOWED_ROLES (invalid JSON)")
-
-        submitter_roles_raw = os.getenv("PREDICTION_BATCH_SUBMITTER_ROLES")
-        if submitter_roles_raw is not None:
-            try:
-                submitter_roles = json.loads(submitter_roles_raw)
-                # An empty list is valid: it explicitly disables population submission.
-                if not isinstance(submitter_roles, list) or any(r not in {"DIRECTOR", "DECANO", "RECTOR"} for r in submitter_roles):
-                    missing.append("PREDICTION_BATCH_SUBMITTER_ROLES (invalid role format)")
-            except Exception:
-                missing.append("PREDICTION_BATCH_SUBMITTER_ROLES (invalid JSON)")
-
-        training_roles_raw = os.getenv("PREDICTION_TRAINING_ROLES")
-        if training_roles_raw is not None:
-            try:
-                training_roles = json.loads(training_roles_raw)
-                if (not isinstance(training_roles, list) or not training_roles
-                        or any(not isinstance(r, str) or not r.strip() for r in training_roles)):
-                    missing.append("PREDICTION_TRAINING_ROLES (invalid role format)")
-            except Exception:
-                missing.append("PREDICTION_TRAINING_ROLES (invalid JSON)")
 
         if missing:
             msg = f"Runtime configuration missing or invalid: {', '.join(missing)}"

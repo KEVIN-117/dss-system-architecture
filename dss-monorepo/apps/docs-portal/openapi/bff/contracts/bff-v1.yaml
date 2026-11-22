@@ -206,7 +206,7 @@ paths:
       tags: [Data Warehouse]
       operationId: listClosures
       summary: Lista cierres académicos
-      x-required-permission: DW_CLOSURE_READ
+      x-required-permission: dw:closure:read
       parameters:
         - { name: gestion, in: query, schema: { type: integer } }
         - { name: periodo, in: query, schema: { type: integer } }
@@ -222,7 +222,7 @@ paths:
       tags: [Data Warehouse]
       operationId: createClosure
       summary: Crea un corte académico pendiente
-      x-required-permission: DW_CLOSURE_MANAGE
+      x-required-permission: dw:closure:manage
       requestBody:
         required: true
         content:
@@ -246,7 +246,7 @@ paths:
       tags: [Data Warehouse]
       operationId: getClosure
       summary: Obtiene un cierre académico
-      x-required-permission: DW_CLOSURE_READ
+      x-required-permission: dw:closure:read
       parameters:
         - $ref: '#/components/parameters/ClosureId'
       responses:
@@ -259,7 +259,7 @@ paths:
       tags: [Data Warehouse]
       operationId: listClosureEvents
       summary: Consulta el historial de auditoría de un cierre
-      x-required-permission: DW_CLOSURE_READ
+      x-required-permission: dw:closure:read
       parameters:
         - $ref: '#/components/parameters/ClosureId'
       responses:
@@ -271,7 +271,7 @@ paths:
       tags: [Data Warehouse]
       operationId: closeClosure
       summary: Autoriza el cierre de un periodo
-      x-required-permission: DW_CLOSURE_MANAGE
+      x-required-permission: dw:closure:manage
       parameters:
         - $ref: '#/components/parameters/ClosureId'
       requestBody:
@@ -296,7 +296,7 @@ paths:
       tags: [Data Warehouse]
       operationId: reopenClosure
       summary: Reabre un periodo cerrado o procesado
-      x-required-permission: DW_CLOSURE_MANAGE
+      x-required-permission: dw:closure:manage
       parameters:
         - $ref: '#/components/parameters/ClosureId'
       requestBody:
@@ -320,7 +320,7 @@ paths:
       tags: [Data Warehouse]
       operationId: listEtlExecutions
       summary: Lista ejecuciones ETL registradas
-      x-required-permission: DW_ETL_MONITOR_READ
+      x-required-permission: dw:etl-monitor:read
       parameters:
         - { name: status, in: query, schema: { type: string } }
         - { name: executionKind, in: query, schema: { type: string } }
@@ -336,7 +336,7 @@ paths:
       tags: [Data Warehouse]
       operationId: getEtlExecution
       summary: Obtiene el detalle de una ejecución ETL
-      x-required-permission: DW_ETL_MONITOR_READ
+      x-required-permission: dw:etl-monitor:read
       parameters:
         - { name: runId, in: path, required: true, schema: { type: string } }
       responses:

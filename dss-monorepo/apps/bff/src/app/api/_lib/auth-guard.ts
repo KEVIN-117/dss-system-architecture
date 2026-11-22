@@ -25,7 +25,6 @@ export interface AuthenticatedRequest {
   roles: readonly DSSRole[];
   /** Permissions from the verified token (`resource_access.dss-permissions.roles`, IAM-014). */
   permissions: readonly string[];
-  clientRoles: Readonly<Record<string, readonly string[]>>;
   token: string;
 }
 
@@ -60,11 +59,6 @@ export async function authenticateRequest(
         user: { ...profile, roles: verified.roles },
         roles: verified.roles,
         permissions: verified.permissions,
-        clientRoles: Object.fromEntries(
-          Object.entries(verified.claims.resource_access ?? {}).map(
-            ([clientId, access]) => [clientId, [...access.roles]],
-          ),
-        ),
         token,
       },
     };
@@ -130,26 +124,6 @@ export function requireRoles(
 
   return NextResponse.json(
     { error: 'Insufficient permissions', requiredRoles },
-    { status: 403 },
-  );
-}
-
-/** Requires roles issued specifically for a Keycloak client, after JWT verification. */
-export function requireClientRoles(
-  authentication: AuthenticatedRequest,
-  clientId: string,
-  requiredRoles: readonly string[],
-): NextResponse | null {
-  const granted = authentication.clientRoles[clientId] ?? [];
-  if (
-    clientId.trim() &&
-    requiredRoles.length > 0 &&
-    requiredRoles.every((role) => granted.includes(role))
-  ) {
-    return null;
-  }
-  return NextResponse.json(
-    { error: 'Insufficient permissions' },
     { status: 403 },
   );
 }

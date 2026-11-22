@@ -61,7 +61,6 @@ function signedIn(permissions: string[]) {
       token: 'user-access-token',
       roles: [],
       permissions,
-      clientRoles: {},
       user: { id: USER, username: 'ana.admin', academicContexts: [], roles: [] },
     },
   };

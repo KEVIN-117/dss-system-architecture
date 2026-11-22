@@ -14,7 +14,7 @@ Proceso completo:
 
 | Requisito | Cómo verificarlo |
 |---|---|
-| Cuenta con rol `SUPERADMIN` | Solo esa cuenta ve **Operaciones ML** en el menú. El servicio de predicción solo acepta los roles de `PREDICTION_TRAINING_ROLES` (por defecto `["SUPERADMIN"]`). |
+| Cuenta con rol `SUPERADMIN` | Solo esa cuenta ve **Operaciones ML** en el menú. El servicio de predicción exige el permiso `prediction:train`, que SUPERADMIN incluye. |
 | DW cargado con los cortes a usar | En el portal admin, **Cierres académicos**: los cortes deben estar en `PROCESADO`. **Ejecuciones ETL**: la última ejecución de cada corte debe ser `EXITOSA`. |
 | Definición del objetivo y de la población **aprobadas por DSA** | Necesitas las dos referencias de esas aprobaciones, registradas en [decisiones-dsa](decisiones-dsa/README.md). Sin ellas el portal rechaza el dataset (ver paso 3). No se inventan referencias. |
 | Entorno local | Git Bash, `uv`, Python y Docker con el contenedor `postgres-dw` corriendo. El DW debe estar accesible en `localhost:5434`. |

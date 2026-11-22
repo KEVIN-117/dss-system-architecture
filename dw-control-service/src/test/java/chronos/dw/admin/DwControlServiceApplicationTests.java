@@ -12,8 +12,7 @@ import org.springframework.test.context.ActiveProfiles;
             "spring.datasource.password=",
             "app.security.jwt.issuer-uri=http://localhost:8080/realms/uatf-dss-realm",
             "app.security.jwt.jwk-set-uri=http://localhost:8080/realms/uatf-dss-realm/protocol/openid-connect/certs",
-            "app.security.jwt.audience=dw-control-service",
-            "app.security.jwt.client-id=dw-control-service"
+            "app.security.jwt.audience=dw-control-service"
         })
 class DwControlServiceApplicationTests {
 

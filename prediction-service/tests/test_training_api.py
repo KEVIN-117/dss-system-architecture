@@ -18,10 +18,13 @@ class FakeIdentity:
     """Token -> principal map; the real provider verifies Keycloak JWTs."""
 
     PRINCIPALS = {
-        "operator-token": Principal("operator-1", frozenset({"SUPERADMIN"}), ()),
+        # SUPERADMIN groups prediction:train in the realm, so its token carries the permission.
+        "operator-token": Principal("operator-1", frozenset({"SUPERADMIN"}), (), frozenset({"prediction:train"})),
         "rector-token": Principal("rector-1", frozenset({"RECTOR"}), ()),
         # IAM-013: the permission alone, without the SUPERADMIN role.
         "ml-permission-token": Principal("ml-1", frozenset(), (), frozenset({"prediction:train"})),
+        # IAM-019: the role alone, without the permission (the retired PREDICTION_TRAINING_ROLES granted it).
+        "superadmin-role-token": Principal("admin-1", frozenset({"SUPERADMIN"}), ()),
     }
 
     def authenticate(self, access_token: str) -> Principal:
@@ -158,27 +161,26 @@ class TrainingApiTests(unittest.TestCase):
         stored = JobStore(self.store_path).get(response.json()["job_id"])
         self.assertEqual(stored.submitted_by, "operator-1")
 
-    def test_invalid_operator_role_policy_fails_closed(self) -> None:
-        with patch.dict("os.environ", {"PREDICTION_TRAINING_ROLES": "not-json"}):
-            response = self.operator.post("/v1/training-jobs", json={"dataset_ref": "fixture:pred003_synthetic-v1", "algorithm": "random_forest"},
-                                          headers={"Idempotency-Key": "bad-policy-key-0001"})
-        self.assertEqual(response.status_code, 503)
-        self.assertEqual(response.json()["code"], "AUTHORIZATION_UNAVAILABLE")
+    def test_retired_operator_role_policy_is_ignored(self) -> None:
+        # IAM-019: an invalid or permissive PREDICTION_TRAINING_ROLES no longer changes anything.
+        body = {"dataset_ref": "fixture:pred003_synthetic-v1", "algorithm": "random_forest"}
+        with patch.dict("os.environ", {"PREDICTION_TRAINING_ROLES": "not-json", "PREDICTION_LEGACY_ROLES_ENABLED": "maybe"}):
+            with patch("training.tasks.train_model_task.apply_async"):
+                response = self.operator.post("/v1/training-jobs", json=body,
+                                              headers={"Idempotency-Key": "bad-policy-key-0001"})
+        self.assertEqual(response.status_code, 202)
 
     @patch("training.tasks.train_model_task.apply_async")
-    def test_prediction_train_permission_grants_training_and_legacy_role_follows_the_flag(self, mock_dispatch) -> None:
+    def test_only_the_prediction_train_permission_grants_training(self, mock_dispatch) -> None:
         body = {"dataset_ref": "fixture:pred003_synthetic-v1", "algorithm": "random_forest"}
         permitted = self.client.post("/v1/training-jobs", json=body, headers={
             "Authorization": "Bearer ml-permission-token", "Idempotency-Key": "permission-operator-0001"})
         self.assertEqual(permitted.status_code, 202)
         self.assertEqual(permitted.json()["submitted_by"], "ml-1")
-        with patch.dict("os.environ", {"PREDICTION_LEGACY_ROLES_ENABLED": "false"}):
-            legacy = self.operator.post("/v1/training-jobs", json=body,
-                                        headers={"Idempotency-Key": "legacy-operator-0001"})
-            still_permitted = self.client.post("/v1/training-jobs", json=body, headers={
-                "Authorization": "Bearer ml-permission-token", "Idempotency-Key": "permission-operator-0002"})
-        self.assertEqual(legacy.status_code, 403, "SUPERADMIN without prediction:train once the coexistence is off")
-        self.assertEqual(still_permitted.status_code, 202)
+        with patch.dict("os.environ", {"PREDICTION_TRAINING_ROLES": '["SUPERADMIN"]'}):
+            role_only = self.client.post("/v1/training-jobs", json=body, headers={
+                "Authorization": "Bearer superadmin-role-token", "Idempotency-Key": "legacy-operator-0001"})
+        self.assertEqual(role_only.status_code, 403, "the SUPERADMIN role alone, without prediction:train")
 
     def test_training_job_status_requires_operator(self) -> None:
         job_id = "d8b9e194-87bf-41e6-a668-2f8c95dab731"

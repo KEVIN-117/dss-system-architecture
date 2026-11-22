@@ -47,7 +47,6 @@ function configureBff() {
   vi.stubEnv('KEYCLOAK_URL', 'http://keycloak:8080');
   vi.stubEnv('KEYCLOAK_REALM', 'uatf-dss-realm');
   vi.stubEnv('KEYCLOAK_AUDIENCE', 'uatf-auth-service');
-  vi.stubEnv('KEYCLOAK_ROLE_CLIENT_ID', 'uatf-auth-service');
   vi.stubEnv('KEYCLOAK_BFF_CLIENT_ID', 'dss-bff');
   vi.stubEnv(
     'KEYCLOAK_BFF_CLIENT_SECRET',

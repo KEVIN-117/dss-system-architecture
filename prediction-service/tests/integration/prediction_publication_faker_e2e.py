@@ -32,9 +32,12 @@ from prediction_faker_e2e import _create_test_bundle, _sample
 class IntegrationIdentity:
     def authenticate(self, token: str) -> Principal:
         if token == "faker-rector-token":
-            return Principal("faker-rector", frozenset({"RECTOR"}), ())
+            return Principal("faker-rector", frozenset({"RECTOR"}), (),
+                             frozenset({"analytics:read", "analytics:global", "prediction:publish"}))
         if token == "faker-out-of-scope-token":
-            return Principal("faker-director", frozenset({"DIRECTOR"}), ())
+            # Career scope without any academic context: every program is out of scope.
+            return Principal("faker-director", frozenset({"DIRECTOR"}), (),
+                             frozenset({"analytics:read", "analytics:career", "prediction:publish"}))
         raise InferenceFailure("INVALID_TOKEN", 401, "The access token is invalid or expired.")
 
 
@@ -52,8 +55,6 @@ def main() -> None:
     if not dw_url:
         raise SystemExit("Configure a development DW connection for this isolated smoke test.")
     os.environ["PREDICTION_DW_DATABASE_URL"] = dw_url
-    os.environ["PREDICTION_ALLOWED_ROLES"] = '["RECTOR","DIRECTOR"]'
-    os.environ["PREDICTION_BATCH_SUBMITTER_ROLES"] = '["RECTOR"]'
 
     _, program_ref, cut_id, _, cadence = _sample(dw_url)
     with tempfile.TemporaryDirectory(prefix="pred007-publication-faker-") as temporary:

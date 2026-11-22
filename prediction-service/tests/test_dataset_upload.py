@@ -20,7 +20,7 @@ from main import app
 
 class FakeIdentity:
     PRINCIPALS = {
-        "operator-token": Principal("operator-1", frozenset({"SUPERADMIN"}), ()),
+        "operator-token": Principal("operator-1", frozenset({"SUPERADMIN"}), (), frozenset({"prediction:train"})),
         "director-token": Principal("director-1", frozenset({"DIRECTOR"}), ()),
     }
 

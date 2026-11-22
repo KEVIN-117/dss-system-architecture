@@ -70,15 +70,11 @@ async function proxy(
   }
 
   // Saiku's administrative API manages OLAP infrastructure. Since IAM-012 it
-  // requires the olap:admin permission (or the legacy OLAP_ADMIN role during
-  // the coexistence), the same rule olap-service enforces; a platform role
-  // such as SUPERADMIN does not imply it (D4). Admin operations are not data
-  // queries, so they skip the academic-scope checks below.
+  // requires the olap:admin permission, the same rule olap-service enforces; a
+  // platform role such as SUPERADMIN does not imply it (D4). Admin operations
+  // are not data queries, so they skip the academic-scope checks below.
   const isOlapAdminPath = safeSegments[2] === 'admin';
-  if (
-    isOlapAdminPath &&
-    !hasOlapAdminAccess(authentication.value.clientRoles ?? {})
-  ) {
+  if (isOlapAdminPath && !hasOlapAdminAccess(authentication.value.permissions)) {
     return withCors(request, olapAdminForbidden());
   }
 
@@ -88,7 +84,7 @@ async function proxy(
   // reaches metadata and scoped queries. SUPERADMIN gets no implicit business
   // access (D4): without analytics or olap:admin permissions it is denied.
   const isOlapAdministrator = hasOlapAdminAccess(
-    authentication.value.clientRoles ?? {},
+    authentication.value.permissions,
   );
   if (!isOlapAdminPath && !isOlapAdministrator) {
     const permissionDenied = requirePermissions(authentication.value, [

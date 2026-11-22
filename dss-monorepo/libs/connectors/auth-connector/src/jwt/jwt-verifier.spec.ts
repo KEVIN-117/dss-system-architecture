@@ -3,31 +3,30 @@ import { describe, expect, it } from 'vitest';
 import { extractDssRoles, extractPermissions } from './jwt-verifier.js';
 
 describe('extractDssRoles', () => {
-  it('uses the configured client and removes roles outside the DSS vocabulary', () => {
+  it('reads realm roles only and removes roles outside the DSS vocabulary (IAM-019)', () => {
     const roles = extractDssRoles({
       realm_access: { roles: ['RECTOR', 'offline_access'] },
       resource_access: {
         'uatf-auth-service': { roles: ['DECANO'] },
         'other-client': { roles: ['SUPERADMIN'] },
       },
-    }, 'uatf-auth-service');
+    } as Parameters<typeof extractDssRoles>[0]);
 
-    expect(roles).toEqual(['RECTOR', 'DECANO']);
+    // The retired uatf-auth-service client roles no longer open a portal.
+    expect(roles).toEqual(['RECTOR']);
   });
 
   it('maps configured realm roles to a portal instead of discarding them (IAM-014)', () => {
     const claims = {
       realm_access: { roles: ['VICERRECTOR', 'COORDINADOR', 'offline_access'] },
-      resource_access: { 'uatf-auth-service': { roles: ['VICERRECTOR'] } },
     };
 
-    expect(extractDssRoles(claims, 'uatf-auth-service')).toEqual([]);
-    expect(extractDssRoles(claims, 'uatf-auth-service', { VICERRECTOR: 'RECTOR' })).toEqual(['RECTOR']);
-    // Only realm roles are mapped; a client role with the same name opens nothing.
-    expect(extractDssRoles({ resource_access: claims.resource_access }, 'uatf-auth-service', { VICERRECTOR: 'RECTOR' }))
-      .toEqual([]);
+    expect(extractDssRoles(claims)).toEqual([]);
+    expect(extractDssRoles(claims, { VICERRECTOR: 'RECTOR' })).toEqual(['RECTOR']);
+    // Only realm roles are mapped; without them nothing opens.
+    expect(extractDssRoles({}, { VICERRECTOR: 'RECTOR' })).toEqual([]);
     // Inherited object keys are not role mappings.
-    expect(extractDssRoles({ realm_access: { roles: ['toString'] } }, 'uatf-auth-service', {})).toEqual([]);
+    expect(extractDssRoles({ realm_access: { roles: ['toString'] } }, {})).toEqual([]);
   });
 });
 

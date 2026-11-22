@@ -132,7 +132,7 @@ GET /internal/users/{keycloakSubject}/academic-contexts
 ```
 
 - Secured by a client-credentials token: only the `olap-service` service account
-  (new client role, e.g. `uatf-auth-service: CONTEXT_READER`) may call it.
+  (the `dss-permissions` permission `context:read`; originally the client role `uatf-auth-service: CONTEXT_READER`, retired in IAM-019) may call it.
 - Keyed by Keycloak `sub`, so it works for live requests **and** for scheduled jobs / alerts that
   run as an owner without a live user token (`OwnerIdentityJobRunner`, `AiMeasureValueReader`).
 - Returns roles from the auth-service snapshot as well, so the resolver can cross-check token
@@ -151,7 +151,7 @@ it is public). That also closes the open question from the bypass analysis — a
 | `AuthServiceContextClient` (new) | Client-credentials call to §4.3, 2 s timeout, **no** fallback to stale data on error. Cache per subject, TTL 60 s (configurable), invalidated by the existing RabbitMQ user events when practical. |
 | `SecurityAwareConnectionManager.applySecurity` | Treat `ACADEMIC` like `LOOKUP`/`ONE2ONE`: resolved list → `setRole`; empty → `enforceRoleResolvedOrAdmin`. No new deny logic. |
 | `infra/olap/datasources/uatf-dw.sds` | Add `security.enabled=true`, `security.type=academic`. |
-| SUPERADMIN | Since IAM-002 the SUPERADMIN composite no longer includes `OLAP_ADMIN`. Only users explicitly granted `olap-service:OLAP_ADMIN` (`dss-permissions:olap:admin` once IAM-012 lands) map to `ROLE_ADMIN` and keep the root role. |
+| SUPERADMIN | Since IAM-002 the SUPERADMIN composite no longer includes `OLAP_ADMIN`. Only users explicitly granted `dss-permissions:olap:admin` (IAM-012; the `olap-service:OLAP_ADMIN` role was retired in IAM-019) map to `ROLE_ADMIN` and keep the root role. |
 | Embed / share tokens | **Open question (§6).** They carry `ROLE_EMBED_GUEST`, not a DSS role, so they would be denied once security is on. |
 
 ### 4.5 Query cache key (required fix)
@@ -168,7 +168,7 @@ must land in the same change. Add a regression test with two DECANO users in dif
 
 ## 5. Rollout
 
-1. **auth-service:** internal endpoint + `CONTEXT_READER` role; Keycloak: make `olap-service`
+1. **auth-service:** internal endpoint + `context:read` permission (was `CONTEXT_READER` until IAM-019); Keycloak: make `olap-service`
    confidential with a service account. No behaviour change yet. *(Implemented: endpoint
    `/internal/users/{keycloakId}/academic-contexts`, `InternalAcademicScopeController` also
    requires `azp` ∈ `AUTH_CONTEXT_READER_CLIENTS`; realm export + `KEYCLOAK_OLAP_CLIENT_SECRET`.

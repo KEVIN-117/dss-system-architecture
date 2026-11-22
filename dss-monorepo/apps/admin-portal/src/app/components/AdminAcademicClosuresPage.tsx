@@ -405,7 +405,7 @@ export function AdminAcademicClosuresPage() {
             No tienes permiso para consultar cierres académicos.
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Solicita el rol DW_CLOSURE_READ al administrador de Keycloak.
+            Solicita el permiso dw:closure:read a un administrador del portal.
           </p>
         </div>
       </section>

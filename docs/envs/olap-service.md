@@ -5,9 +5,7 @@ OLAP corresponde a `olap-service`/Saiku. El launcher se empaqueta como JAR y se 
 | Variable/grupo | Uso |
 |---|---|
 | `KEYCLOAK_ISSUER_URI`, `KEYCLOAK_JWK_SET_URI` | Verificación JWT OIDC; Compose toma issuer/JWKS de `AUTH_KEYCLOAK_ISSUER_URI` y `AUTH_KEYCLOAK_JWK_SET_URI`, usando el DNS interno `keycloak` para descargar claves. |
-| `OLAP_KEYCLOAK_CLIENT_ID` | Cliente de los roles antiguos `OLAP_ADMIN`/`OLAP_USER`, que solo se leen durante la convivencia; default `olap-service`. Compose lo pasa como `KEYCLOAK_OLAP_CLIENT_ID`. |
 | `KEYCLOAK_PERMISSIONS_CLIENT_ID` | Cliente catálogo de los permisos `olap:admin` (→ `ROLE_ADMIN`) y `olap:user` (→ `ROLE_USER`); default `dss-permissions` (IAM-012). |
-| `OLAP_LEGACY_ROLES_ENABLED` | Convivencia: con `true` (default) también se aceptan `OLAP_ADMIN`/`OLAP_USER` de `olap-service`; con `false`, solo los permisos de `dss-permissions`. El BFF lee la misma variable para su gate de `/rest/saiku/admin/**`. |
 | `OLAP_KEYCLOAK_AUDIENCE` | Audiencia esperada en el token; default `olap-service`. Compose lo pasa como `KEYCLOAK_OLAP_AUDIENCE`. |
 | `OLAP_PORT` | Puerto local publicado por Compose; default `8088` porque Keycloak usa `8080`. |
 | `SAIKU_ADMIN_PASSWORD` | Contraseña fuerte para el usuario local `admin`; Compose la pasa al launcher, que genera/guarda el hash en `saiku-home/users.properties`. Configúrala en `.env` (ignorado por Git). No actives `SAIKU_ALLOW_DEFAULT_ADMIN` en una instancia expuesta. |

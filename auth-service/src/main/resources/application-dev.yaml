@@ -32,7 +32,6 @@ app:
 jwt:
   auth:
     converter:
-      resource-id: ${KEYCLOAK_RESOURCE_ID}
       principal-attribute: ${KEYCLOAK_PRINCIPAL_ATTRIBUTE}
 
 logging:

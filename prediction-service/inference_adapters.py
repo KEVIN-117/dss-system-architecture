@@ -36,8 +36,6 @@ from inference import (
 class KeycloakIdentityProvider:
     def authenticate(self, access_token: str) -> Principal:
         audience = _required_env("KEYCLOAK_AUDIENCE")
-        # Client of the legacy academic roles (coexistence); optional since IAM-013.
-        role_client_id = os.getenv("KEYCLOAK_ROLE_CLIENT_ID", "").strip()
         issuer = os.getenv("KEYCLOAK_ISSUER_URI", "").strip()
         if not issuer:
             keycloak_url = _required_env("KEYCLOAK_URL")
@@ -67,10 +65,7 @@ class KeycloakIdentityProvider:
         realm_access = claims.get("realm_access")
         if isinstance(realm_access, dict) and isinstance(realm_access.get("roles"), list):
             role_names.update(role for role in realm_access["roles"] if isinstance(role, str))
-        resource_access = claims.get("resource_access")
-        if role_client_id:
-            role_names.update(_client_roles(resource_access, role_client_id))
-        permissions = frozenset(_client_roles(resource_access, access_policy.permissions_client_id()))
+        permissions = frozenset(_client_roles(claims.get("resource_access"), access_policy.permissions_client_id()))
 
         # AUTH_SERVICE_URL is the service origin (for example,
         # http://auth-service:8000); Auth Service is mounted below /api/v1.
@@ -102,10 +97,10 @@ def _client_roles(resource_access: Any, client_id: str) -> set[str]:
 
 
 class ConfiguredAcademicPolicy(AuthorizationPolicy):
-    """Academic scope from catalog permissions, plus ``PREDICTION_ALLOWED_ROLES`` during the coexistence."""
+    """Academic scope from the catalog permissions and the user's academic contexts."""
 
     def authorize(self, principal: Principal, context: ProgramContext) -> None:
-        authorize_program_context(principal, context, access_policy.legacy_academic_roles())
+        authorize_program_context(principal, context)
 
 
 class DwPredictionDataProvider:
