@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/apache-hop-v1.3.1...apache-hop-v1.4.0) (2026-11-22)
+
+
+### Features
+
+* **load-manager:** Implementado Hop Server como motor de ejecución del proyecto ETL ([#357](https://github.com/KEVIN-117/dss-system-architecture/issues/357)) ([285b9e4](https://github.com/KEVIN-117/dss-system-architecture/commit/285b9e408de4d764ae0763152bac0bfdd2693410))
+
 ## [1.3.1](https://github.com/KEVIN-117/dss-system-architecture/compare/apache-hop-v1.3.0...apache-hop-v1.3.1) (2026-11-18)
 
 
