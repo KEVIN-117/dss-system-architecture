@@ -56,6 +56,25 @@ public class SecurityConfig {
                         .hasAuthority(DwControlJwtAuthenticationConverter.CLOSURE_MANAGE)
                         .requestMatchers(HttpMethod.GET, "/api/v1/etl/executions", "/api/v1/etl/executions/**")
                         .hasAuthority(DwControlJwtAuthenticationConverter.ETL_MONITOR_READ)
+                        // Load Manager (LM-005): reads with the monitor permission, actions with their own.
+                        .requestMatchers(
+                                HttpMethod.GET,
+                                "/api/v1/etl/health",
+                                "/api/v1/etl/status",
+                                "/api/v1/etl/processes",
+                                "/api/v1/etl/launches",
+                                "/api/v1/etl/launches/**",
+                                "/api/v1/etl/schedules",
+                                "/api/v1/etl/schedules/**")
+                        .hasAuthority(DwControlJwtAuthenticationConverter.ETL_MONITOR_READ)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/etl/launches", "/api/v1/etl/launches/*/stop")
+                        .hasAuthority(DwControlJwtAuthenticationConverter.ETL_EXECUTE)
+                        .requestMatchers(HttpMethod.POST, "/api/v1/etl/schedules", "/api/v1/etl/schedules/**")
+                        .hasAuthority(DwControlJwtAuthenticationConverter.ETL_SCHEDULE_MANAGE)
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/etl/schedules/*")
+                        .hasAuthority(DwControlJwtAuthenticationConverter.ETL_SCHEDULE_MANAGE)
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/etl/schedules/*")
+                        .hasAuthority(DwControlJwtAuthenticationConverter.ETL_SCHEDULE_MANAGE)
                         .anyRequest()
                         .denyAll())
                 .oauth2ResourceServer(resourceServer -> resourceServer

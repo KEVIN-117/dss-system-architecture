@@ -41,6 +41,11 @@ El borrador OpenAPI está en [`contracts/dw-control-service-v1.yaml`](contracts/
 | `POST /api/v1/academic-closures/{closureId}/reopen` | `dw:closure:manage` | Transiciona `CERRADO` o `PROCESADO` a `REABIERTO`; exige motivo. |
 | `GET /api/v1/etl/executions` | `dw:etl-monitor:read` | Lista ejecuciones con filtros y paginación. |
 | `GET /api/v1/etl/executions/{runId}` | `dw:etl-monitor:read` | Detalle con pasos, métricas y errores saneados. |
+| `GET /api/v1/etl/{health,status,processes}` | `dw:etl-monitor:read` | Load Manager: disponibilidad de Hop, ETL en curso, catálogo. |
+| `GET /api/v1/etl/launches[/{id}[/logs]]` | `dw:etl-monitor:read` | Historial de lanzamientos (filtros `processCode`, `status`, `trigger`, `scheduleId`) y log saneado. |
+| `POST /api/v1/etl/launches`, `POST /api/v1/etl/launches/{id}/stop` | `dw:etl:execute` | Lanzar y detener procesos en Hop Server. |
+| `GET /api/v1/etl/schedules[/{id}]`, `GET /api/v1/etl/schedules/preview` | `dw:etl-monitor:read` | Programaciones y vista previa de un cron frente al horario DSA. |
+| `POST/PUT/DELETE /api/v1/etl/schedules[/{id}]`, `POST /api/v1/etl/schedules/{id}/enable,disable` | `dw:etl-schedule:manage` | Administrar programaciones. |
 
 Esta entrega no incluye operaciones HTTP para iniciar, cancelar o reintentar cargas. La épica Load Manager (#356) las añade. La ejecución ocurre en Hop Server (LM-001, ver [contrato HTTP de Hop Server](hop-server-contract.md)) y dw-control-service será su único cliente (LM-003 a LM-005). Hasta entonces esta tabla describe el contrato vigente.
 
@@ -63,7 +68,9 @@ Estos son permisos de aplicación, independientes de los roles PostgreSQL:
 | --- | --- |
 | `dw:closure:read` | Leer cierres y eventos. |
 | `dw:closure:manage` | Crear cierres pendientes, cerrar y reabrir. No concede consultas ETL automáticamente. |
-| `dw:etl-monitor:read` | Consultar ejecuciones, pasos, métricas y errores saneados. |
+| `dw:etl-monitor:read` | Consultar ejecuciones, pasos, métricas y errores saneados. Desde LM-005, también el estado, los lanzamientos, sus logs y las programaciones del Load Manager. |
+| `dw:etl:execute` | Lanzar y detener procesos ETL en Hop Server (LM-005). |
+| `dw:etl-schedule:manage` | Crear, editar, pausar y eliminar programaciones (LM-005). |
 
 Desde IAM-011 son roles del cliente catálogo `dss-permissions` y se asignan desde el admin-portal. Los roles antiguos `DW_CLOSURE_READ`, `DW_CLOSURE_MANAGE` y `DW_ETL_MONITOR_READ` del cliente `dw-control-service` se retiraron en IAM-019; ver `docs/envs/dw-control-service.md`. No asumir `SUPERADMIN` como política de autorización dentro del servicio ni aceptar permisos declarados por el navegador. La política se resuelve desde claims de confianza del token validado y se prueba en el servicio.
 

@@ -1,20 +1,29 @@
 package chronos.dw.admin.adapter.out.persistence.launch;
 
+import chronos.dw.admin.application.model.ExecutionPage;
 import chronos.dw.admin.application.port.out.EtlLaunchPort;
+import chronos.dw.admin.application.port.out.QueryEtlLaunchesPort;
 import chronos.dw.admin.domain.exception.EtlLaunchConflictException;
 import chronos.dw.admin.domain.model.EtlLaunch;
+import chronos.dw.admin.domain.model.EtlLaunchSearchCriteria;
 import chronos.dw.admin.domain.model.EtlLaunchStatus;
 import chronos.dw.admin.domain.model.EtlLaunchTrigger;
+import io.micrometer.core.instrument.MeterRegistry;
+import io.micrometer.core.instrument.Timer;
+import io.micrometer.core.instrument.simple.SimpleMeterRegistry;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.TreeMap;
 import java.util.UUID;
 import java.util.function.Supplier;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
@@ -25,10 +34,11 @@ import tools.jackson.databind.json.JsonMapper;
 
 /**
  * Adapter for etl_control.etl_launch. Reads with SELECT (dw_control_reader) and writes only through the audited
- * functions of migration 0065 (dw_control_api).
+ * functions of migration 0065 (dw_control_api). Records {@code etl.launch.total} and {@code etl.launch.duration} when
+ * a launch reaches a final status.
  */
 @Repository
-public class JdbcEtlLaunchRepository implements EtlLaunchPort {
+public class JdbcEtlLaunchRepository implements EtlLaunchPort, QueryEtlLaunchesPort {
 
     static final String COLUMNS =
             """
@@ -42,10 +52,18 @@ public class JdbcEtlLaunchRepository implements EtlLaunchPort {
     private final JdbcTemplate jdbcTemplate;
     private final JsonMapper jsonMapper;
     private final RowMapper<EtlLaunch> rowMapper = this::map;
+    private final MeterRegistry meterRegistry;
 
-    public JdbcEtlLaunchRepository(JdbcTemplate jdbcTemplate, JsonMapper jsonMapper) {
+    @Autowired
+    public JdbcEtlLaunchRepository(JdbcTemplate jdbcTemplate, JsonMapper jsonMapper, MeterRegistry meterRegistry) {
         this.jdbcTemplate = jdbcTemplate;
         this.jsonMapper = jsonMapper;
+        this.meterRegistry = meterRegistry;
+    }
+
+    /** Without a meter registry (tests, tools). */
+    public JdbcEtlLaunchRepository(JdbcTemplate jdbcTemplate, JsonMapper jsonMapper) {
+        this(jdbcTemplate, jsonMapper, new SimpleMeterRegistry());
     }
 
     @Override
@@ -79,7 +97,7 @@ public class JdbcEtlLaunchRepository implements EtlLaunchPort {
             UUID hopExecutionId,
             String resultSummary,
             String logExcerpt) {
-        return single(() -> jdbcTemplate.query(
+        EtlLaunch updated = single(() -> jdbcTemplate.query(
                 "SELECT " + COLUMNS + " FROM etl_control.transition_etl_launch("
                         + "?::uuid, ?::varchar, ?::varchar, ?::uuid, ?::text, ?::text)",
                 rowMapper,
@@ -89,6 +107,10 @@ public class JdbcEtlLaunchRepository implements EtlLaunchPort {
                 hopExecutionId,
                 resultSummary,
                 logExcerpt));
+        if (updated.status().isTerminal()) {
+            recordFinished(updated);
+        }
+        return updated;
     }
 
     @Override
@@ -102,7 +124,7 @@ public class JdbcEtlLaunchRepository implements EtlLaunchPort {
 
     @Override
     public EtlLaunch recordSkipped(UUID launchId, long scheduleId, String actor, String reason) {
-        return single(() -> jdbcTemplate.query(
+        EtlLaunch skipped = single(() -> jdbcTemplate.query(
                 "SELECT " + COLUMNS + " FROM etl_control.record_skipped_etl_launch("
                         + "?::uuid, ?::bigint, ?::varchar, ?::text)",
                 rowMapper,
@@ -110,6 +132,69 @@ public class JdbcEtlLaunchRepository implements EtlLaunchPort {
                 scheduleId,
                 actor,
                 reason));
+        recordFinished(skipped);
+        return skipped;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ExecutionPage<EtlLaunch> find(EtlLaunchSearchCriteria criteria, int page, int size) {
+        List<Object> parameters = new ArrayList<>();
+        StringBuilder where = new StringBuilder(" WHERE TRUE");
+        if (criteria.processCode() != null) {
+            where.append(" AND process_code = ?");
+            parameters.add(criteria.processCode());
+        }
+        if (criteria.status() != null) {
+            where.append(" AND status = ?");
+            parameters.add(criteria.status().name());
+        }
+        if (criteria.trigger() != null) {
+            where.append(" AND trigger_kind = ?");
+            parameters.add(criteria.trigger().name());
+        }
+        if (criteria.scheduleId() != null) {
+            where.append(" AND schedule_id = ?");
+            parameters.add(criteria.scheduleId());
+        }
+        Long total = jdbcTemplate.queryForObject(
+                "SELECT count(*) FROM etl_control.etl_launch" + where, Long.class, parameters.toArray());
+        long totalElements = total == null ? 0 : total;
+
+        List<Object> pageParameters = new ArrayList<>(parameters);
+        pageParameters.add(size);
+        pageParameters.add((long) page * size);
+        List<EtlLaunch> items = jdbcTemplate.query(
+                "SELECT " + COLUMNS + " FROM etl_control.etl_launch" + where
+                        + " ORDER BY requested_at DESC, launch_id DESC LIMIT ? OFFSET ?",
+                rowMapper,
+                pageParameters.toArray());
+        long totalPages = totalElements / size + (totalElements % size == 0 ? 0 : 1);
+        return new ExecutionPage<>(items, page, size, totalElements, totalPages);
+    }
+
+    private void recordFinished(EtlLaunch launch) {
+        meterRegistry
+                .counter(
+                        "etl.launch.total",
+                        "process",
+                        launch.processCode(),
+                        "trigger",
+                        launch.trigger().name(),
+                        "result",
+                        launch.status().name())
+                .increment();
+        if (launch.finishedAt() != null && launch.status() != EtlLaunchStatus.SKIPPED) {
+            Timer.builder("etl.launch.duration")
+                    .description("Time from request to final status of a Load Manager launch")
+                    .tags(
+                            "process",
+                            launch.processCode(),
+                            "result",
+                            launch.status().name())
+                    .register(meterRegistry)
+                    .record(Duration.between(launch.requestedAt(), launch.finishedAt()));
+        }
     }
 
     @Override

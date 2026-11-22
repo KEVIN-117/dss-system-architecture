@@ -41,7 +41,7 @@ flowchart LR
 | Datos | `pipelines:read`, `pipelines:execute`, `connectors:read`, `connectors:write` | BFF |
 | Predicción | `prediction:train`, `prediction:publish` | prediction-service, BFF |
 | OLAP | `olap:admin`, `olap:user` | olap-service, BFF (`/rest/saiku/admin/**`) |
-| Data Warehouse | `dw:closure:read`, `dw:closure:manage`, `dw:etl-monitor:read` | dw-control-service, BFF |
+| Data Warehouse | `dw:closure:read`, `dw:closure:manage`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` | dw-control-service, BFF |
 | IAM | `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read` | auth-service, BFF, admin-portal |
 | Servicio | `context:read` | auth-service (endpoint interno) |
 
@@ -54,9 +54,9 @@ Un permiso nuevo se crea desde el admin-portal (**Permisos**) y llega al token s
 | `DIRECTOR` | director | `analytics:read`, `analytics:career` |
 | `DECANO` | decano | DIRECTOR + `analytics:faculty`, `pipelines:read` |
 | `RECTOR` | rector | DECANO + `analytics:global`, `connectors:read` |
-| `SUPERADMIN` | admin | `iam:*`, `connectors:*`, `pipelines:*`, `prediction:train` |
+| `SUPERADMIN` | admin | `iam:*`, `connectors:*`, `pipelines:*`, `prediction:train`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` |
 
-- SUPERADMIN no tiene permisos académicos ni `olap:admin` (D4): administrar la plataforma no da acceso a los datos.
+- SUPERADMIN no tiene permisos académicos ni `olap:admin` (D4): administrar la plataforma no da acceso a los datos. Desde LM-005 sí opera el Load Manager: lanza, detiene y programa cargas ETL. Esos permisos no dan acceso a los datos del DW.
 - `olap:*`, `dw:*` y `prediction:publish` se asignan por usuario o en roles creados desde el portal.
 - Roles, permisos y la matriz rol × permiso se editan en el admin-portal (**Roles**, **Permisos**, **Matriz de acceso**). Los roles del sistema (los cuatro de arriba) y los permisos `iam:*` y `context:read` no se pueden borrar, y SUPERADMIN siempre conserva `iam:*`.
 

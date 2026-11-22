@@ -20,6 +20,8 @@
 #   5. Agrega a dss-bff el audience mapper explícito de uatf-auth-service.
 #   6. Elimina el cliente público uatf-dss-spa (D4).
 # No toca los roles antiguos de uatf-auth-service, DW_* ni OLAP_* (se retiran en IAM-019).
+# LM-005 (#353): agrega dw:etl:execute y dw:etl-schedule:manage, y da a SUPERADMIN los tres permisos del
+# Load Manager (dw:etl-monitor:read, dw:etl:execute, dw:etl-schedule:manage). Volver a ejecutarlo los aplica.
 set -euo pipefail
 
 REALM=uatf-dss-realm
@@ -46,6 +48,8 @@ PERMISSIONS=(
   "dw:closure:read|Consultar cierres académicos y sus eventos."
   "dw:closure:manage|Crear y gestionar cierres académicos."
   "dw:etl-monitor:read|Consultar ejecuciones ETL del Data Warehouse."
+  "dw:etl:execute|Lanzar y detener procesos ETL del Data Warehouse desde el admin-portal."
+  "dw:etl-schedule:manage|Crear, modificar, pausar y eliminar programaciones ETL del Data Warehouse."
   "context:read|Servicio a servicio: leer el contexto académico de un usuario en auth-service."
   "iam:users:read|Consultar usuarios, sus roles y permisos desde el admin-portal."
   "iam:users:write|Crear, activar, desactivar usuarios y asignar roles y permisos."
@@ -60,7 +64,7 @@ PERMISSIONS=(
 DIRECTOR_PERMS="analytics:read analytics:career"
 DECANO_PERMS="$DIRECTOR_PERMS analytics:faculty pipelines:read"
 RECTOR_PERMS="$DECANO_PERMS analytics:global connectors:read"
-SUPERADMIN_PERMS="connectors:read connectors:write pipelines:read pipelines:execute prediction:train iam:users:read iam:users:write iam:roles:read iam:roles:write iam:clients:read iam:clients:write iam:audit:read"
+SUPERADMIN_PERMS="connectors:read connectors:write pipelines:read pipelines:execute prediction:train iam:users:read iam:users:write iam:roles:read iam:roles:write iam:clients:read iam:clients:write iam:audit:read dw:etl-monitor:read dw:etl:execute dw:etl-schedule:manage"
 
 kc() { "$KCADM" "$@"; }
 log() { printf '[iam-002] %s\n' "$*"; }

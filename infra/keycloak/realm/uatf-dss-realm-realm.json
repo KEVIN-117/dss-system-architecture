@@ -137,7 +137,10 @@
               "iam:roles:write",
               "iam:clients:read",
               "iam:clients:write",
-              "iam:audit:read"
+              "iam:audit:read",
+              "dw:etl-monitor:read",
+              "dw:etl:execute",
+              "dw:etl-schedule:manage"
             ]
           }
         },
@@ -659,6 +662,24 @@
           "id": "57cddd7f-57ea-53ed-8a39-304c2b5c5655",
           "name": "dw:etl-monitor:read",
           "description": "Consultar ejecuciones ETL del Data Warehouse.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "2b4b8462-08dc-5d1a-b6ca-81d8daf67f92",
+          "name": "dw:etl:execute",
+          "description": "Lanzar y detener procesos ETL del Data Warehouse desde el admin-portal.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "e40a0a71-2918-5bb4-b544-afb7f3fc3b6a",
+          "name": "dw:etl-schedule:manage",
+          "description": "Crear, modificar, pausar y eliminar programaciones ETL del Data Warehouse.",
           "composite": false,
           "clientRole": true,
           "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
