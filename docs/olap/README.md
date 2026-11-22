@@ -56,7 +56,7 @@ El diagrama de clases/entidades del generador representa el **modelo de metadato
 
 1. Aún debe enlazarse un esquema Mondrian real con el modelo físico DW UATF y conciliar medidas académicas.
 2. El objetivo de menos de 500 ms y la capacidad bajo concurrencia requieren mediciones con consultas/datos representativos.
-3. La administración y el uso de Saiku se autorizan con `olap:admin`/`olap:user` de `dss-permissions` (IAM-012; `OLAP_ADMIN`/`OLAP_USER` durante la convivencia). Queda cerrar el alcance por facultad/carrera.
+3. La administración y el uso de Saiku se autorizan con `olap:admin`/`olap:user` de `dss-permissions` (IAM-012; los roles `OLAP_ADMIN`/`OLAP_USER` se retiraron en IAM-019). Queda cerrar el alcance por facultad/carrera.
 4. La imagen y su healthcheck deben confirmarse contra el artefacto API-only que se desplegará.
 5. La ejecución por defecto del generador se cablea con `newCachedThreadPool`; no es un pool acotado. Revisar límites si se habilita a usuarios concurrentes.
 

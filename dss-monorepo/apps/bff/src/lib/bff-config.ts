@@ -116,7 +116,6 @@ export function getBffAuthConfig(
       keycloakUrl: requiredHttpUrl(environment, 'KEYCLOAK_URL'),
       realm: requiredValue(environment, 'KEYCLOAK_REALM'),
       audience: requiredValue(environment, 'KEYCLOAK_AUDIENCE'),
-      roleClientId: requiredValue(environment, 'KEYCLOAK_ROLE_CLIENT_ID'),
       permissionsClientId:
         environment.KEYCLOAK_PERMISSIONS_CLIENT_ID?.trim() || 'dss-permissions',
       portalRoles: getPortalRoleMap(environment),

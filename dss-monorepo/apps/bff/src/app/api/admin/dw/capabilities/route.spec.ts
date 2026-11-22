@@ -17,10 +17,7 @@ describe('GET /api/admin/dw/capabilities', () => {
     authenticateRequest.mockResolvedValue({
       authenticated: true,
       value: {
-        clientRoles: {
-          'dw-control-service': ['DW_CLOSURE_READ', 'DW_ETL_MONITOR_READ'],
-          other: ['PRIVATE_ROLE'],
-        },
+        permissions: ['dw:closure:read', 'dw:etl-monitor:read', 'analytics:read'],
       },
     });
 
@@ -35,6 +32,26 @@ describe('GET /api/admin/dw/capabilities', () => {
       canReadEtlExecutions: true,
     });
     expect(response.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('ignores the retired DW_* client roles (IAM-019)', async () => {
+    authenticateRequest.mockResolvedValue({
+      authenticated: true,
+      value: {
+        permissions: ['DW_CLOSURE_READ', 'DW_CLOSURE_MANAGE'],
+        clientRoles: { 'dw-control-service': ['DW_CLOSURE_READ', 'DW_CLOSURE_MANAGE'] },
+      },
+    });
+
+    const response = await GET(
+      new Request('http://bff/api/admin/dw/capabilities'),
+    );
+
+    expect(await response.json()).toEqual({
+      canReadClosures: false,
+      canManageClosures: false,
+      canReadEtlExecutions: false,
+    });
   });
 
   it('preserves the authentication error response', async () => {

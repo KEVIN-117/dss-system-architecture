@@ -7,7 +7,7 @@ from typing import Any
 from uuid import uuid4
 
 import access_policy
-from inference import InferenceFailure, academic_permissions
+from inference import InferenceFailure
 from inference_adapters import ConfiguredAcademicPolicy, DwPredictionDataProvider, KeycloakIdentityProvider
 from training.model_registry import InvalidModelArtifact, ModelRegistry, NoActiveModel
 from training.prediction_publication_store import PredictionPublicationStore, PublicationConflict
@@ -25,7 +25,7 @@ class PopulationPublicationService:
     def academic_options(self, access_token: str) -> dict[str, Any]:
         """Return only DW program/cut combinations visible to this principal."""
         principal = self.identity.authenticate(access_token)
-        if access_policy.ANALYTICS_READ not in academic_permissions(principal, access_policy.legacy_academic_roles()):
+        if access_policy.ANALYTICS_READ not in principal.permissions:
             raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The account cannot view prediction programs.")
         contexts = self.data.list_available_contexts()
         programs: dict[str, dict[str, Any]] = {}
@@ -56,9 +56,8 @@ class PopulationPublicationService:
 
     def submit(self, access_token: str, program_ref: str, closure_id: str, idempotency_key: str) -> dict[str, Any]:
         principal = self.identity.authenticate(access_token)
-        # prediction:publish (or a legacy submitter role during the coexistence), always within the academic scope.
-        if not access_policy.has_permission(principal, access_policy.PREDICTION_PUBLISH,
-                                            access_policy.legacy_submitter_roles()):
+        # prediction:publish, always within the academic scope.
+        if not access_policy.has_permission(principal, access_policy.PREDICTION_PUBLISH):
             raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The account cannot start population scoring.")
         context = self.data.resolve_context(program_ref, closure_id)
         self.policy.authorize(principal, context)

@@ -1,5 +1,7 @@
 # PRED-006 — Implementación de inferencia puntual
 
+> **IAM-019:** las listas `PREDICTION_ALLOWED_ROLES` y `PREDICTION_BATCH_SUBMITTER_ROLES` que menciona este documento se retiraron. El acceso se concede con los permisos `analytics:*` y `prediction:publish` de `dss-permissions` (ver `prediction-service/README.md`).
+
 ## Alcance implementado
 
 El alcance aceptado de PRED-006 es la inferencia individual de **abandono del programa**. `POST /v1/predictions` resuelve estudiante, programa y corte desde el DW; no acepta variables predictoras del cliente. La ruta técnica de abandono de materia se conserva como experimental y no forma parte de la capacidad aceptada ni debe usarse para predicción prospectiva:

@@ -156,7 +156,7 @@ class PublicationFencingTests(unittest.TestCase):
 
 class Identity:
     def authenticate(self, token):
-        return Principal("actor-1", frozenset({"RECTOR"}), ())
+        return Principal("actor-1", frozenset({"RECTOR"}), (), frozenset({"prediction:publish"}))
 
 
 class Data:
@@ -189,9 +189,8 @@ class RacingStore:
 class PublicationConflictTests(unittest.TestCase):
     def test_concurrent_idempotency_conflict_maps_to_409(self) -> None:
         service = PopulationPublicationService(RacingStore(), Identity(), Data(), Policy(), Registry())
-        with patch.dict(os.environ, {"PREDICTION_BATCH_SUBMITTER_ROLES": '["RECTOR"]'}):
-            with self.assertRaises(InferenceFailure) as raised:
-                service.submit("token", "P01", "42", "idempotency-key-0001")
+        with self.assertRaises(InferenceFailure) as raised:
+            service.submit("token", "P01", "42", "idempotency-key-0001")
         self.assertEqual(raised.exception.status_code, 409)
         self.assertEqual(raised.exception.code, "IDEMPOTENCY_CONFLICT")
 
@@ -200,7 +199,7 @@ class OperatorIdentity:
     def authenticate(self, token):
         if token != "operator-token":
             raise InferenceFailure("INVALID_TOKEN", 401, "invalid")
-        return Principal("operator-1", frozenset({"SUPERADMIN"}), ())
+        return Principal("operator-1", frozenset({"SUPERADMIN"}), (), frozenset({"prediction:train"}))
 
 
 class TrainingAdmissionApiTests(unittest.TestCase):

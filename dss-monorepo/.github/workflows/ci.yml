@@ -31,7 +31,6 @@ jobs:
       KEYCLOAK_URL: http://localhost:8080
       KEYCLOAK_REALM: uatf-dss-realm
       KEYCLOAK_AUDIENCE: uatf-auth-service
-      KEYCLOAK_ROLE_CLIENT_ID: uatf-auth-service
       KEYCLOAK_BFF_CLIENT_ID: dss-bff
       KEYCLOAK_BFF_CLIENT_SECRET: ci-client-secret-not-used-in-production
       KEYCLOAK_BFF_REDIRECT_URI: http://localhost:3006/api/auth/callback

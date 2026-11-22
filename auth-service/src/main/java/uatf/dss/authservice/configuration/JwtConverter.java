@@ -23,10 +23,9 @@ import java.util.stream.Stream;
  *     <li>{@code resource_access.<permissions-client-id>.roles} (default {@code dss-permissions}): functional
  *     permissions, kept as-is without prefix, e.g. {@code iam:users:write}. Checked with {@code hasAuthority}.</li>
  *     <li>{@code realm_access.roles}: realm roles as {@code ROLE_<name>}, e.g. {@code ROLE_SUPERADMIN}.</li>
- *     <li>{@code resource_access.<resource-id>.roles} (default {@code uatf-auth-service}): legacy client roles as
- *     {@code ROLE_<name>}, kept while services migrate to {@code dss-permissions} (removed in IAM-019).</li>
  *     <li>{@code scope}: {@code SCOPE_<scope>}.</li>
  * </ul>
+ * Roles of any other client are ignored; the legacy {@code uatf-auth-service} client roles were retired in IAM-019.
  */
 @Component
 public class JwtConverter implements Converter<Jwt, AbstractAuthenticationToken> {
@@ -35,15 +34,12 @@ public class JwtConverter implements Converter<Jwt, AbstractAuthenticationToken>
 
     private final JwtGrantedAuthoritiesConverter scopesConverter = new JwtGrantedAuthoritiesConverter();
     private final String principalAttribute;
-    private final String legacyRoleClientId;
     private final String permissionsClientId;
 
     public JwtConverter(
             @Value("${jwt.auth.converter.principal-attribute:preferred_username}") String principalAttribute,
-            @Value("${jwt.auth.converter.resource-id:uatf-auth-service}") String legacyRoleClientId,
             @Value("${jwt.auth.converter.permissions-client-id:dss-permissions}") String permissionsClientId) {
         this.principalAttribute = principalAttribute;
-        this.legacyRoleClientId = legacyRoleClientId;
         this.permissionsClientId = permissionsClientId;
     }
 
@@ -52,8 +48,6 @@ public class JwtConverter implements Converter<Jwt, AbstractAuthenticationToken>
         Set<GrantedAuthority> authorities = new LinkedHashSet<>(scopesConverter.convert(jwt));
         clientRoles(jwt, permissionsClientId).map(SimpleGrantedAuthority::new).forEach(authorities::add);
         realmRoles(jwt).map(role -> new SimpleGrantedAuthority(ROLE_PREFIX + role)).forEach(authorities::add);
-        clientRoles(jwt, legacyRoleClientId).map(role -> new SimpleGrantedAuthority(ROLE_PREFIX + role))
-                .forEach(authorities::add);
         return new JwtAuthenticationToken(jwt, authorities, principalName(jwt));
     }
 

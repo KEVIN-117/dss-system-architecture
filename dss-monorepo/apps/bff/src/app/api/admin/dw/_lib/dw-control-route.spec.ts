@@ -1,16 +1,14 @@
 import { NextResponse } from 'next/server';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { authenticateRequest, requireClientRoles, requirePermissions } = vi.hoisted(() => ({
+const { authenticateRequest, requirePermissions } = vi.hoisted(() => ({
   authenticateRequest: vi.fn(),
-  requireClientRoles: vi.fn(),
-  // IAM-014: the dw:* permission is checked first; these tests use the legacy DW_* role path.
+  // IAM-011/IAM-019: only the dw:* permission of the token opens DW routes.
   requirePermissions: vi.fn(),
 }));
 
 vi.mock('../../../_lib/auth-guard', () => ({
   authenticateRequest,
-  requireClientRoles,
   requirePermissions,
 }));
 
@@ -28,7 +26,7 @@ const authenticatedRequest = {
     token: 'verified-user-token',
     user: { sub: 'academic-authority-subject' },
     roles: [],
-    clientRoles: { 'dw-control-service': ['DW_CLOSURE_READ'] },
+    permissions: ['dw:closure:read'],
   },
 };
 
@@ -41,7 +39,7 @@ describe('DW control BFF route boundary', () => {
   it('checks service-specific permissions before forwarding the verified identity token', async () => {
     vi.stubEnv('DW_CONTROL_SERVICE_URL', 'http://dw-control-service:8090');
     authenticateRequest.mockResolvedValue(authenticatedRequest);
-    requireClientRoles.mockReturnValue(null);
+    requirePermissions.mockReturnValue(null);
     const action = vi.fn().mockResolvedValue({ result: 'ok' });
 
     const response = await withDwControl(
@@ -51,10 +49,9 @@ describe('DW control BFF route boundary', () => {
     );
 
     expect(response.status).toBe(200);
-    expect(requireClientRoles).toHaveBeenCalledWith(
+    expect(requirePermissions).toHaveBeenCalledWith(
       authenticatedRequest.value,
-      'dw-control-service',
-      ['DW_CLOSURE_READ'],
+      ['dw:closure:read'],
     );
     expect(action).toHaveBeenCalledWith(
       {
@@ -70,7 +67,7 @@ describe('DW control BFF route boundary', () => {
 
   it('does not call the DW service when the client-specific permission is missing', async () => {
     authenticateRequest.mockResolvedValue(authenticatedRequest);
-    requireClientRoles.mockReturnValue(
+    requirePermissions.mockReturnValue(
       NextResponse.json({ error: 'Forbidden' }, { status: 403 }),
     );
     const action = vi.fn();
@@ -88,7 +85,7 @@ describe('DW control BFF route boundary', () => {
   it('maps upstream errors to a safe response without echoing private details', async () => {
     vi.stubEnv('DW_CONTROL_SERVICE_URL', 'http://dw-control-service:8090');
     authenticateRequest.mockResolvedValue(authenticatedRequest);
-    requireClientRoles.mockReturnValue(null);
+    requirePermissions.mockReturnValue(null);
     const action = vi
       .fn()
       .mockRejectedValue(new Error('postgres password=private-value'));
@@ -109,20 +106,14 @@ describe('DW control BFF route boundary', () => {
     errorSpy.mockRestore();
   });
 
-  it('accepts the dw:* permission and, during the coexistence only, the legacy DW_* role (IAM-014)', () => {
+  it('requires the dw:* permission and nothing else (IAM-014, IAM-019)', () => {
     const value = authenticatedRequest.value as never;
     requirePermissions.mockReturnValueOnce(null);
-    expect(requireDwPermission(value, 'DW_CLOSURE_MANAGE', {})).toBeNull();
+    expect(requireDwPermission(value, 'DW_CLOSURE_MANAGE')).toBeNull();
     expect(requirePermissions).toHaveBeenLastCalledWith(value, ['dw:closure:manage']);
-    expect(requireClientRoles).not.toHaveBeenCalled();
 
-    requireClientRoles.mockReturnValue(null);
-    expect(requireDwPermission(value, 'DW_CLOSURE_READ', {})).toBeNull();
-    expect(requireClientRoles).toHaveBeenLastCalledWith(value, 'dw-control-service', ['DW_CLOSURE_READ']);
-
-    requireClientRoles.mockClear();
-    expect(requireDwPermission(value, 'DW_CLOSURE_READ', { DW_CONTROL_LEGACY_ROLES_ENABLED: 'false' })?.status)
-      .toBe(403);
-    expect(requireClientRoles).not.toHaveBeenCalled();
+    // The retired DW_* client role no longer opens anything: only the permission check decides.
+    expect(requireDwPermission(value, 'DW_CLOSURE_READ')?.status).toBe(403);
+    expect(requirePermissions).toHaveBeenLastCalledWith(value, ['dw:closure:read']);
   });
 });

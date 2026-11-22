@@ -1,5 +1,7 @@
 # PRED-007 — Publicación y consulta de predicciones
 
+> **IAM-019:** las listas `PREDICTION_ALLOWED_ROLES` y `PREDICTION_BATCH_SUBMITTER_ROLES` que menciona este documento se retiraron. El acceso se concede con los permisos `analytics:*` y `prediction:publish` de `dss-permissions` (ver `prediction-service/README.md`).
+
 ## Alcance implementado
 
 La publicación poblacional cubre **abandono de programa** por programa y cierre académico. No publica abandono de materia: el indicador disponible en `fact_cursado` se observa después de procesar el período y no sirve como predicción prospectiva con el contrato actual.

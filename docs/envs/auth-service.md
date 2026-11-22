@@ -10,7 +10,7 @@ Fuentes: `auth-service/src/main/resources/application.yaml`, `application-dev.ya
 | `DB_URI`, `DB_USERNAME`, `DB_PASSWORD` | Sí | URL JDBC, usuario y secreto PostgreSQL. Compose mapea `AUTH_DB_URI`, `AUTH_DB_USER`, `AUTH_DB_PASSWORD`. |
 | `KEYCLOAK_ISSUER_URI` | Sí | Issuer que debe coincidir con el claim `iss`; usado por resource server. |
 | `KEYCLOAK_JWK_SET_URI` | Dev/test/Compose | Endpoint de claves públicas; en `dev` se proporciona explícitamente. En prod el perfil declara issuer y confía en resolución OIDC. |
-| `KEYCLOAK_RESOURCE_ID` | Opcional | Cliente/recurso esperado por conversor JWT; default `uatf-auth-service`. |
+| `KEYCLOAK_RESOURCE_ID` | Opcional | Audience por defecto cuando no se define `KEYCLOAK_AUDIENCE`; default `uatf-auth-service`. Desde IAM-019 ya no se leen roles de ese cliente. |
 | `KEYCLOAK_AUDIENCE` | Opcional | Audiencia JWT; deriva del resource ID si falta. |
 | `KEYCLOAK_PRINCIPAL_ATTRIBUTE` | Opcional | Claim para el principal; default `preferred_username`. |
 | `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, `RABBITMQ_PASSWORD`, `RABBITMQ_VHOST` | Sí fuera de defaults local | Conexión al broker; host `localhost`, port 5672, credenciales guest y vhost `/` como fallback del YAML. En Compose usa credenciales default inyectadas. |

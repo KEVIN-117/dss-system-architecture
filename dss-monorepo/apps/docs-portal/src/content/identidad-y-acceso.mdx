@@ -12,8 +12,14 @@ La consulta de perfil de `auth-service` es `GET /api/v1/auth/me` y requiere un J
 
 El BFF vuelve a validar la sesión y aplica los permisos de cada ruta. Los servicios protegidos también verifican la identidad y los permisos que les corresponden; el paso por el BFF no reemplaza esa validación.
 
+## Roles y permisos
+
+La autorización se basa en **permisos** con la forma `recurso:acción` (por ejemplo `analytics:faculty` o `dw:closure:manage`), que Keycloak entrega en el token. Un **rol** (RECTOR, DECANO, DIRECTOR, SUPERADMIN o uno creado por la institución) agrupa permisos y decide a qué portal se entra; el **contexto académico** (facultad o carrera) limita qué datos se ven. Cada servicio comprueba el permiso que le corresponde, así que un permiso nuevo no requiere desplegar código para asignarse, solo para empezar a exigirse.
+
+Usuarios, roles, permisos, aplicaciones y la auditoría de esos cambios se administran desde el portal de administración, sin entrar a Keycloak.
+
 <Callout title="Permisos administrativos">
-  La asignación de contextos académicos y la gestión de cuentas son tareas restringidas. Sus procedimientos detallados se publicarán solo cuando el portal tenga clasificación y control de acceso definidos.
+  La gestión de cuentas, roles, permisos y contextos académicos es una tarea restringida: requiere los permisos `iam:*`. El procedimiento está en la guía del portal de administración, visible solo para administradores.
 </Callout>
 
-<Source path="auth-service/docs/auth-service-funcionamiento.md" label="Funcionamiento de auth-service" /> · <Source path="dss-monorepo/apps/bff/README.md" label="BFF de autenticación" />
+<Source path="auth-service/docs/auth-service-funcionamiento.md" label="Funcionamiento de auth-service" /> · <Source path="dss-monorepo/apps/bff/README.md" label="BFF de autenticación" /> · <Source path="docs/auth/rbac-current-state.md" label="Modelo de roles y permisos" />

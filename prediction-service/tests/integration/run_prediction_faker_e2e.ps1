@@ -14,7 +14,6 @@ if ([string]::IsNullOrWhiteSpace($databaseUrl)) {
 # Route the existing local dev connection through the published DW port.
 $databaseUrl = $databaseUrl -replace '@postgres-dw:5432/', '@localhost:5434/'
 $env:PREDICTION_DW_DATABASE_URL = $databaseUrl
-$env:PREDICTION_ALLOWED_ROLES = '["RECTOR"]'
 $env:TEMP = Join-Path (Get-Location) ".test-tmp"
 $env:TMP = $env:TEMP
 

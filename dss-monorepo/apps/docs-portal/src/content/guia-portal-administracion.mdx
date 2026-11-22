@@ -21,6 +21,26 @@ El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio d
 | <Ui>Esquemas y cubos</Ui> | servicio OLAP | Subir y revisar esquemas Mondrian. |
 | <Ui>Operaciones ML</Ui> | servicio de aprendizaje automático | Subir conjuntos de datos de entrenamiento y lanzar entrenamientos candidatos. |
 
+## Cómo funciona el acceso
+
+Toda la identidad del DSS se gestiona desde este portal; no hace falta entrar a Keycloak. El modelo tiene tres piezas:
+
+- **Permiso**: autoriza una acción concreta y se escribe `recurso:acción` (por ejemplo `analytics:faculty`, `dw:closure:manage`, `olap:admin`). Los servicios solo miran permisos.
+- **Rol**: agrupa permisos y decide a qué portal entra la persona. RECTOR, DECANO y DIRECTOR traen la analítica de su nivel; SUPERADMIN trae la administración de la plataforma, pero **no** datos académicos ni la administración de Saiku.
+- **Contexto académico**: la facultad o carrera sobre la que un Decano o Director ve datos. Se asigna en el usuario, no en el rol.
+
+Tareas habituales:
+
+| Quieres… | Haz esto |
+| --- | --- |
+| Dar acceso a una nueva autoridad | **Usuarios** → <Ui>Nuevo usuario</Ui> → rol (por ejemplo DECANO) en la pestaña **Roles** → facultad en **Contextos**. |
+| Que alguien administre Saiku o los cierres del almacén | Asígnale `olap:admin` o `dw:closure:manage` en la pestaña **Permisos** del usuario, o crea un rol que los agrupe. Ningún rol del sistema los trae. |
+| Crear un cargo nuevo (por ejemplo VICERRECTOR) | **Roles** → <Ui>Nuevo rol</Ui> con su portal → sus permisos en **Matriz de acceso**. |
+| Conectar una aplicación nueva | **Aplicaciones** → <Ui>Nueva aplicación</Ui>; guarda el secreto en ese momento. |
+| Saber quién cambió algo | **Auditoría**, filtrando por objetivo o por actor. |
+
+Los cambios de roles y permisos llegan a la persona al iniciar sesión o al renovarla (unos minutos). Los roles antiguos de Keycloak (`OLAP_ADMIN`, `DW_*`, roles del cliente `uatf-auth-service`) ya no existen: si alguien pide «el rol `DW_CLOSURE_READ`», lo que necesita es el permiso `dw:closure:read`.
+
 ## Resumen general
 
 <Ui>Estado de servicios</Ui> indica para servicio de autenticación, servicio de control del almacén de datos, servicio OLAP y servicio de aprendizaje automático si están **Disponible**, **Sin conexión** o **En desarrollo**. <Ui>Actividad administrativa reciente</Ui> lista los últimos cierres y ejecuciones ETL. Si ves «Una parte de servicio de control del almacén de datos no respondió», el resto del portal sigue funcionando; revisa ese servicio.
@@ -109,6 +129,8 @@ Un entrenamiento produce un **candidato**; no lo aprueba para uso institucional.
 
 - Registra en cada motivo de cierre o reapertura la decisión institucional que lo respalda.
 - No pegues contraseñas, tokens ni datos personales en motivos, capturas o reportes.
+- Da acceso con roles y deja los permisos sueltos para excepciones: así la **Matriz de acceso** sigue explicando quién puede qué.
+- Revisa en **Auditoría** los cambios hechos con <Ui>Eliminar de todas formas</Ui> o con rotación de secretos.
 - Antes de cambiar una conexión o un esquema en producción, coordina con el mantenedor de OLAP: los tableros de las autoridades dependen de ellos.
 
-<Source path="auth-service/README.md" label="Directorio administrativo de servicio de autenticación" /> · <Source path="dss-monorepo/apps/bff/README.md" label="Permisos de las rutas administrativas" />
+<Source path="auth-service/README.md" label="Directorio administrativo de servicio de autenticación" /> · <Source path="dss-monorepo/apps/bff/README.md" label="Permisos de las rutas administrativas" /> · <Source path="docs/auth/rbac-current-state.md" label="Modelo de roles y permisos" />

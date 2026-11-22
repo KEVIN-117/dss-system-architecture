@@ -23,8 +23,9 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Guards the functional permission model in the realm export (IAM-002, decisions D1 and D4).
  *
  * <p>Permissions are client roles of the bearer-only catalog client {@code dss-permissions}, named
- * {@code resource:action}. Realm roles group them as composites. The legacy {@code uatf-auth-service} client roles
- * stay in the composites while services migrate.
+ * {@code resource:action}. Realm roles group them as composites. Since IAM-019 the legacy client roles
+ * ({@code uatf-auth-service} business roles, {@code DW_*}, {@code OLAP_*}) are gone: every service reads
+ * {@code dss-permissions}.
  */
 class RealmPermissionCatalogTest {
 
@@ -42,11 +43,8 @@ class RealmPermissionCatalogTest {
     private static final Map<String, List<String>> EXPECTED_PERMISSIONS = Map.of(
             "DIRECTOR", DIRECTOR, "DECANO", DECANO, "RECTOR", RECTOR, "SUPERADMIN", SUPERADMIN);
 
-    private static final Map<String, List<String>> EXPECTED_LEGACY_ROLES = Map.of(
-            "DIRECTOR", List.of("DIRECTOR"),
-            "DECANO", List.of("DECANO", "DIRECTOR"),
-            "RECTOR", List.of("DECANO", "DIRECTOR", "RECTOR"),
-            "SUPERADMIN", List.of("SUPERADMIN"));
+    /** Clients whose business roles were retired in IAM-019; the clients themselves stay. */
+    private static final List<String> LEGACY_ROLE_CLIENTS = List.of("uatf-auth-service", "olap-service", "dw-control-service");
 
     private static List<String> concat(List<String> base, String... more) {
         List<String> all = new java.util.ArrayList<>(base);
@@ -126,11 +124,21 @@ class RealmPermissionCatalogTest {
     }
 
     @Test
-    void legacyAuthServiceClientRolesAreKeptDuringMigration() throws Exception {
+    void legacyClientRolesAreRetired() throws Exception {
         JsonNode realm = realm();
-        EXPECTED_LEGACY_ROLES.forEach((roleName, expected) -> assertEquals(new TreeSet<>(expected),
-                names(realmRole(realm, roleName).path("composites").path("client").path("uatf-auth-service")),
-                roleName + " legacy uatf-auth-service roles"));
+        for (String clientId : LEGACY_ROLE_CLIENTS) {
+            assertNotNull(client(realm, clientId), clientId + " client must still exist");
+            assertTrue(names(realm.path("roles").path("client").path(clientId)).isEmpty(),
+                    clientId + " must not define business roles anymore");
+            for (JsonNode role : realm.path("roles").path("realm")) {
+                assertTrue(role.path("composites").path("client").path(clientId).isMissingNode(),
+                        role.path("name").asText() + " must not group " + clientId + " roles");
+            }
+            for (JsonNode user : realm.path("users")) {
+                assertTrue(user.path("clientRoles").path(clientId).isMissingNode(),
+                        user.path("username").asText() + " must not hold " + clientId + " roles");
+            }
+        }
     }
 
     @Test
@@ -164,8 +172,6 @@ class RealmPermissionCatalogTest {
         for (JsonNode user : realm().path("users")) {
             if ("olap-service".equals(user.path("serviceAccountClientId").asText())) {
                 assertTrue(names(user.path("clientRoles").path(CATALOG)).contains("context:read"));
-                assertTrue(names(user.path("clientRoles").path("uatf-auth-service")).contains("CONTEXT_READER"),
-                        "legacy CONTEXT_READER is kept during migration");
                 return;
             }
         }
@@ -196,16 +202,52 @@ class RealmPermissionCatalogTest {
         assertEquals(exported, scripted, "iam-002-permission-catalog.sh must match the realm export");
     }
 
+    /**
+     * Audiences used to arrive through the legacy client roles ("audience resolve"); without them every token that
+     * calls a service needs an explicit access-token audience mapper.
+     */
     @Test
-    void bffAccessTokensCarryTheAuthServiceAudienceExplicitly() throws Exception {
-        JsonNode bff = client(realm(), "dss-bff");
-        boolean found = false;
-        for (JsonNode mapper : bff.path("protocolMappers")) {
+    void tokensCarryTheirServiceAudiencesExplicitly() throws Exception {
+        JsonNode realm = realm();
+        for (String audience : List.of("uatf-auth-service", "olap-service", "dw-control-service")) {
+            assertTrue(hasAudience(client(realm, "dss-bff"), audience), "dss-bff needs the " + audience + " audience");
+        }
+        assertTrue(hasAudience(client(realm, "olap-service"), "uatf-auth-service"),
+                "olap-service calls the internal academic-context endpoint of auth-service");
+    }
+
+    private static boolean hasAudience(JsonNode client, String audience) {
+        for (JsonNode mapper : client.path("protocolMappers")) {
             if ("oidc-audience-mapper".equals(mapper.path("protocolMapper").asText())
-                    && "uatf-auth-service".equals(mapper.path("config").path("included.client.audience").asText())) {
-                found = "true".equals(mapper.path("config").path("access.token.claim").asText());
+                    && audience.equals(mapper.path("config").path("included.client.audience").asText())
+                    && "true".equals(mapper.path("config").path("access.token.claim").asText())) {
+                return true;
             }
         }
-        assertTrue(found, "dss-bff needs an access-token audience mapper for uatf-auth-service");
+        return false;
+    }
+
+    @Test
+    void retirementScriptMapsEveryLegacyRoleToAnExistingTarget() throws Exception {
+        Path script = Path.of("..", "infra", "keycloak", "migrations", "iam-019-retire-legacy-roles.sh");
+        JsonNode realm = realm();
+        Set<String> catalog = catalogPermissions(realm);
+        Pattern entry = Pattern.compile("^\\s*\"([a-z-]+)\\|([A-Z_]+)\\|([^\"]+)\"\\s*$");
+        int mapped = 0;
+        for (String line : Files.readAllLines(script)) {
+            var matcher = entry.matcher(line);
+            if (!matcher.matches()) {
+                continue;
+            }
+            mapped++;
+            assertTrue(LEGACY_ROLE_CLIENTS.contains(matcher.group(1)), matcher.group(1) + " is not a legacy role client");
+            String target = matcher.group(3);
+            if (target.startsWith("realm:")) {
+                assertNotNull(realmRole(realm, target.substring("realm:".length())), target + " must exist");
+            } else {
+                assertTrue(catalog.contains(target), target + " must be a catalog permission");
+            }
+        }
+        assertEquals(10, mapped, "every retired role (5 uatf-auth-service, 2 OLAP_*, 3 DW_*) needs a target");
     }
 }

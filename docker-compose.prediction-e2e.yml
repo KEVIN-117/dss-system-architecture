@@ -45,14 +45,13 @@ services:
       PREDICTION_LOG_LEVEL: info
       PREDICTION_DATABASE_URL: sqlite:///app/artifacts/prediction-publications.sqlite
       PREDICTION_DW_DATABASE_URL: ${PREDICTION_DW_DATABASE_URL:?PREDICTION_DW_DATABASE_URL must be configured}
-      PREDICTION_ALLOWED_ROLES: '["RECTOR","DECANO","DIRECTOR"]'
-      PREDICTION_BATCH_SUBMITTER_ROLES: '["RECTOR"]'
+      # IAM-019: access comes only from dss-permissions. The RECTOR e2e account reads through its role
+      # composites (analytics:*) and needs prediction:publish assigned to start population scoring.
       PREDICTION_IDEMPOTENCY_SCOPE: prediction-e2e
       PREDICTION_OUTBOX_POLL_SECONDS: 1
       KEYCLOAK_URL: http://keycloak:8080
       KEYCLOAK_REALM: uatf-dss-realm
       KEYCLOAK_AUDIENCE: uatf-auth-service
-      KEYCLOAK_ROLE_CLIENT_ID: uatf-auth-service
       KEYCLOAK_ISSUER_URI: http://localhost:8080/realms/uatf-dss-realm
       KEYCLOAK_JWKS_URL: http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs
       AUTH_SERVICE_URL: http://auth-service:8000

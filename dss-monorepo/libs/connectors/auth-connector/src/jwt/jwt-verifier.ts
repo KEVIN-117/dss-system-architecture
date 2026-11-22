@@ -18,8 +18,6 @@ export interface KeycloakJwtVerificationOptions {
   realm: string;
   /** Expected audience of tokens consumed by the BFF. */
   audience: string;
-  /** Client whose legacy resource roles may still carry DSS portal roles. */
-  roleClientId: string;
   /** Catalog client whose roles are the permissions (`dss-permissions`, IAM-014). */
   permissionsClientId?: string;
   /**
@@ -78,7 +76,7 @@ export async function verifyKeycloakJwt(
 
     return {
       claims,
-      roles: extractDssRoles(claims, options.roleClientId, options.portalRoles),
+      roles: extractDssRoles(claims, options.portalRoles),
       permissions: extractPermissions(
         claims,
         options.permissionsClientId ?? DEFAULT_PERMISSIONS_CLIENT_ID,
@@ -124,21 +122,20 @@ export async function verifyKeycloakIdToken(
 export const DEFAULT_PERMISSIONS_CLIENT_ID = 'dss-permissions';
 
 /**
- * Portal roles of the token: the known DSS roles among realm roles and the legacy client roles, plus
- * realm roles mapped to a portal role through `portalRoles`.
+ * Portal roles of the token: the known DSS roles among realm roles, plus realm roles mapped to a portal
+ * role through `portalRoles`. Client roles never open a portal (the legacy `uatf-auth-service` roles
+ * were retired in IAM-019).
  */
 export function extractDssRoles(
-  claims: Pick<KeycloakTokenClaims, 'realm_access' | 'resource_access'>,
-  roleClientId: string,
+  claims: Pick<KeycloakTokenClaims, 'realm_access'>,
   portalRoles: Readonly<Record<string, DSSRole>> = {},
 ): DSSRole[] {
   const realmRoles = claims.realm_access?.roles ?? [];
-  const clientRoles = claims.resource_access?.[roleClientId]?.roles ?? [];
   const mapped = realmRoles.flatMap((role) =>
     Object.prototype.hasOwnProperty.call(portalRoles, role) ? [portalRoles[role]] : [],
   );
 
-  return [...new Set([...realmRoles, ...clientRoles, ...mapped])].filter(isDSSRole);
+  return [...new Set([...realmRoles, ...mapped])].filter(isDSSRole);
 }
 
 /** `resource_access.<permissionsClientId>.roles`; roles of any other client are not permissions. */

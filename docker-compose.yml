@@ -114,9 +114,7 @@ services:
       KEYCLOAK_ISSUER_URI: ${AUTH_KEYCLOAK_ISSUER_URI:-http://localhost:8080/realms/uatf-dss-realm}
       KEYCLOAK_JWK_SET_URI: ${AUTH_KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs}
       KEYCLOAK_DW_CONTROL_AUDIENCE: ${KEYCLOAK_DW_CONTROL_AUDIENCE:-dw-control-service}
-      KEYCLOAK_DW_CONTROL_CLIENT_ID: ${KEYCLOAK_DW_CONTROL_CLIENT_ID:-dw-control-service}
       KEYCLOAK_PERMISSIONS_CLIENT_ID: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:-dss-permissions}
-      DW_CONTROL_LEGACY_ROLES_ENABLED: ${DW_CONTROL_LEGACY_ROLES_ENABLED:-true}
     ports:
       - "127.0.0.1:${DW_CONTROL_PORT:-8090}:8090"
     networks:
@@ -285,9 +283,7 @@ services:
       KEYCLOAK_ISSUER_URI: ${AUTH_KEYCLOAK_ISSUER_URI:-http://localhost:8080/realms/uatf-dss-realm}
       KEYCLOAK_JWK_SET_URI: ${AUTH_KEYCLOAK_JWK_SET_URI:-http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs}
       KEYCLOAK_OLAP_AUDIENCE: ${OLAP_KEYCLOAK_AUDIENCE:-olap-service}
-      KEYCLOAK_OLAP_CLIENT_ID: ${OLAP_KEYCLOAK_CLIENT_ID:-olap-service}
       KEYCLOAK_PERMISSIONS_CLIENT_ID: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:-dss-permissions}
-      OLAP_LEGACY_ROLES_ENABLED: ${OLAP_LEGACY_ROLES_ENABLED:-true}
     ports:
       - "127.0.0.1:${OLAP_PORT:-8088}:8080"
     volumes:
@@ -333,17 +329,11 @@ services:
       KEYCLOAK_URL: ${KEYCLOAK_URL:-}
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-}
-      KEYCLOAK_ROLE_CLIENT_ID: ${KEYCLOAK_ROLE_CLIENT_ID:-}
       KEYCLOAK_PERMISSIONS_CLIENT_ID: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:-dss-permissions}
-      # IAM-013: the PREDICTION_*_ROLES lists below only apply while this is true.
-      PREDICTION_LEGACY_ROLES_ENABLED: ${PREDICTION_LEGACY_ROLES_ENABLED:-true}
       KEYCLOAK_ISSUER_URI: ${KEYCLOAK_ISSUER_URI:-${AUTH_KEYCLOAK_ISSUER_URI:-}}
       KEYCLOAK_JWKS_URL: ${KEYCLOAK_JWKS_URL:-${AUTH_KEYCLOAK_JWK_SET_URI:-}}
       AUTH_SERVICE_URL: ${AUTH_SERVICE_URL:-http://auth-service:8000}
-      PREDICTION_ALLOWED_ROLES: ${PREDICTION_ALLOWED_ROLES:-}
-      PREDICTION_BATCH_SUBMITTER_ROLES: ${PREDICTION_BATCH_SUBMITTER_ROLES:-[]}
       PREDICTION_IDEMPOTENCY_SCOPE: ${PREDICTION_IDEMPOTENCY_SCOPE:-development}
-      PREDICTION_TRAINING_ROLES: '${PREDICTION_TRAINING_ROLES:-["SUPERADMIN"]}'
       # Training admission control: running + queued jobs never exceed these.
       WORKER_MAX_CONCURRENT_JOBS: ${WORKER_MAX_CONCURRENT_JOBS:-1}
       PREDICTION_MAX_QUEUED_JOBS: ${PREDICTION_MAX_QUEUED_JOBS:-4}
@@ -488,10 +478,8 @@ services:
       KEYCLOAK_URL: http://localhost:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM:-uatf-dss-realm}
       KEYCLOAK_AUDIENCE: ${KEYCLOAK_AUDIENCE:-uatf-auth-service}
-      KEYCLOAK_ROLE_CLIENT_ID: ${KEYCLOAK_ROLE_CLIENT_ID:-uatf-auth-service}
       # IAM-014: optional realm roles that open a portal, e.g. {"VICERRECTOR":"RECTOR"}.
       KEYCLOAK_PORTAL_ROLES: ${KEYCLOAK_PORTAL_ROLES:-}
-      DW_CONTROL_LEGACY_ROLES_ENABLED: ${DW_CONTROL_LEGACY_ROLES_ENABLED:-true}
       KEYCLOAK_BFF_CLIENT_ID: dss-bff
       KEYCLOAK_BFF_CLIENT_SECRET: ${KEYCLOAK_BFF_CLIENT_SECRET:?KEYCLOAK_BFF_CLIENT_SECRET must be set}
       KEYCLOAK_BFF_REDIRECT_URI: http://localhost:3006/api/auth/callback
@@ -499,10 +487,8 @@ services:
       AUTH_SERVICE_URL: http://auth-service:${AUTH_SERVER_PORT:-8000}
       DW_CONTROL_SERVICE_URL: http://dw-control-service:8090
       OLAP_SERVICE_URL: http://olap-service:8080
-      # Saiku admin gate (IAM-012): same switches as olap-service.
-      KEYCLOAK_OLAP_CLIENT_ID: ${OLAP_KEYCLOAK_CLIENT_ID:-olap-service}
+      # Saiku admin gate (IAM-012): same permissions catalog as olap-service.
       KEYCLOAK_PERMISSIONS_CLIENT_ID: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:-dss-permissions}
-      OLAP_LEGACY_ROLES_ENABLED: ${OLAP_LEGACY_ROLES_ENABLED:-true}
       OLAP_ACADEMIC_SCOPE_FILTERS: '{"faculty":{"dimension":"Ámbito de facultad","hierarchy":"Facultad","level":"Facultad","memberTemplate":"[Ámbito de facultad].[Facultad].[Facultad].&[{id}]"},"career":{"dimension":"Ámbito de carrera","hierarchy":"Carrera","level":"Carrera","memberTemplate":"[Ámbito de carrera].[Carrera].[Carrera].&[{id}]"}}'
       PREDICTION_SERVICE_URL: http://prediction-service:8000
       BFF_ALLOWED_ORIGINS: http://localhost:3000,http://localhost:3001,http://localhost:3002,http://localhost:3003,http://localhost:3004

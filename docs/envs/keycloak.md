@@ -6,7 +6,7 @@ El Compose raíz utiliza `KC_BOOTSTRAP_ADMIN_USERNAME` y `KC_BOOTSTRAP_ADMIN_PAS
 
 `KEYCLOAK_BFF_CLIENT_SECRET` es secreto del cliente confidencial BFF. Se exige al interpolar Compose, se utiliza también al importar la configuración del realm y debe coincidir con el secreto provisionado en Keycloak. No es el secreto de sesión del BFF.
 
-`KEYCLOAK_OLAP_CLIENT_SECRET` es el secreto del cliente confidencial `olap-service`. Ese cliente ya no es público ni admite login interactivo (standard flow desactivado): solo emite tokens `client_credentials` para su cuenta de servicio `service-account-olap-service`, que tiene el rol `uatf-auth-service: CONTEXT_READER` para leer el alcance académico. Se exige al interpolar Compose y se usa al importar el realm.
+`KEYCLOAK_OLAP_CLIENT_SECRET` es el secreto del cliente confidencial `olap-service`. Ese cliente ya no es público ni admite login interactivo (standard flow desactivado): solo emite tokens `client_credentials` para su cuenta de servicio `service-account-olap-service`, que tiene el permiso `dss-permissions: context:read` para leer el alcance académico. El cliente agrega `uatf-auth-service` a `aud` con un audience mapper explícito. Se exige al interpolar Compose y se usa al importar el realm.
 
 `KEYCLOAK_AUTH_SERVICE_CLIENT_SECRET` es el secreto del cliente confidencial `uatf-auth-service`. Solo admite `client_credentials` (sin standard flow, password ni implicit). Su cuenta de servicio `service-account-uatf-auth-service` tiene los roles mínimos de `realm-management` para que auth-service gestione identidad desde el admin-portal mediante la Admin REST API (épica IAM, #290):
 
@@ -19,7 +19,7 @@ El Compose raíz utiliza `KC_BOOTSTRAP_ADMIN_USERNAME` y `KC_BOOTSTRAP_ADMIN_PAS
 
 No se otorgan `realm-admin`, `manage-authorization`, `manage-identity-providers` ni `manage-events`. `RealmAuthServiceAdminAccessTest` (módulo `keycloak-webhook`) verifica este conjunto exacto. El secreto se exige al interpolar Compose y se usa al importar el realm.
 
-**Realms ya importados:** `--import-realm` no sobrescribe un realm existente. En un entorno que ya tiene `uatf-dss-realm`, aplicar a mano (consola o `kcadm`): volver confidencial `olap-service` con service account y el secreto anterior, desactivar standard flow, crear el rol de cliente `CONTEXT_READER` en `uatf-auth-service` y asignarlo a `service-account-olap-service`.
+**Realms ya importados:** `--import-realm` no sobrescribe un realm existente. En un entorno que ya tiene `uatf-dss-realm`, aplicar a mano (consola o `kcadm`): volver confidencial `olap-service` con service account y el secreto anterior, desactivar standard flow y aplicar los scripts de `infra/keycloak/migrations/` en orden (`iam-002` crea el catálogo y da `context:read` a `service-account-olap-service`; `iam-019` retira los roles antiguos).
 
 Para `uatf-auth-service` (IAM-001), con `kcadm.sh` dentro del contenedor:
 
@@ -50,10 +50,19 @@ Desde IAM-002 (decisiones D1 y D4 de `docs/auth/rbac-iam-admin-proposal.md`), el
 - **Permisos que se asignan por usuario:** `olap:admin`, `olap:user`, `dw:closure:read`, `dw:closure:manage`, `dw:etl-monitor:read` y `prediction:publish` (IAM-013: iniciar el scoring poblacional). Ningún rol los incluye.
 - **Permiso de servicio:** `context:read`, que tiene `service-account-olap-service`.
 
-**Convivencia:** los roles antiguos (`uatf-auth-service:*`, `DW_*`, `OLAP_*`, `CONTEXT_READER`) se mantienen en los compuestos y en las cuentas de servicio hasta que todos los servicios lean `dss-permissions` (IAM-011 a IAM-014). Se retiran en IAM-019.
+**Roles antiguos retirados (IAM-019):** los roles de cliente `uatf-auth-service:{SUPERADMIN,RECTOR,DECANO,DIRECTOR,CONTEXT_READER}`, `olap-service:{OLAP_ADMIN,OLAP_USER}` y `dw-control-service:{DW_CLOSURE_READ,DW_CLOSURE_MANAGE,DW_ETL_MONITOR_READ}` ya no existen. Todos los servicios leen solo `dss-permissions` y los roles del realm. Los clientes siguen existiendo. Como esos roles añadían el `aud` de su cliente («audience resolve»), las audiencias ahora son explícitas: `dss-bff` incluye `uatf-auth-service`, `olap-service` y `dw-control-service`, y `olap-service` incluye `uatf-auth-service`.
+
+En un realm ya importado, ejecutar después de `iam-002`:
+
+```sh
+docker exec -i -e DRY_RUN=1 uatf-keycloak bash -s < infra/keycloak/migrations/iam-019-retire-legacy-roles.sh   # revisar
+docker exec -i uatf-keycloak bash -s < infra/keycloak/migrations/iam-019-retire-legacy-roles.sh
+```
+
+El script es idempotente: agrega las audiencias que falten, da a cada usuario, cuenta de servicio o rol del realm que tenía un rol antiguo su equivalente (`OLAP_ADMIN` → `olap:admin`, `DW_CLOSURE_READ` → `dw:closure:read`, `CONTEXT_READER` → `context:read`, `uatf-auth-service:RECTOR` → rol del realm `RECTOR`…) y después borra los roles antiguos. Los tokens ya emitidos con esos roles dejan de dar acceso en cuanto se despliegan los servicios; los usuarios recuperan el acceso al renovar la sesión.
 
 **Cambios de D4:**
-- SUPERADMIN ya no incluye `olap-service:OLAP_ADMIN`. Desde IAM-012 la administración de Saiku se concede con el permiso `olap:admin`; durante la convivencia también sirve `olap-service:OLAP_ADMIN` asignado directamente.
+- SUPERADMIN ya no incluye `olap-service:OLAP_ADMIN`. Desde IAM-012 la administración de Saiku se concede con el permiso `olap:admin`.
 - Se eliminó el cliente público `uatf-dss-spa`, que no se usaba.
 - `dss-bff` agrega `uatf-auth-service` a `aud` con un audience mapper explícito.
 

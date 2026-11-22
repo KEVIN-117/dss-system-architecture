@@ -48,9 +48,5 @@ app:
       issuer-uri: ${KEYCLOAK_ISSUER_URI}
       jwk-set-uri: ${KEYCLOAK_JWK_SET_URI}
       audience: ${KEYCLOAK_DW_CONTROL_AUDIENCE:dw-control-service}
-      # Client of the legacy DW_* roles (only read while legacy-dw-roles-enabled is true).
-      client-id: ${KEYCLOAK_DW_CONTROL_CLIENT_ID:dw-control-service}
       # Catalog client of the permissions dw:closure:read, dw:closure:manage and dw:etl-monitor:read (IAM-011).
       permissions-client-id: ${KEYCLOAK_PERMISSIONS_CLIENT_ID:dss-permissions}
-    # Coexistence: also accept the old DW_* roles. Turn off once every operator has the dss-permissions permissions.
-    legacy-dw-roles-enabled: ${DW_CONTROL_LEGACY_ROLES_ENABLED:true}

@@ -1,6 +1,6 @@
 # Propuesta: gestionar usuarios, roles y permisos desde el admin-portal
 
-> Estado: **decisiones D1 a D4 tomadas; falta el diseño detallado**. Se apoya en [rbac-current-state.md](rbac-current-state.md).
+> Estado: **implementada** (épica IAM #290, IAM-001 a IAM-019). Las decisiones D1–D4 rigen el modelo; el estado resultante está en [rbac-current-state.md](rbac-current-state.md). Las menciones a roles antiguos y a la convivencia son históricas: esos roles y flags se retiraron en IAM-019.
 
 ## Objetivo
 

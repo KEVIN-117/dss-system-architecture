@@ -18,7 +18,7 @@ paths:
       tags: [Academic closures]
       operationId: listAcademicClosures
       summary: Lista cierres académicos
-      x-required-permission: DW_CLOSURE_READ
+      x-required-permission: dw:closure:read
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
@@ -46,7 +46,7 @@ paths:
       tags: [Academic closures]
       operationId: createAcademicClosure
       summary: Crea un cierre pendiente
-      x-required-permission: DW_CLOSURE_MANAGE
+      x-required-permission: dw:closure:manage
       description: Actor obtenido del subject del JWT; no se acepta actor en el body.
       requestBody:
         required: true
@@ -75,7 +75,7 @@ paths:
       tags: [Academic closures]
       operationId: getAcademicClosure
       summary: Obtiene un cierre académico
-      x-required-permission: DW_CLOSURE_READ
+      x-required-permission: dw:closure:read
       responses:
         '200':
           description: Detalle del cierre.
@@ -100,7 +100,7 @@ paths:
       tags: [Academic closures]
       operationId: listAcademicClosureEvents
       summary: Consulta la bitácora del cierre
-      x-required-permission: DW_CLOSURE_READ
+      x-required-permission: dw:closure:read
       responses:
         '200':
           description: Eventos inmutables, del más reciente al más antiguo.
@@ -117,7 +117,7 @@ paths:
       tags: [Academic closures]
       operationId: closeAcademicPeriod
       summary: Autoriza el cierre de un periodo
-      x-required-permission: DW_CLOSURE_MANAGE
+      x-required-permission: dw:closure:manage
       parameters:
         - name: closureId
           in: path
@@ -146,7 +146,7 @@ paths:
       tags: [Academic closures]
       operationId: reopenAcademicPeriod
       summary: Reabre un periodo cerrado o procesado
-      x-required-permission: DW_CLOSURE_MANAGE
+      x-required-permission: dw:closure:manage
       parameters:
         - name: closureId
           in: path
@@ -175,7 +175,7 @@ paths:
       tags: [ETL executions]
       operationId: listEtlExecutions
       summary: Lista ejecuciones ETL registradas por Hop
-      x-required-permission: DW_ETL_MONITOR_READ
+      x-required-permission: dw:etl-monitor:read
       parameters:
         - $ref: '#/components/parameters/Page'
         - $ref: '#/components/parameters/Size'
@@ -214,7 +214,7 @@ paths:
       tags: [ETL executions]
       operationId: getEtlExecution
       summary: Consulta ejecución, pasos, métricas y errores saneados
-      x-required-permission: DW_ETL_MONITOR_READ
+      x-required-permission: dw:etl-monitor:read
       parameters:
         - name: runId
           in: path

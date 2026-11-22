@@ -15,7 +15,6 @@ const environment = {
   KEYCLOAK_URL: 'https://keycloak.example.edu/auth/',
   KEYCLOAK_REALM: 'uatf-dss-realm',
   KEYCLOAK_AUDIENCE: 'uatf-auth-service',
-  KEYCLOAK_ROLE_CLIENT_ID: 'uatf-auth-service',
   KEYCLOAK_BFF_CLIENT_ID: 'dss-bff',
   KEYCLOAK_BFF_CLIENT_SECRET:
     'a-confidential-client-secret-that-is-not-committed',
@@ -86,7 +85,6 @@ describe('BFF server configuration', () => {
         keycloakUrl: 'https://keycloak.example.edu/auth',
         realm: 'uatf-dss-realm',
         audience: 'uatf-auth-service',
-        roleClientId: 'uatf-auth-service',
         permissionsClientId: 'dss-permissions',
         portalRoles: {},
       },

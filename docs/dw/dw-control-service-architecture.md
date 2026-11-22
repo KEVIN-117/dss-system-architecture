@@ -65,7 +65,7 @@ Estos son permisos de aplicación, independientes de los roles PostgreSQL:
 | `dw:closure:manage` | Crear cierres pendientes, cerrar y reabrir. No concede consultas ETL automáticamente. |
 | `dw:etl-monitor:read` | Consultar ejecuciones, pasos, métricas y errores saneados. |
 
-Desde IAM-011 son roles del cliente catálogo `dss-permissions` y se asignan desde el admin-portal. Durante la convivencia (`DW_CONTROL_LEGACY_ROLES_ENABLED=true`) también se aceptan los roles antiguos `DW_CLOSURE_READ`, `DW_CLOSURE_MANAGE` y `DW_ETL_MONITOR_READ` del cliente `dw-control-service`, traducidos al permiso equivalente; ver `docs/envs/dw-control-service.md`. No asumir `SUPERADMIN` como política de autorización dentro del servicio ni aceptar permisos declarados por el navegador. La política se resuelve desde claims de confianza del token validado y se prueba en el servicio.
+Desde IAM-011 son roles del cliente catálogo `dss-permissions` y se asignan desde el admin-portal. Los roles antiguos `DW_CLOSURE_READ`, `DW_CLOSURE_MANAGE` y `DW_ETL_MONITOR_READ` del cliente `dw-control-service` se retiraron en IAM-019; ver `docs/envs/dw-control-service.md`. No asumir `SUPERADMIN` como política de autorización dentro del servicio ni aceptar permisos declarados por el navegador. La política se resuelve desde claims de confianza del token validado y se prueba en el servicio.
 
 ## Roles objetivo en PostgreSQL
 

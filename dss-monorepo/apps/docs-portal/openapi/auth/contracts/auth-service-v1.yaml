@@ -5,9 +5,10 @@ info:
   description: >-
     Contrato documental de las operaciones REST de auth-service redactado a partir
     de los controladores `UserProfileController`, `AdminUserDirectoryController`,
-    `AcademicCatalogController` y `AcademicContextAssignmentController`. Los
-    endpoints de demostración (`/demo/*`, `/example-user`) y las rutas internas
-    servidor a servidor no forman parte de este contrato. Springdoc puede generar
+    `AcademicCatalogController` y `AcademicContextAssignmentController`. Las rutas
+    internas servidor a servidor no forman parte de este contrato. Desde IAM-004 la
+    autorización usa permisos de `resource_access.dss-permissions.roles`
+    (`x-required-permission`), no roles. Springdoc puede generar
     el esquema en tiempo de ejecución con `AUTH_API_DOCS_ENABLED=true`; ante una
     diferencia, prevalece la implementación y este archivo debe corregirse.
 servers:
@@ -45,7 +46,7 @@ paths:
       tags: [Directorio administrativo]
       operationId: listAdminUsers
       summary: Lista el directorio de usuarios
-      x-required-permission: ROLE_SUPERADMIN
+      x-required-permission: iam:users:read
       description: Directorio paginado con filtros opcionales por texto, estado, rol y ámbito académico.
       parameters:
         - name: q
@@ -86,7 +87,7 @@ paths:
       tags: [Directorio administrativo]
       operationId: getAdminUser
       summary: Obtiene el detalle de un usuario
-      x-required-permission: ROLE_SUPERADMIN
+      x-required-permission: iam:users:read
       parameters:
         - $ref: '#/components/parameters/UserId'
       responses:
@@ -103,11 +104,13 @@ paths:
       tags: [Directorio administrativo]
       operationId: replaceAcademicContexts
       summary: Reemplaza los contextos académicos de un usuario
-      x-required-permission: ROLE_SUPERADMIN
+      x-required-permission: iam:users:write
       description: >-
-        Sustituye la lista completa de contextos académicos. Una carrera requiere
-        su facultad; `facultyId` no puede ser negativo y `careerId` tiene tres
-        caracteres sin espacios.
+        Sustituye la lista completa de contextos académicos. SUPERADMIN y RECTOR no
+        llevan contextos; DECANO lleva una o más facultades (sin carrera) y DIRECTOR
+        una o más carreras (con su facultad), hasta 20 y sin repetir ninguno (IAM-009).
+        Una carrera requiere su facultad; `facultyId` no puede ser negativo y
+        `careerId` tiene tres caracteres sin espacios.
       parameters:
         - $ref: '#/components/parameters/UserId'
       requestBody:
@@ -132,7 +135,7 @@ paths:
       tags: [Catálogo académico]
       operationId: getAcademicCatalog
       summary: Obtiene el catálogo de facultades y carreras
-      x-required-permission: ROLE_SUPERADMIN
+      x-required-permission: iam:users:read
       responses:
         '200':
           description: Catálogo activo.
@@ -141,6 +144,622 @@ paths:
               schema: { $ref: '#/components/schemas/AcademicCatalog' }
         '401': { $ref: '#/components/responses/Unauthorized' }
         '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/iam/audit:
+    get:
+      tags: [Auditoría administrativa]
+      operationId: listAdminAudit
+      summary: Consulta la auditoría de operaciones administrativas
+      x-required-permission: iam:audit:read
+      description: >-
+        Registros de `admin_audit_log`, del más reciente al más antiguo. Todos los filtros son opcionales.
+        Responde con `Cache-Control: no-store`.
+      parameters:
+        - { name: actor, in: query, description: Keycloak id o username exacto del actor, schema: { type: string, maxLength: 255 } }
+        - { name: action, in: query, description: 'Acción exacta, por ejemplo USER_ACADEMIC_CONTEXTS_REPLACED', schema: { type: string, maxLength: 100 } }
+        - { name: targetType, in: query, schema: { type: string, enum: [USER, ROLE, PERMISSION, CLIENT] } }
+        - { name: targetId, in: query, schema: { type: string, maxLength: 255 } }
+        - { name: outcome, in: query, schema: { type: string, enum: [PENDING, SUCCESS, FAILURE] } }
+        - { name: from, in: query, description: Desde (incluido), ISO-8601, schema: { type: string, format: date-time } }
+        - { name: to, in: query, description: Hasta (excluido), ISO-8601, schema: { type: string, format: date-time } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 100, default: 20 } }
+      responses:
+        '200':
+          description: Página de registros de auditoría.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/AdminAuditPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/iam/users:
+    post:
+      tags: [Administración de identidad]
+      operationId: createIamUser
+      summary: Crea un usuario en Keycloak
+      x-required-permission: iam:users:write
+      x-audit-action: USER_CREATED
+      description: >-
+        Crea el usuario sin contraseña, actualiza la copia local y, salvo `sendInvitation: false`, envía el correo
+        con las acciones UPDATE_PASSWORD y VERIFY_EMAIL (acción de auditoría `USER_ACTIONS_EMAIL_SENT`). Si el correo
+        no se puede enviar, el usuario igual se crea y `invitationSent` es `false`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IamCreateUserRequest' }
+      responses:
+        '201':
+          description: Usuario creado. `Location` apunta a `/admin/users/{id}`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamUser' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/users/{userId}:
+    patch:
+      tags: [Administración de identidad]
+      operationId: updateIamUser
+      summary: Actualiza datos básicos o activa/desactiva un usuario
+      x-required-permission: iam:users:write
+      x-audit-action: USER_UPDATED
+      description: >-
+        Los campos omitidos no cambian. Nadie puede desactivar su propia cuenta y el último SUPERADMIN habilitado no
+        puede desactivarse (409).
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IamUpdateUserRequest' }
+      responses:
+        '200':
+          description: Usuario actualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamUser' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/users/{userId}/actions-email:
+    post:
+      tags: [Administración de identidad]
+      operationId: sendIamUserActionsEmail
+      summary: Envía al usuario un correo con acciones requeridas
+      x-required-permission: iam:users:write
+      x-audit-action: USER_ACTIONS_EMAIL_SENT
+      description: Reenvía la invitación o pide restablecer la contraseña. Requiere SMTP configurado en el realm.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IamActionsEmailRequest' }
+      responses:
+        '202': { description: Correo solicitado a Keycloak. }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/users/{userId}/roles:
+    get:
+      tags: [Administración de identidad]
+      operationId: getIamUserRoles
+      summary: Roles del realm del usuario, directos y efectivos
+      x-required-permission: iam:users:read
+      description: No incluye los roles que Keycloak da a todos (`offline_access`, `uma_authorization`, `default-roles-*`).
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Asignaciones.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamAssignments' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Administración de identidad]
+      operationId: replaceIamUserRoles
+      summary: Reemplaza los roles del realm asignados directamente
+      x-required-permission: iam:users:write
+      x-audit-action: USER_ROLES_REPLACED
+      description: >-
+        Asigna o quita solo la diferencia; los roles integrados de Keycloak no se tocan ni se pueden pedir (400).
+        Quitar SUPERADMIN al último SUPERADMIN habilitado devuelve 409. Un rol inexistente devuelve 404. Actualiza la
+        réplica local de roles.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [roles]
+              properties:
+                roles: { type: array, uniqueItems: true, items: { type: string, maxLength: 255 } }
+      responses:
+        '200':
+          description: Asignaciones resultantes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamAssignments' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/users/{userId}/permissions:
+    get:
+      tags: [Administración de identidad]
+      operationId: getIamUserPermissions
+      summary: Permisos del usuario, directos y heredados de sus roles
+      x-required-permission: iam:users:read
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: Asignaciones de permisos (`dss-permissions`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamAssignments' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Administración de identidad]
+      operationId: replaceIamUserPermissions
+      summary: Reemplaza los permisos asignados directamente al usuario
+      x-required-permission: iam:users:write
+      x-audit-action: USER_PERMISSIONS_REPLACED
+      description: >-
+        Asigna permisos sueltos del cliente catálogo `dss-permissions` (por ejemplo `dw:closure:read`). Los permisos
+        heredados de los roles no cambian. Un permiso inexistente devuelve 404.
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissions]
+              properties:
+                permissions: { type: array, uniqueItems: true, items: { type: string, maxLength: 255 } }
+      responses:
+        '200':
+          description: Asignaciones resultantes.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamAssignments' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/users/resync:
+    post:
+      tags: [Administración de identidad]
+      operationId: resyncIamUsers
+      summary: Resincroniza la copia local de todos los usuarios desde Keycloak
+      x-required-permission: iam:users:write
+      x-audit-action: USERS_RESYNCED
+      description: >-
+        Recorre todos los usuarios de Keycloak, actualiza su copia local con los roles efectivos del realm y borra
+        lógicamente (desactiva, anonimiza y oculta del directorio) a los usuarios locales que ya no existen en
+        Keycloak. Sirve para recuperar eventos perdidos o mensajes en la DLQ (IAM-010). Es síncrona. Si Keycloak
+        cambia mientras se recorre (la cantidad leída no coincide con el conteo), falla con 502 sin borrar nada.
+      responses:
+        '200':
+          description: Resultado de la resincronización.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamResyncReport' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/roles:
+    get:
+      tags: [Roles y permisos]
+      operationId: listIamRoles
+      summary: Lista los roles del realm (sin los integrados de Keycloak)
+      x-required-permission: iam:roles:read
+      responses:
+        '200':
+          description: Roles.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IamRoleView' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Roles y permisos]
+      operationId: createIamRole
+      summary: Crea un rol del realm
+      x-required-permission: iam:roles:write
+      x-audit-action: ROLE_CREATED
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name]
+              properties:
+                name: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,49}$' }
+                description: { type: string, maxLength: 255 }
+                portal: { type: string, pattern: '^[a-z][a-z0-9-]{0,49}$' }
+      responses:
+        '201':
+          description: Rol creado; `Location` apunta a `/admin/iam/roles/{name}`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamRoleView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/roles/{name}:
+    get:
+      tags: [Roles y permisos]
+      operationId: getIamRole
+      summary: Obtiene un rol
+      x-required-permission: iam:roles:read
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Rol.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamRoleView' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Roles y permisos]
+      operationId: updateIamRole
+      summary: Actualiza la descripción o el portal de un rol
+      x-required-permission: iam:roles:write
+      x-audit-action: ROLE_UPDATED
+      description: El nombre no cambia. Los campos omitidos no cambian; un `portal` vacío lo elimina.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                description: { type: string, maxLength: 255 }
+                portal: { type: string, maxLength: 50 }
+      responses:
+        '200':
+          description: Rol actualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamRoleView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Roles y permisos]
+      operationId: deleteIamRole
+      summary: Elimina un rol
+      x-required-permission: iam:roles:write
+      x-audit-action: ROLE_DELETED
+      description: >-
+        Los roles del sistema (SUPERADMIN, RECTOR, DECANO, DIRECTOR y los integrados de Keycloak) nunca se eliminan
+        (409). Un rol asignado a usuarios requiere `force=true` (sin él, 409).
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: force, in: query, schema: { type: boolean, default: false }, description: Confirma el borrado de un elemento en uso. }
+      responses:
+        '204': { description: Rol eliminado. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/roles/{name}/permissions:
+    get:
+      tags: [Roles y permisos]
+      operationId: getIamRolePermissions
+      summary: Permisos que agrupa el rol
+      x-required-permission: iam:roles:read
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Permisos del rol.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IamPermissionView' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [Roles y permisos]
+      operationId: replaceIamRolePermissions
+      summary: Reemplaza los permisos que agrupa el rol
+      x-required-permission: iam:roles:write
+      x-audit-action: ROLE_PERMISSIONS_REPLACED
+      description: >-
+        Agrega o quita solo la diferencia. Los usuarios con el rol reciben el cambio en su próximo token.
+        SUPERADMIN no puede perder ningún permiso `iam:*` (409). Un permiso inexistente devuelve 404.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [permissions]
+              properties:
+                permissions: { type: array, uniqueItems: true, items: { type: string, maxLength: 100 } }
+      responses:
+        '200':
+          description: Permisos resultantes.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IamPermissionView' } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/permissions:
+    get:
+      tags: [Roles y permisos]
+      operationId: listIamPermissions
+      summary: Lista el catálogo de permisos (`dss-permissions`)
+      x-required-permission: iam:roles:read
+      responses:
+        '200':
+          description: Permisos.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IamPermissionView' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Roles y permisos]
+      operationId: createIamPermission
+      summary: Crea un permiso
+      x-required-permission: iam:roles:write
+      x-audit-action: PERMISSION_CREATED
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [name, description]
+              properties:
+                name: { type: string, maxLength: 100, pattern: '^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*)+$', example: 'reports:export' }
+                description: { type: string, maxLength: 255 }
+      responses:
+        '201':
+          description: Permiso creado; `Location` apunta a `/admin/iam/permissions/{name}`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamPermissionView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/permissions/matrix:
+    get:
+      tags: [Roles y permisos]
+      operationId: getIamPermissionMatrix
+      summary: Matriz rol × permiso
+      x-required-permission: iam:roles:read
+      responses:
+        '200':
+          description: Roles, permisos y qué permisos agrupa cada rol.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamPermissionMatrix' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /admin/iam/permissions/{name}:
+    patch:
+      tags: [Roles y permisos]
+      operationId: updateIamPermission
+      summary: Actualiza la descripción de un permiso
+      x-required-permission: iam:roles:write
+      x-audit-action: PERMISSION_UPDATED
+      description: El nombre no cambia.
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [description]
+              properties:
+                description: { type: string, maxLength: 255 }
+      responses:
+        '200':
+          description: Permiso actualizado.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamPermissionView' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Roles y permisos]
+      operationId: deleteIamPermission
+      summary: Elimina un permiso
+      x-required-permission: iam:roles:write
+      x-audit-action: PERMISSION_DELETED
+      description: >-
+        Los permisos del sistema (`iam:*`, `context:read`) nunca se eliminan (409). Uno que agrupa algún rol o tiene
+        algún usuario requiere `force=true` (sin él, 409 con los roles que lo usan).
+      parameters:
+        - { name: name, in: path, required: true, schema: { type: string } }
+        - { name: force, in: query, schema: { type: boolean, default: false }, description: Confirma el borrado de un elemento en uso. }
+      responses:
+        '204': { description: Permiso eliminado. }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/clients:
+    get:
+      tags: [Aplicaciones]
+      operationId: listIamClients
+      summary: Lista las aplicaciones registradas
+      x-required-permission: iam:clients:read
+      parameters:
+        - { name: search, in: query, description: Filtra por clientId (contiene), schema: { type: string, maxLength: 64 } }
+        - { name: page, in: query, schema: { type: integer, minimum: 0, default: 0 } }
+        - { name: size, in: query, schema: { type: integer, minimum: 1, maximum: 200, default: 50 } }
+      responses:
+        '200':
+          description: Aplicaciones.
+          content:
+            application/json:
+              schema: { type: array, items: { $ref: '#/components/schemas/IamClient' } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    post:
+      tags: [Aplicaciones]
+      operationId: createIamClient
+      summary: Registra una aplicación
+      x-required-permission: iam:clients:write
+      x-audit-action: CLIENT_CREATED
+      description: >-
+        PUBLIC: sin secreto, código de autorización con PKCE S256; requiere al menos una redirect URI y no admite cuenta
+        de servicio. CONFIDENTIAL: recibe su primer secreto en esta respuesta (una sola vez, `Cache-Control: no-store`).
+        Nunca se habilitan los flujos implícito ni de contraseña. Las URIs siguen las reglas de `ClientUriPolicy`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IamCreateClientRequest' }
+      responses:
+        '201':
+          description: Aplicación registrada; `Location` apunta a `/admin/iam/clients/{clientId}`.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamCreatedClient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/clients/{clientId}:
+    get:
+      tags: [Aplicaciones]
+      operationId: getIamClient
+      summary: Obtiene una aplicación
+      x-required-permission: iam:clients:read
+      parameters:
+        - { name: clientId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Aplicación (sin secreto).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamClient' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    patch:
+      tags: [Aplicaciones]
+      operationId: updateIamClient
+      summary: Actualiza una aplicación
+      x-required-permission: iam:clients:write
+      x-audit-action: CLIENT_UPDATED
+      description: >-
+        Los campos omitidos no cambian; el tipo y el clientId no se pueden cambiar. Los clientes del sistema son de solo
+        lectura (409), salvo `dss-bff`, del que se pueden editar nombre, descripción y URIs, pero que no se puede desactivar.
+      parameters:
+        - { name: clientId, in: path, required: true, schema: { type: string } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IamUpdateClientRequest' }
+      responses:
+        '200':
+          description: Aplicación actualizada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamClient' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /admin/iam/clients/{clientId}/secret:
+    post:
+      tags: [Aplicaciones]
+      operationId: rotateIamClientSecret
+      summary: Rota el secreto de una aplicación confidencial
+      x-required-permission: iam:clients:write
+      x-audit-action: CLIENT_SECRET_ROTATED
+      description: >-
+        Devuelve el nuevo secreto una sola vez (`Cache-Control: no-store`); el anterior deja de valer de inmediato. El
+        secreto no se guarda en la auditoría ni se escribe en los logs. Los clientes del sistema no se rotan desde aquí
+        (409) y los públicos o bearer-only no tienen secreto (400).
+      parameters:
+        - { name: clientId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: Nuevo secreto.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IamIssuedSecret' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '502': { $ref: '#/components/responses/BadGateway' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 components:
   securitySchemes:
     bearerAuth:
@@ -163,9 +782,24 @@ components:
     Unauthorized:
       description: Token ausente, inválido o vencido.
     Forbidden:
-      description: El token no incluye `ROLE_SUPERADMIN`.
+      description: El token no incluye el permiso requerido (`x-required-permission`) en `resource_access.dss-permissions.roles`.
     NotFound:
-      description: Usuario inexistente.
+      description: Usuario inexistente (o, en `/admin/iam/**`, rol o permiso inexistente en Keycloak).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    Conflict:
+      description: Dato duplicado en Keycloak o regla institucional incumplida (`IamRuleViolationException`).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    BadGateway:
+      description: Keycloak rechazó la operación o respondió con error (por ejemplo, sin SMTP para enviar correos).
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    ServiceUnavailable:
+      description: Keycloak no responde o la cuenta de servicio no está configurada.
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -227,12 +861,199 @@ components:
         size: { type: integer }
         totalElements: { type: integer, format: int64 }
         totalPages: { type: integer }
+    IamCreateUserRequest:
+      type: object
+      required: [username, email]
+      properties:
+        username: { type: string, pattern: '^[A-Za-z0-9._@-]{3,255}$' }
+        email: { type: string, format: email, maxLength: 255 }
+        firstName: { type: string, maxLength: 255 }
+        lastName: { type: string, maxLength: 255 }
+        enabled: { type: boolean, default: true }
+        sendInvitation: { type: boolean, default: true }
+    IamUpdateUserRequest:
+      type: object
+      description: Los campos omitidos no cambian.
+      properties:
+        email: { type: string, format: email, maxLength: 255 }
+        firstName: { type: string, maxLength: 255 }
+        lastName: { type: string, maxLength: 255 }
+        enabled: { type: boolean }
+    IamActionsEmailRequest:
+      type: object
+      required: [actions]
+      properties:
+        actions:
+          type: array
+          minItems: 1
+          uniqueItems: true
+          items: { type: string, enum: [UPDATE_PASSWORD, VERIFY_EMAIL, UPDATE_PROFILE, CONFIGURE_TOTP] }
+        lifespanHours: { type: integer, minimum: 1, maximum: 720, description: 'Por defecto IAM_INVITATION_LIFESPAN (72 h).' }
+    IamUser:
+      type: object
+      description: Vista administrativa; no expone el id de Keycloak ni credenciales.
+      required: [id, username, enabled, emailVerified]
+      properties:
+        id: { type: string, format: uuid, description: Id local (el de `/admin/users`). }
+        username: { type: string }
+        email: { type: [string, 'null'] }
+        firstName: { type: [string, 'null'] }
+        lastName: { type: [string, 'null'] }
+        enabled: { type: boolean }
+        emailVerified: { type: boolean }
+        createdAt: { type: [string, 'null'], format: date-time }
+        invitationSent:
+          type: [boolean, 'null']
+          description: Solo al crear. `false` si el correo de invitación no se pudo enviar; `null` si no se pidió.
+    IamRole:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string }
+        description: { type: [string, 'null'] }
+    IamResyncReport:
+      type: object
+      required: [scanned, synced, skipped, removed]
+      properties:
+        scanned: { type: integer, description: Usuarios leídos de Keycloak. }
+        synced: { type: integer, description: Copias locales creadas o actualizadas. }
+        skipped: { type: integer, description: 'Usuarios de Keycloak que no cumplen las reglas locales (por ejemplo, sin email): se registran en el log y no se borran.' }
+        removed: { type: integer, description: Usuarios locales borrados lógicamente porque Keycloak ya no los tiene. }
+    IamAssignments:
+      type: object
+      required: [direct, effective]
+      properties:
+        direct:
+          type: array
+          description: Asignados directamente al usuario.
+          items: { $ref: '#/components/schemas/IamRole' }
+        effective:
+          type: array
+          description: Directos más los heredados por roles compuestos.
+          items: { $ref: '#/components/schemas/IamRole' }
+    IamRoleView:
+      type: object
+      required: [name, system]
+      properties:
+        name: { type: string }
+        description: { type: [string, 'null'] }
+        portal: { type: [string, 'null'], description: 'Portal al que se dirige a quien tiene el rol (atributo `portal`).' }
+        system: { type: boolean, description: 'Rol del que depende la plataforma: se edita, pero no se elimina.' }
+    IamPermissionView:
+      type: object
+      required: [name, resource, action, system]
+      properties:
+        name: { type: string, example: 'dw:closure:manage' }
+        description: { type: [string, 'null'] }
+        resource: { type: string, example: 'dw:closure' }
+        action: { type: string, example: 'manage' }
+        system: { type: boolean, description: 'Permiso del que depende la plataforma (`iam:*`, `context:read`).' }
+    IamPermissionMatrix:
+      type: object
+      required: [roles, permissions, grants]
+      properties:
+        roles: { type: array, items: { $ref: '#/components/schemas/IamRoleView' } }
+        permissions: { type: array, items: { $ref: '#/components/schemas/IamPermissionView' } }
+        grants:
+          type: object
+          description: Rol → permisos que agrupa.
+          additionalProperties: { type: array, items: { type: string } }
+    IamClient:
+      type: object
+      required: [clientId, type, enabled, system]
+      properties:
+        clientId: { type: string }
+        name: { type: [string, 'null'] }
+        description: { type: [string, 'null'] }
+        type: { type: string, enum: [PUBLIC, CONFIDENTIAL, BEARER_ONLY] }
+        enabled: { type: boolean }
+        standardFlowEnabled: { type: boolean }
+        serviceAccountsEnabled: { type: boolean }
+        redirectUris: { type: array, items: { type: string } }
+        webOrigins: { type: array, items: { type: string } }
+        postLogoutRedirectUris: { type: array, items: { type: string } }
+        system: { type: boolean, description: 'Cliente del que depende la plataforma: solo lectura (dss-bff: edición limitada).' }
+    IamCreateClientRequest:
+      type: object
+      required: [clientId, type]
+      properties:
+        clientId: { type: string, pattern: '^[a-z][a-z0-9-]{2,63}$' }
+        name: { type: string, maxLength: 255 }
+        description: { type: string, maxLength: 255 }
+        type: { type: string, enum: [PUBLIC, CONFIDENTIAL] }
+        enabled: { type: boolean, default: true }
+        serviceAccountsEnabled: { type: boolean, default: false, description: Solo CONFIDENTIAL. }
+        redirectUris: { type: array, maxItems: 50, items: { type: string, maxLength: 500 } }
+        webOrigins: { type: array, maxItems: 50, items: { type: string, maxLength: 500 } }
+        postLogoutRedirectUris: { type: array, maxItems: 50, items: { type: string, maxLength: 500 } }
+    IamUpdateClientRequest:
+      type: object
+      description: Los campos omitidos no cambian.
+      properties:
+        name: { type: string, maxLength: 255 }
+        description: { type: string, maxLength: 255 }
+        enabled: { type: boolean }
+        redirectUris: { type: array, maxItems: 50, items: { type: string, maxLength: 500 } }
+        webOrigins: { type: array, maxItems: 50, items: { type: string, maxLength: 500 } }
+        postLogoutRedirectUris: { type: array, maxItems: 50, items: { type: string, maxLength: 500 } }
+    IamCreatedClient:
+      type: object
+      required: [client]
+      properties:
+        client: { $ref: '#/components/schemas/IamClient' }
+        secret: { type: [string, 'null'], description: Solo para CONFIDENTIAL; se muestra una única vez. }
+    IamIssuedSecret:
+      type: object
+      required: [clientId, secret]
+      properties:
+        clientId: { type: string }
+        secret: { type: string, description: Se muestra una única vez. }
+    AdminAuditEntry:
+      type: object
+      required: [id, occurredAt, actor, action, targetType, outcome]
+      properties:
+        id: { type: string, format: uuid }
+        occurredAt: { type: string, format: date-time }
+        actor:
+          type: object
+          properties:
+            keycloakId: { type: [string, 'null'] }
+            username: { type: [string, 'null'] }
+            ipAddress: { type: [string, 'null'] }
+        action: { type: string }
+        targetType: { type: string, enum: [USER, ROLE, PERMISSION, CLIENT] }
+        targetId: { type: [string, 'null'] }
+        before:
+          type: [object, 'null']
+          description: Estado previo. Las claves con contraseñas, secretos, tokens o credenciales se guardan como `[REDACTED]`.
+        after:
+          type: [object, 'null']
+          description: Estado posterior, saneado igual que `before`.
+        outcome:
+          type: string
+          enum: [PENDING, SUCCESS, FAILURE]
+          description: PENDING solo en operaciones ejecutadas en Keycloak cuyo resultado aún no se confirmó.
+        failureReason: { type: [string, 'null'] }
+        completedAt: { type: [string, 'null'], format: date-time }
+    AdminAuditPage:
+      type: object
+      required: [content, page, size, totalElements, totalPages]
+      properties:
+        content:
+          type: array
+          items: { $ref: '#/components/schemas/AdminAuditEntry' }
+        page: { type: integer }
+        size: { type: integer }
+        totalElements: { type: integer, format: int64 }
+        totalPages: { type: integer }
     AcademicContextAssignmentRequest:
       type: object
       required: [contexts]
       properties:
         contexts:
           type: array
+          maxItems: 20
+          description: Sin duplicados (misma facultad y carrera). El filtro analítico es la unión de todos.
           items:
             type: object
             properties:

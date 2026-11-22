@@ -32,9 +32,9 @@ def career(faculty_id, career_id):
     return {"facultyId": faculty_id, "careerId": career_id}
 
 
-def allowed(who, context, legacy_roles=frozenset()):
+def allowed(who, context):
     try:
-        authorize_program_context(who, context, legacy_roles)
+        authorize_program_context(who, context)
         return True
     except InferenceFailure as failure:
         assert failure.status_code == 403
@@ -42,7 +42,7 @@ def allowed(who, context, legacy_roles=frozenset()):
 
 
 class PermissionAndContextMatrixTests(unittest.TestCase):
-    """Every combination of scope permission and academic contexts, without legacy roles."""
+    """Every combination of scope permission and academic contexts."""
 
     def test_matrix(self):
         cases = [
@@ -70,70 +70,37 @@ class PermissionAndContextMatrixTests(unittest.TestCase):
                 self.assertEqual(allowed(who, P02), p02)
 
     def test_superadmin_role_has_no_academic_access(self):
-        self.assertFalse(allowed(principal((), (), {"SUPERADMIN"}), P01, {"RECTOR", "DECANO", "DIRECTOR"}))
+        self.assertFalse(allowed(principal((), (), {"SUPERADMIN"}), P01))
 
 
-class LegacyRoleTests(unittest.TestCase):
-    """Coexistence: PREDICTION_ALLOWED_ROLES still grants what each role meant."""
+class RetiredRoleListTests(unittest.TestCase):
+    """IAM-019: realm roles and the old role lists grant nothing by themselves; only permissions do."""
 
-    def test_legacy_roles_map_to_the_same_scope(self):
-        self.assertTrue(allowed(principal(roles={"RECTOR"}), P05, {"RECTOR"}))
-        self.assertTrue(allowed(principal((), (faculty(10), faculty(20)), {"DECANO"}), P05, {"DECANO"}))
-        self.assertTrue(allowed(principal((), (career(10, "P01"),), {"DIRECTOR"}), P01, {"DIRECTOR"}))
-        self.assertFalse(allowed(principal((), (career(10, "P01"),), {"DIRECTOR"}), P02, {"DIRECTOR"}))
+    def test_realm_roles_without_permissions_grant_nothing(self):
+        for role in ("RECTOR", "DECANO", "DIRECTOR"):
+            with self.subTest(role=role):
+                self.assertFalse(allowed(principal((), (faculty(10), career(10, "P01")), {role}), P01))
 
-    def test_a_role_outside_the_accepted_list_grants_nothing(self):
-        self.assertFalse(allowed(principal(roles={"RECTOR"}), P01, {"DECANO"}))
-        self.assertFalse(allowed(principal(roles={"RECTOR"}), P01))
-
-    def test_permissions_and_legacy_roles_are_combined(self):
-        # Faculty 10 by permission, faculty 20 through the legacy DECANO role.
-        who = principal({READ, CAREER}, (career(10, "P01"), faculty(20)), {"DECANO"})
-        self.assertTrue(allowed(who, P01, {"DECANO"}))
-        self.assertTrue(allowed(who, P05, {"DECANO"}))
-        self.assertFalse(allowed(who, P05))
+    def test_the_retired_environment_variables_are_ignored(self):
+        retired = {"PREDICTION_ALLOWED_ROLES": '["RECTOR"]', "PREDICTION_BATCH_SUBMITTER_ROLES": '["RECTOR"]',
+                   "PREDICTION_TRAINING_ROLES": '["SUPERADMIN"]', "PREDICTION_LEGACY_ROLES_ENABLED": "true"}
+        with patch.dict(os.environ, retired):
+            with self.assertRaises(InferenceFailure) as raised:
+                ConfiguredAcademicPolicy().authorize(principal(roles={"RECTOR"}), P01)
+            self.assertEqual(raised.exception.status_code, 403)
+            self.assertFalse(access_policy.has_permission(principal(roles={"SUPERADMIN"}), "prediction:train"))
 
 
 class ConfiguredPolicyTests(unittest.TestCase):
     def test_permissions_need_no_role_configuration(self):
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("PREDICTION_ALLOWED_ROLES", None)
-            ConfiguredAcademicPolicy().authorize(principal({READ, GLOBAL}), P01)
-
-    def test_legacy_roles_follow_the_flag(self):
-        rector = principal(roles={"RECTOR"})
-        with patch.dict(os.environ, {"PREDICTION_ALLOWED_ROLES": '["RECTOR"]'}):
-            ConfiguredAcademicPolicy().authorize(rector, P01)
-        with patch.dict(os.environ, {"PREDICTION_ALLOWED_ROLES": '["RECTOR"]', "PREDICTION_LEGACY_ROLES_ENABLED": "false"}):
-            with self.assertRaises(InferenceFailure) as raised:
-                ConfiguredAcademicPolicy().authorize(rector, P01)
-            self.assertEqual(raised.exception.status_code, 403)
-            ConfiguredAcademicPolicy().authorize(principal({READ, GLOBAL}), P01)
-
-    def test_invalid_configuration_fails_closed(self):
-        for env in ({"PREDICTION_ALLOWED_ROLES": "not-json"}, {"PREDICTION_ALLOWED_ROLES": '["SUPERADMIN"]'},
-                    {"PREDICTION_LEGACY_ROLES_ENABLED": "maybe"}):
-            with self.subTest(env=env), patch.dict(os.environ, env):
-                with self.assertRaises(InferenceFailure) as raised:
-                    ConfiguredAcademicPolicy().authorize(principal({READ, GLOBAL}), P01)
-                self.assertEqual(raised.exception.status_code, 503)
+        ConfiguredAcademicPolicy().authorize(principal({READ, GLOBAL}), P01)
 
 
 class PermissionHelperTests(unittest.TestCase):
     def test_has_permission(self):
         self.assertTrue(access_policy.has_permission(principal({"prediction:train"}), "prediction:train"))
-        self.assertTrue(access_policy.has_permission(principal(roles={"SUPERADMIN"}), "prediction:train", {"SUPERADMIN"}))
+        self.assertFalse(access_policy.has_permission(principal(roles={"SUPERADMIN"}), "prediction:train"))
         self.assertFalse(access_policy.has_permission(principal({"prediction:publish"}), "prediction:train"))
-
-    def test_training_roles_default_and_flag(self):
-        with patch.dict(os.environ, {}, clear=False):
-            os.environ.pop("PREDICTION_TRAINING_ROLES", None)
-            os.environ.pop("PREDICTION_LEGACY_ROLES_ENABLED", None)
-            self.assertEqual(access_policy.legacy_training_roles(), frozenset({"SUPERADMIN"}))
-        with patch.dict(os.environ, {"PREDICTION_LEGACY_ROLES_ENABLED": "false"}):
-            self.assertEqual(access_policy.legacy_training_roles(), frozenset())
-            self.assertEqual(access_policy.legacy_submitter_roles(), frozenset())
-            self.assertEqual(access_policy.legacy_academic_roles(), frozenset())
 
 
 class KeycloakPermissionClaimTests(unittest.TestCase):
@@ -151,7 +118,7 @@ class KeycloakPermissionClaimTests(unittest.TestCase):
         profile = MagicMock()
         profile.json.return_value = {"isActive": True,
                                      "academicContexts": [faculty(10), faculty(20)]}
-        values = {"KEYCLOAK_ROLE_CLIENT_ID": "", "KEYCLOAK_PERMISSIONS_CLIENT_ID": "", **self.ENV, **(env or {})}
+        values = {"KEYCLOAK_PERMISSIONS_CLIENT_ID": "", **self.ENV, **(env or {})}
         with patch.dict(os.environ, values), \
                 patch("inference_adapters._jwks_client", return_value=jwks), \
                 patch("inference_adapters.jwt.decode", return_value=claims), \
@@ -174,15 +141,16 @@ class KeycloakPermissionClaimTests(unittest.TestCase):
         self.assertTrue(allowed(result, P05))
         self.assertNotIn(GLOBAL, result.permissions)
 
-    def test_legacy_client_roles_are_optional_and_configurable(self):
+    def test_client_roles_outside_the_catalog_are_ignored_and_the_catalog_is_configurable(self):
         claims = {"sub": "user-1", "resource_access": {"uatf-auth-service": {"roles": ["RECTOR"]},
                                                        "catalog": {"roles": ["prediction:train"]}}}
-        without = self.authenticate(claims)
-        self.assertEqual(without.roles, frozenset())
-        self.assertEqual(without.permissions, frozenset())
+        default = self.authenticate(claims)
+        self.assertEqual(default.roles, frozenset())
+        self.assertEqual(default.permissions, frozenset())
+        # KEYCLOAK_ROLE_CLIENT_ID was retired in IAM-019: setting it no longer reads that client's roles.
         configured = self.authenticate(claims, {"KEYCLOAK_ROLE_CLIENT_ID": "uatf-auth-service",
                                                 "KEYCLOAK_PERMISSIONS_CLIENT_ID": "catalog"})
-        self.assertEqual(configured.roles, frozenset({"RECTOR"}))
+        self.assertEqual(configured.roles, frozenset())
         self.assertEqual(configured.permissions, frozenset({"prediction:train"}))
 
 

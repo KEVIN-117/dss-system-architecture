@@ -16,7 +16,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtConverterTest {
 
-    private final JwtConverter converter = new JwtConverter("preferred_username", "uatf-auth-service", "dss-permissions");
+    private final JwtConverter converter = new JwtConverter("preferred_username", "dss-permissions");
 
     private static Jwt jwt(Consumer<Map<String, Object>> claims) {
         Jwt.Builder builder = Jwt.withTokenValue("token")
@@ -38,8 +38,7 @@ class JwtConverterTest {
         Jwt token = jwt(claims -> {
             claims.put("realm_access", Map.of("roles", List.of("SUPERADMIN", "offline_access")));
             claims.put("resource_access", Map.of(
-                    "dss-permissions", Map.of("roles", List.of("iam:users:read", "iam:users:write")),
-                    "uatf-auth-service", Map.of("roles", List.of("SUPERADMIN"))));
+                    "dss-permissions", Map.of("roles", List.of("iam:users:read", "iam:users:write"))));
             claims.put("scope", "openid profile");
         });
 
@@ -49,17 +48,11 @@ class JwtConverterTest {
                 "SCOPE_openid", "SCOPE_profile");
     }
 
+    /** IAM-019: the legacy client roles were retired; a stale token carrying them grants nothing. */
     @Test
-    void keepsLegacyAuthServiceClientRolesDuringMigration() {
-        Jwt token = jwt(claims -> claims.put("resource_access",
-                Map.of("uatf-auth-service", Map.of("roles", List.of("DECANO", "DIRECTOR", "CONTEXT_READER")))));
-
-        assertThat(authorities(token)).containsExactlyInAnyOrder("ROLE_DECANO", "ROLE_DIRECTOR", "ROLE_CONTEXT_READER");
-    }
-
-    @Test
-    void ignoresRolesOfOtherClients() {
+    void ignoresRolesOfOtherClientsIncludingTheRetiredLegacyOnes() {
         Jwt token = jwt(claims -> claims.put("resource_access", Map.of(
+                "uatf-auth-service", Map.of("roles", List.of("DECANO", "DIRECTOR", "CONTEXT_READER")),
                 "olap-service", Map.of("roles", List.of("OLAP_ADMIN")),
                 "dw-control-service", Map.of("roles", List.of("DW_CLOSURE_MANAGE")))));
 
@@ -70,12 +63,10 @@ class JwtConverterTest {
     void serviceAccountTokenCarriesContextReadPermission() {
         Jwt token = jwt(claims -> {
             claims.put("azp", "olap-service");
-            claims.put("resource_access", Map.of(
-                    "dss-permissions", Map.of("roles", List.of("context:read")),
-                    "uatf-auth-service", Map.of("roles", List.of("CONTEXT_READER"))));
+            claims.put("resource_access", Map.of("dss-permissions", Map.of("roles", List.of("context:read"))));
         });
 
-        assertThat(authorities(token)).containsExactlyInAnyOrder("context:read", "ROLE_CONTEXT_READER");
+        assertThat(authorities(token)).containsExactly("context:read");
     }
 
     @Test
@@ -99,7 +90,7 @@ class JwtConverterTest {
 
     @Test
     void permissionsClientIsConfigurable() {
-        JwtConverter custom = new JwtConverter("preferred_username", "uatf-auth-service", "other-catalog");
+        JwtConverter custom = new JwtConverter("preferred_username", "other-catalog");
         Jwt token = jwt(claims -> claims.put("resource_access", Map.of(
                 "other-catalog", Map.of("roles", List.of("iam:audit:read")),
                 "dss-permissions", Map.of("roles", List.of("iam:users:write")))));

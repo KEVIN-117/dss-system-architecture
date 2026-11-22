@@ -23,12 +23,6 @@ public class SaikuKeycloakJwtAuthenticationConverterTest {
 
     private final SaikuKeycloakJwtAuthenticationConverter converter = new SaikuKeycloakJwtAuthenticationConverter();
 
-    private static SaikuKeycloakJwtAuthenticationConverter permissionsOnly() {
-        SaikuKeycloakJwtAuthenticationConverter converter = new SaikuKeycloakJwtAuthenticationConverter();
-        converter.setLegacyRolesEnabled(false);
-        return converter;
-    }
-
     private static Jwt token(Map<String, Object> realmAccess, Map<String, Object> resourceAccess) {
         return Jwt.withTokenValue("test-token")
                 .header("alg", "RS256")
@@ -42,6 +36,10 @@ public class SaikuKeycloakJwtAuthenticationConverterTest {
                 .build();
     }
 
+    private Set<String> authorities(Jwt jwt) {
+        return authorities(converter, jwt);
+    }
+
     private static Set<String> authorities(SaikuKeycloakJwtAuthenticationConverter converter, Jwt jwt) {
         return converter.convert(jwt).getAuthorities().stream()
                 .map(authority -> authority.getAuthority())
@@ -49,11 +47,11 @@ public class SaikuKeycloakJwtAuthenticationConverterTest {
     }
 
     @Test
-    public void maps_keycloak_roles_and_scope_to_saiku_authorities() {
+    public void maps_realm_roles_permissions_and_scope_to_saiku_authorities() {
         Jwt jwt = token(
                 Map.of("roles", List.of("RECTOR")),
                 Map.of(
-                        "olap-service", Map.of("roles", List.of("user", "ROLE_ANALYST")),
+                        "dss-permissions", Map.of("roles", List.of("olap:user")),
                         "auth-service", Map.of("roles", List.of("unrelated"))));
 
         JwtAuthenticationToken authentication = (JwtAuthenticationToken) converter.convert(jwt);
@@ -64,7 +62,6 @@ public class SaikuKeycloakJwtAuthenticationConverterTest {
         assertEquals("subject-123", authentication.getName());
         assertTrue("realm roles keep their authority (Mondrian roles)", authorities.contains("ROLE_RECTOR"));
         assertTrue(authorities.contains("ROLE_USER"));
-        assertTrue(authorities.contains("ROLE_ANALYST"));
         assertTrue(authorities.contains("SCOPE_openid"));
         assertTrue(authorities.contains("SCOPE_olap.read"));
         assertFalse(authorities.contains("ROLE_UNRELATED"));
@@ -93,49 +90,42 @@ public class SaikuKeycloakJwtAuthenticationConverterTest {
                 Map.of("dss-permissions", Map.of("roles", List.of("olap:admin", "analytics:read"))));
         Jwt user = token(Map.of(), Map.of("dss-permissions", Map.of("roles", List.of("olap:user"))));
 
-        for (SaikuKeycloakJwtAuthenticationConverter each : List.of(converter, permissionsOnly())) {
-            Set<String> adminAuthorities = authorities(each, admin);
-            assertTrue(adminAuthorities.contains("ROLE_ADMIN"));
-            assertFalse(adminAuthorities.contains("ROLE_USER"));
-            assertFalse(
-                    "other permissions are not Saiku authorities", adminAuthorities.contains("ROLE_ANALYTICS:READ"));
-            assertTrue(authorities(each, user).contains("ROLE_USER"));
-            assertFalse(authorities(each, user).contains("ROLE_ADMIN"));
-        }
+        Set<String> adminAuthorities = authorities(admin);
+        assertTrue(adminAuthorities.contains("ROLE_ADMIN"));
+        assertFalse(adminAuthorities.contains("ROLE_USER"));
+        assertFalse("other permissions are not Saiku authorities", adminAuthorities.contains("ROLE_ANALYTICS:READ"));
+        assertTrue(authorities(user).contains("ROLE_USER"));
+        assertFalse(authorities(user).contains("ROLE_ADMIN"));
     }
 
     @Test
-    public void maps_olap_client_roles_to_saiku_legacy_authorities_during_coexistence() {
-        Jwt jwt = token(
-                Map.of("roles", List.of("SUPERADMIN")),
-                Map.of(
-                        "olap-service", Map.of("roles", List.of("OLAP_ADMIN", "OLAP_USER")),
-                        "uatf-auth-service", Map.of("roles", List.of("OLAP_ADMIN"))));
-
-        Set<String> authorities = authorities(converter, jwt);
-
-        assertTrue(converter.isLegacyRolesEnabled());
-        assertTrue(authorities.contains("ROLE_OLAP_ADMIN"));
-        assertTrue(authorities.contains("ROLE_OLAP_USER"));
-        assertTrue(authorities.contains("ROLE_ADMIN"));
-        assertTrue(authorities.contains("ROLE_USER"));
-        assertTrue(authorities.contains("ROLE_SUPERADMIN"));
-    }
-
-    @Test
-    public void with_coexistence_off_only_the_new_permissions_are_accepted() {
-        SaikuKeycloakJwtAuthenticationConverter converter = permissionsOnly();
+    public void retired_olap_client_roles_grant_nothing() {
+        // IAM-019: OLAP_ADMIN / OLAP_USER of olap-service were retired; a stale token carrying them is not trusted.
         Jwt legacyOnly = token(
                 Map.of("roles", List.of("SUPERADMIN")),
-                Map.of("olap-service", Map.of("roles", List.of("OLAP_ADMIN", "OLAP_USER"))));
+                Map.of("olap-service", Map.of("roles", List.of("OLAP_ADMIN", "OLAP_USER", "ROLE_ANALYST"))));
 
-        Set<String> authorities = authorities(converter, legacyOnly);
+        Set<String> authorities = authorities(legacyOnly);
 
-        assertFalse(converter.isLegacyRolesEnabled());
         assertFalse(authorities.contains("ROLE_ADMIN"));
         assertFalse(authorities.contains("ROLE_USER"));
         assertFalse(authorities.contains("ROLE_OLAP_ADMIN"));
+        assertFalse(authorities.contains("ROLE_ANALYST"));
         assertTrue(authorities.contains("ROLE_SUPERADMIN"));
+    }
+
+    @Test
+    public void legacy_roles_next_to_permissions_add_nothing() {
+        Jwt jwt = token(
+                Map.of(),
+                Map.of(
+                        "olap-service", Map.of("roles", List.of("OLAP_ADMIN")),
+                        "dss-permissions", Map.of("roles", List.of("olap:user"))));
+
+        Set<String> authorities = authorities(jwt);
+
+        assertTrue(authorities.contains("ROLE_USER"));
+        assertFalse(authorities.contains("ROLE_ADMIN"));
     }
 
     @Test
@@ -145,11 +135,9 @@ public class SaikuKeycloakJwtAuthenticationConverterTest {
                 Map.of("roles", List.of("SUPERADMIN")),
                 Map.of("dss-permissions", Map.of("roles", List.of("iam:users:write", "iam:roles:write"))));
 
-        for (SaikuKeycloakJwtAuthenticationConverter each : List.of(converter, permissionsOnly())) {
-            Set<String> authorities = authorities(each, jwt);
-            assertTrue(authorities.contains("ROLE_SUPERADMIN"));
-            assertFalse(authorities.contains("ROLE_ADMIN"));
-        }
+        Set<String> authorities = authorities(jwt);
+        assertTrue(authorities.contains("ROLE_SUPERADMIN"));
+        assertFalse(authorities.contains("ROLE_ADMIN"));
     }
 
     @Test
@@ -157,12 +145,10 @@ public class SaikuKeycloakJwtAuthenticationConverterTest {
         // Realm roles can be created from the admin API (IAM-007); a role called ADMIN must not be a backdoor.
         Jwt jwt = token(Map.of("roles", List.of("admin", "ROLE_ADMIN", "USER", "DECANO")), Map.of());
 
-        for (SaikuKeycloakJwtAuthenticationConverter each : List.of(converter, permissionsOnly())) {
-            Set<String> authorities = authorities(each, jwt);
-            assertFalse(authorities.contains("ROLE_ADMIN"));
-            assertFalse(authorities.contains("ROLE_USER"));
-            assertTrue(authorities.contains("ROLE_DECANO"));
-        }
+        Set<String> authorities = authorities(jwt);
+        assertFalse(authorities.contains("ROLE_ADMIN"));
+        assertFalse(authorities.contains("ROLE_USER"));
+        assertTrue(authorities.contains("ROLE_DECANO"));
     }
 
     @Test
@@ -173,12 +159,12 @@ public class SaikuKeycloakJwtAuthenticationConverterTest {
                         "olap-service", Map.of("roles", List.of("olap:admin")),
                         "uatf-auth-service", Map.of("roles", List.of("olap:admin", "OLAP_ADMIN"))));
 
-        assertFalse(authorities(permissionsOnly(), jwt).contains("ROLE_ADMIN"));
+        assertFalse(authorities(jwt).contains("ROLE_ADMIN"));
     }
 
     @Test
     public void the_catalog_client_is_configurable() {
-        SaikuKeycloakJwtAuthenticationConverter converter = permissionsOnly();
+        SaikuKeycloakJwtAuthenticationConverter converter = new SaikuKeycloakJwtAuthenticationConverter();
         converter.setPermissionsClientId(" catalog ");
         converter.setPermissionsClientId(" ");
 
@@ -193,7 +179,7 @@ public class SaikuKeycloakJwtAuthenticationConverterTest {
                 Map.of("roles", List.of("SUPERADMIN")),
                 Map.of("uatf-auth-service", Map.of("roles", List.of("OLAP_ADMIN"))));
 
-        Set<String> authorities = authorities(converter, jwt);
+        Set<String> authorities = authorities(jwt);
 
         assertTrue(authorities.contains("ROLE_SUPERADMIN"));
         assertFalse(authorities.contains("ROLE_ADMIN"));

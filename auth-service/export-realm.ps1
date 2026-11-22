@@ -14,7 +14,7 @@
 .PARAMETER RealmName
     Nombre del Realm que se desea exportar. Por defecto 'uatf-dss-realm'.
 .PARAMETER OutputPath
-    Ruta relativa o absoluta donde se guardará el archivo JSON exportado. Por defecto '../infra/keycloak/realm/uatf-realm-realm.json'.
+    Ruta relativa o absoluta donde se guardará el archivo JSON exportado. Por defecto '../infra/keycloak/realm/uatf-dss-realm-realm.json'.
 .EXAMPLE
     .\export-realm.ps1
 .EXAMPLE
@@ -23,13 +23,17 @@
 
 param (
     [string]$KeycloakUrl = "http://localhost:8080",
-    [string]$AdminUser = "kerbero",
-    [string]$AdminPassword = "jFeCD7",
+    [string]$AdminUser = $env:KC_BOOTSTRAP_ADMIN_USERNAME,
+    [string]$AdminPassword = $env:KC_BOOTSTRAP_ADMIN_PASSWORD,
     [string]$RealmName = "uatf-dss-realm",
     [string]$OutputPath = "$PSScriptRoot/../infra/keycloak/realm/uatf-dss-realm-realm.json"
 )
 
 $ErrorActionPreference = "Stop"
+
+if (-not $AdminUser -or -not $AdminPassword) {
+    throw "Define KC_BOOTSTRAP_ADMIN_USERNAME y KC_BOOTSTRAP_ADMIN_PASSWORD, o pasa -AdminUser y -AdminPassword."
+}
 
 Write-Host "========== Iniciando Exportación de Keycloak ==========" -ForegroundColor Cyan
 Write-Host "Servidor: $KeycloakUrl"

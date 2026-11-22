@@ -18,7 +18,7 @@ Portal ── cookie HttpOnly ──> BFF /api/olap/*
 El BFF valida issuer, firma, expiración y audiencia de autenticación antes de
 reenviar el token. El cliente `dss-bff` de Keycloak incluye además la audiencia
 `olap-service`; el servicio OLAP valida esa audiencia y los permisos `olap:user` /
-`olap:admin` de `dss-permissions` (o `OLAP_USER` / `OLAP_ADMIN` durante la convivencia). Para el portal se configura `NEXT_PUBLIC_BFF_URL`;
+`olap:admin` de `dss-permissions` (los roles `OLAP_USER` / `OLAP_ADMIN` se retiraron en IAM-019). Para el portal se configura `NEXT_PUBLIC_BFF_URL`;
 en el servidor BFF, `OLAP_SERVICE_URL` apunta a la URL privada del servicio.
 
 No se debe pasar `Authorization` desde el navegador ni exponer la URL privada

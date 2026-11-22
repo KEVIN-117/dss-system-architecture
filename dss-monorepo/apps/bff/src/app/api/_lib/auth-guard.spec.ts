@@ -8,7 +8,6 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import {
   authenticateRequest,
   extractBearerToken,
-  requireClientRoles,
   requirePermissions,
   requireRoles,
 } from './auth-guard';
@@ -42,7 +41,6 @@ describe('BFF authentication guard', () => {
     vi.stubEnv('KEYCLOAK_URL', 'http://keycloak:8080');
     vi.stubEnv('KEYCLOAK_REALM', 'uatf-dss-realm');
     vi.stubEnv('KEYCLOAK_AUDIENCE', 'uatf-auth-service');
-    vi.stubEnv('KEYCLOAK_ROLE_CLIENT_ID', 'uatf-auth-service');
     vi.stubEnv('KEYCLOAK_BFF_CLIENT_ID', 'dss-bff');
     vi.stubEnv(
       'KEYCLOAK_BFF_CLIENT_SECRET',
@@ -83,7 +81,6 @@ describe('BFF authentication guard', () => {
         token: 'access-token',
         roles: ['DIRECTOR'],
         permissions: ['analytics:read', 'analytics:career'],
-        clientRoles: {},
         user: { ...profile, roles: ['DIRECTOR'] },
       },
     });
@@ -91,7 +88,6 @@ describe('BFF authentication guard', () => {
       keycloakUrl: 'http://keycloak:8080',
       realm: 'uatf-dss-realm',
       audience: 'uatf-auth-service',
-      roleClientId: 'uatf-auth-service',
       permissionsClientId: 'dss-permissions',
       portalRoles: {},
     });
@@ -209,7 +205,6 @@ describe('BFF authentication guard', () => {
       token: 'access-token',
       roles: ['SUPERADMIN'] as const,
       permissions: ['pipelines:execute', 'iam:users:read'],
-      clientRoles: {},
       user: { ...profile, roles: ['SUPERADMIN'] as const },
     };
 
@@ -231,28 +226,4 @@ describe('BFF authentication guard', () => {
     ).toBe(403);
   });
 
-  it('requires the requested permission from the verified service client roles', () => {
-    const authentication = {
-      token: 'access-token',
-      roles: ['SUPERADMIN'] as const,
-      permissions: [],
-      clientRoles: { 'dw-control-service': ['DW_CLOSURE_READ'] },
-      user: { ...profile, roles: ['SUPERADMIN'] as const },
-    };
-
-    expect(
-      requireClientRoles(authentication, 'dw-control-service', [
-        'DW_CLOSURE_READ',
-      ]),
-    ).toBeNull();
-    expect(
-      requireClientRoles(authentication, 'dw-control-service', [
-        'DW_CLOSURE_MANAGE',
-      ])?.status,
-    ).toBe(403);
-    expect(
-      requireClientRoles(authentication, 'other-client', ['DW_CLOSURE_READ'])
-        ?.status,
-    ).toBe(403);
-  });
 });

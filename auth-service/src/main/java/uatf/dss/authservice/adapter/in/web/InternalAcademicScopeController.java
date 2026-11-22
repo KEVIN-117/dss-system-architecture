@@ -27,7 +27,7 @@ import java.util.UUID;
  *
  * <p>Two independent checks, both required:
  * <ol>
- *   <li>the token carries the {@code uatf-auth-service} client role {@code CONTEXT_READER}, which is
+ *   <li>the token carries the {@code dss-permissions} permission {@code context:read}, which is
  *       granted only to service accounts in Keycloak; and
  *   <li>the token's authorized party ({@code azp}) is one of the configured reader clients, so a
  *       human user who was mistakenly given the role still cannot read other users' scope.

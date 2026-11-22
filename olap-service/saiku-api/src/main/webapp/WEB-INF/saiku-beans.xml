@@ -28,11 +28,9 @@
          external saiku-beans.properties; no issuer, keys, or credentials are baked in. -->
     <bean id="saikuKeycloakJwtAuthenticationConverter"
           class="org.saiku.web.security.keycloak.SaikuKeycloakJwtAuthenticationConverter">
-        <property name="clientId" value="${KEYCLOAK_OLAP_CLIENT_ID:olap-service}" />
-        <!-- IAM-012: olap:admin / olap:user of the catalog client grant ROLE_ADMIN / ROLE_USER. While
-             OLAP_LEGACY_ROLES_ENABLED is true, OLAP_ADMIN / OLAP_USER of the client above still work. -->
+        <!-- IAM-012: olap:admin / olap:user of the catalog client grant ROLE_ADMIN / ROLE_USER. The old
+             OLAP_ADMIN / OLAP_USER client roles were retired in IAM-019. -->
         <property name="permissionsClientId" value="${KEYCLOAK_PERMISSIONS_CLIENT_ID:dss-permissions}" />
-        <property name="legacyRolesEnabled" value="${OLAP_LEGACY_ROLES_ENABLED:true}" />
     </bean>
     <bean id="saikuKeycloakJwtDecoder"
           class="org.saiku.web.security.keycloak.KeycloakJwtDecoderFactory"

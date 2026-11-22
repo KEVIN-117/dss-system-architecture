@@ -62,7 +62,6 @@ La cadena de seguridad es stateless, deshabilita CSRF y requiere bearer JWT para
 |---|---|---|
 | `resource_access[KEYCLOAK_PERMISSIONS_CLIENT_ID].roles` (default `dss-permissions`) | El permiso tal cual, sin prefijo | `iam:users:write` |
 | `realm_access.roles` | `ROLE_<rol>` | `ROLE_SUPERADMIN` |
-| `resource_access[KEYCLOAK_RESOURCE_ID].roles` (default `uatf-auth-service`) | `ROLE_<rol>` (heredado; se retira en IAM-019) | `ROLE_CONTEXT_READER` |
 | `scope` | `SCOPE_<scope>` | `SCOPE_profile` |
 
 Los endpoints autorizan con `hasAuthority('<permiso>')`. Tener el rol `ROLE_SUPERADMIN` sin el permiso ya no da acceso. El principal se obtiene del claim configurado, con fallback a `preferred_username` y luego `sub`. Para consultar el perfil, sin embargo, el controlador usa directamente el `sub` como UUID de Keycloak.

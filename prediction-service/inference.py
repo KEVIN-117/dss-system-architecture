@@ -6,7 +6,6 @@ import math
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from decimal import Decimal
-from collections.abc import Collection
 from typing import Any, Mapping, Protocol
 from uuid import uuid4
 
@@ -102,35 +101,16 @@ ANALYTICS_READ = "analytics:read"
 ANALYTICS_GLOBAL = "analytics:global"
 ANALYTICS_FACULTY = "analytics:faculty"
 ANALYTICS_CAREER = "analytics:career"
-#: What each legacy academic role meant, expressed as catalog permissions (coexistence, IAM-013).
-LEGACY_ROLE_PERMISSIONS: dict[str, frozenset[str]] = {
-    "RECTOR": frozenset({ANALYTICS_READ, ANALYTICS_GLOBAL}),
-    "DECANO": frozenset({ANALYTICS_READ, ANALYTICS_FACULTY}),
-    "DIRECTOR": frozenset({ANALYTICS_READ, ANALYTICS_CAREER}),
-}
-
-
-def academic_permissions(principal: Principal, legacy_roles: Collection[str] = frozenset()) -> frozenset[str]:
-    """Token permissions plus what the accepted legacy academic roles meant."""
-    granted = set(principal.permissions)
-    for role in principal.roles & frozenset(legacy_roles):
-        granted |= LEGACY_ROLE_PERMISSIONS.get(role, frozenset())
-    return frozenset(granted)
-
-
-def authorize_program_context(
-    principal: Principal, context: ProgramContext, legacy_roles: Collection[str] = frozenset()
-) -> None:
+def authorize_program_context(principal: Principal, context: ProgramContext) -> None:
     """Authorize one requested program against the principal's permissions and academic contexts.
 
     ``analytics:read`` is required, then a scope: ``analytics:global`` is institution-wide,
     ``analytics:faculty`` covers the faculty of any faculty context (``careerId`` empty) and
     ``analytics:career`` the program of any career context. The scope is the union over every
-    context and every scope permission (IAM-009). ``legacy_roles`` are the academic roles still
-    accepted during the coexistence, translated through :data:`LEGACY_ROLE_PERMISSIONS`. SUPERADMIN
-    has no academic permission, hence no academic access.
+    context and every scope permission (IAM-009). SUPERADMIN has no academic permission, hence no
+    academic access.
     """
-    permissions = academic_permissions(principal, legacy_roles)
+    permissions = principal.permissions
     if ANALYTICS_READ in permissions:
         if ANALYTICS_GLOBAL in permissions:
             return

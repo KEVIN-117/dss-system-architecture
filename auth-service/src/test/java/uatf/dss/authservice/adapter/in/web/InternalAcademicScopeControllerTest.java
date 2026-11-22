@@ -39,7 +39,7 @@ class InternalAcademicScopeControllerTest extends BaseWebMvcTest {
     }
 
     @Test
-    void legacyContextReaderRoleWithoutPermissionIsForbidden() throws Exception {
+    void retiredContextReaderRoleWithoutPermissionIsForbidden() throws Exception {
         mockMvc.perform(get(PATH, UUID.randomUUID())
                         .with(jwt().jwt(token -> token.claim("azp", "olap-service"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_CONTEXT_READER"))))

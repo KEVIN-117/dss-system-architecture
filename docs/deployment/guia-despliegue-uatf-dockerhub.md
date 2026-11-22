@@ -285,7 +285,6 @@ SAIKU_ADMIN_PASSWORD=<CONTRASEÑA_FUERTE_UNICA>
 KEYCLOAK_ISSUER_URI=https://<KEYCLOAK_PUBLIC_HOST>/realms/uatf-dss-realm
 KEYCLOAK_JWK_SET_URI=http://keycloak:8080/realms/uatf-dss-realm/protocol/openid-connect/certs
 KEYCLOAK_OLAP_AUDIENCE=olap-service
-KEYCLOAK_OLAP_CLIENT_ID=olap-service
 ```
 
 El password del admin se inicializa en el `saiku-home` y se guarda como hash. Mantener persistente y respaldado `/app/saiku-home`; no borrar el volumen al actualizar. El contenedor corre como usuario no-root `10001:10001`; volúmenes bind montados deben permitir escritura a esa identidad.

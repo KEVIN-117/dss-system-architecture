@@ -41,6 +41,8 @@ export const ADMIN_PERMISSIONS = {
   roles: ['iam:roles:read'],
   clients: ['iam:clients:read'],
   audit: ['iam:audit:read'],
+  closures: ['dw:closure:read', 'dw:closure:manage'],
+  etl: ['dw:etl-monitor:read'],
   olap: ['olap:admin'],
   ml: ['prediction:train'],
 } as const satisfies Record<string, readonly DSSPermission[]>;
@@ -51,6 +53,8 @@ export const ANY_ADMIN_PERMISSION: readonly DSSPermission[] = [
   ...ADMIN_PERMISSIONS.roles,
   ...ADMIN_PERMISSIONS.clients,
   ...ADMIN_PERMISSIONS.audit,
+  ...ADMIN_PERMISSIONS.closures,
+  ...ADMIN_PERMISSIONS.etl,
   ...ADMIN_PERMISSIONS.olap,
   ...ADMIN_PERMISSIONS.ml,
 ];
@@ -60,11 +64,8 @@ export function AdminPortalLayout({
   access = ANY_ADMIN_PERMISSION,
 }: {
   children: ReactNode;
-  /**
-   * `authenticated` lets the service decide (DW pages, whose operators may still hold the legacy
-   * DW_* roles); otherwise any of the listed permissions opens the page.
-   */
-  access?: 'authenticated' | readonly DSSPermission[];
+  /** Any of the listed permissions opens the page. */
+  access?: readonly DSSPermission[];
 }) {
   const { user, permissions, logout } = useAuth();
   const pathname = usePathname() ?? '';
@@ -75,6 +76,8 @@ export function AdminPortalLayout({
   const canRoles = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.roles);
   const canClients = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.clients);
   const canAudit = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.audit);
+  const canClosures = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.closures);
+  const canEtl = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.etl);
   const canOlap = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.olap);
   const canMl = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.ml);
   const canOverview = hasRequiredPermissions(granted, ANY_ADMIN_PERMISSION);
@@ -116,11 +119,11 @@ export function AdminPortalLayout({
       navigationItem('Conexiones', '/datasources', <Cable aria-hidden="true" />),
       navigationItem('Esquemas y cubos', '/schemas', <Database aria-hidden="true" />),
     ]),
-    // DW pages stay visible to every authenticated user: dw-control-service decides, and during the
-    // coexistence operators may still hold the legacy DW_* roles instead of the dw:* permissions.
-    ...group(true, 'Servicio de control del almacén de datos', [
-      navigationItem('Cierres académicos', '/academic-closures', <CalendarClock aria-hidden="true" />),
-      navigationItem('Ejecuciones ETL', '/etl-executions', <Activity aria-hidden="true" />),
+    ...group(canClosures || canEtl, 'Servicio de control del almacén de datos', [
+      ...(canClosures
+        ? [navigationItem('Cierres académicos', '/academic-closures', <CalendarClock aria-hidden="true" />)]
+        : []),
+      ...(canEtl ? [navigationItem('Ejecuciones ETL', '/etl-executions', <Activity aria-hidden="true" />)] : []),
     ]),
     ...group(canMl, 'Servicio de aprendizaje automático', [
       navigationItem('Operaciones ML', '/ml-operations', <BrainCircuit aria-hidden="true" />),
@@ -135,7 +138,15 @@ export function AdminPortalLayout({
         <LandingLoginRedirect landingUrl={process.env.NEXT_PUBLIC_LANDING_URL} />
       }
     >
-      {access === 'authenticated' ? (
+      <Can
+        permissions={access}
+        fallback={
+          <AccessDenied
+            portalName="de administración"
+            logoutHref={`${process.env.NEXT_PUBLIC_BFF_URL}/api/auth/logout`}
+          />
+        }
+      >
         <DashboardTemplate
           sidebarTitle="Administración DSS"
           navGroups={navGroups}
@@ -152,34 +163,7 @@ export function AdminPortalLayout({
         >
           {children}
         </DashboardTemplate>
-      ) : (
-        <Can
-          permissions={access}
-          fallback={
-            <AccessDenied
-              portalName="de administración"
-              logoutHref={`${process.env.NEXT_PUBLIC_BFF_URL}/api/auth/logout`}
-            />
-          }
-        >
-          <DashboardTemplate
-            sidebarTitle="Administración DSS"
-            navGroups={navGroups}
-            surfaceMaterial="frosted"
-            user={
-              user
-                ? {
-                    name: `${user.firstName} ${user.lastName}`,
-                    email: user.email,
-                  }
-                : undefined
-            }
-            onDisconnect={logout}
-          >
-            {children}
-          </DashboardTemplate>
-        </Can>
-      )}
+      </Can>
     </ProtectedRoute>
   );
 }

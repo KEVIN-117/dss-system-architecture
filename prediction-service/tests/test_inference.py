@@ -120,19 +120,20 @@ class InferenceTests(unittest.TestCase):
 
     def test_decano_and_director_are_restricted_to_profile_contexts(self):
         context = ProgramContext("P01", "P01", 10, "42", 2026, 1, "2026-06-01T00:00:00+00:00")
+        # The realm roles group these permissions (DECANO: faculty scope, DIRECTOR: career scope).
         authorize_program_context(
-            Principal("user", frozenset({"DECANO"}), ({"facultyId": 10, "careerId": None},)),
-            context, {"DECANO"},
+            Principal("user", frozenset({"DECANO"}), ({"facultyId": 10, "careerId": None},),
+                      frozenset({"analytics:read", "analytics:faculty"})),
+            context,
         )
         with self.assertRaises(InferenceFailure):
             authorize_program_context(
-                Principal("user", frozenset({"DIRECTOR"}), ({"facultyId": 10, "careerId": "P02"},)),
-                context, {"DIRECTOR"},
+                Principal("user", frozenset({"DIRECTOR"}), ({"facultyId": 10, "careerId": "P02"},),
+                          frozenset({"analytics:read", "analytics:career"})),
+                context,
             )
         with self.assertRaises(InferenceFailure):
-            authorize_program_context(
-                Principal("admin", frozenset({"SUPERADMIN"}), ()), context, {"RECTOR", "DECANO", "DIRECTOR"},
-            )
+            authorize_program_context(Principal("admin", frozenset({"SUPERADMIN"}), ()), context)
 
     def test_a_b_a_and_concurrent_requests_do_not_contaminate_features(self):
         service = self._service()

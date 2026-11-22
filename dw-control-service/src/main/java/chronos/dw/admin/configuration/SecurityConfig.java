@@ -25,8 +25,6 @@ import org.springframework.security.web.SecurityFilterChain;
 @EnableMethodSecurity
 public class SecurityConfig {
 
-    private static final org.slf4j.Logger LOGGER = org.slf4j.LoggerFactory.getLogger(SecurityConfig.class);
-
     @Bean
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
@@ -69,20 +67,8 @@ public class SecurityConfig {
 
     @Bean
     DwControlJwtAuthenticationConverter dwControlJwtAuthenticationConverter(
-            @Value("${app.security.jwt.permissions-client-id:dss-permissions}") String permissionsClientId,
-            @Value("${app.security.jwt.client-id}") String legacyClientId,
-            @Value("${app.security.legacy-dw-roles-enabled:true}") boolean legacyRolesEnabled) {
-        DwControlJwtAuthenticationConverter converter =
-                new DwControlJwtAuthenticationConverter(permissionsClientId, legacyClientId, legacyRolesEnabled);
-        if (legacyRolesEnabled) {
-            LOGGER.warn(
-                    "Convivencia activa: se aceptan los roles DW_* de {} además de los permisos de {}. "
-                            + "Desactívala con DW_CONTROL_LEGACY_ROLES_ENABLED=false cuando todos los usuarios tengan los "
-                            + "permisos nuevos.",
-                    legacyClientId,
-                    permissionsClientId);
-        }
-        return converter;
+            @Value("${app.security.jwt.permissions-client-id:dss-permissions}") String permissionsClientId) {
+        return new DwControlJwtAuthenticationConverter(permissionsClientId);
     }
 
     @Bean
