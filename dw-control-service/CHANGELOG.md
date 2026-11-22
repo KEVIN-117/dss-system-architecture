@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.5.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-control-service-v1.4.0...dw-control-service-v1.5.0) (2026-11-22)
+
+
+### Features
+
+* **dw-control-service:** API REST del Load Manager y permisos en Keycloak ([#365](https://github.com/KEVIN-117/dss-system-architecture/issues/365)) ([81919b4](https://github.com/KEVIN-117/dss-system-architecture/commit/81919b43b9e71437263529a3055f7d70adb3af0b))
+* **dw-control-service:** programaciones cron fuera del horario operativo de la DSA ([#362](https://github.com/KEVIN-117/dss-system-architecture/issues/362)) ([34c3f7e](https://github.com/KEVIN-117/dss-system-architecture/commit/34c3f7e69ed939769301629b0564bb2eababac47))
+* **dw-control-service:** programaciones cron fuera del horario operativo de la DSA ([#364](https://github.com/KEVIN-117/dss-system-architecture/issues/364)) ([700147d](https://github.com/KEVIN-117/dss-system-architecture/commit/700147d17d23135172b42173bf636b88d36c6121))
+
 ## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-control-service-v1.3.0...dw-control-service-v1.4.0) (2026-11-22)
 
 
