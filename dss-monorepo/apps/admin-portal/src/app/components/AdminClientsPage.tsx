@@ -61,19 +61,30 @@ export function AdminClientsPage() {
   const [revealed, setRevealed] = React.useState<Revealed | null>(null);
   const [notice, setNotice] = React.useState<string | null>(null);
 
-  const load = React.useCallback(async (signal?: AbortSignal) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const result = await listClients(search, signal);
-      setClients([...result].sort((left, right) => left.clientId.localeCompare(right.clientId)));
-    } catch (cause) {
-      if (signal?.aborted) return;
-      setError(cause instanceof Error ? cause.message : 'No se pudieron cargar las aplicaciones.');
-    } finally {
-      if (!signal?.aborted) setLoading(false);
-    }
-  }, [search]);
+  const load = React.useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true);
+      setError(null);
+      try {
+        const result = await listClients(search, signal);
+        setClients(
+          [...result].sort((left, right) =>
+            left.clientId.localeCompare(right.clientId),
+          ),
+        );
+      } catch (cause) {
+        if (signal?.aborted) return;
+        setError(
+          cause instanceof Error
+            ? cause.message
+            : 'No se pudieron cargar las aplicaciones.',
+        );
+      } finally {
+        if (!signal?.aborted) setLoading(false);
+      }
+    },
+    [search],
+  );
 
   React.useEffect(() => {
     const controller = new AbortController();
@@ -81,19 +92,33 @@ export function AdminClientsPage() {
     return () => controller.abort();
   }, [load]);
 
+  console.log(clients);
+
   return (
     <section className="space-y-6" aria-labelledby="admin-clients-title">
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div className="space-y-1">
-          <p className="text-sm font-medium text-muted-foreground">Administración · servicio de autenticación</p>
-          <h1 id="admin-clients-title" className="text-2xl font-semibold tracking-tight">Aplicaciones</h1>
+          <p className="text-sm font-medium text-muted-foreground">
+            Administración · servicio de autenticación
+          </p>
+          <h1
+            id="admin-clients-title"
+            className="text-2xl font-semibold tracking-tight"
+          >
+            Aplicaciones
+          </h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Aplicaciones que inician sesión o validan tokens con Keycloak. Las marcadas como protegidas sostienen la
-            plataforma y no se modifican desde aquí.
+            Aplicaciones que inician sesión o validan tokens con Keycloak. Las
+            marcadas como protegidas sostienen la plataforma y no se modifican
+            desde aquí.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => void load()} disabled={loading}>
+          <Button
+            variant="outline"
+            onClick={() => void load()}
+            disabled={loading}
+          >
             <RefreshCw aria-hidden="true" className="size-4" />
             Actualizar
           </Button>
@@ -115,7 +140,9 @@ export function AdminClientsPage() {
         }}
       >
         <div className="w-full space-y-1.5 sm:w-72">
-          <label htmlFor="client-search" className="text-sm font-medium">Buscar por identificador</label>
+          <label htmlFor="client-search" className="text-sm font-medium">
+            Buscar por identificador
+          </label>
           <Input
             id="client-search"
             maxLength={64}
@@ -129,20 +156,38 @@ export function AdminClientsPage() {
       </form>
 
       {notice && (
-        <div role="status" className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 p-3 text-sm">
+        <div
+          role="status"
+          className="flex items-center justify-between gap-2 rounded-lg border bg-muted/30 p-3 text-sm"
+        >
           <p>{notice}</p>
-          <Button variant="ghost" size="sm" onClick={() => setNotice(null)}>Cerrar aviso</Button>
+          <Button variant="ghost" size="sm" onClick={() => setNotice(null)}>
+            Cerrar aviso
+          </Button>
         </div>
       )}
       {error && (
-        <div role="alert" className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive">
+        <div
+          role="alert"
+          className="rounded-lg border border-destructive/40 bg-destructive/10 p-4 text-sm text-destructive"
+        >
           <p className="font-medium">No se pudieron cargar las aplicaciones</p>
           <p className="mt-1">{error}</p>
-          <Button variant="outline" size="sm" className="mt-3" onClick={() => void load()}>Reintentar</Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-3"
+            onClick={() => void load()}
+          >
+            Reintentar
+          </Button>
         </div>
       )}
 
-      <div className="rounded-xl border border-border bg-card" aria-busy={loading}>
+      <div
+        className="rounded-xl border border-border bg-card"
+        aria-busy={loading}
+      >
         <Table aria-label="Aplicaciones registradas">
           <TableHeader>
             <TableRow>
@@ -160,13 +205,23 @@ export function AdminClientsPage() {
                   <TableCell>
                     <span className="flex flex-wrap items-center gap-2 font-mono text-sm">
                       {item.clientId}
-                      {item.system && <Badge variant="outline">Protegida</Badge>}
+                      {item.system && (
+                        <Badge variant="outline">Protegida</Badge>
+                      )}
                     </span>
-                    {item.name && <span className="block font-sans text-xs text-muted-foreground">{item.name}</span>}
+                    {item.name && (
+                      <span className="block font-sans text-xs text-muted-foreground">
+                        {item.name}
+                      </span>
+                    )}
                   </TableCell>
-                  <TableCell className="font-sans text-sm">{TYPE_LABELS[item.type] ?? item.type}</TableCell>
+                  <TableCell className="font-sans text-sm">
+                    {TYPE_LABELS[item.type] ?? item.type}
+                  </TableCell>
                   <TableCell>
-                    <Badge variant={item.enabled ? 'secondary' : 'outline'}>{item.enabled ? 'Activa' : 'Inactiva'}</Badge>
+                    <Badge variant={item.enabled ? 'secondary' : 'outline'}>
+                      {item.enabled ? 'Activa' : 'Inactiva'}
+                    </Badge>
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-1">
@@ -176,7 +231,11 @@ export function AdminClientsPage() {
                         aria-label={`${editable ? 'Editar' : 'Ver'} ${item.clientId}`}
                         onClick={() => setEditing(item)}
                       >
-                        {editable ? <Pencil aria-hidden="true" className="size-4" /> : <Eye aria-hidden="true" className="size-4" />}
+                        {editable ? (
+                          <Pencil aria-hidden="true" className="size-4" />
+                        ) : (
+                          <Eye aria-hidden="true" className="size-4" />
+                        )}
                       </Button>
                       {canWrite && canRotateSecret(item) && (
                         <Button
@@ -195,15 +254,24 @@ export function AdminClientsPage() {
             })}
             {!loading && clients.length === 0 && (
               <TableRow>
-                <TableCell colSpan={4} className="h-24 text-center font-sans text-muted-foreground">
-                  {error ? 'Verifica la conexión e inténtalo de nuevo.' : 'No hay aplicaciones que coincidan.'}
+                <TableCell
+                  colSpan={4}
+                  className="h-24 text-center font-sans text-muted-foreground"
+                >
+                  {error
+                    ? 'Verifica la conexión e inténtalo de nuevo.'
+                    : 'No hay aplicaciones que coincidan.'}
                 </TableCell>
               </TableRow>
             )}
             {loading && clients.length === 0 && (
               <TableRow>
                 <TableCell colSpan={4} role="status">
-                  <Loader text="Cargando aplicaciones…" fullScreen={false} className="min-h-24" />
+                  <Loader
+                    text="Cargando aplicaciones…"
+                    fullScreen={false}
+                    className="min-h-24"
+                  />
                 </TableCell>
               </TableRow>
             )}
@@ -216,7 +284,11 @@ export function AdminClientsPage() {
         canWrite={canWrite}
         onClose={() => setEditing(null)}
         onSaved={(saved, secret) => {
-          setNotice(editing === 'new' ? `Aplicación ${saved.clientId} registrada.` : `Aplicación ${saved.clientId} actualizada.`);
+          setNotice(
+            editing === 'new'
+              ? `Aplicación ${saved.clientId} registrada.`
+              : `Aplicación ${saved.clientId} actualizada.`,
+          );
           if (secret) setRevealed({ clientId: saved.clientId, value: secret });
           void load();
         }}
@@ -225,7 +297,9 @@ export function AdminClientsPage() {
         client={rotating}
         onClose={() => setRotating(null)}
         onRotated={(issued) => {
-          setNotice(`Secreto de ${issued.clientId} rotado. El anterior ya no es válido.`);
+          setNotice(
+            `Secreto de ${issued.clientId} rotado. El anterior ya no es válido.`,
+          );
           setRevealed({ clientId: issued.clientId, value: issued.secret });
         }}
       />
@@ -234,7 +308,14 @@ export function AdminClientsPage() {
   );
 }
 
-function UriField({ id, label, hint, value, onChange, disabled }: {
+function UriField({
+  id,
+  label,
+  hint,
+  value,
+  onChange,
+  disabled,
+}: {
   id: string;
   label: string;
   hint: string;
@@ -244,7 +325,9 @@ function UriField({ id, label, hint, value, onChange, disabled }: {
 }) {
   return (
     <div className="space-y-1.5">
-      <label htmlFor={id} className="text-sm font-medium">{label}</label>
+      <label htmlFor={id} className="text-sm font-medium">
+        {label}
+      </label>
       <Textarea
         id={id}
         rows={2}
@@ -255,12 +338,19 @@ function UriField({ id, label, hint, value, onChange, disabled }: {
         aria-describedby={`${id}-hint`}
         spellCheck={false}
       />
-      <p id={`${id}-hint`} className="text-xs text-muted-foreground">{hint}</p>
+      <p id={`${id}-hint`} className="text-xs text-muted-foreground">
+        {hint}
+      </p>
     </div>
   );
 }
 
-function ClientFormDialog({ client, canWrite, onClose, onSaved }: {
+function ClientFormDialog({
+  client,
+  canWrite,
+  onClose,
+  onSaved,
+}: {
   client: IamClient | 'new' | null;
   canWrite: boolean;
   onClose: () => void;
@@ -268,10 +358,13 @@ function ClientFormDialog({ client, canWrite, onClose, onSaved }: {
 }) {
   const creating = client === 'new';
   const existing = client === 'new' ? null : client;
-  const readOnly = !creating && (!canWrite || (existing !== null && !isEditable(existing)));
+  const readOnly =
+    !creating && (!canWrite || (existing !== null && !isEditable(existing)));
   const canToggle = creating || existing?.clientId !== EDITABLE_SYSTEM_CLIENT;
   const [clientId, setClientId] = React.useState('');
-  const [type, setType] = React.useState<'PUBLIC' | 'CONFIDENTIAL'>('CONFIDENTIAL');
+  const [type, setType] = React.useState<'PUBLIC' | 'CONFIDENTIAL'>(
+    'CONFIDENTIAL',
+  );
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [enabled, setEnabled] = React.useState(true);
@@ -306,16 +399,27 @@ function ClientFormDialog({ client, canWrite, onClose, onSaved }: {
       postLogoutRedirectUris: parseUriList(logoutUris),
     };
     if (creating && !CLIENT_ID_PATTERN.test(clientId.trim())) {
-      setError('El identificador usa minúsculas, números y guion, empieza con una letra y tiene de 3 a 64 caracteres.');
+      setError(
+        'El identificador usa minúsculas, números y guion, empieza con una letra y tiene de 3 a 64 caracteres.',
+      );
       return;
     }
-    if (Object.values(uris).some((list) => list.length > MAX_URIS || list.some((uri) => uri.length > 500))) {
-      setError(`Cada lista admite hasta ${MAX_URIS} URIs de 500 caracteres como máximo.`);
+    if (
+      Object.values(uris).some(
+        (list) =>
+          list.length > MAX_URIS || list.some((uri) => uri.length > 500),
+      )
+    ) {
+      setError(
+        `Cada lista admite hasta ${MAX_URIS} URIs de 500 caracteres como máximo.`,
+      );
       return;
     }
     const isPublic = creating ? type === 'PUBLIC' : existing?.type === 'PUBLIC';
     if (isPublic && uris.redirectUris.length === 0) {
-      setError('Una aplicación pública necesita al menos una URI de redirección.');
+      setError(
+        'Una aplicación pública necesita al menos una URI de redirección.',
+      );
       return;
     }
     setSaving(true);
@@ -323,74 +427,128 @@ function ClientFormDialog({ client, canWrite, onClose, onSaved }: {
     try {
       if (creating) {
         const created = await createClient({
-          clientId, type, name, description, enabled, serviceAccountsEnabled: serviceAccounts, ...uris,
+          clientId,
+          type,
+          name,
+          description,
+          enabled,
+          serviceAccountsEnabled: serviceAccounts,
+          ...uris,
         });
         onSaved(created.client, created.secret);
       } else if (existing) {
         const updated = await updateClient(existing.clientId, {
-          name, description, ...(canToggle ? { enabled } : {}), ...uris,
+          name,
+          description,
+          ...(canToggle ? { enabled } : {}),
+          ...uris,
         });
         onSaved(updated, null);
       }
       onClose();
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo guardar la aplicación.');
+      setError(
+        cause instanceof Error
+          ? cause.message
+          : 'No se pudo guardar la aplicación.',
+      );
     } finally {
       setSaving(false);
     }
   };
 
-  const title = creating ? 'Nueva aplicación' : `${readOnly ? '' : 'Editar '}${existing?.clientId ?? ''}`;
+  const title = creating
+    ? 'Nueva aplicación'
+    : `${readOnly ? '' : 'Editar '}${existing?.clientId ?? ''}`;
   const disabled = readOnly || saving;
 
   return (
-    <Dialog open={client !== null} onOpenChange={(open) => !open && !saving && onClose()}>
+    <Dialog
+      open={client !== null}
+      onOpenChange={(open) => !open && !saving && onClose()}
+    >
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           <DialogDescription>
-            {creating && 'El identificador y el tipo no se pueden cambiar después.'}
-            {!creating && readOnly && existing?.system && 'Aplicación protegida: la plataforma depende de ella y es de solo lectura.'}
-            {!creating && readOnly && !existing?.system && 'Vista de solo lectura.'}
-            {!creating && !readOnly && existing?.clientId === EDITABLE_SYSTEM_CLIENT &&
+            {creating &&
+              'El identificador y el tipo no se pueden cambiar después.'}
+            {!creating &&
+              readOnly &&
+              existing?.system &&
+              'Aplicación protegida: la plataforma depende de ella y es de solo lectura.'}
+            {!creating &&
+              readOnly &&
+              !existing?.system &&
+              'Vista de solo lectura.'}
+            {!creating &&
+              !readOnly &&
+              existing?.clientId === EDITABLE_SYSTEM_CLIENT &&
               'Aplicación protegida: puedes cambiar nombre, descripción y URIs, pero no desactivarla.'}
-            {!creating && !readOnly && existing?.clientId !== EDITABLE_SYSTEM_CLIENT &&
+            {!creating &&
+              !readOnly &&
+              existing?.clientId !== EDITABLE_SYSTEM_CLIENT &&
               `Tipo ${TYPE_LABELS[existing?.type ?? 'CONFIDENTIAL'].toLowerCase()}. El identificador y el tipo no se pueden cambiar.`}
           </DialogDescription>
         </DialogHeader>
-        <form id="client-form" onSubmit={(event) => void submit(event)} className="space-y-4" noValidate>
+        <form
+          id="client-form"
+          onSubmit={(event) => void submit(event)}
+          className="space-y-4"
+          noValidate
+        >
           {creating && (
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
-                <label htmlFor="client-id" className="text-sm font-medium">Identificador <span aria-hidden="true">*</span></label>
+                <label htmlFor="client-id" className="text-sm font-medium">
+                  Identificador <span aria-hidden="true">*</span>
+                </label>
                 <Input
                   id="client-id"
                   required
                   value={clientId}
-                  onChange={(event) => setClientId(event.target.value.toLowerCase())}
+                  onChange={(event) =>
+                    setClientId(event.target.value.toLowerCase())
+                  }
                   placeholder="portal-becas"
                   className="font-mono"
                 />
               </div>
               <div className="space-y-1.5">
-                <label htmlFor="client-type" className="text-sm font-medium">Tipo</label>
+                <label htmlFor="client-type" className="text-sm font-medium">
+                  Tipo
+                </label>
                 <Select
                   id="client-type"
                   value={type}
-                  onChange={(event) => setType(event.target.value as 'PUBLIC' | 'CONFIDENTIAL')}
+                  onChange={(event) =>
+                    setType(event.target.value as 'PUBLIC' | 'CONFIDENTIAL')
+                  }
                 >
-                  <option value="CONFIDENTIAL">Confidencial (con secreto)</option>
+                  <option value="CONFIDENTIAL">
+                    Confidencial (con secreto)
+                  </option>
                   <option value="PUBLIC">Pública (navegador, PKCE)</option>
                 </Select>
               </div>
             </div>
           )}
           <div className="space-y-1.5">
-            <label htmlFor="client-name" className="text-sm font-medium">Nombre</label>
-            <Input id="client-name" maxLength={255} value={name} disabled={disabled} onChange={(event) => setName(event.target.value)} />
+            <label htmlFor="client-name" className="text-sm font-medium">
+              Nombre
+            </label>
+            <Input
+              id="client-name"
+              maxLength={255}
+              value={name}
+              disabled={disabled}
+              onChange={(event) => setName(event.target.value)}
+            />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="client-description" className="text-sm font-medium">Descripción</label>
+            <label htmlFor="client-description" className="text-sm font-medium">
+              Descripción
+            </label>
             <Input
               id="client-description"
               maxLength={255}
@@ -438,21 +596,38 @@ function ClientFormDialog({ client, canWrite, onClose, onSaved }: {
               id="client-service-account"
               checked={serviceAccounts}
               disabled={disabled}
-              onCheckedChange={(checked) => setServiceAccounts(checked === true)}
+              onCheckedChange={(checked) =>
+                setServiceAccounts(checked === true)
+              }
               label="Cuenta de servicio"
               description="Permite que la aplicación obtenga tokens propios (client credentials), sin usuario."
             />
           )}
           {error && (
-            <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+            <p
+              role="alert"
+              className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+            >
+              {error}
+            </p>
           )}
         </form>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={saving}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={saving}
+          >
             {readOnly ? 'Cerrar' : 'Cancelar'}
           </Button>
           {!readOnly && (
-            <Button type="submit" form="client-form" loading={saving} disabled={saving}>
+            <Button
+              type="submit"
+              form="client-form"
+              loading={saving}
+              disabled={saving}
+            >
               {creating ? 'Registrar aplicación' : 'Guardar'}
             </Button>
           )}
@@ -462,7 +637,11 @@ function ClientFormDialog({ client, canWrite, onClose, onSaved }: {
   );
 }
 
-function RotateSecretDialog({ client, onClose, onRotated }: {
+function RotateSecretDialog({
+  client,
+  onClose,
+  onRotated,
+}: {
   client: IamClient | null;
   onClose: () => void;
   onRotated: (issued: { clientId: string; secret: string }) => void;
@@ -481,27 +660,53 @@ function RotateSecretDialog({ client, onClose, onRotated }: {
       onClose();
       onRotated(issued);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'No se pudo rotar el secreto.');
+      setError(
+        cause instanceof Error ? cause.message : 'No se pudo rotar el secreto.',
+      );
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <Dialog open={client !== null} onOpenChange={(open) => !open && !busy && onClose()}>
+    <Dialog
+      open={client !== null}
+      onOpenChange={(open) => !open && !busy && onClose()}
+    >
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>¿Rotar el secreto de {client?.clientId ?? ''}?</DialogTitle>
+          <DialogTitle>
+            ¿Rotar el secreto de {client?.clientId ?? ''}?
+          </DialogTitle>
           <DialogDescription>
-            El secreto actual deja de valer de inmediato: la aplicación fallará hasta que configures el nuevo.
+            El secreto actual deja de valer de inmediato: la aplicación fallará
+            hasta que configures el nuevo.
           </DialogDescription>
         </DialogHeader>
         {error && (
-          <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>
+          <p
+            role="alert"
+            className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive"
+          >
+            {error}
+          </p>
         )}
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={onClose} disabled={busy}>Cancelar</Button>
-          <Button type="button" variant="destructive" loading={busy} disabled={busy} onClick={() => void rotate()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={onClose}
+            disabled={busy}
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            variant="destructive"
+            loading={busy}
+            disabled={busy}
+            onClick={() => void rotate()}
+          >
             Rotar secreto
           </Button>
         </DialogFooter>

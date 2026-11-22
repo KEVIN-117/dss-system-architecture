@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   Activity,
   AppWindow,
@@ -18,7 +18,11 @@ import {
   ShieldCheck,
   Users,
 } from 'lucide-react';
-import { LandingLoginRedirect, ProtectedRoute, useAuth } from '@dss-monorepo/auth';
+import {
+  LandingLoginRedirect,
+  ProtectedRoute,
+  useAuth,
+} from '@dss-monorepo/auth';
 import {
   AccessDenied,
   DashboardTemplate,
@@ -69,6 +73,7 @@ export function AdminPortalLayout({
 }) {
   const { user, permissions, logout } = useAuth();
   const pathname = usePathname() ?? '';
+  const router = useRouter();
   const [navigationReady, setNavigationReady] = useState(false);
   useEffect(() => setNavigationReady(true), []);
   const granted = navigationReady && user ? permissions : [];
@@ -76,7 +81,10 @@ export function AdminPortalLayout({
   const canRoles = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.roles);
   const canClients = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.clients);
   const canAudit = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.audit);
-  const canClosures = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.closures);
+  const canClosures = hasRequiredPermissions(
+    granted,
+    ADMIN_PERMISSIONS.closures,
+  );
   const canEtl = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.etl);
   const canOlap = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.olap);
   const canMl = hasRequiredPermissions(granted, ADMIN_PERMISSIONS.ml);
@@ -101,41 +109,125 @@ export function AdminPortalLayout({
   ): NavigationGroup[] => (visible ? [{ title, items }] : []);
   const navGroups: NavigationGroup[] = [
     ...group(canOverview, 'Plataforma', [
-      navigationItem('Resumen general', '/', <LayoutDashboard aria-hidden="true" />),
+      navigationItem(
+        'Resumen general',
+        '/',
+        <LayoutDashboard aria-hidden="true" />,
+      ),
     ]),
-    ...group(canUsers || canRoles || canClients || canAudit, 'Servicio de autenticación', [
-      ...(canUsers ? [navigationItem('Usuarios', '/users', <Users aria-hidden="true" />)] : []),
-      ...(canRoles
-        ? [
-            navigationItem('Roles', '/roles', <ShieldCheck aria-hidden="true" />),
-            navigationItem('Permisos', '/permissions', <KeyRound aria-hidden="true" />),
-            navigationItem('Matriz de acceso', '/access-matrix', <Grid3x3 aria-hidden="true" />),
-          ]
-        : []),
-      ...(canClients ? [navigationItem('Aplicaciones', '/clients', <AppWindow aria-hidden="true" />)] : []),
-      ...(canAudit ? [navigationItem('Auditoría', '/audit', <ScrollText aria-hidden="true" />)] : []),
-    ]),
+    ...group(
+      canUsers || canRoles || canClients || canAudit,
+      'Servicio de autenticación',
+      [
+        ...(canUsers
+          ? [navigationItem('Usuarios', '/users', <Users aria-hidden="true" />)]
+          : []),
+        ...(canRoles
+          ? [
+              navigationItem(
+                'Roles',
+                '/roles',
+                <ShieldCheck aria-hidden="true" />,
+              ),
+              navigationItem(
+                'Permisos',
+                '/permissions',
+                <KeyRound aria-hidden="true" />,
+              ),
+              navigationItem(
+                'Matriz de acceso',
+                '/access-matrix',
+                <Grid3x3 aria-hidden="true" />,
+              ),
+            ]
+          : []),
+        ...(canClients
+          ? [
+              navigationItem(
+                'Aplicaciones',
+                '/clients',
+                <AppWindow aria-hidden="true" />,
+              ),
+            ]
+          : []),
+        ...(canAudit
+          ? [
+              navigationItem(
+                'Auditoría',
+                '/audit',
+                <ScrollText aria-hidden="true" />,
+              ),
+            ]
+          : []),
+      ],
+    ),
     ...group(canOlap, 'Servicio OLAP', [
-      navigationItem('Conexiones', '/datasources', <Cable aria-hidden="true" />),
-      navigationItem('Esquemas y cubos', '/schemas', <Database aria-hidden="true" />),
+      navigationItem(
+        'Conexiones',
+        '/datasources',
+        <Cable aria-hidden="true" />,
+      ),
+      navigationItem(
+        'Esquemas y cubos',
+        '/schemas',
+        <Database aria-hidden="true" />,
+      ),
     ]),
-    ...group(canClosures || canEtl, 'Servicio de control del almacén de datos', [
-      ...(canClosures
-        ? [navigationItem('Cierres académicos', '/academic-closures', <CalendarClock aria-hidden="true" />)]
-        : []),
-      ...(canEtl ? [navigationItem('Ejecuciones ETL', '/etl-executions', <Activity aria-hidden="true" />)] : []),
-    ]),
+    ...group(
+      canClosures || canEtl,
+      'Servicio de control del almacén de datos',
+      [
+        ...(canClosures
+          ? [
+              navigationItem(
+                'Cierres académicos',
+                '/academic-closures',
+                <CalendarClock aria-hidden="true" />,
+              ),
+            ]
+          : []),
+        ...(canEtl
+          ? [
+              navigationItem(
+                'Ejecuciones ETL',
+                '/etl-executions',
+                <Activity aria-hidden="true" />,
+              ),
+            ]
+          : []),
+      ],
+    ),
     ...group(canMl, 'Servicio de aprendizaje automático', [
-      navigationItem('Operaciones ML', '/ml-operations', <BrainCircuit aria-hidden="true" />),
-      navigationItem('Validación de modelos', '/ml-models', <BarChart3 aria-hidden="true" />),
-      navigationItem('Modelos activos', '/ml-registry', <ServerCog aria-hidden="true" />),
+      navigationItem(
+        'Operaciones ML',
+        '/ml-operations',
+        <BrainCircuit aria-hidden="true" />,
+      ),
+      navigationItem(
+        'Validación de modelos',
+        '/ml-models',
+        <BarChart3 aria-hidden="true" />,
+      ),
+      navigationItem(
+        'Modelos activos',
+        '/ml-registry',
+        <ServerCog aria-hidden="true" />,
+      ),
     ]),
   ];
   return (
     <ProtectedRoute
-      loadingFallback={<Loader text="Verificando sesión…" fullScreen={false} className="min-h-[60vh]" />}
+      loadingFallback={
+        <Loader
+          text="Verificando sesión…"
+          fullScreen={false}
+          className="min-h-screen"
+        />
+      }
       unauthenticatedFallback={
-        <LandingLoginRedirect landingUrl={process.env.NEXT_PUBLIC_LANDING_URL} />
+        <LandingLoginRedirect
+          landingUrl={process.env.NEXT_PUBLIC_LANDING_URL}
+        />
       }
     >
       <Can
@@ -160,6 +252,7 @@ export function AdminPortalLayout({
               : undefined
           }
           onDisconnect={logout}
+          onNavigate={(href) => navigatePortal(href, router.push)}
         >
           {children}
         </DashboardTemplate>
@@ -168,3 +261,17 @@ export function AdminPortalLayout({
   );
 }
 
+/**
+ * Sidebar links navigate client-side so the session held by AuthProvider survives the route change.
+ * A plain anchor reloads the document, re-fetches the BFF session and blanks the portal behind the loader.
+ */
+function navigatePortal(href: string, push: (path: string) => void): void {
+  if (
+    typeof window !== 'undefined' &&
+    new URL(href, window.location.href).origin !== window.location.origin
+  ) {
+    window.location.assign(href);
+    return;
+  }
+  push(href);
+}

@@ -1,10 +1,10 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
-const { useAuth } = vi.hoisted(() => ({ useAuth: vi.fn() }));
+const { useAuth, push } = vi.hoisted(() => ({ useAuth: vi.fn(), push: vi.fn() }));
 
-vi.mock('next/navigation', () => ({ usePathname: () => '/' }));
+vi.mock('next/navigation', () => ({ usePathname: () => '/', useRouter: () => ({ push }) }));
 vi.mock('@dss-monorepo/auth', () => ({
   useAuth,
   ProtectedRoute: ({ children }: { children: ReactNode }) => <>{children}</>,
@@ -15,13 +15,23 @@ vi.mock('@dss-monorepo/design-system', () => ({
   Loader: () => null,
   DashboardTemplate: ({
     navGroups,
+    onNavigate,
     children,
   }: {
-    navGroups: { title: string; items: { title: string }[] }[];
+    navGroups: { title: string; items: { title: string; href: string }[] }[];
+    onNavigate?: (href: string) => void;
     children: ReactNode;
   }) => (
     <div>
-      <nav>{navGroups.flatMap((group) => group.items.map((item) => <span key={item.title}>{item.title}</span>))}</nav>
+      <nav>
+        {navGroups.flatMap((group) =>
+          group.items.map((item) => (
+            <button key={item.title} type="button" onClick={() => onNavigate?.(item.href)}>
+              {item.title}
+            </button>
+          )),
+        )}
+      </nav>
       {children}
     </div>
   ),
@@ -117,5 +127,14 @@ describe('AdminPortalLayout', () => {
     render(<AdminPortalLayout access={ADMIN_PERMISSIONS.closures}><p>cierres</p></AdminPortalLayout>);
     expect(screen.getByText('Acceso restringido')).toBeTruthy();
     expect(screen.queryByText('cierres')).toBeNull();
+  });
+
+  it('navigates the sidebar client-side so the session is not re-verified', () => {
+    useAuth.mockReturnValue(session([], ['iam:users:read', 'iam:roles:read']));
+    render(<AdminPortalLayout><p>contenido</p></AdminPortalLayout>);
+
+    fireEvent.click(screen.getByText('Roles'));
+
+    expect(push).toHaveBeenCalledWith('/roles');
   });
 });

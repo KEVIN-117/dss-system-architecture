@@ -30,7 +30,9 @@ export function ProtectedRoute({
   unauthorizedFallback,
 }: ProtectedRouteProps) {
   const { isAuthenticated, isLoading, user } = useAuth();
-  const unauthenticated = unauthenticatedFallback ?? unauthorizedFallback ?? <DefaultUnauthenticated />;
+  const unauthenticated = unauthenticatedFallback ?? unauthorizedFallback ?? (
+    <DefaultUnauthenticated />
+  );
 
   if (isLoading) return loadingFallback;
   if (!isAuthenticated || !user) return unauthenticated;
