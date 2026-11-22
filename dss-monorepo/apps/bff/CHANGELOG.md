@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.10.0...bff-v1.11.0) (2026-11-22)
+
+
+### Features
+
+* **BFF y dw-control-connector:** rutas /api/admin/dw/etl/** ([#368](https://github.com/KEVIN-117/dss-system-architecture/issues/368)) ([fb6d5eb](https://github.com/KEVIN-117/dss-system-architecture/commit/fb6d5eb6cd624fedefc19d408ecace7c1c8c1367))
+
 ## [1.10.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.9.1...bff-v1.10.0) (2026-11-22)
 
 
