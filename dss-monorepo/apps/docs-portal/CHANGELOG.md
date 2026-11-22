@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.4.0...docs-portal-v1.5.0) (2026-11-22)
+
+
+### Features
+
+* **iam:** Documentación y limpieza del modelo IAM ([#335](https://github.com/KEVIN-117/dss-system-architecture/issues/335)) ([3b559ef](https://github.com/KEVIN-117/dss-system-architecture/commit/3b559ef12c283d7d67c88de4b845817278f0528e))
+
 ## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.3.0...docs-portal-v1.4.0) (2026-11-21)
 
 
