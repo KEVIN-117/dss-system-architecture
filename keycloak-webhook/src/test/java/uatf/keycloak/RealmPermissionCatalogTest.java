@@ -38,7 +38,9 @@ class RealmPermissionCatalogTest {
     private static final List<String> SUPERADMIN = List.of(
             "connectors:read", "connectors:write", "pipelines:read", "pipelines:execute", "prediction:train",
             "iam:users:read", "iam:users:write", "iam:roles:read", "iam:roles:write",
-            "iam:clients:read", "iam:clients:write", "iam:audit:read");
+            "iam:clients:read", "iam:clients:write", "iam:audit:read",
+            // LM-005: Load Manager (monitor, execute, schedule).
+            "dw:etl-monitor:read", "dw:etl:execute", "dw:etl-schedule:manage");
 
     private static final Map<String, List<String>> EXPECTED_PERMISSIONS = Map.of(
             "DIRECTOR", DIRECTOR, "DECANO", DECANO, "RECTOR", RECTOR, "SUPERADMIN", SUPERADMIN);

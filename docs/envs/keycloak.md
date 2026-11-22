@@ -45,9 +45,10 @@ Desde IAM-002 (decisiones D1 y D4 de `docs/auth/rbac-iam-admin-proposal.md`), el
 | DIRECTOR | `analytics:read`, `analytics:career` |
 | DECANO | DIRECTOR + `analytics:faculty`, `pipelines:read` |
 | RECTOR | DECANO + `analytics:global`, `connectors:read` |
-| SUPERADMIN | `connectors:read`, `connectors:write`, `pipelines:read`, `pipelines:execute`, `prediction:train`, `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read` |
+| SUPERADMIN | `connectors:read`, `connectors:write`, `pipelines:read`, `pipelines:execute`, `prediction:train`, `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` (Load Manager, LM-005) |
 
-- **Permisos que se asignan por usuario:** `olap:admin`, `olap:user`, `dw:closure:read`, `dw:closure:manage`, `dw:etl-monitor:read` y `prediction:publish` (IAM-013: iniciar el scoring poblacional). Ningún rol los incluye.
+- **Permisos que se asignan por usuario:** `olap:admin`, `olap:user`, `dw:closure:read`, `dw:closure:manage` y `prediction:publish` (IAM-013: iniciar el scoring poblacional). Ningún rol los incluye.
+- **Load Manager (LM-005):** `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` vienen en SUPERADMIN. A otros usuarios se asignan por separado: lectura y monitoreo, lanzar y detener cargas, y administrar programaciones. `iam-002-permission-catalog.sh` aplica estos cambios a un realm ya importado; se vuelve a ejecutar sin efectos duplicados.
 - **Permiso de servicio:** `context:read`, que tiene `service-account-olap-service`.
 
 **Roles antiguos retirados (IAM-019):** los roles de cliente `uatf-auth-service:{SUPERADMIN,RECTOR,DECANO,DIRECTOR,CONTEXT_READER}`, `olap-service:{OLAP_ADMIN,OLAP_USER}` y `dw-control-service:{DW_CLOSURE_READ,DW_CLOSURE_MANAGE,DW_ETL_MONITOR_READ}` ya no existen. Todos los servicios leen solo `dss-permissions` y los roles del realm. Los clientes siguen existiendo. Como esos roles añadían el `aud` de su cliente («audience resolve»), las audiencias ahora son explícitas: `dss-bff` incluye `uatf-auth-service`, `olap-service` y `dw-control-service`, y `olap-service` incluye `uatf-auth-service`.

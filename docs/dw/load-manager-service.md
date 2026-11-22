@@ -1,6 +1,6 @@
 # Load Manager en dw-control-service
 
-Estado: LM-003 (#351) implementó la ejecución y el monitoreo, y LM-004 (#352) las programaciones. La API REST (LM-005) se apoya en estos servicios. Referencias: [contrato de Hop Server](hop-server-contract.md) y [esquema `etl_control`](load-manager-schema.md).
+Estado: LM-003 (#351) implementó la ejecución y el monitoreo, y LM-004 (#352) las programaciones. LM-005 (#353) añadió la API REST y los permisos. Referencias: [contrato de Hop Server](hop-server-contract.md) y [esquema `etl_control`](load-manager-schema.md).
 
 ## Piezas
 
@@ -82,6 +82,35 @@ Este es el alcance del Load Manager: programar las actualizaciones del DW para q
 5. `complete_etl_schedule_fire` registra el evento `FIRED` o `SKIPPED` y fija el siguiente `next_fire_at`.
 
 El siguiente disparo se calcula desde el momento actual, así que las ocurrencias perdidas mientras el servicio estuvo caído no se recuperan. Varias réplicas pueden disparar sin duplicar ejecuciones: `FOR UPDATE SKIP LOCKED` más el lease de cada disparo lo impiden (probado en `etl_schedule_claim_concurrency_test.sh`). Si una instancia cae a mitad de un disparo, el lease vence y otra lo retoma.
+
+## API REST (LM-005)
+
+El contrato completo está en [`docs/dw/contracts/dw-control-service-v1.yaml`](contracts/dw-control-service-v1.yaml). El docs-portal guarda una copia idéntica en `apps/docs-portal/openapi`. El actor de cada operación es el `sub` del JWT.
+
+| Método y ruta | Permiso | Respuesta |
+|---|---|---|
+| `GET /api/v1/etl/health` | `dw:etl-monitor:read` | `hopOnline`, `hopStatus`, interruptores del monitor y del scheduler, horario DSA |
+| `GET /api/v1/etl/status` | `dw:etl-monitor:read` | `running` y lanzamientos activos (para el indicador del header) |
+| `GET /api/v1/etl/processes` | `dw:etl-monitor:read` | Catálogo de procesos |
+| `GET /api/v1/etl/launches` | `dw:etl-monitor:read` | Historial paginado; filtros `processCode`, `status`, `trigger`, `scheduleId` (historial de disparos de una programación) |
+| `GET /api/v1/etl/launches/{id}` · `/logs` | `dw:etl-monitor:read` | Lanzamiento; el log saneado (hasta 64 KiB) va aparte |
+| `POST /api/v1/etl/launches` | `dw:etl:execute` | 201 con `Location` (puede venir ya `SUBMIT_FAILED`); 409 si hay un lanzamiento activo; 503 si Hop no responde |
+| `POST /api/v1/etl/launches/{id}/stop` | `dw:etl:execute` | 202 (pasa a `STOPPED` cuando el monitor lo observa) |
+| `GET /api/v1/etl/schedules` · `/{id}` | `dw:etl-monitor:read` | Programaciones; `firing` indica si una instancia las está disparando en este momento |
+| `GET /api/v1/etl/schedules/preview?cronExpression=&timezone=&count=` | `dw:etl-monitor:read` | Próximas ejecuciones marcadas contra el horario DSA; `valid` y `validationMessage` indican si se aceptaría |
+| `POST /api/v1/etl/schedules` · `PUT /{id}` | `dw:etl-schedule:manage` | 201 / 200; 400 con el motivo (horario DSA, cron, zona, frecuencia) |
+| `POST /api/v1/etl/schedules/{id}/enable` · `/disable` | `dw:etl-schedule:manage` | Cuerpo `{"rowVersion": n}`; 409 si la versión está obsoleta o la programación está en pleno disparo |
+| `DELETE /api/v1/etl/schedules/{id}?rowVersion=n` | `dw:etl-schedule:manage` | 204 (borrado lógico) |
+
+**Métricas (Micrometer):**
+
+| Métrica | Tipo | Etiquetas | Qué mide |
+|---|---|---|---|
+| `etl.launch.total` | contador | `process`, `trigger`, `result` | Lanzamientos que llegaron a un estado final, incluidos los omitidos |
+| `etl.launch.duration` | timer | `process`, `result` | Tiempo de cada lanzamiento desde que se solicita hasta su estado final |
+| `etl.hop.up` | gauge | — | 1 si la última consulta a `/health` encontró a Hop disponible |
+
+Actuator solo expone `health` e `info`. Para que un recolector lea estas métricas hay que exponer `metrics` o `prometheus` en `management.endpoints.web.exposure.include`.
 
 ## Errores HTTP
 

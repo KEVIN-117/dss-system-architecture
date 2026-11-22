@@ -3,8 +3,10 @@ package chronos.dw.admin.configuration;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 
 import java.time.Instant;
 import java.util.List;
@@ -77,6 +79,58 @@ class DwControlUrlAuthorizationTest {
                 .isEqualTo(403);
         assertThat(status(get("/api/v1/unknown"), permissions("dw:closure:read")))
                 .isEqualTo(403);
+    }
+
+    /** LM-005: monitor permission reads, execute launches and stops, schedule-manage changes schedules. */
+    @Test
+    void loadManagerPermissionsOpenOnlyTheirRoutes() throws Exception {
+        for (String path : List.of(
+                "/api/v1/etl/status",
+                "/api/v1/etl/processes",
+                "/api/v1/etl/launches",
+                "/api/v1/etl/launches/" + java.util.UUID.randomUUID(),
+                "/api/v1/etl/launches/" + java.util.UUID.randomUUID() + "/logs",
+                "/api/v1/etl/schedules",
+                "/api/v1/etl/schedules/1",
+                "/api/v1/etl/schedules/preview?cronExpression=0+0+2+*+*+*")) {
+            assertThat(status(get(path), permissions("dw:etl-monitor:read")))
+                    .as(path)
+                    .matches(DwControlUrlAuthorizationTest::allowed);
+            assertThat(status(get(path), permissions("dw:etl:execute", "dw:etl-schedule:manage")))
+                    .as(path + " without monitor permission")
+                    .isEqualTo(403);
+        }
+
+        assertThat(status(post("/api/v1/etl/launches"), permissions("dw:etl:execute")))
+                .matches(DwControlUrlAuthorizationTest::allowed);
+        assertThat(status(
+                        post("/api/v1/etl/launches/" + java.util.UUID.randomUUID() + "/stop"),
+                        permissions("dw:etl:execute")))
+                .matches(DwControlUrlAuthorizationTest::allowed);
+        assertThat(status(post("/api/v1/etl/launches"), permissions("dw:etl-monitor:read", "dw:etl-schedule:manage")))
+                .isEqualTo(403);
+
+        assertThat(status(post("/api/v1/etl/schedules"), permissions("dw:etl-schedule:manage")))
+                .matches(DwControlUrlAuthorizationTest::allowed);
+        assertThat(status(put("/api/v1/etl/schedules/1"), permissions("dw:etl-schedule:manage")))
+                .matches(DwControlUrlAuthorizationTest::allowed);
+        assertThat(status(post("/api/v1/etl/schedules/1/disable"), permissions("dw:etl-schedule:manage")))
+                .matches(DwControlUrlAuthorizationTest::allowed);
+        assertThat(status(delete("/api/v1/etl/schedules/1"), permissions("dw:etl-schedule:manage")))
+                .matches(DwControlUrlAuthorizationTest::allowed);
+        assertThat(status(post("/api/v1/etl/schedules"), permissions("dw:etl-monitor:read", "dw:etl:execute")))
+                .isEqualTo(403);
+        assertThat(status(delete("/api/v1/etl/schedules/1"), permissions("dw:etl:execute")))
+                .isEqualTo(403);
+        assertThat(status(
+                        post("/api/v1/etl/launches/" + java.util.UUID.randomUUID() + "/stop"),
+                        permissions("dw:etl-schedule:manage")))
+                .isEqualTo(403);
+        assertThat(mockMvc.perform(get("/api/v1/etl/status"))
+                        .andReturn()
+                        .getResponse()
+                        .getStatus())
+                .isEqualTo(401);
     }
 
     /** IAM-019: the old DW_* roles were retired and no longer open anything. */

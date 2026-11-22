@@ -4,6 +4,7 @@ import chronos.dw.admin.domain.model.EtlSchedule;
 import chronos.dw.admin.domain.model.EtlScheduleDefinition;
 import chronos.dw.admin.domain.model.ScheduleOccurrence;
 import java.util.List;
+import java.util.Optional;
 
 public interface ManageEtlSchedulesUseCase {
 
@@ -21,4 +22,7 @@ public interface ManageEtlSchedulesUseCase {
 
     /** Next occurrences of a cron expression, flagged against the DSA operating window. Does not validate. */
     List<ScheduleOccurrence> preview(String cronExpression, String timezone, int count);
+
+    /** Why the expression would be rejected as a schedule, or empty when it is valid. */
+    Optional<String> validationError(String cronExpression, String timezone);
 }

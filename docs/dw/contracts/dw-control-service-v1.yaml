@@ -3,8 +3,9 @@ info:
   title: DW Control Service API
   version: 1.0.0-draft
   description: >-
-    Contrato documental para la administración de cierres académicos y la
-    consulta de ejecuciones ETL. No inicia ni reintenta ejecuciones.
+    Contrato documental para la administración de cierres académicos, la
+    consulta de ejecuciones ETL y el Load Manager (LM-005): lanzar, detener y
+    programar procesos ETL en Hop Server fuera del horario operativo de la DSA.
 servers:
   - url: /api/v1
 security:
@@ -12,6 +13,8 @@ security:
 tags:
   - name: Academic closures
   - name: ETL executions
+  - name: Load Manager
+  - name: Load Manager schedules
 paths:
   /academic-closures:
     get:
@@ -232,6 +235,377 @@ paths:
         '404': { $ref: '#/components/responses/NotFound' }
         '500': { $ref: '#/components/responses/ServerError' }
         '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/health:
+    get:
+      tags: [Load Manager]
+      operationId: getLoadManagerHealth
+      summary: Disponibilidad de Hop Server y estado del monitor y del scheduler
+      x-required-permission: dw:etl-monitor:read
+      responses:
+        '200':
+          description: Estado del Load Manager. hopOnline es false cuando Hop no responde.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/LoadManagerHealth' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/status:
+    get:
+      tags: [Load Manager]
+      operationId: getEtlStatus
+      summary: Indica si hay algún ETL en curso (indicador del header del portal)
+      x-required-permission: dw:etl-monitor:read
+      responses:
+        '200':
+          description: Lanzamientos QUEUED, SUBMITTED o RUNNING.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlStatus' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/processes:
+    get:
+      tags: [Load Manager]
+      operationId: listEtlProcesses
+      summary: Catálogo de procesos que el Load Manager puede ejecutar o programar
+      x-required-permission: dw:etl-monitor:read
+      responses:
+        '200':
+          description: Procesos del catálogo.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EtlProcess' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/launches:
+    get:
+      tags: [Load Manager]
+      operationId: listEtlLaunches
+      summary: Historial de lanzamientos, del más reciente al más antiguo
+      description: El historial de disparos de una programación es scheduleId=<id>.
+      x-required-permission: dw:etl-monitor:read
+      parameters:
+        - $ref: '#/components/parameters/Page'
+        - $ref: '#/components/parameters/Size'
+        - name: processCode
+          in: query
+          schema: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,31}$' }
+        - name: status
+          in: query
+          schema: { $ref: '#/components/schemas/EtlLaunchStatus' }
+        - name: trigger
+          in: query
+          schema: { type: string, enum: [MANUAL, SCHEDULED] }
+        - name: scheduleId
+          in: query
+          schema: { type: integer, format: int64, minimum: 1 }
+      responses:
+        '200':
+          description: Página de lanzamientos.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlLaunchPage' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Load Manager]
+      operationId: launchEtlProcess
+      summary: Registra un lanzamiento y lo envía a Hop Server
+      description: >-
+        Responde 201 con el lanzamiento. Puede quedar ya en SUBMIT_FAILED si Hop
+        rechazó la solicitud. Responde 409 si el proceso ya tiene un lanzamiento
+        activo y 503 si Hop Server no está disponible (el intento queda registrado).
+      x-required-permission: dw:etl:execute
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LaunchEtlRequest' }
+      responses:
+        '201':
+          description: Lanzamiento registrado.
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlLaunch' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/HopUnavailable' }
+  /etl/launches/{launchId}:
+    get:
+      tags: [Load Manager]
+      operationId: getEtlLaunch
+      summary: Consulta un lanzamiento
+      x-required-permission: dw:etl-monitor:read
+      parameters:
+        - $ref: '#/components/parameters/LaunchId'
+      responses:
+        '200':
+          description: Lanzamiento.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlLaunch' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/launches/{launchId}/logs:
+    get:
+      tags: [Load Manager]
+      operationId: getEtlLaunchLogs
+      summary: Cola saneada del log de Hop (máximo 64 KiB)
+      x-required-permission: dw:etl-monitor:read
+      parameters:
+        - $ref: '#/components/parameters/LaunchId'
+      responses:
+        '200':
+          description: Log del lanzamiento, actualizado por el monitor.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlLaunchLog' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/launches/{launchId}/stop:
+    post:
+      tags: [Load Manager]
+      operationId: stopEtlLaunch
+      summary: Pide detener un lanzamiento activo
+      description: >-
+        Responde 202. El lanzamiento pasa a STOPPED cuando el monitor lo observa en
+        Hop. Uno que todavía estaba QUEUED se detiene de inmediato.
+      x-required-permission: dw:etl:execute
+      parameters:
+        - $ref: '#/components/parameters/LaunchId'
+      responses:
+        '202':
+          description: Detención solicitada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlLaunch' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/HopUnavailable' }
+  /etl/schedules:
+    get:
+      tags: [Load Manager schedules]
+      operationId: listEtlSchedules
+      summary: Programaciones vigentes (no eliminadas)
+      x-required-permission: dw:etl-monitor:read
+      responses:
+        '200':
+          description: Programaciones ordenadas por nombre.
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/EtlSchedule' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    post:
+      tags: [Load Manager schedules]
+      operationId: createEtlSchedule
+      summary: Crea una programación fuera del horario operativo de la DSA
+      description: >-
+        Responde 400 con el motivo si el cron no tiene 6 campos, si la zona no
+        es válida, si nunca se ejecuta, si alguna de sus próximas 20 ejecuciones
+        cae en el horario operativo de la DSA o si dos ejecuciones seguidas están
+        a menos de 1 h.
+      x-required-permission: dw:etl-schedule:manage
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/CreateEtlScheduleRequest' }
+      responses:
+        '201':
+          description: Programación creada.
+          headers:
+            Location:
+              schema: { type: string }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlSchedule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/schedules/preview:
+    get:
+      tags: [Load Manager schedules]
+      operationId: previewEtlSchedule
+      summary: Próximas ejecuciones de una expresión cron y si sería aceptada
+      x-required-permission: dw:etl-monitor:read
+      parameters:
+        - name: cronExpression
+          in: query
+          required: true
+          schema: { type: string, maxLength: 120 }
+        - name: timezone
+          in: query
+          schema: { type: string, maxLength: 64 }
+        - name: count
+          in: query
+          schema: { type: integer, minimum: 1, maximum: 50, default: 10 }
+      responses:
+        '200':
+          description: Vista previa. No guarda nada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SchedulePreview' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/schedules/{scheduleId}:
+    get:
+      tags: [Load Manager schedules]
+      operationId: getEtlSchedule
+      summary: Consulta una programación
+      x-required-permission: dw:etl-monitor:read
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      responses:
+        '200':
+          description: Programación.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlSchedule' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    put:
+      tags: [Load Manager schedules]
+      operationId: updateEtlSchedule
+      summary: Edita nombre, cron y zona; el proceso no cambia
+      x-required-permission: dw:etl-schedule:manage
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/UpdateEtlScheduleRequest' }
+      responses:
+        '200':
+          description: Programación actualizada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlSchedule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+    delete:
+      tags: [Load Manager schedules]
+      operationId: deleteEtlSchedule
+      summary: Borrado lógico; los lanzamientos conservan su programación
+      x-required-permission: dw:etl-schedule:manage
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+        - name: rowVersion
+          in: query
+          required: true
+          schema: { type: integer, minimum: 1 }
+      responses:
+        '204':
+          description: Programación eliminada.
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/schedules/{scheduleId}/enable:
+    post:
+      tags: [Load Manager schedules]
+      operationId: enableEtlSchedule
+      summary: Reactiva una programación (se vuelve a validar contra el horario DSA)
+      x-required-permission: dw:etl-schedule:manage
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScheduleVersionRequest' }
+      responses:
+        '200':
+          description: Programación activa.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlSchedule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
+  /etl/schedules/{scheduleId}/disable:
+    post:
+      tags: [Load Manager schedules]
+      operationId: disableEtlSchedule
+      summary: Pausa una programación
+      x-required-permission: dw:etl-schedule:manage
+      parameters:
+        - $ref: '#/components/parameters/ScheduleId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ScheduleVersionRequest' }
+      responses:
+        '200':
+          description: Programación pausada.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/EtlSchedule' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '404': { $ref: '#/components/responses/NotFound' }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { $ref: '#/components/responses/ServerError' }
+        '503': { $ref: '#/components/responses/ServiceUnavailable' }
 components:
   securitySchemes:
     bearerAuth:
@@ -247,6 +621,16 @@ components:
       name: size
       in: query
       schema: { type: integer, minimum: 1, maximum: 100, default: 20 }
+    LaunchId:
+      name: launchId
+      in: path
+      required: true
+      schema: { type: string, format: uuid }
+    ScheduleId:
+      name: scheduleId
+      in: path
+      required: true
+      schema: { type: integer, format: int64, minimum: 1 }
   responses:
     BadRequest:
       description: Petición inválida.
@@ -280,6 +664,11 @@ components:
           schema: { $ref: '#/components/schemas/Problem' }
     ServiceUnavailable:
       description: Dependencia de base de datos temporalmente no disponible.
+      content:
+        application/problem+json:
+          schema: { $ref: '#/components/schemas/Problem' }
+    HopUnavailable:
+      description: Hop Server o la base de datos no están disponibles (code HOP_UNAVAILABLE o DEPENDENCY_UNAVAILABLE).
       content:
         application/problem+json:
           schema: { $ref: '#/components/schemas/Problem' }
@@ -430,6 +819,151 @@ components:
             items:
               type: array
               items: { $ref: '#/components/schemas/ExecutionSummary' }
+    LoadManagerHealth:
+      type: object
+      required: [hopOnline, monitoringEnabled, schedulerEnabled, operatingWindow, checkedAt]
+      properties:
+        hopOnline: { type: boolean }
+        hopStatus: { type: [string, 'null'], description: Descripción de Hop (Online) o null si no responde. }
+        monitoringEnabled: { type: boolean }
+        schedulerEnabled: { type: boolean }
+        operatingWindow: { type: string, description: Horario operativo de la DSA en texto. }
+        checkedAt: { type: string, format: date-time }
+    EtlProcess:
+      type: object
+      required: [code, displayName, workflowFile, parameterNames, schedulable, enabled]
+      properties:
+        code: { type: string, enum: [VERTICAL_LOAD, CATALOG_SYNC, PUBLISH_STAGED] }
+        displayName: { type: string }
+        description: { type: string }
+        workflowFile: { type: string }
+        parameterNames: { type: array, items: { type: string } }
+        schedulable: { type: boolean }
+        scheduleMode: { type: [string, 'null'], enum: [AUTO_PENDING_CLOSURES, NO_PARAMETERS, null] }
+        enabled: { type: boolean }
+    EtlLaunchStatus:
+      type: string
+      enum: [QUEUED, SUBMITTED, RUNNING, SUCCEEDED, FAILED, STOPPED, SKIPPED, SUBMIT_FAILED]
+    EtlLaunch:
+      type: object
+      required: [id, processCode, trigger, parameters, status, active, requestedBy, requestedAt, rowVersion]
+      properties:
+        id: { type: string, format: uuid }
+        processCode: { type: string }
+        trigger: { type: string, enum: [MANUAL, SCHEDULED] }
+        scheduleId: { type: [integer, 'null'], format: int64 }
+        closureId: { type: [integer, 'null'], format: int64 }
+        runId: { type: [string, 'null'], format: uuid, description: 'P_RUN_ID enviado a Hop; enlaza con /etl/executions/{runId}.' }
+        parameters: { type: object, additionalProperties: { type: string } }
+        status: { $ref: '#/components/schemas/EtlLaunchStatus' }
+        active: { type: boolean }
+        hopExecutionId: { type: [string, 'null'], format: uuid }
+        requestedBy: { type: string }
+        requestedAt: { type: string, format: date-time }
+        submittedAt: { type: [string, 'null'], format: date-time }
+        startedAt: { type: [string, 'null'], format: date-time }
+        finishedAt: { type: [string, 'null'], format: date-time }
+        stopRequestedBy: { type: [string, 'null'] }
+        stopRequestedAt: { type: [string, 'null'], format: date-time }
+        resultSummary: { type: [string, 'null'], description: Resultado o motivo (incluido el de una ejecución OMITIDA). }
+        rowVersion: { type: integer }
+    EtlLaunchPage:
+      allOf:
+        - $ref: '#/components/schemas/PageMetadata'
+        - type: object
+          required: [items]
+          properties:
+            items:
+              type: array
+              items: { $ref: '#/components/schemas/EtlLaunch' }
+    EtlLaunchLog:
+      type: object
+      required: [launchId, status, active, log]
+      properties:
+        launchId: { type: string, format: uuid }
+        status: { $ref: '#/components/schemas/EtlLaunchStatus' }
+        active: { type: boolean }
+        log: { type: string, description: Cola del log de Hop sin credenciales ni caracteres de control. }
+    EtlStatus:
+      type: object
+      required: [running, active]
+      properties:
+        running: { type: boolean }
+        active:
+          type: array
+          items: { $ref: '#/components/schemas/EtlLaunch' }
+    LaunchEtlRequest:
+      type: object
+      required: [processCode]
+      description: >-
+        VERTICAL_LOAD requiere executionKind=CIERRE_ACADEMICO con closureId de un
+        cierre CERRADO, o REPROCESO con retryOfRunId. PUBLISH_STAGED requiere
+        runId. CATALOG_SYNC no requiere nada más.
+      properties:
+        processCode: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,31}$' }
+        executionKind: { type: string, enum: [CIERRE_ACADEMICO, REPROCESO] }
+        closureId: { type: integer, format: int64, minimum: 1 }
+        retryOfRunId: { type: string, format: uuid }
+        runId: { type: string, format: uuid }
+    EtlSchedule:
+      type: object
+      required: [id, processCode, name, cronExpression, timezone, mode, enabled, firing, rowVersion]
+      properties:
+        id: { type: integer, format: int64 }
+        processCode: { type: string }
+        name: { type: string }
+        cronExpression: { type: string, description: Cron de Spring de 6 campos (segundo minuto hora día mes día-semana). }
+        timezone: { type: string }
+        mode: { type: string, enum: [AUTO_PENDING_CLOSURES, NO_PARAMETERS] }
+        enabled: { type: boolean }
+        nextFireAt: { type: [string, 'null'], format: date-time }
+        lastFiredAt: { type: [string, 'null'], format: date-time }
+        lastLaunchId: { type: [string, 'null'], format: uuid }
+        firing: { type: boolean, description: Una instancia la está disparando en este momento. }
+        createdBy: { type: string }
+        createdAt: { type: string, format: date-time }
+        updatedBy: { type: string }
+        updatedAt: { type: string, format: date-time }
+        rowVersion: { type: integer }
+    CreateEtlScheduleRequest:
+      type: object
+      required: [processCode, name, cronExpression]
+      properties:
+        processCode: { type: string, enum: [VERTICAL_LOAD, CATALOG_SYNC] }
+        name: { type: string, maxLength: 120 }
+        cronExpression: { type: string, maxLength: 120, examples: ['0 0 2 * * *'] }
+        timezone: { type: string, maxLength: 64, default: America/La_Paz }
+        enabled: { type: boolean, default: true }
+    UpdateEtlScheduleRequest:
+      type: object
+      required: [name, cronExpression, rowVersion]
+      properties:
+        name: { type: string, maxLength: 120 }
+        cronExpression: { type: string, maxLength: 120 }
+        timezone: { type: string, maxLength: 64 }
+        rowVersion: { type: integer, minimum: 1 }
+    ScheduleVersionRequest:
+      type: object
+      required: [rowVersion]
+      properties:
+        rowVersion: { type: integer, minimum: 1 }
+    SchedulePreview:
+      type: object
+      required: [cronExpression, timezone, operatingWindow, valid, occurrences]
+      properties:
+        cronExpression: { type: string }
+        timezone: { type: string }
+        operatingWindow: { type: string }
+        valid: { type: boolean }
+        validationMessage: { type: [string, 'null'] }
+        occurrences:
+          type: array
+          items:
+            type: object
+            required: [at, insideOperatingWindow]
+            properties:
+              at: { type: string, format: date-time }
+              insideOperatingWindow: { type: boolean }
     Problem:
       type: object
       required: [type, title, status, code]

@@ -14,6 +14,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import org.springframework.scheduling.support.CronExpression;
 import org.springframework.stereotype.Service;
 
@@ -105,6 +106,16 @@ public class ScheduleService implements ManageEtlSchedulesUseCase {
         CronExpression cron = policy.parseCron(cronExpression);
         ZoneId zone = policy.parseZone(timezone);
         return policy.occurrences(cron, zone, clock.instant(), Math.max(1, Math.min(count, MAX_PREVIEW)));
+    }
+
+    @Override
+    public Optional<String> validationError(String cronExpression, String timezone) {
+        try {
+            validate(cronExpression, timezone);
+            return Optional.empty();
+        } catch (InvalidEtlScheduleException exception) {
+            return Optional.of(exception.getMessage());
+        }
     }
 
     private ValidSchedule validate(String cronExpression, String timezone) {
