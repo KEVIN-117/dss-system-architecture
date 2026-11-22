@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.9.1...bff-v1.10.0) (2026-11-22)
+
+
+### Features
+
+* **iam:** Documentación y limpieza del modelo IAM ([#335](https://github.com/KEVIN-117/dss-system-architecture/issues/335)) ([3b559ef](https://github.com/KEVIN-117/dss-system-architecture/commit/3b559ef12c283d7d67c88de4b845817278f0528e))
+
 ## [1.9.1](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.9.0...bff-v1.9.1) (2026-11-20)
 
 
