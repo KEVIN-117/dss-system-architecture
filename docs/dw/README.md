@@ -19,3 +19,7 @@ El [informe de cierre del Req. 6](hop-req-6-progress.md) registra la implementac
 ## Implementación conservada para el futuro
 
 [Load Manager y snapshots paginados](loadmanager-paginated-snapshots.md) documenta el servicio Go pausado, no la arquitectura activa del MVP. Matrícula y graduación también quedan fuera del MVP; la fuente oficial de graduación registrada para su análisis futuro es `actas_graduacion.graduados`.
+
+## Load Manager (operación desde el admin-portal)
+
+El [esquema del Load Manager](load-manager-schema.md) define el catálogo de procesos, los lanzamientos y las programaciones que opera dw-control-service (LM-002, épica #356). No reactiva el servicio Go pausado descrito arriba: la ejecución ocurre en Hop Server.
