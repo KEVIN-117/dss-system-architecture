@@ -23,6 +23,9 @@ export async function GET(request: Request): Promise<Response> {
         canReadClosures: permissions.includes(DW_PERMISSIONS.DW_CLOSURE_READ),
         canManageClosures: permissions.includes(DW_PERMISSIONS.DW_CLOSURE_MANAGE),
         canReadEtlExecutions: permissions.includes(DW_PERMISSIONS.DW_ETL_MONITOR_READ),
+        // Load Manager (LM-006): launch/stop and schedule administration.
+        canExecuteEtl: permissions.includes(DW_PERMISSIONS.DW_ETL_EXECUTE),
+        canManageEtlSchedules: permissions.includes(DW_PERMISSIONS.DW_ETL_SCHEDULE_MANAGE),
       },
       { headers: { 'Cache-Control': 'no-store' } },
     ),
