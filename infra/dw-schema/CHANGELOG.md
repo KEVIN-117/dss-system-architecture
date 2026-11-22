@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.7.1...dw-migrator-v1.8.0) (2026-11-22)
+
+
+### Features
+
+* **load-manager:** Esquema etl_control para catálogo, lanzamientos y programaciones ([#360](https://github.com/KEVIN-117/dss-system-architecture/issues/360)) ([4589484](https://github.com/KEVIN-117/dss-system-architecture/commit/45894843e437e177ac29553a194d1972ec03aaf1))
+
 ## [1.7.1](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.7.0...dw-migrator-v1.7.1) (2026-11-18)
 
 
