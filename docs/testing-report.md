@@ -1,18 +1,17 @@
 # Reporte de pruebas del DSS
 
-**Actualización editorial:** 23 de noviembre de 2026 · **Corridas registradas:** 11 y 23 de noviembre de 2026
-**Alcance:** resultados locales que constan en los logs enumerados en este reporte. Los logs no identifican un SHA de commit para cada ejecución; la evidencia no equivale a aceptación institucional.
+**Actualización editorial:** 23 de noviembre de 2026 · **Corridas registradas:** 11 y 23 de noviembre de 2026, más la repetición del 23/11 posterior a las correcciones
+**Alcance:** resultados locales que constan en los logs enumerados en este reporte. Las corridas iniciales no identifican un SHA de commit; la repetición posterior a las correcciones corresponde al contenido publicado en el commit `d78d42ed` (PR #379). La evidencia no equivale a aceptación institucional.
 
 ## Estado actual de la evidencia
 
-**La ejecución más reciente tampoco quedó completamente green.** El perfil de integración OLAP tuvo fallos y el flujo vertical del DW no llegó a iniciar por un conflicto de puerto. Hay pruebas unitarias y de componentes aprobadas, además de evaluaciones pendientes. Este reporte conserva esos estados; no interpreta la existencia de una suite como resultado aprobado ni una prueba técnica como aceptación institucional.
+**Tras las correcciones del 23/11, las suites automatizadas registradas quedan aprobadas.** La corrida inicial del 23/11 tenía tres resultados abiertos: el perfil de integración OLAP falló, el flujo vertical del DW no llegó a iniciar y el E2E de administración no produjo resumen. Los tres se diagnosticaron y se repitieron (sección [Repetición del 23 de noviembre tras correcciones](#repetición-del-23-de-noviembre-tras-correcciones)). Este reporte conserva ambos estados y no interpreta una prueba técnica como aceptación institucional.
 
-Los resultados que requieren atención o evidencia adicional son:
+Los resultados que siguen requiriendo atención o evidencia adicional son:
 
-- OLAP, perfil de integración del 23/11: 132 casos; 64 aprobados, 67 fallidos y 1 error.
-- DW, flujo vertical del 23/11: no llegó a ejecutar porque el puerto TCP 5433 ya estaba ocupado.
-- E2E de administración: el log disponible muestra el servidor listo, pero no contiene el resumen final de Playwright.
+- OLAP, perfil de integración: aprobado con alcance reducido. Se excluyeron 14 clases IT que dependían de los cubos de ejemplo de Saiku, que ya no forman parte del despliegue; deben portarse a los cubos académicos para recuperar esa cobertura.
 - Modelos: PRED-004 sigue siendo un experimento sintético con decisión `EVIDENCIA_INSUFICIENTE`; no se volvió a ejecutar el 23/11.
+- E2E de rectorado: los dos escenarios de publicación predictiva con capturas de fallo no se repitieron.
 - Rendimiento y usabilidad institucional: sin una nueva medición aceptada ni evaluación documentada con participantes.
 
 ## Ejecución local del 23 de noviembre de 2026
@@ -25,21 +24,26 @@ Los resultados siguientes se extrajeron de los logs creados el 23/11/2026. Las r
 | DW Control Service | 87 pruebas; 0 fallos, 0 errores y 2 omitidas. `BUILD SUCCESSFUL`. | Aprobadas las ejecutadas; conservar la explicación de las 2 omitidas. |
 | Keycloak Webhook | 33 pruebas; 0 fallos, 0 errores y 0 omitidas. `BUILD SUCCESS`. | Aprobada. |
 | OLAP, suite predeterminada | 974 pruebas; 0 fallos, 0 errores y 1 omitida. `BUILD SUCCESS`. | Aprobadas las ejecutadas; una omitida. |
-| OLAP, perfil de integración | 132 pruebas; 67 aprobadas, 67 fallidas y 1 error. `BUILD FAILURE`. | Fallida. |
+| OLAP, perfil de integración | 132 pruebas; 64 aprobadas, 67 fallidas y 1 error. `BUILD FAILURE`. | Fallida en la corrida inicial; aprobada en la repetición (ver más abajo). |
 | Prediction Service, unitarias | 197 pruebas; resultado `OK`. | Aprobada. |
 | Ciclo de vida ML | 3 aserciones aprobadas: recarga del paquete tras reinicio, volumen compartido entre API y worker, y persistencia del puntero/artefacto. | Smoke test aprobado. |
 | Regresión de esquema DW (`test.dw_01.log`) | El contenedor de pruebas terminó con código 0; el log registra comprobaciones de checksum de migración, concurrencia de locks y compatibilidad. | Aprobada según salida del contenedor. El error de clave duplicada forma parte del escenario de contención y va seguido por “Lock concurrency test passed”. |
 | Contrato de consultas fuente (`test.integration.log`) | Las nueve consultas de solo lectura pasaron contra un fixture sintético de Jachasun. | Aprobada con fixture; no es acceso a una base institucional. |
-| Flujo vertical DW (`test.dw_vetical.log`) | Docker no pudo enlazar `127.0.0.1:5433` porque el puerto estaba ocupado. | No ejecutada; bloqueo de ambiente, sin resultado funcional atribuible. |
+| Flujo vertical DW (`test.dw_vetical.log`) | Docker no pudo enlazar `127.0.0.1:5433` porque el puerto estaba ocupado. | No ejecutada en la corrida inicial; aprobada en la repetición (ver más abajo). |
 | Vitest de aplicaciones | 366/366 aprobadas: BFF 201, Administración 109, Dirección 20, Decanato 6, Landing 12 y Rectorado 18. | Aprobada para las suites registradas. |
 | Vitest de bibliotecas | 65/65 aprobadas: Auth Connector 25, DW Control Connector 13, ML Connector 8, OLAP Connector 14 y OLAP Data Access 5. | Aprobada para las suites registradas. |
 | Auth Models | El comando registró “No test files found” y salió con código 1. | Sin casos de prueba encontrados; no contabilizar como suite aprobada. |
 | Playwright BFF | 9/9 aprobadas en Chromium, Firefox y WebKit. | Aprobada para este flujo. El log reporta tareas Nx recuperadas de caché para dependencias. |
-| Playwright Administración | El log registra arranque de Next.js y respuesta 200 a `/`, pero no muestra resumen ni conteo final de Playwright. | Resultado no atribuible con el log disponible. |
+| Playwright Administración | El log registra arranque de Next.js y respuesta 200 a `/`, pero no muestra resumen ni conteo final de Playwright. | No atribuible en la corrida inicial (la ejecución quedó colgada); 27/27 en la repetición (ver más abajo). |
 
 ### Casos de integración OLAP fallidos identificables
 
-El log de integración registra, entre otros, los siguientes resultados: `TotalsFormatIT` esperaba HTTP 200 y recibió HTTP 400; `UserWorkflowIT` no encontró el cubo Sales; `AdvancedAiQueryIT.multipleFiltersOnSameHierarchy_rejectedAsValidationError` encontró un error de cubo desconocido; y `OssieTileQueryIT` recibió errores de validación de datasource. El reporte Failsafe de `saiku-launcher/target/failsafe-reports` conserva el detalle de los 67 fallos y el error. No se atribuye una causa raíz hasta revisar esos reportes y reproducir los escenarios.
+El log de integración registra, entre otros, los siguientes resultados: `TotalsFormatIT` esperaba HTTP 200 y recibió HTTP 400; `UserWorkflowIT` no encontró el cubo Sales; `AdvancedAiQueryIT.multipleFiltersOnSameHierarchy_rejectedAsValidationError` encontró un error de cubo desconocido; y `OssieTileQueryIT` recibió errores de validación de datasource. El reporte Failsafe de `saiku-launcher/target/failsafe-reports` conserva el detalle de los 67 fallos y el error.
+
+La revisión posterior identificó dos causas:
+
+1. **Datos de ejemplo ausentes (66 fallos y el error).** Esas clases consultan el cubo FoodMart y los datasources Ossie de demostración del Saiku original. En este despliegue esos ejemplos solo se siembran en modo demo, y el seed `foodmart_h2.sql.zip` nunca se incorporó al repositorio, así que el servidor de pruebas arranca sin la conexión `foodmart` (de ahí los errores de cubo desconocido y las listas vacías).
+2. **Defecto real en `AdminIT.getUsers_asAdmin_ok` (1 fallo).** `GET /rest/saiku/admin/users` respondía HTTP 400 por `IllegalArgumentException: SQL must not be null`. `JdbcUserDAO` lee `database-queries.properties` desde el classpath, pero el archivo estaba en `saiku-api/src/main/webapp/WEB-INF/`, fuera del classpath, por lo que todas las consultas de usuarios quedaban sin cargar.
 
 ### Evidencia de la corrida
 
@@ -52,6 +56,36 @@ El log de integración registra, entre otros, los siguientes resultados: `Totals
 | Portales, conectores y E2E | `dss-monorepo/test.*.log` |
 
 Los logs se conservaron en el árbol de trabajo local. No se registra en ellos el SHA del commit ejecutado, por lo que los conteos se atribuyen a la corrida fechada y no a una revisión inmutable.
+
+## Repetición del 23 de noviembre tras correcciones
+
+Los tres resultados abiertos de la corrida inicial se diagnosticaron y se repitieron el mismo día. Las correcciones se publicaron en el commit `d78d42ed` (PR #379), que corresponde al árbol de trabajo sobre el que se repitieron las suites.
+
+| Componente o flujo | Corrida inicial | Causa identificada | Corrección | Resultado de la repetición |
+|---|---|---|---|---|
+| OLAP, perfil de integración | 64 aprobadas, 67 fallidas y 1 error (de 132). | Clases IT dependientes de los cubos de ejemplo de Saiku, ausentes en este despliegue, y `database-queries.properties` fuera del classpath (ver la sección anterior). | Se movió `database-queries.properties` a `saiku-api/src/main/resources/`. Se excluyeron del failsafe (`saiku-launcher/pom.xml`) 14 clases IT que solo prueban los cubos de ejemplo; se conservan para portarlas a los cubos académicos. | `BUILD SUCCESS`: 55/55 IT en 14 clases (incluido `AdminIT` 11/11), suites unitarias del reactor sin fallos y Spotless aprobado. |
+| Flujo vertical DW | No ejecutado: puerto 5433 ocupado. | Otro entorno de fixtures seguía publicando el puerto; no es un defecto de código. | Repetición con puertos aislados (`DW_INTEGRATION_SOURCE_PORT=55432`, `DW_INTEGRATION_TARGET_PORT=55433`, los mismos de `infra/dw-integration/run-local-vertical.sh`) y baja del proyecto al terminar. | Aprobado: extracción Hop de 9 fuentes, 5 dimensiones, 3 lotes de hechos, publicación atómica, clasificación de retención, rechazo por rango de notas y SCD2. |
+| Playwright Administración | Sin resumen: la ejecución quedaba colgada tras arrancar Next.js. | Las dependencias inferidas por `@nx/playwright` (`admin-portal:dev` + `wait-for-webserver`) nunca dejaban arrancar Playwright. Además, un selector desactualizado por el rediseño del panel de usuarios, y sobrecarga de compilación en frío con 8 workers en tres navegadores. | Se aplicó el patrón de `bff-e2e` y `rector-dashboard-e2e` (`dependsOn: ["^build"]` y `next dev` directo); se agregó `global-setup.ts`, que precompila las rutas; se limitaron a 4 los workers locales (CI conserva 1 worker y 2 reintentos), y se actualizó el selector en `user-management.spec.ts`. | 27/27 aprobadas en Chromium, Firefox y WebKit. |
+
+**Alcance de la exclusión OLAP.** Las clases excluidas son `AdvancedAiQueryIT`, `AiQueryAsyncIT`, `AiQueryExtrasIT`, `AiQueryIT`, `AppBuilderIT`, `DrillthroughIT`, `MeasureFilterIT`, `OlapDiscoverIT`, `OssieTileQueryIT`, `Query2AdvancedIT`, `Query2ResourceIT`, `QueryNameCollisionIT`, `TotalsFormatIT` y `UserWorkflowIT`. Algunas incluían también casos de validación que sí pasaban; dejan de ejecutarse con la exclusión. La API de consultas OLAP no tiene, por tanto, cobertura de integración contra los cubos académicos hasta portar esas pruebas.
+
+| Grupo | Ruta local del log de la repetición |
+|---|---|
+| OLAP, perfil de integración | `olap-service/test.integration.rerun.log` |
+| Flujo vertical DW | `test.dw_vertical.rerun.log` |
+| Playwright Administración | `dss-monorepo/test.e2e_admin.rerun.log` |
+
+Comandos de la repetición:
+
+```powershell
+# OLAP: perfil de integración, desde olap-service
+mvn -B -ntp -DskipITs=false -DskipTests=false verify
+# Flujo vertical DW con puertos aislados, desde la raíz del repositorio (bash)
+DW_INTEGRATION_SOURCE_PORT=55432 DW_INTEGRATION_TARGET_PORT=55433 docker compose -p dss-dw-vertical -f infra/dw-integration/dw-integration-test.yml --profile dw-vertical run --rm hop-vertical-assert
+docker compose -p dss-dw-vertical -f infra/dw-integration/dw-integration-test.yml --profile dw-vertical down --volumes --remove-orphans
+# Playwright Administración, desde dss-monorepo
+bunx nx run @dss-monorepo/admin-portal-e2e:e2e
+```
 
 ## Ejecución local del 11 de noviembre de 2026
 
@@ -203,7 +237,7 @@ Antes de incorporar estas imágenes al informe final como evidencia explicativa,
 | Unitaria / componente | Suites identificadas en Java, Python, TypeScript y SQL; la corrida histórica del 11/11 no consolidó todos los resultados. | Reportar los conteos disponibles por componente y conservar el corte histórico separado del 23/11. |
 | Integración DW | Req. 6: 9 manifiestos, 5 dimensiones, 3 hechos y 8 lotes; cierre `EXITOSA` descrito en el registro. | Ejecutada con fixtures sintéticos; no equivale a prueba productiva. |
 | Calidad e integridad DW | Aserciones de rechazo de nota 101, transiciones SCD2, clasificación de retención, sellado/gates y publicación atómica. | Atribuibles al flujo de integración documentado y a pruebas transaccionales; conservar su alcance sintético. |
-| Funcional / permisos | Specs para GraphQL, login, callback, contexto, conectores y portales; seis capturas de fallos E2E de rectorado. | No afirmar aceptación funcional integral; investigar y documentar esos fallos antes de cerrar el resultado E2E. |
+| Funcional / permisos | Specs para GraphQL, login, callback, contexto, conectores y portales. El 23/11: Playwright BFF 9/9 y Administración 27/27 en tres navegadores; integración OLAP 55/55 con alcance reducido. Se mantienen seis capturas de fallos E2E de rectorado. | No afirmar aceptación funcional integral; investigar y documentar los fallos de rectorado y portar las IT OLAP excluidas antes de cerrar el resultado. |
 | Pipeline ML | PRED-004, dos algoritmos, 30/10, tres folds, decisión `EVIDENCIA_INSUFICIENTE`. | Experimento sintético ejecutado; no seleccionar modelo ni autorizar despliegue. |
 | Rendimiento | PRED-008 incompleto, umbrales ausentes, respuestas 502 en inferencia. | Caracterización exploratoria; repetir con servicio sano, carga acordada y criterios previos. |
 | Usabilidad | Sin evidencia de sesiones con participantes institucionales. | Pendiente; no contabilizar como prueba ejecutada. |
@@ -215,9 +249,10 @@ Las seis capturas de Playwright son candidatas a anexarse como evidencia de fall
 ## Próximas evidencias que completarían el capítulo
 
 1. Ejecutar las suites con una versión y commit identificados y conservar salida JUnit/JSON fechada por componente.
-2. Revisar los seis fallos E2E; guardar el resultado posterior con navegador, versión y causa/corrección asociada.
-3. Repetir PRED-008 después de corregir/verificar disponibilidad de inferencia y fijar concurrencia, duración, volumen, recursos y umbrales antes de medir.
-4. Planificar una prueba de aceptación con usuarios institucionales, tareas por perfil, consentimiento/autorización y métricas acordadas.
+2. Revisar los seis fallos E2E de rectorado; guardar el resultado posterior con navegador, versión y causa/corrección asociada.
+3. Portar a los cubos académicos las 14 clases IT de OLAP excluidas, para recuperar la cobertura de integración de la API de consultas.
+4. Repetir PRED-008 después de corregir/verificar disponibilidad de inferencia y fijar concurrencia, duración, volumen, recursos y umbrales antes de medir.
+5. Planificar una prueba de aceptación con usuarios institucionales, tareas por perfil, consentimiento/autorización y métricas acordadas.
 
 **Fuente de elaboración del corte histórico del 11/11:** inventario local del repositorio; `docs/dw/hop-req-6-progress.md`; `docs/prediction/evidence/PRED-004-synthetic-comparison.json`; artefactos locales PRED-008 y capturas Playwright de rectorado. Esa revisión no ejecutó ni modificó las suites.
 
