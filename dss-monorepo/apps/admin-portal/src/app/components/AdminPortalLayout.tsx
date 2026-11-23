@@ -9,7 +9,9 @@ import {
   BrainCircuit,
   Cable,
   CalendarClock,
+  CalendarRange,
   Database,
+  Gauge,
   Grid3x3,
   KeyRound,
   LayoutDashboard,
@@ -35,6 +37,8 @@ import {
   hasRequiredPermissions,
   type DSSPermission,
 } from '@dss-monorepo/rbac';
+
+import { EtlRunningIndicator } from './etl/EtlRunningIndicator';
 
 /**
  * Permissions that open each administration area (IAM-014). They come from the token, so who sees what
@@ -173,30 +177,34 @@ export function AdminPortalLayout({
         <Database aria-hidden="true" />,
       ),
     ]),
-    ...group(
-      canClosures || canEtl,
-      'Servicio de control del almacén de datos',
-      [
-        ...(canClosures
-          ? [
-              navigationItem(
-                'Cierres académicos',
-                '/academic-closures',
-                <CalendarClock aria-hidden="true" />,
-              ),
-            ]
-          : []),
-        ...(canEtl
-          ? [
-              navigationItem(
-                'Ejecuciones ETL',
-                '/etl-executions',
-                <Activity aria-hidden="true" />,
-              ),
-            ]
-          : []),
-      ],
-    ),
+    // dw-control-service: academic closures plus the Load Manager (LM-007), which operates and schedules the ETL from
+    // the portal; Hop Web is only for editing workflows.
+    ...group(canClosures || canEtl, 'Servicio de control del almacén de datos', [
+      ...(canClosures
+        ? [
+            navigationItem(
+              'Cierres académicos',
+              '/academic-closures',
+              <CalendarClock aria-hidden="true" />,
+            ),
+          ]
+        : []),
+      ...(canEtl
+        ? [
+            navigationItem('Panel ETL', '/etl', <Gauge aria-hidden="true" />),
+            navigationItem(
+              'Ejecuciones ETL',
+              '/etl-executions',
+              <Activity aria-hidden="true" />,
+            ),
+            navigationItem(
+              'Programaciones ETL',
+              '/etl-schedules',
+              <CalendarRange aria-hidden="true" />,
+            ),
+          ]
+        : []),
+    ]),
     ...group(canMl, 'Servicio de aprendizaje automático', [
       navigationItem(
         'Operaciones ML',
@@ -253,6 +261,7 @@ export function AdminPortalLayout({
           }
           onDisconnect={logout}
           onNavigate={(href) => navigatePortal(href, router.push)}
+          headerContext={<EtlRunningIndicator enabled={canEtl} />}
         >
           {children}
         </DashboardTemplate>

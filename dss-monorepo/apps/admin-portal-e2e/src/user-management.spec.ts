@@ -140,8 +140,8 @@ test('an administrator creates a user and assigns a role', async ({ page, baseUR
     sendInvitation: true,
   });
 
-  // The management panel opens on the new user's roles.
-  const panel = page.getByRole('dialog', { name: 'Gestionar usuario' });
+  // The management panel opens on the new user's roles; it is titled with the person's name.
+  const panel = page.getByRole('dialog', { name: 'Nuevo Docente' });
   await expect(panel.getByText('nuevo.docente@uatf.edu.bo', { exact: false })).toBeVisible();
   const director = panel.getByRole('checkbox', { name: 'DIRECTOR' });
   await expect(director).not.toBeChecked();

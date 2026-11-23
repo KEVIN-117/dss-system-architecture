@@ -6,6 +6,13 @@
     "implicitDependencies": [
       "@dss-monorepo/admin-portal"
     ],
+    "targets": {
+      "e2e": {
+        "dependsOn": [
+          "^build"
+        ]
+      }
+    },
     "tags": [
       "type:e2e",
       "scope:admin"

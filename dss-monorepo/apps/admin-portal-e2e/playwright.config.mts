@@ -1,6 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 import { nxE2EPreset } from '@nx/playwright/preset';
 import { workspaceRoot } from '@nx/devkit';
+import { resolve } from 'node:path';
 import { loadE2EEnv, resolveBaseURL } from '../../tools/load-e2e-env.mjs';
 
 // For CI, you may want to set BASE_URL to the deployed application.
@@ -32,6 +33,12 @@ const baseURL = resolveBaseURL(env['ADMIN_PORTAL_BASE_URL'], port);
 export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src' }),
   timeout: 60_000,
+  // Pre-compiles the portal routes under `next dev` before the parallel workers start.
+  globalSetup: './src/global-setup.ts',
+  // Locally the preset runs fully parallel with no retries; 8 workers across three browsers
+  // against a single `next dev` starved hydration and the landing redirect timed out. CI keeps
+  // the preset (1 worker, 2 retries).
+  ...(process.env.CI ? {} : { workers: 4 }),
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     baseURL,
@@ -39,11 +46,17 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   /* Run your local dev server before starting the tests */
+  // Start `next dev` directly (as rector-dashboard-e2e does) instead of a nested
+  // `nx run …:dev`: the inferred Nx dev + wait-for-webserver dependencies hung
+  // without ever starting Playwright. The e2e target now only depends on
+  // `^build` (package.json), so the libraries are built before this runs.
   webServer: {
-    command: 'bun nx run @dss-monorepo/admin-portal:dev',
+    command: `bun run next dev --webpack --port ${port}`,
     url: baseURL,
+    timeout: 180_000,
+    stdout: 'pipe',
     reuseExistingServer: !process.env.CI,
-    cwd: workspaceRoot,
+    cwd: resolve(workspaceRoot, 'apps/admin-portal'),
   },
   projects: [
     {

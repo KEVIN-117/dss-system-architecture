@@ -1,17 +1,34 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Loader,
-} from '@dss-monorepo/design-system';
+  AlertTriangle,
+  CheckCircle2,
+  DoorOpen,
+  LogOut,
+  Percent,
+  RotateCcw,
+  ShieldCheck,
+  Star,
+  Users,
+} from 'lucide-react';
+import { Button, Card, Skeleton } from '@dss-monorepo/design-system';
+import {
+  ChartFrame,
+  EmptyState,
+  FilterBar,
+  KpiCard,
+  NativeSelect,
+  PageContainer,
+  PageHeader,
+  RefreshIndicator,
+  StatusBanner,
+  type DeltaBadgeProps,
+} from '@dss-monorepo/design-system/page';
+import { useReveal } from '@dss-monorepo/design-system/motion';
 import { TrendLineChart } from '@dss-monorepo/charts';
 import { AcademicSparkline } from '../academic-sparkline';
+import { useAcademicScope, useScopeYear } from './academic-scope';
 import {
   CAREER_AXIS,
   FACULTY_AXIS,
@@ -46,7 +63,11 @@ import {
 type CubeRows = Partial<Record<SummaryCube, DataRow[]>>;
 
 /** Subjects of a career; only the coursework cube publishes the Materia dimension. */
-const SUBJECT_AXIS: Axis = { dimension: 'Materia', hierarchy: 'Nivel y materia', level: 'Materia' };
+const SUBJECT_AXIS: Axis = {
+  dimension: 'Materia',
+  hierarchy: 'Nivel y materia',
+  level: 'Materia',
+};
 
 interface SummaryConfig {
   scope: 'faculty' | 'career';
@@ -70,7 +91,14 @@ interface SummaryConfig {
   };
 }
 
-const KPIS: SummaryKey[] = ['applications', 'admissionRate', 'passRate', 'averageGrade', 'dropoutRate', 'retentionRate'];
+const KPIS: SummaryKey[] = [
+  'applications',
+  'admissionRate',
+  'passRate',
+  'averageGrade',
+  'dropoutRate',
+  'retentionRate',
+];
 const TRENDS: SummaryKey[] = ['applications', 'passRate', 'dropoutRate'];
 
 const FACULTY_CONFIG: SummaryConfig = {
@@ -85,9 +113,16 @@ const FACULTY_CONFIG: SummaryConfig = {
     cubes: SUMMARY_CUBES,
     header: 'Carrera',
     title: (year) => `Carreras de la facultad, gestión ${year}`,
-    caption: 'Se marcan las carreras con aprobación o deserción a más de 5 puntos del promedio de la facultad.',
+    caption:
+      'Se marcan las carreras con aprobación o deserción a más de 5 puntos del promedio de la facultad.',
     referenceLabel: 'Promedio de la facultad',
-    columns: ['applications', 'admissionRate', 'passRate', 'averageGrade', 'dropoutRate'],
+    columns: [
+      'applications',
+      'admissionRate',
+      'passRate',
+      'averageGrade',
+      'dropoutRate',
+    ],
     sorts: [
       { key: 'applications', label: 'Más postulaciones', direction: -1 },
       { key: 'passRate', label: 'Menor aprobación', direction: 1 },
@@ -110,9 +145,16 @@ const CAREER_CONFIG: SummaryConfig = {
     cubes: ['Rendimiento académico'],
     header: 'Materia',
     title: (year) => `Materias de la carrera, gestión ${year}`,
-    caption: 'Se marcan las materias con reprobación o repitencia a más de 5 puntos del promedio de la carrera.',
+    caption:
+      'Se marcan las materias con reprobación o repitencia a más de 5 puntos del promedio de la carrera.',
     referenceLabel: 'Promedio de la carrera',
-    columns: ['attempts', 'passRate', 'failRate', 'repetitionRate', 'averageGrade'],
+    columns: [
+      'attempts',
+      'passRate',
+      'failRate',
+      'repetitionRate',
+      'averageGrade',
+    ],
     sorts: [
       { key: 'failRate', label: 'Mayor reprobación', direction: -1 },
       { key: 'repetitionRate', label: 'Mayor repitencia', direction: -1 },
@@ -123,24 +165,61 @@ const CAREER_CONFIG: SummaryConfig = {
   },
 };
 
-const measureOf = (key: SummaryKey) => SUMMARY_MEASURES.find((item) => item.key === key)!;
-const show = (key: SummaryKey, value: number | null | undefined) => formatValue(value ?? null, measureOf(key).format);
+const measureOf = (key: SummaryKey) =>
+  SUMMARY_MEASURES.find((item) => item.key === key)!;
+const show = (key: SummaryKey, value: number | null | undefined) =>
+  formatValue(value ?? null, measureOf(key).format);
 
-function formatDelta(key: SummaryKey, delta: number | null): string | null {
-  if (delta === null) return null;
-  const sign = delta > 0 ? '+' : delta < 0 ? '−' : '';
-  const abs = Math.abs(delta);
-  return measureOf(key).format === 'percent'
-    ? `${sign}${new Intl.NumberFormat('es-BO', { maximumFractionDigits: 1, minimumFractionDigits: 1 }).format(abs * 100)} pp`
-    : `${sign}${new Intl.NumberFormat('es-BO', { style: 'percent', maximumFractionDigits: 1 }).format(abs)}`;
+/** Indicators where a lower value is good news. */
+const LOWER_IS_BETTER = new Set<SummaryKey>([
+  'dropoutRate',
+  'failRate',
+  'repetitionRate',
+]);
+
+const KPI_ICONS: Partial<Record<SummaryKey, ReactNode>> = {
+  applications: <DoorOpen />,
+  admissionRate: <Percent />,
+  passRate: <CheckCircle2 />,
+  averageGrade: <Star />,
+  dropoutRate: <LogOut />,
+  retentionRate: <Users />,
+};
+
+/**
+ * Change against the previous gestión for DeltaBadge: percentage points for
+ * rates, relative change (%) for counts and averages.
+ */
+function deltaBadge(
+  key: SummaryKey,
+  delta: number | null,
+  previousLabel: string | null,
+): DeltaBadgeProps {
+  return {
+    value: delta == null ? null : delta * 100,
+    unit: measureOf(key).format === 'percent' ? 'pp' : '%',
+    goodWhen: LOWER_IS_BETTER.has(key) ? 'down' : 'up',
+    comparisonLabel: previousLabel
+      ? `respecto a ${previousLabel}`
+      : 'frente a la gestión anterior',
+  };
 }
 
-const measureNames = (cube: SummaryCube) => measuresOf(cube).map((item) => item.measure);
+const measureNames = (cube: SummaryCube) =>
+  measuresOf(cube).map((item) => item.measure);
 /** The cube's base count (first measure), non-empty wherever a row has data; used to rank rows. */
 const baseMeasure = (cube: SummaryCube) => measuresOf(cube)[0].measure;
 
-const settledRows = (cubes: SummaryCube[], results: PromiseSettledResult<DataRow[]>[]): CubeRows =>
-  Object.fromEntries(cubes.map((cube, i) => [cube, results[i].status === 'fulfilled' ? results[i].value : []]));
+const settledRows = (
+  cubes: SummaryCube[],
+  results: PromiseSettledResult<DataRow[]>[],
+): CubeRows =>
+  Object.fromEntries(
+    cubes.map((cube, i) => [
+      cube,
+      results[i].status === 'fulfilled' ? results[i].value : [],
+    ]),
+  );
 
 /** Dean's home: the selected faculty and its careers. */
 export function FacultySummaryDashboard() {
@@ -159,12 +238,11 @@ export function CareerSummaryDashboard() {
  */
 function ScopeSummaryDashboard({ config }: { config: SummaryConfig }) {
   const { detail } = config;
-  const [years, setYears] = useState<Member[]>([]);
-  const [cubeYears, setCubeYears] = useState<Partial<Record<SummaryCube, Member[]>>>({});
-  const [year, setYear] = useState('');
-  const [yearPicked, setYearPicked] = useState(false);
-  const [unit, setUnit] = useState('');
-  const [units, setUnits] = useState<string[]>([]);
+  const [cubeYears, setCubeYears] = useState<
+    Partial<Record<SummaryCube, Member[]>>
+  >({});
+  // Shared with the header badge when the portal provides an academic scope.
+  const { unit, units, setUnit, setUnits, shared } = useAcademicScope();
   const [trendRows, setTrendRows] = useState<CubeRows | null>(null);
   const [detailRows, setDetailRows] = useState<CubeRows | null>(null);
   const [failed, setFailed] = useState<SummaryCube[]>([]);
@@ -182,40 +260,68 @@ function ScopeSummaryDashboard({ config }: { config: SummaryConfig }) {
     setError('');
     (async () => {
       await assertViewerScope(config.scope);
-      const yearResults = await Promise.allSettled(SUMMARY_CUBES.map((cube) => yearMembers(cube)));
+      const yearResults = await Promise.allSettled(
+        SUMMARY_CUBES.map((cube) => yearMembers(cube)),
+      );
       // Gestiones of every cube: admissions and coursework do not cover the same years.
       const members = [
         ...new Map(
-          yearResults.flatMap((result) => (result.status === 'fulfilled' ? result.value : [])).map((m) => [m.caption, m]),
+          yearResults
+            .flatMap((result) =>
+              result.status === 'fulfilled' ? result.value : [],
+            )
+            .map((m) => [m.caption, m]),
         ).values(),
-      ].sort((a, b) => a.caption.localeCompare(b.caption, 'es', { numeric: true }));
-      if (!members.length) throw new Error('No hay gestiones académicas publicadas.');
+      ].sort((a, b) =>
+        a.caption.localeCompare(b.caption, 'es', { numeric: true }),
+      );
+      if (!members.length)
+        throw new Error('No hay gestiones académicas publicadas.');
       const results = await Promise.allSettled(
         SUMMARY_CUBES.map((cube) =>
-          queryCube(cube, measureNames(cube), [config.unitAxis, YEAR_AXIS[cube]], undefined, baseMeasure(cube)),
+          queryCube(
+            cube,
+            measureNames(cube),
+            [config.unitAxis, YEAR_AXIS[cube]],
+            undefined,
+            baseMeasure(cube),
+          ),
         ),
       );
       if (!active) return;
-      if (results.every((result) => result.status === 'rejected')) throw (results[0] as PromiseRejectedResult).reason;
+      if (results.every((result) => result.status === 'rejected'))
+        throw (results[0] as PromiseRejectedResult).reason;
       const rows = settledRows(SUMMARY_CUBES, results);
       // A unit may lack data in one cube (e.g. no admissions), so list the union.
-      const found = [...new Set(SUMMARY_CUBES.flatMap((cube) => facultiesIn(rows[cube] ?? [], config.unitAxis.level)))].sort(
-        (a, b) => a.localeCompare(b, 'es'),
+      const found = [
+        ...new Set(
+          SUMMARY_CUBES.flatMap((cube) =>
+            facultiesIn(rows[cube] ?? [], config.unitAxis.level),
+          ),
+        ),
+      ].sort((a, b) => a.localeCompare(b, 'es'));
+      setFailed(
+        SUMMARY_CUBES.filter((_, i) => results[i].status === 'rejected'),
       );
-      setFailed(SUMMARY_CUBES.filter((_, i) => results[i].status === 'rejected'));
-      setYears(members);
       setCubeYears(
         Object.fromEntries(
-          SUMMARY_CUBES.map((cube, i) => [cube, yearResults[i].status === 'fulfilled' ? yearResults[i].value : []]),
+          SUMMARY_CUBES.map((cube, i) => [
+            cube,
+            yearResults[i].status === 'fulfilled' ? yearResults[i].value : [],
+          ]),
         ),
       );
+      // Keeps the current unit when it is still in scope, otherwise picks the first.
       setUnits(found);
-      setUnit((current) => (found.includes(current) ? current : found[0] ?? ''));
       setTrendRows(rows);
     })()
       .catch((reason: unknown) => {
         if (active)
-          setError(reason instanceof Error ? reason.message : `No se pudo cargar el ${config.title.toLocaleLowerCase('es')}.`);
+          setError(
+            reason instanceof Error
+              ? reason.message
+              : `No se pudo cargar el ${config.title.toLocaleLowerCase('es')}.`,
+          );
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -223,7 +329,34 @@ function ScopeSummaryDashboard({ config }: { config: SummaryConfig }) {
     return () => {
       active = false;
     };
-  }, [attempt, config]);
+  }, [attempt, config, setUnits]);
+
+  const series = useMemo(() => {
+    const merged = new Map<string, SummaryValues>();
+    if (!trendRows || !unit) return merged;
+    for (const cube of SUMMARY_CUBES) {
+      for (const [label, values] of facultyYearSeries(
+        trendRows[cube] ?? [],
+        cube,
+        unit,
+        config.unitAxis.level,
+        YEAR_AXIS[cube].level,
+      ))
+        merged.set(label, { ...merged.get(label), ...values });
+    }
+    return merged;
+  }, [trendRows, unit, config]);
+
+  const yearLabels = useMemo(
+    () =>
+      [...series.keys()].sort((a, b) =>
+        a.localeCompare(b, 'es', { numeric: true }),
+      ),
+    [series],
+  );
+  // One gestión for the whole portal (header); this page offers the gestiones
+  // with data for the unit and falls back to the latest one.
+  const { year, setYear } = useScopeYear(yearLabels, yearLabels.at(-1) ?? '');
 
   // Details of the selected gestión.
   useEffect(() => {
@@ -235,7 +368,13 @@ function ScopeSummaryDashboard({ config }: { config: SummaryConfig }) {
         // A cube without this gestión has no details to show for it.
         const member = cubeYears[cube]?.find((item) => item.caption === year);
         return member
-          ? queryCube(cube, measureNames(cube), [config.unitAxis, detail.axis], member, baseMeasure(cube))
+          ? queryCube(
+              cube,
+              measureNames(cube),
+              [config.unitAxis, detail.axis],
+              member,
+              baseMeasure(cube),
+            )
           : Promise.resolve([] as DataRow[]);
       }),
     )
@@ -249,25 +388,6 @@ function ScopeSummaryDashboard({ config }: { config: SummaryConfig }) {
       active = false;
     };
   }, [year, cubeYears, loading, error, config, detail]);
-
-  const series = useMemo(() => {
-    const merged = new Map<string, SummaryValues>();
-    if (!trendRows || !unit) return merged;
-    for (const cube of SUMMARY_CUBES) {
-      for (const [label, values] of facultyYearSeries(trendRows[cube] ?? [], cube, unit, config.unitAxis.level, YEAR_AXIS[cube].level))
-        merged.set(label, { ...merged.get(label), ...values });
-    }
-    return merged;
-  }, [trendRows, unit, config]);
-
-  const yearLabels = useMemo(
-    () => [...series.keys()].sort((a, b) => a.localeCompare(b, 'es', { numeric: true })),
-    [series],
-  );
-  // Until the user picks one, show the latest gestión with data for the unit.
-  useEffect(() => {
-    if (!yearPicked && yearLabels.length) setYear(yearLabels.at(-1)!);
-  }, [yearLabels, yearPicked]);
 
   const current = series.get(year) ?? {};
   const prevLabel = previousYear(yearLabels, year);
@@ -291,215 +411,374 @@ function ScopeSummaryDashboard({ config }: { config: SummaryConfig }) {
     });
   }, [detailRows, unit, sortIndex, config, detail]);
 
-  const trendPoints = yearLabels.flatMap((label) => {
-    const value = series.get(label)?.[trendKey];
-    if (value == null) return [];
-    return [{ label, value: measureOf(trendKey).format === 'percent' ? Math.round(value * 1000) / 10 : value }];
-  });
+  const trendPoints = useMemo(
+    () =>
+      yearLabels.flatMap((label) => {
+        const value = series.get(label)?.[trendKey];
+        if (value == null) return [];
+        return [
+          {
+            label,
+            value:
+              measureOf(trendKey).format === 'percent'
+                ? Math.round(value * 1000) / 10
+                : value,
+          },
+        ];
+      }),
+    [yearLabels, series, trendKey],
+  );
 
-  if (loading) return <Loader text={`Cargando el ${config.title.toLocaleLowerCase('es')}…`} fullScreen={false} />;
-  if (error)
+  /** Per-indicator series for the KPI sparklines, rebuilt only when data changes. */
+  const sparklines = useMemo(
+    () =>
+      Object.fromEntries(
+        KPIS.map((key) => [
+          key,
+          yearLabels.flatMap((label) => {
+            const value = series.get(label)?.[key];
+            return value == null ? [] : [{ label, value }];
+          }),
+        ]),
+      ) as Record<SummaryKey, { label: string; value: number }[]>,
+    [yearLabels, series],
+  );
+
+  // First load shows skeletons; later loads keep the data on screen and dim it.
+  const firstLoad = loading && !trendRows;
+  const refreshing = loading && !!trendRows;
+  const unitName = config.unitLabel.toLocaleLowerCase('es');
+
+  // One staggered entrance when the first data lands; never on refresh.
+  const pageRef = useRef<HTMLDivElement>(null);
+  useReveal(pageRef, { when: !firstLoad && !error });
+
+  if (error && !trendRows)
     return (
-      <Card role="alert">
-        <CardContent className="flex flex-wrap items-center gap-3 p-6">
-          <span>{error}</span>
-          <Button variant="outline" onClick={() => setAttempt((n) => n + 1)}>
-            Reintentar
-          </Button>
-        </CardContent>
-      </Card>
+      <PageContainer>
+        <PageHeader
+          title={config.title}
+          description={config.description(config.unitLabel)}
+        />
+        <StatusBanner
+          title={`No se pudo cargar el ${config.title.toLocaleLowerCase('es')}`}
+          description={error}
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
+      </PageContainer>
     );
 
   return (
-    <div className="mx-auto w-full max-w-[1600px] space-y-5">
-      <header className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="max-w-3xl space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">{config.title}</h1>
-          <p className="text-sm text-muted-foreground sm:text-base">{config.description(unit || config.unitLabel)}</p>
-        </div>
-        <div className="flex flex-wrap items-end gap-3">
-          {units.length > 1 ? (
-            <label className="grid gap-1 text-sm font-medium">
-              {config.unitLabel}
-              <select
-                className="min-h-10 rounded-md border border-input bg-background px-3"
-                value={unit}
-                onChange={(event) => setUnit(event.target.value)}
-              >
-                {units.map((item) => (
-                  <option key={item} value={item}>
-                    {item}
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
-          <label className="grid gap-1 text-sm font-medium">
-            Gestión académica
-            <select
-              className="min-h-10 rounded-md border border-input bg-background px-3"
-              value={year}
-              onChange={(event) => {
-                setYearPicked(true);
-                setYear(event.target.value);
-              }}
+    <div ref={pageRef}>
+      <PageContainer>
+        <PageHeader
+          title={config.title}
+          description={config.description(unit || config.unitLabel)}
+          meta={
+            shared ? (
+              <span className="inline-flex items-center gap-1.5">
+                <ShieldCheck aria-hidden="true" className="size-3.5" />
+                {`Datos limitados a tu ${unitName}`}
+              </span>
+            ) : year ? (
+              `Gestión ${year}`
+            ) : undefined
+          }
+          actions={
+            <Button
+              variant="outline"
+              loading={refreshing}
+              iconLeft={<RotateCcw aria-hidden="true" />}
+              onClick={() => setAttempt((n) => n + 1)}
             >
-              {years.map((item) => (
-                <option key={item.uniqueName} value={item.caption}>
-                  {item.caption}
-                </option>
-              ))}
-            </select>
-          </label>
-          <Button variant="outline" onClick={() => setAttempt((n) => n + 1)}>
-            Actualizar datos
-          </Button>
-        </div>
-      </header>
+              {refreshing ? 'Actualizando…' : 'Actualizar datos'}
+            </Button>
+          }
+        />
 
-      {failed.length > 0 ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          {`No se pudo consultar: ${failed.join(', ')}. El resto de indicadores sigue disponible.`}
-        </p>
-      ) : null}
+        {/* With a shared scope the header holds the unit and gestión selectors. */}
+        {shared ? null : (
+          <FilterBar
+            label={`Filtros del ${config.title.toLocaleLowerCase('es')}`}
+            aside={
+              <>
+                <ShieldCheck aria-hidden="true" />
+                {`Datos limitados a tu ${unitName}`}
+              </>
+            }
+          >
+            {units.length > 1 ? (
+              <NativeSelect
+                label={config.unitLabel}
+                value={unit}
+                onChange={(event) => setUnit(event.currentTarget.value)}
+                options={units.map((item) => ({ value: item, label: item }))}
+                containerClassName="min-w-56"
+              />
+            ) : null}
+            <NativeSelect
+              label="Gestión académica"
+              value={year}
+              disabled={firstLoad}
+              onChange={(event) => setYear(event.currentTarget.value)}
+              options={[...yearLabels].reverse().map((label) => ({
+                value: label,
+                label,
+              }))}
+            />
+          </FilterBar>
+        )}
 
-      <section
-        aria-label={`Indicadores de la ${config.unitLabel.toLocaleLowerCase('es')}`}
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3"
-      >
-        {KPIS.map((key) => {
-          const delta = formatDelta(key, deltaOf(current[key], previous[key], measureOf(key).format));
-          const spark = yearLabels.flatMap((label) => {
-            const value = series.get(label)?.[key];
-            return value == null ? [] : [{ label, value }];
-          });
-          return (
-            <Card key={key}>
-              <CardContent className="space-y-2 px-5 py-5">
-                <p className="text-sm font-medium text-muted-foreground">{measureOf(key).label}</p>
-                <p className="text-3xl font-semibold tabular-nums tracking-tight">{show(key, current[key])}</p>
-                <p className="text-xs text-muted-foreground">
-                  {current[key] == null
-                    ? 'Sin dato para esta gestión'
-                    : delta && prevLabel
-                      ? `${delta} respecto a ${prevLabel}`
-                      : `Gestión ${year}`}
-                </p>
-                {spark.length > 1 ? (
+        {error ? (
+          <StatusBanner
+            title="No se pudieron actualizar los datos"
+            description={`${error} Se muestran los últimos datos cargados.`}
+            onRetry={() => setAttempt((n) => n + 1)}
+          />
+        ) : null}
+        {failed.length > 0 ? (
+          <StatusBanner
+            tone="warning"
+            title="Algunos indicadores no están disponibles"
+            description={`No se pudo consultar: ${failed.join(', ')}. El resto de indicadores sigue disponible.`}
+          />
+        ) : null}
+
+        <section
+          aria-label={`Indicadores de la ${unitName}`}
+          className="grid grid-cols-2 gap-3 sm:gap-4 md:grid-cols-3 2xl:grid-cols-6"
+        >
+          {KPIS.map((key) => (
+            <KpiCard
+              key={key}
+              label={measureOf(key).label}
+              icon={KPI_ICONS[key]}
+              value={current[key] ?? null}
+              format={(value) => show(key, value)}
+              emptyLabel="Sin dato para esta gestión"
+              loading={firstLoad}
+              refreshing={refreshing}
+              delta={
+                current[key] == null
+                  ? undefined
+                  : deltaBadge(
+                      key,
+                      deltaOf(
+                        current[key],
+                        previous[key],
+                        measureOf(key).format,
+                      ),
+                      prevLabel,
+                    )
+              }
+              detail={
+                current[key] == null && !firstLoad
+                  ? 'Sin dato para esta gestión'
+                  : undefined
+              }
+              sparkline={
+                sparklines[key]?.length > 1 ? (
                   <AcademicSparkline
                     label={measureOf(key).label}
-                    data={spark}
+                    data={sparklines[key]}
                     formatValue={(value) => show(key, value)}
-                    className="h-8 w-full text-(--role-accent,var(--primary))"
+                    className="h-7 w-24 text-role-accent"
                   />
-                ) : null}
-              </CardContent>
-            </Card>
-          );
-        })}
-      </section>
+                ) : undefined
+              }
+            />
+          ))}
+        </section>
 
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle>{`Evolución de la ${config.unitLabel.toLocaleLowerCase('es')}`}</CardTitle>
-            <CardDescription>{`Valor de la ${config.unitLabel.toLocaleLowerCase('es')} en cada gestión.`}</CardDescription>
-          </div>
-          <div role="group" aria-label="Indicador de la evolución" className="flex flex-wrap gap-2">
-            {TRENDS.map((key) => (
-              <Button
-                key={key}
-                size="sm"
-                variant={key === trendKey ? 'default' : 'outline'}
-                aria-pressed={key === trendKey}
-                onClick={() => setTrendKey(key)}
-              >
-                {measureOf(key).label}
-              </Button>
-            ))}
-          </div>
-        </CardHeader>
-        <CardContent>
+        <ChartFrame
+          title={`Evolución de la ${unitName}`}
+          description={`Valor de la ${unitName} en cada gestión.`}
+          loading={firstLoad}
+          refreshing={refreshing}
+          height={280}
+          empty={
+            !firstLoad && trendPoints.length === 0
+              ? {
+                  title: 'Sin datos para este indicador',
+                  description:
+                    'Prueba con otro indicador o revisa si los cubos ya publican gestiones.',
+                }
+              : undefined
+          }
+          actions={
+            <div
+              role="group"
+              aria-label="Indicador de la evolución"
+              className="inline-flex flex-wrap gap-1 rounded-xl bg-(--glass-track) p-1"
+            >
+              {TRENDS.map((key) => (
+                <button
+                  key={key}
+                  type="button"
+                  aria-pressed={key === trendKey}
+                  onClick={() => setTrendKey(key)}
+                  className="rounded-lg px-3 py-1.5 text-xs font-medium text-muted-foreground transition-[background-color,color,box-shadow] duration-(--dur-fast) hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none aria-pressed:bg-background aria-pressed:text-foreground aria-pressed:shadow-glass dark:aria-pressed:bg-white/10"
+                >
+                  {measureOf(key).label}
+                </button>
+              ))}
+            </div>
+          }
+        >
           <TrendLineChart
             data={trendPoints}
             ariaLabel={`${measureOf(trendKey).label}${measureOf(trendKey).format === 'percent' ? ' (%)' : ''} de ${unit} por gestión`}
             height={280}
           />
-        </CardContent>
-      </Card>
+        </ChartFrame>
 
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-end justify-between gap-3">
-          <div>
-            <CardTitle>{detail.title(year)}</CardTitle>
-            <CardDescription>{detail.caption}</CardDescription>
+        <Card data-reveal className="gap-0 py-0">
+          <RefreshIndicator
+            active={detailLoading && details.length > 0}
+            label="Actualizando el detalle…"
+          />
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3 px-5 pt-5 pb-4 sm:px-6">
+            <div className="min-w-0">
+              <h2 className="font-heading text-base font-semibold tracking-tight">
+                {detail.title(year)}
+              </h2>
+              <p className="mt-0.5 max-w-[70ch] text-xs text-muted-foreground">
+                {detail.caption}
+              </p>
+            </div>
+            <NativeSelect
+              label="Ordenar por"
+              value={String(sortIndex)}
+              onChange={(event) =>
+                setSortIndex(Number(event.currentTarget.value))
+              }
+              options={detail.sorts.map((sort, index) => ({
+                value: String(index),
+                label: sort.label,
+              }))}
+            />
           </div>
-          <label className="grid gap-1 text-sm font-medium">
-            Ordenar por
-            <select
-              className="min-h-10 rounded-md border border-input bg-background px-3"
-              value={sortIndex}
-              onChange={(event) => setSortIndex(Number(event.target.value))}
+
+          {(firstLoad || detailLoading) && details.length === 0 ? (
+            <div
+              aria-hidden="true"
+              className="flex flex-col gap-3 px-5 pb-6 sm:px-6"
             >
-              {detail.sorts.map((sort, index) => (
-                <option key={sort.key} value={index}>
-                  {sort.label}
-                </option>
+              {[0, 1, 2, 3, 4].map((row) => (
+                <Skeleton key={row} className="h-9 w-full rounded-lg" />
               ))}
-            </select>
-          </label>
-        </CardHeader>
-        <CardContent className="overflow-x-auto">
-          {detailLoading ? (
-            <Loader text="Cargando detalle…" fullScreen={false} />
+            </div>
+          ) : details.length === 0 ? (
+            <EmptyState
+              title={detail.empty}
+              description="Elige otra gestión o revisa si el cierre académico ya se publicó."
+            />
           ) : (
-            <table className="w-full min-w-[720px] text-left text-sm">
-              <thead>
-                <tr className="text-muted-foreground">
-                  <th scope="col" className="p-3 font-medium">{detail.header}</th>
-                  {detail.columns.map((key) => (
-                    <th key={key} scope="col" className="p-3 text-right font-medium">
-                      {measureOf(key).label}
+            <div
+              role="region"
+              aria-label={detail.title(year)}
+              tabIndex={0}
+              className={`overflow-x-auto border-t border-(--glass-border) transition-opacity duration-(--dur-base) focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none ${detailLoading ? 'opacity-60' : ''}`}
+            >
+              <table className="w-full min-w-[760px] text-left text-sm">
+                <caption className="sr-only">{`${detail.title(year)}. ${detail.caption}`}</caption>
+                <thead>
+                  <tr className="text-xs text-muted-foreground">
+                    <th scope="col" className="px-5 py-3 font-medium sm:px-6">
+                      {detail.header}
                     </th>
-                  ))}
-                  <th scope="col" className="p-3 font-medium">Atención</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-t border-border bg-muted/40 font-semibold">
-                  <th scope="row" className="p-3">{detail.referenceLabel}</th>
-                  {detail.columns.map((key) => (
-                    <td key={key} className="p-3 text-right tabular-nums">{show(key, current[key])}</td>
-                  ))}
-                  <td className="p-3" />
-                </tr>
-                {details.map((row) => {
-                  const flags = attentionFor(row.values, current, detail.rules);
-                  return (
-                    <tr key={row.career} className="border-t border-border">
-                      <th scope="row" className="p-3 font-normal">{row.career}</th>
-                      {detail.columns.map((key) => (
-                        <td
-                          key={key}
-                          className={`p-3 text-right tabular-nums ${flags.some((flag) => flag.key === key) ? 'font-semibold text-destructive' : ''}`}
-                        >
-                          {show(key, row.values[key])}
-                        </td>
-                      ))}
-                      <td className="p-3 text-xs">
-                        {flags.length ? flags.map((flag) => flag.message).join(' · ') : '—'}
+                    {detail.columns.map((key) => (
+                      <th
+                        key={key}
+                        scope="col"
+                        className="px-3 py-3 text-right font-medium"
+                      >
+                        {measureOf(key).label}
+                      </th>
+                    ))}
+                    <th scope="col" className="px-5 py-3 font-medium sm:px-6">
+                      Atención
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr className="border-t border-(--glass-border) bg-(--glass-track) text-muted-foreground">
+                    <th
+                      scope="row"
+                      className="px-5 py-3 font-medium italic sm:px-6"
+                    >
+                      {detail.referenceLabel}
+                    </th>
+                    {detail.columns.map((key) => (
+                      <td
+                        key={key}
+                        className="px-3 py-3 text-right tabular-nums"
+                      >
+                        {show(key, current[key])}
                       </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+                    ))}
+                    <td className="px-5 py-3 text-xs sm:px-6">Referencia</td>
+                  </tr>
+                  {details.map((row) => {
+                    const flags = attentionFor(
+                      row.values,
+                      current,
+                      detail.rules,
+                    );
+                    return (
+                      <tr
+                        key={row.career}
+                        className="border-t border-(--glass-border) transition-colors duration-(--dur-instant) hover:bg-role-accent/5"
+                      >
+                        <th
+                          scope="row"
+                          className="px-5 py-3 font-medium sm:px-6"
+                        >
+                          {row.career}
+                        </th>
+                        {detail.columns.map((key) => (
+                          <td
+                            key={key}
+                            className={`px-3 py-3 text-right tabular-nums ${flags.some((flag) => flag.key === key) ? 'font-semibold text-destructive' : ''}`}
+                          >
+                            {show(key, row.values[key])}
+                          </td>
+                        ))}
+                        <td className="px-5 py-3 sm:px-6">
+                          {flags.length ? (
+                            <span className="inline-flex flex-wrap gap-1.5">
+                              {flags.map((flag) => (
+                                <span
+                                  key={flag.key}
+                                  className="inline-flex items-center gap-1.5 rounded-full bg-warning/14 px-2.5 whitespace-nowrap py-0.5 text-xs font-medium text-warning ring-1 ring-inset ring-warning/30"
+                                >
+                                  <AlertTriangle
+                                    aria-hidden="true"
+                                    className="size-3.5"
+                                  />
+                                  {flag.message}
+                                </span>
+                              ))}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1.5 rounded-full bg-success/12 px-2.5 whitespace-nowrap py-0.5 text-xs font-medium text-success ring-1 ring-inset ring-success/25">
+                              <CheckCircle2
+                                aria-hidden="true"
+                                className="size-3.5"
+                              />
+                              En rango
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
           )}
-          {!detailLoading && details.length === 0 ? (
-            <p className="p-3 text-sm text-muted-foreground">{detail.empty}</p>
-          ) : null}
-        </CardContent>
-      </Card>
+        </Card>
+      </PageContainer>
     </div>
   );
 }

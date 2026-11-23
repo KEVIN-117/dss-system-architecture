@@ -1,16 +1,29 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Button,
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-  Loader,
-} from '@dss-monorepo/design-system';
+  ArrowLeft,
+  ChevronDown,
+  ChevronRight,
+  ShieldCheck,
+} from 'lucide-react';
+import { Button, Card, Skeleton } from '@dss-monorepo/design-system';
+import {
+  ChartFrame,
+  EmptyState,
+  FilterBar,
+  KpiCard,
+  NativeSelect,
+  PageContainer,
+  PageHeader,
+  RefreshIndicator,
+  StatusBanner,
+  type DeltaBadgeProps,
+} from '@dss-monorepo/design-system/page';
+import { useReveal } from '@dss-monorepo/design-system/motion';
 import { AcademicBarChart, TrendLineChart } from '@dss-monorepo/charts';
+import { AcademicSparkline } from '../academic-sparkline';
+import { useAcademicScope, useScopeYear } from './academic-scope';
 import {
   YEAR_AXIS,
   assertViewerScope,
@@ -75,6 +88,35 @@ async function loadRows(
   return [...merged.entries()].map(([label, values]) => ({ label, values }));
 }
 
+/**
+ * Change of one measure against the previous gestión. The views do not say
+ * which direction is good, so the badge stays neutral: arrow and text only.
+ */
+function deltaFor(
+  measure: ViewMeasure,
+  current: number | null | undefined,
+  previous: number | null | undefined,
+  previousLabel: string | undefined,
+): DeltaBadgeProps {
+  let value: number | null = null;
+  if (current != null && previous != null) {
+    value =
+      measure.format === 'percent'
+        ? (current - previous) * 100
+        : previous === 0
+          ? null
+          : ((current - previous) / previous) * 100;
+  }
+  return {
+    value,
+    unit: measure.format === 'percent' ? 'pp' : '%',
+    goodWhen: 'none',
+    comparisonLabel: previousLabel
+      ? `respecto a ${previousLabel}`
+      : 'frente a la gestión anterior',
+  };
+}
+
 function MeasureTable({
   view,
   rows,
@@ -88,16 +130,32 @@ function MeasureTable({
   rank?: boolean;
   onSelect?: (label: string) => void;
 }) {
+  const caption = `${view.title} por ${labelHeader.toLocaleLowerCase('es')}`;
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[44rem] text-left text-sm">
-        <caption className="sr-only">{`${view.title} por ${labelHeader.toLocaleLowerCase('es')}`}</caption>
+    <div
+      role="region"
+      aria-label={caption}
+      tabIndex={0}
+      className="overflow-x-auto rounded-xl border border-(--glass-border) focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none"
+    >
+      <table className="w-full min-w-[40rem] text-left text-sm">
+        <caption className="sr-only">{caption}</caption>
         <thead>
-          <tr className="border-b border-border text-muted-foreground">
-            {rank ? <th className="p-3 text-right">Orden</th> : null}
-            <th className="p-3">{labelHeader}</th>
+          <tr className="bg-(--glass-track) text-xs text-muted-foreground">
+            {rank ? (
+              <th scope="col" className="px-4 py-3 text-right font-medium">
+                Orden
+              </th>
+            ) : null}
+            <th scope="col" className="px-4 py-3 font-medium">
+              {labelHeader}
+            </th>
             {view.measures.map((measure) => (
-              <th key={measure.name} className="p-3 text-right">
+              <th
+                key={measure.name}
+                scope="col"
+                className="px-4 py-3 text-right font-medium"
+              >
                 {measure.label}
               </th>
             ))}
@@ -107,29 +165,36 @@ function MeasureTable({
           {rows.map((row, index) => (
             <tr
               key={row.label}
-              className="border-b border-border/60 last:border-0"
+              className="border-t border-(--glass-border) transition-colors duration-(--dur-instant) hover:bg-role-accent/5"
             >
               {rank ? (
-                <td className="p-3 text-right tabular-nums text-muted-foreground">
-                  {index + 1}
+                <td className="px-4 py-3 text-right font-mono text-xs text-muted-foreground tabular-nums">
+                  {String(index + 1).padStart(2, '0')}
                 </td>
               ) : null}
-              <td className="p-3 font-medium">
+              <th scope="row" className="px-4 py-3 font-medium">
                 {onSelect ? (
                   <button
                     type="button"
-                    className="text-left text-primary underline-offset-4 hover:underline"
+                    className="group/drill inline-flex items-center gap-1 rounded-md text-left text-foreground underline decoration-role-accent/40 underline-offset-4 transition-colors hover:text-role-accent hover:decoration-role-accent focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none"
                     onClick={() => onSelect(row.label)}
-                    title={`Ver el detalle de ${row.label}`}
+                    aria-label={`Ver el detalle de ${row.label}`}
                   >
                     {row.label}
+                    <ChevronRight
+                      aria-hidden="true"
+                      className="size-3.5 opacity-60 transition-transform duration-(--dur-fast) group-hover/drill:translate-x-0.5"
+                    />
                   </button>
                 ) : (
                   row.label
                 )}
-              </td>
+              </th>
               {view.measures.map((measure) => (
-                <td key={measure.name} className="p-3 text-right tabular-nums">
+                <td
+                  key={measure.name}
+                  className="px-4 py-3 text-right tabular-nums"
+                >
                   {formatValue(
                     row.values[measure.name] ?? null,
                     measure.format,
@@ -144,30 +209,6 @@ function MeasureTable({
   );
 }
 
-function Kpi({
-  measure,
-  value,
-}: {
-  measure: ViewMeasure;
-  value: number | null;
-}) {
-  return (
-    <Card>
-      <CardHeader className="pb-2">
-        <CardDescription>{measure.label}</CardDescription>
-        <CardTitle className="text-3xl tabular-nums">
-          {formatValue(value, measure.format)}
-        </CardTitle>
-      </CardHeader>
-      {measure.help ? (
-        <CardContent className="text-xs text-muted-foreground">
-          {measure.help}
-        </CardContent>
-      ) : null}
-    </Card>
-  );
-}
-
 export type PanelScope = AcademicScopeKind;
 
 const SCOPE_NOTE: Record<PanelScope, string | null> = {
@@ -176,25 +217,51 @@ const SCOPE_NOTE: Record<PanelScope, string | null> = {
   career: 'Datos limitados a tu carrera.',
 };
 
+/** Root of the drill-down breadcrumb when the unit name is not known yet. */
+const SCOPE_ROOT: Record<PanelScope, string> = {
+  global: 'UATF',
+  faculty: 'Tu facultad',
+  career: 'Tu carrera',
+};
+
 /**
  * Analytics panel for one view. `scope` is the portal's academic scope: the
  * BFF filters every query to the user's faculty or career, and the panel
  * ranks careers directly instead of faculties outside the global scope.
+ *
+ * With `eyebrow` the panel renders the page header itself (title, description
+ * and section); without it the hosting page keeps its own header.
  */
 export function RendimientoViewPanel({
   view,
   scope = 'global',
+  eyebrow,
 }: {
   view: RendimientoView;
   scope?: PanelScope;
+  eyebrow?: string;
 }) {
   const [years, setYears] = useState<Partial<Record<CubeName, Member[]>>>({});
-  const [year, setYear] = useState('');
   const [trend, setTrend] = useState<Row[]>([]);
-  const breakdowns = (view.breakdowns ?? [FACULTY_BREAKDOWN]).map((option) =>
-    scope !== 'global' && option.id === FACULTY_BREAKDOWN.id
-      ? CAREER_BREAKDOWN
-      : option,
+  // One gestión for the whole portal (header). This report offers the gestiones
+  // it has data for and falls back to the latest one with its main measure.
+  const trendLabels = useMemo(() => trend.map((row) => row.label), [trend]);
+  const latestYear = useMemo(
+    () =>
+      trend.filter((row) => row.values[view.headline] != null).at(-1)?.label ??
+      trend.at(-1)?.label ??
+      '',
+    [trend, view.headline],
+  );
+  const { year, setYear } = useScopeYear(trendLabels, latestYear);
+  const breakdowns = useMemo(
+    () =>
+      (view.breakdowns ?? [FACULTY_BREAKDOWN]).map((option) =>
+        scope !== 'global' && option.id === FACULTY_BREAKDOWN.id
+          ? CAREER_BREAKDOWN
+          : option,
+      ),
+    [view, scope],
   );
   const [breakdownId, setBreakdownId] = useState(breakdowns[0].id);
   const selected =
@@ -208,7 +275,20 @@ export function RendimientoViewPanel({
   const [loading, setLoading] = useState(true);
   const [breakdownLoading, setBreakdownLoading] = useState(false);
   const [error, setError] = useState('');
+  // A failed breakdown only affects its own card, never the whole panel.
+  const [breakdownError, setBreakdownError] = useState('');
   const [attempt, setAttempt] = useState(0);
+  const [breakdownAttempt, setBreakdownAttempt] = useState(0);
+  const {
+    unit: scopeUnit,
+    units: scopeUnits,
+    shared: sharedScope,
+  } = useAcademicScope();
+
+  // A new gestión starts the drill-down again from the first level.
+  useEffect(() => {
+    setParent(null);
+  }, [year]);
 
   const headline =
     view.measures.find((m) => m.name === view.headline) ?? view.measures[0];
@@ -275,15 +355,6 @@ export function RendimientoViewPanel({
       if (!active) return;
       setYears(byCube);
       setTrend(rows);
-      const withHeadline = rows.filter(
-        (row) =>
-          row.values[view.headline] !== null &&
-          row.values[view.headline] !== undefined,
-      );
-      setYear(
-        (current) =>
-          current || withHeadline.at(-1)?.label || rows.at(-1)?.label || '',
-      );
     })()
       .catch((reason: unknown) => {
         if (active)
@@ -306,6 +377,7 @@ export function RendimientoViewPanel({
     if (!year || loading || error) return;
     let active = true;
     setBreakdownLoading(true);
+    setBreakdownError('');
     loadRows(
       view,
       () =>
@@ -334,7 +406,7 @@ export function RendimientoViewPanel({
       })
       .catch((reason: unknown) => {
         if (active)
-          setError(
+          setBreakdownError(
             reason instanceof Error
               ? reason.message
               : 'No se pudo cargar el desglose.',
@@ -346,213 +418,380 @@ export function RendimientoViewPanel({
     return () => {
       active = false;
     };
-  }, [view, year, parent, selected, loading, error, memberFor]);
+  }, [
+    view,
+    year,
+    parent,
+    selected,
+    loading,
+    error,
+    memberFor,
+    breakdownAttempt,
+  ]);
 
-  const yearRow = useMemo(
-    () => trend.find((row) => row.label === year),
-    [trend, year],
+  // Drill-down focus: into the detail, focus "Volver"; back out, focus the heading.
+  const backRef = useRef<HTMLButtonElement>(null);
+  const breakdownHeadingRef = useRef<HTMLHeadingElement>(null);
+  const previousParent = useRef<string | null>(null);
+  useEffect(() => {
+    if (parent && !previousParent.current) backRef.current?.focus();
+    if (!parent && previousParent.current) breakdownHeadingRef.current?.focus();
+    previousParent.current = parent;
+  }, [parent]);
+
+  const yearIndex = trend.findIndex((row) => row.label === year);
+  const yearRow = trend[yearIndex];
+  const previousRow = yearIndex > 0 ? trend[yearIndex - 1] : undefined;
+  const kpis = useMemo(
+    () => view.measures.slice(0, view.kpiCount ?? 4),
+    [view],
   );
-  const kpis = view.measures.slice(0, view.kpiCount ?? 4);
-  const asChartValue = (value: number | null | undefined) =>
-    value === null || value === undefined
-      ? null
-      : headline.format === 'percent'
-        ? Number((value * 100).toFixed(1))
-        : Number(value.toFixed(1));
-  const trendPoints = trend
-    .map((row) => ({
-      label: row.label,
-      value: asChartValue(row.values[view.headline]),
-    }))
-    .filter(
-      (point): point is { label: string; value: number } =>
-        point.value !== null,
-    );
-  const breakdownPoints = breakdown
-    .map((row) => ({
-      label: row.label,
-      value: asChartValue(row.values[view.headline]),
-    }))
-    .filter(
-      (point): point is { label: string; value: number } =>
-        point.value !== null,
-    );
+
+  const asChartValue = useCallback(
+    (value: number | null | undefined) =>
+      value === null || value === undefined
+        ? null
+        : headline.format === 'percent'
+          ? Number((value * 100).toFixed(1))
+          : Number(value.toFixed(1)),
+    [headline],
+  );
+  const trendPoints = useMemo(
+    () =>
+      trend
+        .map((row) => ({
+          label: row.label,
+          value: asChartValue(row.values[view.headline]),
+        }))
+        .filter(
+          (point): point is { label: string; value: number } =>
+            point.value !== null,
+        ),
+    [trend, view.headline, asChartValue],
+  );
+  const breakdownPoints = useMemo(
+    () =>
+      breakdown
+        .map((row) => ({
+          label: row.label,
+          value: asChartValue(row.values[view.headline]),
+        }))
+        .filter(
+          (point): point is { label: string; value: number } =>
+            point.value !== null,
+        ),
+    [breakdown, view.headline, asChartValue],
+  );
+  const sparklines = useMemo(
+    () =>
+      Object.fromEntries(
+        kpis.map((measure) => [
+          measure.name,
+          trend.flatMap((row) => {
+            const value = row.values[measure.name];
+            return value == null ? [] : [{ label: row.label, value }];
+          }),
+        ]),
+      ) as Record<string, { label: string; value: number }[]>,
+    [kpis, trend],
+  );
+
   const unit = headline.format === 'percent' ? ' (%)' : '';
   const firstSingular = selected.first.level.toLocaleLowerCase('es');
   const scopeLabel = parent
     ? `${selected.secondPlural ?? 'Detalle'} de ${parent}`
     : selected.firstPlural;
+  // Reports cover every unit in scope, so name the root only when there is just one.
+  const rootLabel =
+    scopeUnits.length === 1 && scopeUnit
+      ? scopeUnit
+      : scope === 'career' && scopeUnits.length > 1
+        ? 'Tus carreras'
+        : scope === 'faculty' && scopeUnits.length > 1
+          ? 'Tus facultades'
+          : SCOPE_ROOT[scope];
 
-  if (loading)
-    return <Loader text="Cargando indicadores…" fullScreen={false} />;
-  if (error)
+  // First load shows skeletons; reloads keep the data on screen and dim it.
+  const firstLoad = loading && trend.length === 0;
+  const refreshing = loading && trend.length > 0;
+
+  const pageRef = useRef<HTMLDivElement>(null);
+  useReveal(pageRef, { when: !firstLoad && !error });
+
+  const header = eyebrow ? (
+    <PageHeader
+      eyebrow={view.section ?? eyebrow}
+      title={view.title}
+      description={view.description}
+      meta={
+        sharedScope && SCOPE_NOTE[scope] ? (
+          <span className="inline-flex items-center gap-1.5">
+            <ShieldCheck aria-hidden="true" className="size-3.5" />
+            {SCOPE_NOTE[scope]}
+          </span>
+        ) : year ? (
+          `Gestión ${year}`
+        ) : undefined
+      }
+    />
+  ) : (
+    <p className="max-w-3xl text-sm text-muted-foreground">
+      {view.description}
+    </p>
+  );
+
+  if (error && trend.length === 0)
     return (
-      <Card role="alert">
-        <CardContent className="flex flex-wrap items-center gap-3 p-6">
-          <span>{error}</span>
-          <Button variant="outline" onClick={() => setAttempt((n) => n + 1)}>
-            Reintentar
-          </Button>
-        </CardContent>
-      </Card>
+      <PageContainer>
+        {header}
+        <StatusBanner
+          title="No se pudieron cargar los indicadores"
+          description={error}
+          onRetry={() => setAttempt((n) => n + 1)}
+        />
+      </PageContainer>
     );
 
-  console.log('view', view);
-
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div className="max-w-3xl space-y-1">
-          <p className="text-muted-foreground">{view.description}</p>
-          {SCOPE_NOTE[scope] ? (
-            <p className="text-sm font-medium">{SCOPE_NOTE[scope]}</p>
-          ) : null}
-        </div>
-        <label className="grid gap-1 text-sm font-medium">
-          Gestión académica
-          <select
-            className="min-h-10 rounded-md border border-input bg-background px-3"
-            value={year}
-            onChange={(event) => {
-              setYear(event.target.value);
-              setParent(null);
-            }}
+    <div ref={pageRef}>
+      <PageContainer>
+        {header}
+
+        {/* With a shared scope the gestión is chosen in the header. */}
+        {sharedScope ? null : (
+          <FilterBar
+            label={`Filtros de ${view.title}`}
+            aside={
+              SCOPE_NOTE[scope] ? (
+                <>
+                  <ShieldCheck aria-hidden="true" />
+                  {SCOPE_NOTE[scope]}
+                </>
+              ) : undefined
+            }
           >
-            {trend.map((row) => (
-              <option key={row.label} value={row.label}>
-                {row.label}
-              </option>
-            ))}
-          </select>
-        </label>
-      </div>
+            <NativeSelect
+              label="Gestión académica"
+              value={year}
+              disabled={firstLoad}
+              onChange={(event) => setYear(event.currentTarget.value)}
+              options={[...trendLabels].reverse().map((label) => ({
+                value: label,
+                label,
+              }))}
+            />
+          </FilterBar>
+        )}
 
-      <section
-        aria-label={`Indicadores de la gestión ${year}`}
-        className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4"
-      >
-        {kpis.map((measure) => (
-          <Kpi
-            key={measure.name}
-            measure={measure}
-            value={yearRow?.values[measure.name] ?? null}
+        {error ? (
+          <StatusBanner
+            title="No se pudieron actualizar los indicadores"
+            description={`${error} Se muestran los últimos datos cargados.`}
+            onRetry={() => setAttempt((n) => n + 1)}
           />
-        ))}
-      </section>
+        ) : null}
 
-      {view.slug === 'resumen' && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Evolución por gestión</CardTitle>
-            <CardDescription>
-              {view.stack
+        <section
+          aria-label={
+            year ? `Indicadores de la gestión ${year}` : 'Indicadores'
+          }
+          className="grid grid-cols-2 gap-3 sm:gap-4 xl:grid-cols-4"
+        >
+          {kpis.map((measure) => (
+            <KpiCard
+              key={measure.name}
+              label={measure.label}
+              value={yearRow?.values[measure.name] ?? null}
+              format={(value) => formatValue(value, measure.format)}
+              emptyLabel="Sin dato para esta gestión"
+              loading={firstLoad}
+              refreshing={refreshing}
+              delta={
+                yearRow?.values[measure.name] == null
+                  ? undefined
+                  : deltaFor(
+                      measure,
+                      yearRow?.values[measure.name],
+                      previousRow?.values[measure.name],
+                      previousRow?.label,
+                    )
+              }
+              detail={measure.help}
+              sparkline={
+                sparklines[measure.name]?.length > 1 ? (
+                  <AcademicSparkline
+                    label={measure.label}
+                    data={sparklines[measure.name]}
+                    formatValue={(value) => formatValue(value, measure.format)}
+                    className="h-7 w-24 text-role-accent"
+                  />
+                ) : undefined
+              }
+            />
+          ))}
+        </section>
+
+        {view.slug === 'resumen' && (
+          <ChartFrame
+            title="Evolución por gestión"
+            description={
+              view.stack
                 ? `Distribución porcentual de ${view.stack.map((p) => p.label.toLocaleLowerCase('es')).join(', ')} en cada gestión.`
-                : `${headline.label}${unit} en cada gestión cargada.`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {view.stack ? (
-              <StackedShareChart
-                ariaLabel={`${view.title}: evolución por gestión`}
-                parts={view.stack.map((part) => part.label)}
-                rows={trend.map((row) => ({
-                  label: row.label,
-                  parts: view.stack!.map(
-                    (part) => row.values[part.name] ?? null,
-                  ),
-                }))}
-              />
-            ) : (
-              <TrendLineChart
-                data={trendPoints}
-                ariaLabel={`${headline.label} por gestión`}
-                height={300}
-              />
-            )}
-            <MeasureTable view={view} rows={trend} labelHeader="Gestión" />
-          </CardContent>
-        </Card>
-      )}
+                : `${headline.label}${unit} en cada gestión cargada.`
+            }
+            loading={firstLoad}
+            refreshing={refreshing}
+            height={300}
+          >
+            <div className="flex flex-col gap-6">
+              {view.stack ? (
+                <StackedShareChart
+                  ariaLabel={`${view.title}: evolución por gestión`}
+                  parts={view.stack.map((part) => part.label)}
+                  rows={trend.map((row) => ({
+                    label: row.label,
+                    parts: view.stack!.map(
+                      (part) => row.values[part.name] ?? null,
+                    ),
+                  }))}
+                />
+              ) : (
+                <TrendLineChart
+                  data={trendPoints}
+                  ariaLabel={`${headline.label} por gestión`}
+                  height={300}
+                />
+              )}
+              <MeasureTable view={view} rows={trend} labelHeader="Gestión" />
+            </div>
+          </ChartFrame>
+        )}
 
-      {view.composition && composition.rows.length ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>{`Composición por ${view.composition.label.toLocaleLowerCase('es')}`}</CardTitle>
-            <CardDescription>
-              {`Distribución porcentual de ${view.measures.find((m) => m.name === view.composition!.measure)?.label.toLocaleLowerCase('es') ?? view.composition.measure.toLocaleLowerCase('es')} por ${view.composition.label.toLocaleLowerCase('es')} en cada gestión.`}
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
+        {view.composition && composition.rows.length ? (
+          <ChartFrame
+            title={`Composición por ${view.composition.label.toLocaleLowerCase('es')}`}
+            description={`Distribución porcentual de ${view.measures.find((m) => m.name === view.composition!.measure)?.label.toLocaleLowerCase('es') ?? view.composition.measure.toLocaleLowerCase('es')} por ${view.composition.label.toLocaleLowerCase('es')} en cada gestión.`}
+            refreshing={refreshing}
+          >
             <StackedShareChart
               ariaLabel={`${view.title}: composición por ${view.composition.label.toLocaleLowerCase('es')}`}
               parts={composition.parts}
               rows={composition.rows}
             />
-          </CardContent>
-        </Card>
-      ) : null}
+          </ChartFrame>
+        ) : null}
 
-      <Card>
-        <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
-          <div className="space-y-1.5">
-            <CardTitle>{`${scopeLabel}, gestión ${year}`}</CardTitle>
-            <CardDescription>
-              {parent
-                ? `Ranking por ${headline.label}.`
-                : selected.second
-                  ? `Ranking por ${headline.label}. Elige un elemento de la tabla para ver su detalle (${(selected.secondPlural ?? '').toLocaleLowerCase('es')}).`
-                  : `Ranking por ${headline.label}.`}
-            </CardDescription>
-          </div>
-          <div className="flex flex-wrap items-end gap-3">
-            {breakdowns.length > 1 ? (
-              <label className="grid gap-1 text-sm font-medium">
-                Desglosar por
-                <select
-                  className="min-h-10 rounded-md border border-input bg-background px-3"
+        <Card data-reveal className="gap-5 px-5 py-5 sm:px-6">
+          <RefreshIndicator
+            active={breakdownLoading && breakdown.length > 0}
+            label="Actualizando el desglose…"
+          />
+          <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-3">
+            <div className="min-w-0">
+              <h2
+                ref={breakdownHeadingRef}
+                tabIndex={-1}
+                className="font-heading text-base font-semibold tracking-tight outline-none"
+              >
+                {year ? `${scopeLabel}, gestión ${year}` : scopeLabel}
+              </h2>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {parent
+                  ? `Ranking por ${headline.label}.`
+                  : selected.second
+                    ? `Ranking por ${headline.label}. Elige un elemento de la tabla para ver su detalle (${(selected.secondPlural ?? '').toLocaleLowerCase('es')}).`
+                    : `Ranking por ${headline.label}.`}
+              </p>
+            </div>
+            <div className="flex flex-wrap items-end gap-2">
+              {breakdowns.length > 1 ? (
+                <NativeSelect
+                  label="Desglosar por"
                   value={selected.id}
                   onChange={(event) => {
-                    setBreakdownId(event.target.value);
+                    setBreakdownId(event.currentTarget.value);
                     setParent(null);
                   }}
+                  options={breakdowns.map((option) => ({
+                    value: option.id,
+                    label: option.label,
+                  }))}
+                />
+              ) : null}
+              {parent ? (
+                <Button
+                  ref={backRef}
+                  variant="outline"
+                  className="h-10 animate-ds-fade"
+                  iconLeft={<ArrowLeft aria-hidden="true" />}
+                  onClick={() => setParent(null)}
                 >
-                  {breakdowns.map((option) => (
-                    <option key={option.id} value={option.id}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            ) : null}
-            {parent ? (
-              <Button variant="outline" onClick={() => setParent(null)}>
-                {`Volver a ${selected.firstPlural.toLocaleLowerCase('es')}`}
-              </Button>
-            ) : null}
+                  {`Volver a ${selected.firstPlural.toLocaleLowerCase('es')}`}
+                </Button>
+              ) : null}
+            </div>
           </div>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          <nav
-            aria-label="Nivel de desglose"
-            className="text-sm text-muted-foreground"
-          >
-            <button
-              type="button"
-              className="hover:underline"
-              onClick={() => setParent(null)}
-            >
-              UATF
-            </button>
-            {parent ? <span>{` / ${parent}`}</span> : null}
+
+          <nav aria-label="Nivel de desglose">
+            <ol className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+              <li>
+                {parent ? (
+                  <button
+                    type="button"
+                    className="rounded-md underline-offset-4 hover:text-foreground hover:underline focus-visible:ring-3 focus-visible:ring-ring/35 focus-visible:outline-none"
+                    onClick={() => setParent(null)}
+                  >
+                    {rootLabel}
+                  </button>
+                ) : (
+                  <span
+                    aria-current="page"
+                    className="font-medium text-foreground"
+                  >
+                    {rootLabel}
+                  </span>
+                )}
+              </li>
+              {parent ? (
+                <>
+                  <li aria-hidden="true">
+                    <ChevronRight className="size-3.5" />
+                  </li>
+                  <li
+                    aria-current="page"
+                    className="font-medium text-foreground"
+                  >
+                    {parent}
+                  </li>
+                </>
+              ) : null}
+            </ol>
           </nav>
-          {breakdownLoading ? (
-            <Loader text="Cargando desglose…" fullScreen={false} />
+
+          {breakdownError ? (
+            <StatusBanner
+              title="No se pudo cargar el desglose"
+              description={`${breakdownError} Los indicadores de arriba siguen disponibles.`}
+              onRetry={() => setBreakdownAttempt((n) => n + 1)}
+            />
+          ) : (firstLoad || breakdownLoading) && breakdown.length === 0 ? (
+            <div aria-hidden="true" className="flex flex-col gap-3">
+              <Skeleton className="h-64 w-full rounded-xl" />
+              {[0, 1, 2].map((row) => (
+                <Skeleton key={row} className="h-9 w-full rounded-lg" />
+              ))}
+            </div>
           ) : breakdown.length === 0 ? (
-            <p className="text-muted-foreground">
-              No hay datos para esta selección.
-            </p>
+            <EmptyState
+              title="No hay datos para esta selección"
+              description="Elige otra gestión u otra forma de desglose."
+              size="compact"
+            />
           ) : (
-            <>
+            <div
+              key={`${selected.id}-${parent ?? 'root'}`}
+              className={`flex animate-ds-fade flex-col gap-6 transition-opacity duration-(--dur-base) ${breakdownLoading ? 'pointer-events-none opacity-60' : ''}`}
+            >
               {view.stack ? (
                 <StackedShareChart
                   horizontal
@@ -587,40 +826,47 @@ export function RendimientoViewPanel({
                     : (label) => setParent(label)
                 }
               />
-            </>
+            </div>
           )}
-        </CardContent>
-      </Card>
+        </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Cómo leer estos indicadores</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <dl className="grid gap-3 text-sm">
-            {view.measures
-              .filter((measure) => measure.help)
-              .map((measure) => (
-                <div key={measure.name}>
-                  <dt className="font-medium">{measure.label}</dt>
-                  <dd className="text-muted-foreground">{measure.help}</dd>
-                </div>
-              ))}
-          </dl>
-          {view.notes?.length ? (
-            <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-              {view.notes.map((note) => (
-                <li key={note}>{note}</li>
-              ))}
-            </ul>
-          ) : null}
-          <p className="mt-4 text-xs text-muted-foreground">
-            {view.sourceNote ??
-              'Fuente: DW institucional (cubos «Rendimiento académico» y «Rendimiento estudiantil»), con las definiciones del Boletín 3 de la DSA.'}{' '}
-            Las celdas con menos de 5 personas se ocultan por privacidad.
-          </p>
-        </CardContent>
-      </Card>
+        <details
+          data-reveal
+          className="group/glossary glass-surface rounded-2xl border border-(--glass-border) shadow-glass"
+        >
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-3 rounded-2xl px-5 py-4 font-heading text-base font-semibold tracking-tight outline-none focus-visible:ring-3 focus-visible:ring-ring/35 sm:px-6 [&::-webkit-details-marker]:hidden">
+            Cómo leer estos indicadores
+            <ChevronDown
+              aria-hidden="true"
+              className="size-4 text-muted-foreground transition-transform duration-(--dur-base) group-open/glossary:rotate-180"
+            />
+          </summary>
+          <div className="border-t border-(--glass-border) px-5 py-5 sm:px-6">
+            <dl className="grid gap-3 text-sm sm:grid-cols-2">
+              {view.measures
+                .filter((measure) => measure.help)
+                .map((measure) => (
+                  <div key={measure.name}>
+                    <dt className="font-medium">{measure.label}</dt>
+                    <dd className="text-muted-foreground">{measure.help}</dd>
+                  </div>
+                ))}
+            </dl>
+            {view.notes?.length ? (
+              <ul className="mt-4 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
+                {view.notes.map((note) => (
+                  <li key={note}>{note}</li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        </details>
+        <p className="text-xs text-muted-foreground">
+          {view.sourceNote ??
+            'Fuente: DW institucional (cubos «Rendimiento académico» y «Rendimiento estudiantil»), con las definiciones del Boletín 3 de la DSA.'}{' '}
+          Las celdas con menos de 5 personas se ocultan por privacidad.
+        </p>
+      </PageContainer>
     </div>
   );
 }

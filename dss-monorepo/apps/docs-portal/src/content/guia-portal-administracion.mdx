@@ -2,7 +2,7 @@ export const metadata = { title: 'Portal de administración', audience: ['admini
 
 ## Acceso
 
-El portal de administración muestra cada sección según los permisos de tu cuenta: **Usuarios** requiere `iam:users:read`, **Roles**, **Permisos** y **Matriz de acceso** `iam:roles:read`, **Aplicaciones** `iam:clients:read`, **Auditoría** `iam:audit:read`, **Servicio OLAP** `olap:admin`, **Aprendizaje automático** `prediction:train`, y los cierres y ejecuciones ETL `dw:closure:read`/`dw:etl-monitor:read`. Los permisos se asignan desde este mismo portal, directamente o a través de un rol. Cada operación vuelve a validarse en el BFF y en el servicio correspondiente. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso necesario.
+El portal de administración muestra cada sección según los permisos de tu cuenta: **Usuarios** requiere `iam:users:read`, **Roles**, **Permisos** y **Matriz de acceso** `iam:roles:read`, **Aplicaciones** `iam:clients:read`, **Auditoría** `iam:audit:read`, **Servicio OLAP** `olap:admin`, **Aprendizaje automático** `prediction:train`, los cierres `dw:closure:read` y las páginas del Load Manager (Panel ETL, Ejecuciones ETL y Programaciones ETL, dentro de **Servicio de control del almacén de datos**) `dw:etl-monitor:read`. Dentro del Load Manager, ejecutar o detener procesos requiere `dw:etl:execute` y administrar programaciones `dw:etl-schedule:manage`. Los permisos se asignan desde este mismo portal, directamente o a través de un rol. Cada operación vuelve a validarse en el BFF y en el servicio correspondiente. Si una sección muestra «Acceso restringido», tu cuenta no tiene el permiso necesario.
 
 El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio de autenticación**, **servicio OLAP**, **servicio de control del almacén de datos** y **servicio de aprendizaje automático**.
 
@@ -16,7 +16,9 @@ El menú lateral agrupa las secciones por servicio: **Plataforma**, **servicio d
 | <Ui>Aplicaciones</Ui> | servicio de autenticación | Registrar y editar las aplicaciones que inician sesión con Keycloak y rotar sus secretos. |
 | <Ui>Auditoría</Ui> | servicio de autenticación | Revisar quién cambió qué en usuarios, roles, permisos y aplicaciones. |
 | <Ui>Cierres académicos</Ui> | servicio de control del almacén de datos | Crear, autorizar y reabrir cortes de periodo. |
-| <Ui>Ejecuciones ETL</Ui> | servicio de control del almacén de datos | Revisar el historial y el detalle de las cargas. |
+| <Ui>Panel ETL</Ui> | servicio de control del almacén de datos | Ejecutar, detener y seguir los procesos ETL en Hop Server. |
+| <Ui>Ejecuciones ETL</Ui> | servicio de control del almacén de datos | Revisar el historial y el detalle de las cargas del DW. |
+| <Ui>Programaciones ETL</Ui> | servicio de control del almacén de datos | Programar cargas automáticas fuera del horario operativo de la DSA. |
 | <Ui>Conexiones</Ui> | servicio OLAP | Registrar y mantener conexiones OLAP. |
 | <Ui>Esquemas y cubos</Ui> | servicio OLAP | Subir y revisar esquemas Mondrian. |
 | <Ui>Operaciones ML</Ui> | servicio de aprendizaje automático | Subir conjuntos de datos de entrenamiento y lanzar entrenamientos candidatos. |
@@ -104,6 +106,24 @@ Un **cierre académico** autoriza que los datos de una gestión y periodo se con
 <Callout title="DW Control no ejecuta el ETL" tone="warning">
   Autorizar un cierre no inicia ni reintenta cargas. Las ejecuciones las realiza Apache Hop; aquí solo se registran y consultan.
 </Callout>
+
+## Panel ETL
+
+El **Panel ETL** concentra la operación del ETL; solo hace falta salir a Hop Web para editar workflows (enlace **Editar workflows en Hop Web**). Muestra si Hop Server está en línea, las ejecuciones en curso, el catálogo de procesos, los últimos lanzamientos y las próximas cargas programadas.
+
+- **Ejecutar** (requiere `dw:etl:execute`): la carga vertical pide un cierre académico en estado CERRADO o, para un reproceso, que elijas de una lista el último intento terminado de cada periodo (los periodos ya procesados aparecen deshabilitados hasta que se reabren y vuelven a cerrar en Cierres académicos); la publicación pide el run ID preparado; la sincronización del catálogo no pide nada. No se puede lanzar un proceso que ya está en ejecución.
+- **Detener**: pide a Hop Server que detenga la ejecución; pasa a «Detenida» cuando Hop lo confirma.
+- Cada lanzamiento tiene su página con fechas, parámetros enviados a Hop, el resultado y el **log de Hop**, que se actualiza cada 5 segundos mientras corre. Desde allí se abre la ejecución del DW con sus pasos y métricas.
+
+Mientras hay un ETL en ejecución, el encabezado del portal muestra **ETL en ejecución** con el proceso y el tiempo transcurrido; un clic lleva a su detalle.
+
+## Programaciones
+
+Las **Programaciones** actualizan el DW automáticamente. Al crear o editar una, la vista previa muestra las próximas ejecuciones y marca en rojo las que caen dentro del horario operativo de la DSA (por defecto lunes a viernes de 08:00 a 18:00, America/La_Paz); esas programaciones no se pueden guardar. La expresión cron tiene seis campos (`segundo minuto hora día mes día-de-semana`) y hay accesos rápidos para los horarios habituales.
+
+- La carga vertical programada procesa en cada disparo el cierre CERRADO más antiguo pendiente; si no hay ninguno, el disparo queda **Omitido** con su motivo.
+- **Historial** muestra la fecha y el resultado de cada disparo, incluidos los omitidos.
+- Pausar, activar, editar y eliminar requieren `dw:etl-schedule:manage`. Eliminar conserva el historial.
 
 ## Ejecuciones ETL
 

@@ -18,8 +18,8 @@ Estado: LM-003 (#351) implementó la ejecución y el monitoreo, y LM-004 (#352) 
 
 | Proceso | Entrada | Parámetros enviados a Hop |
 |---|---|---|
-| `VERTICAL_LOAD` + `CIERRE_ACADEMICO` | `closureId` de un cierre `CERRADO` | `P_RUN_ID` (nuevo), `P_REQUESTED_GESTION`, `P_REQUESTED_PERIODO`, `P_EXECUTION_KIND` |
-| `VERTICAL_LOAD` + `REPROCESO` | `retryOfRunId` | Los anteriores; la gestión y el periodo salen de la ejecución original. Se añade `P_RETRY_OF_RUN_ID`. |
+| `VERTICAL_LOAD` + `CIERRE_ACADEMICO` | `closureId` de un cierre `CERRADO` y ya efectivo | `P_RUN_ID` (nuevo), `P_REQUESTED_GESTION`, `P_REQUESTED_PERIODO`, `P_EXECUTION_KIND`. Si el cierre ya se cargó con éxito antes (se reabrió y volvió a cerrar), el servicio lo envía como `REPROCESO` del último intento terminado (`P_RETRY_OF_RUN_ID`), porque `create_hop_etl_execution` no acepta una segunda carga `CIERRE_ACADEMICO` del mismo cierre. Lo mismo aplica a las programaciones automáticas. Con un intento en curso responde 422. |
+| `VERTICAL_LOAD` + `REPROCESO` | `retryOfRunId` | Los anteriores; la gestión y el periodo salen de la ejecución original. Se añade `P_RETRY_OF_RUN_ID`. La ejecución original debe estar terminada y, si tiene cierre, ese cierre debe estar `CERRADO` y sin procesar (reabierto y vuelto a cerrar); si no, el servicio responde 422 sin enviar nada a Hop, igual que la compuerta de `create_hop_etl_execution`. |
 | `PUBLISH_STAGED` | `runId` de una ejecución existente | `P_RUN_ID` |
 | `CATALOG_SYNC` | — | — |
 
@@ -111,6 +111,17 @@ El contrato completo está en [`docs/dw/contracts/dw-control-service-v1.yaml`](c
 | `etl.hop.up` | gauge | — | 1 si la última consulta a `/health` encontró a Hop disponible |
 
 Actuator solo expone `health` e `info`. Para que un recolector lea estas métricas hay que exponer `metrics` o `prometheus` en `management.endpoints.web.exposure.include`.
+
+## Admin-portal (LM-007)
+
+| Ruta | Contenido |
+|---|---|
+| `/etl` (Panel ETL) | Estado de Hop Server, ejecuciones en curso con **Detener**, catálogo con **Ejecutar**, últimos lanzamientos y próximas programaciones; enlace a Hop Web (`NEXT_PUBLIC_HOP_WEB_URL`) solo para editar. |
+| `/etl/launches/{id}` | Detalle de un lanzamiento: fechas, parámetros, resultado, log de Hop (refresco cada 5 s mientras está activo), **Detener** y enlace a `/etl-executions/{runId}`. |
+| `/etl-schedules` | Programaciones con vista previa en vivo contra el horario DSA, pausar/activar, eliminar e historial de disparos (incluidos los omitidos). |
+| Encabezado | `EtlRunningIndicator`: consulta `/etl/status` cada 15 s (solo con `dw:etl-monitor:read` y con la pestaña visible) y muestra el ETL en curso con su duración. |
+
+Los botones de ejecución y programación solo aparecen con `dw:etl:execute` y `dw:etl-schedule:manage` (`/api/admin/dw/capabilities`); el BFF y el servicio vuelven a validar cada operación.
 
 ## Errores HTTP
 

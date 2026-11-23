@@ -16,6 +16,20 @@ vi.mock('@dss-monorepo/charts', () => ({
 }));
 
 import { RectorAnalyticsDashboard } from './rector-analytics-dashboard';
+import {
+  AcademicScopeHeader,
+  AcademicScopeProvider,
+} from '@dss-monorepo/academic-analytics/panel/academic-scope';
+
+/** The home as the portal renders it: the gestión selector lives in the header. */
+function renderInPortal() {
+  return render(
+    <AcademicScopeProvider roleLabel="Rectoría">
+      <AcademicScopeHeader badge="never" />
+      <RectorAnalyticsDashboard />
+    </AcademicScopeProvider>,
+  );
+}
 
 const admissionCubeId = 'academic/UATF/UATF/Admision';
 const retentionCubeId = 'academic/UATF/UATF/Permanencia';
@@ -177,7 +191,7 @@ beforeEach(() => {
 describe('RectorAnalyticsDashboard', () => {
   it('loads admission and retention indicators from the authenticated BFF', async () => {
     const { requests } = setupFetch();
-    render(<RectorAnalyticsDashboard />);
+    renderInPortal();
 
     expect(await screen.findByText('1.280')).toBeTruthy();
     expect(screen.getAllByText('640').length).toBeGreaterThan(0);
@@ -208,7 +222,7 @@ describe('RectorAnalyticsDashboard', () => {
 
   it('re-runs the year-scoped queries when another academic year is selected', async () => {
     const { requests } = setupFetch();
-    render(<RectorAnalyticsDashboard />);
+    renderInPortal();
     await screen.findByText('1.280');
     // The latest published year is selected by default.
     expect(
@@ -234,13 +248,16 @@ describe('RectorAnalyticsDashboard', () => {
           input.filters[0].members[0].endsWith('&[2025]'),
       ),
     ).toBe(true);
-    expect(screen.getByText('Gestión 2025')).toBeTruthy();
+    // The page label, not the header option with the same text.
+    expect(
+      screen.getByText('Gestión 2025', { ignore: 'option, script, style' }),
+    ).toBeTruthy();
   });
 
   it('restores a valid academic year from the URL', async () => {
     const { requests } = setupFetch();
     window.history.replaceState({}, '', '/?gestion=2025');
-    render(<RectorAnalyticsDashboard />);
+    renderInPortal();
 
     await screen.findByText('1.280');
     expect(
@@ -255,7 +272,7 @@ describe('RectorAnalyticsDashboard', () => {
 
   it('shows an actionable error and supports retry when the BFF is unavailable', async () => {
     const { fetchMock } = setupFetch({ failCubes: true });
-    render(<RectorAnalyticsDashboard />);
+    renderInPortal();
     expect(await screen.findByRole('alert')).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }));
     await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
@@ -263,7 +280,7 @@ describe('RectorAnalyticsDashboard', () => {
 
   it('explains when the admission cube is not available to the account', async () => {
     setupFetch({ emptyCubes: true });
-    render(<RectorAnalyticsDashboard />);
+    renderInPortal();
     expect((await screen.findByRole('status')).textContent).toContain(
       'no está publicado',
     );

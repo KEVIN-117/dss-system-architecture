@@ -1,24 +1,24 @@
 import { test, expect } from '@playwright/test';
 
+// The BFF runs under `next dev` during e2e: the first visit compiles chunks on
+// demand and, with several browsers in parallel, the `load` event can take
+// longer than the test timeout (seen on Firefox). The assertions only need the
+// rendered HTML, so wait for DOMContentLoaded and let the locators retry.
 test('has title', async ({ page }) => {
-  await page.goto('/');
-  expect(await page.locator('h1').innerText()).toContain('BFF');
-  expect(await page.locator('h2').innerText()).toContain(
-    'Backend for Frontend',
-  );
+  await page.goto('/', { waitUntil: 'domcontentloaded' });
+  await expect(page.locator('h1')).toContainText('BFF');
+  await expect(page.locator('h2')).toContainText('Backend for Frontend');
 });
 
+// The API checks do not need a rendered page: use the request fixture, which
+// resolves relative URLs against `baseURL`.
 test('keeps the OAuth start route public and redirects to Keycloak', async ({
-  page,
+  request,
 }) => {
-  await page.goto('/');
-  const loginUrl = new URL(
+  const response = await request.get(
     '/api/auth/login?returnTo=http://localhost:3001/login',
-    page.url(),
+    { maxRedirects: 0 },
   );
-  const response = await page.request.get(loginUrl.toString(), {
-    maxRedirects: 0,
-  });
 
   expect(response.status()).toBe(302);
   const location = response.headers().location;
@@ -29,10 +29,8 @@ test('keeps the OAuth start route public and redirects to Keycloak', async ({
   );
 });
 
-test('requires authentication on the session endpoint', async ({ page }) => {
-  await page.goto('/');
-  const sessionUrl = new URL('/api/auth/me', page.url());
-  const response = await page.request.get(sessionUrl.toString());
+test('requires authentication on the session endpoint', async ({ request }) => {
+  const response = await request.get('/api/auth/me');
 
   expect(response.status()).toBe(401);
 });
