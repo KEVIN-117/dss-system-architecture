@@ -65,6 +65,20 @@ const STATUSES: ClosureStatus[] = [
 
 type ActionMode = 'close' | 'reopen';
 
+/**
+ * Value for `<input type="datetime-local">`, which is read as local time. `toISOString()` would give UTC and, in
+ * La Paz (UTC-4), turn "now" into a closure effective 4 h in the future that Hop refuses to load.
+ */
+export function toDateTimeLocal(date: Date): string {
+  const pad = (value: number) => String(value).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+}
+
+/** Same rule as ClosureStatus.canTransitionTo and transition_academic_period_closure: CERRADO or PROCESADO → REABIERTO. */
+function canReopen(status: ClosureStatus): boolean {
+  return status === 'CERRADO' || status === 'PROCESADO';
+}
+
 function formatDate(value: string | null): string {
   if (!value) return '—';
   const date = new Date(value);
@@ -347,7 +361,7 @@ export function AdminAcademicClosuresPage() {
     setAction({ mode, closure });
     setActionReason('');
     setActionError(null);
-    setEffectiveAt(new Date().toISOString().slice(0, 16));
+    setEffectiveAt(toDateTimeLocal(new Date()));
   };
 
   const start = totalElements === 0 ? 0 : page * PAGE_SIZE + 1;
@@ -630,8 +644,7 @@ export function AdminAcademicClosuresPage() {
                           <span className="sr-only">Ver detalle</span>
                         </Button>
                         {capabilities.canManageClosures &&
-                          closure.status !== 'PROCESADO' &&
-                          (closure.status === 'CERRADO' ? (
+                          (canReopen(closure.status) ? (
                             <Button
                               size="sm"
                               variant="outline"
@@ -658,11 +671,12 @@ export function AdminAcademicClosuresPage() {
                               Cerrar
                             </Button>
                           ))}
-                        {closure.status === 'PROCESADO' && (
-                          <span className="pr-2 text-xs text-muted-foreground">
-                            Informativo
-                          </span>
-                        )}
+                        {!capabilities.canManageClosures &&
+                          closure.status === 'PROCESADO' && (
+                            <span className="pr-2 text-xs text-muted-foreground">
+                              Informativo
+                            </span>
+                          )}
                       </div>
                     </TableCell>
                   </TableRow>
@@ -912,36 +926,33 @@ export function AdminAcademicClosuresPage() {
                       </div>
                     )}
                   </section>
-                  {capabilities.canManageClosures &&
-                    detail.status !== 'PROCESADO' && (
-                      <div className="flex flex-wrap gap-2 border-t border-border pt-4">
-                        {detail.status === 'CERRADO' ? (
-                          <Button
-                            variant="outline"
-                            onClick={() => startAction('reopen', detail)}
-                          >
-                            <RotateCcw aria-hidden="true" className="size-4" />
-                            Reabrir cierre
-                          </Button>
-                        ) : (
-                          <Button
-                            variant="outline"
-                            onClick={() => startAction('close', detail)}
-                          >
-                            <ShieldCheck
-                              aria-hidden="true"
-                              className="size-4"
-                            />
-                            Autorizar cierre
-                          </Button>
-                        )}
-                      </div>
-                    )}
+                  {capabilities.canManageClosures && (
+                    <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+                      {canReopen(detail.status) ? (
+                        <Button
+                          variant="outline"
+                          onClick={() => startAction('reopen', detail)}
+                        >
+                          <RotateCcw aria-hidden="true" className="size-4" />
+                          Reabrir cierre
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="outline"
+                          onClick={() => startAction('close', detail)}
+                        >
+                          <ShieldCheck aria-hidden="true" className="size-4" />
+                          Autorizar cierre
+                        </Button>
+                      )}
+                    </div>
+                  )}
                   {detail.status === 'PROCESADO' && (
                     <p className="flex items-center gap-2 rounded-md bg-muted/30 p-3 text-sm text-muted-foreground">
                       <CircleCheck aria-hidden="true" className="size-4" />
-                      El corte fue procesado y se muestra únicamente como
-                      referencia.
+                      {capabilities.canManageClosures
+                        ? 'El corte ya se cargó en el DW. Para reprocesarlo, reábrelo y vuelve a cerrarlo.'
+                        : 'El corte fue procesado y se muestra únicamente como referencia.'}
                     </p>
                   )}
                 </>
@@ -1083,6 +1094,14 @@ export function AdminAcademicClosuresPage() {
               auditoría.
             </DialogDescription>
           </DialogHeader>
+          {action?.mode === 'reopen' &&
+            action.closure.status === 'PROCESADO' && (
+              <p className="rounded-md border border-amber-500/40 bg-amber-500/10 p-3 text-sm">
+                Este corte ya se cargó en el DW. Reabrirlo no borra lo
+                publicado: los datos actuales se mantienen hasta que vuelvas a
+                cerrarlo y se ejecute el reproceso desde el Panel ETL.
+              </p>
+            )}
           {action?.mode === 'close' && (
             <div className="space-y-1.5">
               <label
@@ -1097,7 +1116,20 @@ export function AdminAcademicClosuresPage() {
                 required
                 value={effectiveAt}
                 onChange={(event) => setEffectiveAt(event.target.value)}
+                aria-describedby="closure-effective-at-hint"
               />
+              <p
+                id="closure-effective-at-hint"
+                className={
+                  effectiveAt && new Date(effectiveAt).getTime() > Date.now()
+                    ? 'text-xs text-amber-600'
+                    : 'text-xs text-muted-foreground'
+                }
+              >
+                {effectiveAt && new Date(effectiveAt).getTime() > Date.now()
+                  ? 'La fecha está en el futuro: el periodo no se podrá cargar en el DW hasta esa hora.'
+                  : 'Hora local de tu equipo. El periodo se puede cargar en el DW desde esta fecha.'}
+              </p>
             </div>
           )}
           <form

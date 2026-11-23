@@ -11,7 +11,11 @@ import {
   CardTitle,
 } from '@dss-monorepo/design-system';
 import { TrendLineChart } from '@dss-monorepo/charts';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import {
+  ALL_YEARS,
+  useScopeYear,
+} from '@dss-monorepo/academic-analytics/panel/academic-scope';
 import {
   BookOpenCheck,
   CalendarDays,
@@ -62,7 +66,20 @@ export function RectorAnalyticsDashboard() {
     paths: RetentionPaths;
     members: PublishedMember[];
   } | null>(null);
-  const [selectedYear, setSelectedYear] = useState('');
+  // One gestión for the whole portal, chosen in the header. Rectoría can also
+  // see every gestión at once ("Todas las gestiones").
+  const memberLabels = useMemo(
+    () =>
+      admission?.members.map((member) => member.caption ?? member.name) ?? [],
+    [admission],
+  );
+  const { year: scopeYear, setYear: setScopeYear } = useScopeYear(
+    memberLabels,
+    memberLabels.at(-1) ?? '',
+    { allowAll: true },
+  );
+  /** Empty means every gestión, as the queries below expect. */
+  const selectedYear = scopeYear === ALL_YEARS ? '' : scopeYear;
   const [filter, setFilter] = useState('');
   const [page, setPage] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -149,15 +166,15 @@ export function RectorAnalyticsDashboard() {
         const requested = new URL(window.location.href).searchParams.get(
           'gestion',
         );
-        const selected =
-          requested === 'todas'
-            ? ''
-            : (members.find((m) => (m.caption ?? m.name) === requested)
-                ?.caption ??
-              members.at(-1)?.caption ??
-              members.at(-1)?.name ??
-              '');
-        setSelectedYear(selected);
+        // A shared link (?gestion=) chooses the gestión; otherwise the header's
+        // current choice stays, or the latest gestión when there is none.
+        if (requested === 'todas') setScopeYear(ALL_YEARS);
+        else {
+          const match = members.find(
+            (m) => (m.caption ?? m.name) === requested,
+          );
+          if (match) setScopeYear(match.caption ?? match.name);
+        }
         setAdmission({ id: admissionCube.cubeId, paths, members });
         const retentionCube = findCube('permanencia y deserción');
         if (!retentionCube) {
@@ -204,7 +221,7 @@ export function RectorAnalyticsDashboard() {
     return () => {
       active = false;
     };
-  }, [refresh]);
+  }, [refresh, setScopeYear]);
 
   useEffect(() => {
     if (!admission || loading) return;
@@ -357,6 +374,11 @@ export function RectorAnalyticsDashboard() {
     };
   }, [admission, retention, selectedYear, loading]);
 
+  // A new gestión starts the faculty table again from its first page.
+  useEffect(() => {
+    setPage(0);
+  }, [selectedYear]);
+
   const busy = loading || queryLoading;
   const filtered = (busy ? [] : data.faculty).filter((row) =>
     row.label.toLocaleLowerCase().includes(filter.toLocaleLowerCase().trim()),
@@ -389,28 +411,6 @@ export function RectorAnalyticsDashboard() {
         >
           Consultar predicciones de abandono
         </Link>
-        <label className="grid gap-1 text-sm">
-          Gestión académica
-          <select
-            className="min-h-10 rounded-md border border-input bg-background px-3"
-            value={selectedYear}
-            disabled={loading || !admission?.members.length}
-            onChange={(event) => {
-              setSelectedYear(event.target.value);
-              setPage(0);
-            }}
-          >
-            <option value="">Todas las gestiones</option>
-            {admission?.members.map((member) => (
-              <option
-                key={member.uniqueName}
-                value={member.caption ?? member.name}
-              >
-                {member.caption ?? member.name}
-              </option>
-            ))}
-          </select>
-        </label>
       </header>
       {error && (
         <div
@@ -427,7 +427,10 @@ export function RectorAnalyticsDashboard() {
         </div>
       )}
       {!loading && !error && !admission && (
-        <p role="status" className="rounded-lg border border-border p-4 text-sm text-muted-foreground">
+        <p
+          role="status"
+          className="rounded-lg border border-border p-4 text-sm text-muted-foreground"
+        >
           El cubo de admisión no está publicado para esta cuenta.
         </p>
       )}

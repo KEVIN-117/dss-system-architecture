@@ -1,7 +1,57 @@
 # Reporte de pruebas del DSS
 
-**Fecha de revisión de evidencias:** 11 de noviembre de 2026  
-**Alcance:** repositorios locales del DSS y ejecución de pruebas del 11 de noviembre de 2026 sobre el árbol de trabajo disponible. No se identificó un commit limpio para atribuir estos resultados; la evidencia no equivale a aceptación institucional.
+**Actualización editorial:** 23 de noviembre de 2026 · **Corridas registradas:** 11 y 23 de noviembre de 2026
+**Alcance:** resultados locales que constan en los logs enumerados en este reporte. Los logs no identifican un SHA de commit para cada ejecución; la evidencia no equivale a aceptación institucional.
+
+## Estado actual de la evidencia
+
+**La ejecución más reciente tampoco quedó completamente green.** El perfil de integración OLAP tuvo fallos y el flujo vertical del DW no llegó a iniciar por un conflicto de puerto. Hay pruebas unitarias y de componentes aprobadas, además de evaluaciones pendientes. Este reporte conserva esos estados; no interpreta la existencia de una suite como resultado aprobado ni una prueba técnica como aceptación institucional.
+
+Los resultados que requieren atención o evidencia adicional son:
+
+- OLAP, perfil de integración del 23/11: 132 casos; 64 aprobados, 67 fallidos y 1 error.
+- DW, flujo vertical del 23/11: no llegó a ejecutar porque el puerto TCP 5433 ya estaba ocupado.
+- E2E de administración: el log disponible muestra el servidor listo, pero no contiene el resumen final de Playwright.
+- Modelos: PRED-004 sigue siendo un experimento sintético con decisión `EVIDENCIA_INSUFICIENTE`; no se volvió a ejecutar el 23/11.
+- Rendimiento y usabilidad institucional: sin una nueva medición aceptada ni evaluación documentada con participantes.
+
+## Ejecución local del 23 de noviembre de 2026
+
+Los resultados siguientes se extrajeron de los logs creados el 23/11/2026. Las rutas corresponden a la copia local; algunos archivos contienen datos operativos o detalles internos y deben revisarse antes de distribuirse fuera del equipo.
+
+| Componente o flujo | Resultado del log | Estado |
+|---|---:|---|
+| Auth Service | 352 pruebas; 0 fallos, 0 errores y 0 omitidas. `BUILD SUCCESS`. | Aprobada. |
+| DW Control Service | 87 pruebas; 0 fallos, 0 errores y 2 omitidas. `BUILD SUCCESSFUL`. | Aprobadas las ejecutadas; conservar la explicación de las 2 omitidas. |
+| Keycloak Webhook | 33 pruebas; 0 fallos, 0 errores y 0 omitidas. `BUILD SUCCESS`. | Aprobada. |
+| OLAP, suite predeterminada | 974 pruebas; 0 fallos, 0 errores y 1 omitida. `BUILD SUCCESS`. | Aprobadas las ejecutadas; una omitida. |
+| OLAP, perfil de integración | 132 pruebas; 67 aprobadas, 67 fallidas y 1 error. `BUILD FAILURE`. | Fallida. |
+| Prediction Service, unitarias | 197 pruebas; resultado `OK`. | Aprobada. |
+| Ciclo de vida ML | 3 aserciones aprobadas: recarga del paquete tras reinicio, volumen compartido entre API y worker, y persistencia del puntero/artefacto. | Smoke test aprobado. |
+| Regresión de esquema DW (`test.dw_01.log`) | El contenedor de pruebas terminó con código 0; el log registra comprobaciones de checksum de migración, concurrencia de locks y compatibilidad. | Aprobada según salida del contenedor. El error de clave duplicada forma parte del escenario de contención y va seguido por “Lock concurrency test passed”. |
+| Contrato de consultas fuente (`test.integration.log`) | Las nueve consultas de solo lectura pasaron contra un fixture sintético de Jachasun. | Aprobada con fixture; no es acceso a una base institucional. |
+| Flujo vertical DW (`test.dw_vetical.log`) | Docker no pudo enlazar `127.0.0.1:5433` porque el puerto estaba ocupado. | No ejecutada; bloqueo de ambiente, sin resultado funcional atribuible. |
+| Vitest de aplicaciones | 366/366 aprobadas: BFF 201, Administración 109, Dirección 20, Decanato 6, Landing 12 y Rectorado 18. | Aprobada para las suites registradas. |
+| Vitest de bibliotecas | 65/65 aprobadas: Auth Connector 25, DW Control Connector 13, ML Connector 8, OLAP Connector 14 y OLAP Data Access 5. | Aprobada para las suites registradas. |
+| Auth Models | El comando registró “No test files found” y salió con código 1. | Sin casos de prueba encontrados; no contabilizar como suite aprobada. |
+| Playwright BFF | 9/9 aprobadas en Chromium, Firefox y WebKit. | Aprobada para este flujo. El log reporta tareas Nx recuperadas de caché para dependencias. |
+| Playwright Administración | El log registra arranque de Next.js y respuesta 200 a `/`, pero no muestra resumen ni conteo final de Playwright. | Resultado no atribuible con el log disponible. |
+
+### Casos de integración OLAP fallidos identificables
+
+El log de integración registra, entre otros, los siguientes resultados: `TotalsFormatIT` esperaba HTTP 200 y recibió HTTP 400; `UserWorkflowIT` no encontró el cubo Sales; `AdvancedAiQueryIT.multipleFiltersOnSameHierarchy_rejectedAsValidationError` encontró un error de cubo desconocido; y `OssieTileQueryIT` recibió errores de validación de datasource. El reporte Failsafe de `saiku-launcher/target/failsafe-reports` conserva el detalle de los 67 fallos y el error. No se atribuye una causa raíz hasta revisar esos reportes y reproducir los escenarios.
+
+### Evidencia de la corrida
+
+| Grupo | Ruta local del log |
+|---|---|
+| Auth, DW Control y Webhook | `auth-service/test.log`, `dw-control-service/test.log`, `keycloak-webhook/test.log` |
+| OLAP | `olap-service/test.log`, `olap-service/test.integration.log` |
+| Predicción | `prediction-service/test.log`, `prediction-service/test_ml_lifecycle_smoke.log` |
+| DW | `test.dw_01.log`, `test.dw_vetical.log`, `test.integration.log` |
+| Portales, conectores y E2E | `dss-monorepo/test.*.log` |
+
+Los logs se conservaron en el árbol de trabajo local. No se registra en ellos el SHA del commit ejecutado, por lo que los conteos se atribuyen a la corrida fechada y no a una revisión inmutable.
 
 ## Ejecución local del 11 de noviembre de 2026
 
@@ -12,8 +62,6 @@ Se ejecutaron suites de servicios, bibliotecas y portales. Docker estaba detenid
 | Auth Service | 157/157 aprobadas. |
 | DW Control | 6/6 aprobadas. |
 | Keycloak Webhook | 8/8 aprobadas. |
-| ETL Load Manager (Go) | 25 casos aprobados; dos paquetes sin casos. |
-| ETL Service (Maven) | Build exitoso; no hay casos definidos. |
 | OLAP (suite predeterminada) | 2.808/2.815 aprobadas; 7 omitidas. |
 | OLAP (perfil integración) | 67/135 aprobadas, 67 fallidas y 1 error. Varios casos recibieron HTTP 400 cuando esperaban 200. |
 | Prediction Service (unitarias) | 112/112 aprobadas. |
@@ -23,9 +71,25 @@ Se ejecutaron suites de servicios, bibliotecas y portales. Docker estaba detenid
 | Vitest de bibliotecas | 47/47 aprobadas. |
 | Playwright Chromium | 20/20 aprobadas: BFF 3, administración 3, Landing 4, Decanato 4, Dirección 3 y Rectorado 3. |
 
+### Casos fallidos identificables en los logs
+
+Los logs conservan el nombre y la salida de los fallos siguientes. Se incluyen ejemplos concretos para que la tabla de resultados no oculte el comportamiento observado; no son una lista exhaustiva de todas las aserciones fallidas.
+
+| Suite y caso | Resultado esperado | Resultado observado |
+|---|---|---|
+| BFF `analytics.spec.ts`: derivar el alcance de Director desde los contextos de Auth Service. | Obtener el alcance académico del contexto validado. | `TypeError: deriveAcademicScope is not a function`. |
+| BFF `analytics.spec.ts`: mantener los alcances de Decano y Rector aunque haya roles compuestos inferiores. | Conservar el alcance correspondiente al rol. | `TypeError: deriveAcademicScope is not a function`. |
+| BFF `route.spec.ts`: reenviar el Bearer token verificado al servicio OLAP. | HTTP 200 del proxy en el escenario autorizado. | HTTP 403. |
+| BFF `route.spec.ts`: preservar la barra final de la ruta de Saiku. | Reenviar la ruta incluyendo la barra final. | La prueba recibió un valor indefinido al inspeccionar la solicitud reenviada. |
+| BFF `route.spec.ts`: devolver 504 cuando el servicio OLAP excede el tiempo límite. | HTTP 504. | HTTP 403; Vitest también registró un rechazo no controlado asociado a este escenario. |
+| BFF `route.spec.ts`: permitir rutas OLAP ordinarias a roles autenticados que no son administradores. | HTTP 200. | HTTP 403. |
+| OLAP `AdminIT.getUsers_asAdmin_ok`, `AdvancedAiQueryIT.topNIsUnaffected` y `AiQueryAsyncIT.asyncQueryRoundTrip_submitPollResult`. | Respuestas satisfactorias según cada caso de integración. | Los casos aparecen como fallidos en `olap-integration.log`; varios casos de esa suite recibieron HTTP 400 cuando esperaban HTTP 200. |
+
+La causa raíz de estos resultados no se determina solo con el resumen. Antes de describir una corrección, debe vincularse cada fallo con el diagnóstico y con una ejecución posterior que lo confirme.
+
 ### Comandos por componente
 
-Ejecutar los comandos Maven/Gradle/Go/Python desde la raíz de cada servicio indicada; los comandos Vitest y Playwright desde `dss-monorepo`.
+Ejecutar los comandos Maven, Gradle y Python desde la raíz del servicio indicada; los comandos Vitest y Playwright desde `dss-monorepo`.
 
 ```powershell
 # Auth Service
@@ -34,10 +98,6 @@ cd auth-service; .\mvnw.cmd --batch-mode --no-transfer-progress test
 cd dw-control-service; .\gradlew.bat test --rerun-tasks
 # Keycloak Webhook
 cd keycloak-webhook; mvn --batch-mode --no-transfer-progress verify
-# ETL Load Manager
-cd etl-layer\loadmanager; go test ./... -count=1 -v
-# ETL Service
-mvn --batch-mode --no-transfer-progress -f etl-service\pom.xml test
 # OLAP: suite predeterminada
 cd olap-service; mvn --batch-mode --no-transfer-progress -DskipTests=false verify
 # OLAP: perfil de integración
@@ -74,14 +134,14 @@ bunx playwright test --config apps/director-dashboard-e2e/playwright.config.mts
 bunx playwright test --config apps/rector-dashboard-e2e/playwright.config.mts --grep-invert "prediction-publication"
 ```
 
-Las pruebas E2E excluyeron los dos casos de publicación predictiva que requieren cuentas/datos preaprovisionados y el workspace OLAP que requiere servicios autenticados. El alcance fue Chromium. PRED-008 no se reejecutó porque depende de sesiones autenticadas de Rectorado y Superadmin, además de un servicio de inferencia disponible. La evaluación de usabilidad institucional sigue pendiente. Los seis fallos de Vitest y la suite de integración OLAP deben diagnosticarse y repetirse.
+Las pruebas E2E excluyeron los dos casos de publicación predictiva que requieren cuentas/datos preaprovisionados y el workspace OLAP que requiere servicios autenticados. El alcance fue Chromium. PRED-008 no se reejecutó porque depende de sesiones autenticadas de Rectorado y Superadmin, además de un servicio de inferencia disponible. La evaluación de usabilidad institucional sigue pendiente. Los seis fallos de Vitest, el error no controlado y la suite de integración OLAP deben diagnosticarse y repetirse.
 
-Los estados descritos en el inventario siguiente representan lo encontrado antes de la corrida de esta fecha; esta sección añade los resultados de ejecución disponibles.
+El inventario siguiente separa la existencia de suites de los resultados efectivamente obtenidos en esta corrida.
 ## Resumen ejecutivo
 
 La verificación del DSS abarca pruebas unitarias y de componentes en Auth Service, DW Control, servicios de datos y portales; pruebas SQL y de integración del Data Warehouse; flujos E2E; experimentación del pipeline predictivo; y una prueba de carga exploratoria.
 
-Se encontraron dos evidencias consolidadas de ejecución que pueden complementar la matriz del informe:
+Se encontraron evidencias de ejecución que permiten complementar la matriz del informe:
 
 - **Integración vertical del DW:** el cierre de Req. 6 registra una ejecución Docker exitosa con nueve manifiestos, cinco dimensiones, tres hechos y ocho lotes; incluye rechazo de nota fuera de rango, reglas de retención, SCD2 y publicación atómica. Los datos son fixtures sintéticos; no es una carga productiva.
 - **Experimento predictivo PRED-004:** comparación reproducible con datos sintéticos, 30 casos de entrenamiento, 10 de prueba y validación de tres folds. La decisión registrada es `EVIDENCIA_INSUFICIENTE` y no hay ganador único; no habilita despliegue institucional.
@@ -96,7 +156,6 @@ La presencia de archivos de prueba acredita procedimientos, no resultados. La co
 |---|---|---|---|
 | Auth Service | JWT, validación de identidad, contextos académicos, directorio de usuarios y configuración de ambiente de prueba. | `auth-service/src/test`; `.test-run.log` está vacío (0 bytes). | Suites presentes; el archivo de log no aporta resultados. |
 | DW Control y autorización | Política de transición de cierres y configuración de seguridad. | `dw-control-service` y `infra/dw-schema/tests`. | Aserciones automatizadas disponibles; sin resumen global de ejecución identificado. |
-| ETL / Load Manager | Dominio, configuración, ejecución, registro de fuentes, handlers HTTP y adaptadores PostgreSQL; hay pruebas de integración y recuperación. | `etl-layer/loadmanager/**/` (`*_test.go`). | Código de prueba presente; no se atribuyen resultados sin log de ejecución. |
 | Esquema e integridad del DW | Calendario académico, capas analíticas y roles, dimensiones conformadas, control de ejecución, concurrencia, migraciones, publicaciones predictivas, gates, publisher atómico y SCD2. | `infra/dw-schema/tests/` (`*.sql`, `*.sh`). | Las aserciones de la integración Req. 6 están respaldadas por el cierre documentado; las demás suites no se consideran ejecutadas por ese solo hecho. |
 | Integración Apache Hop–DW | Extracción de nueve fuentes, preparación de dimensiones y hechos, sellado de lotes, controles de calidad y publicación atómica. | `infra/dw-integration/`, `etl-layer/apache-hop/`; `docs/dw/hop-req-6-progress.md`. | Ejecución documentada como exitosa sobre fixtures sintéticos. |
 | Servicios predictivos | Contrato y carga de dataset, preparación, balanceo, entrenamiento, evaluación/comparación, inferencia, artefactos, registro y publicaciones. | `prediction-service/tests/` y `prediction-service/tests/integration/`. | Suites disponibles; PRED-004 aporta experimento ejecutado y PRED-008 aporta una caracterización de carga incompleta. |
@@ -141,7 +200,7 @@ Antes de incorporar estas imágenes al informe final como evidencia explicativa,
 
 | Prueba | Resultado atribuible | Conclusión para el informe |
 |---|---|---|
-| Unitaria / componente | Numerosas suites identificadas en Java, Go, Python, TypeScript y SQL; no hay reporte consolidado de ejecución. | Reportar inventario, no porcentaje aprobado. Adjuntar salida fechada por suite en la siguiente corrida. |
+| Unitaria / componente | Suites identificadas en Java, Python, TypeScript y SQL; la corrida histórica del 11/11 no consolidó todos los resultados. | Reportar los conteos disponibles por componente y conservar el corte histórico separado del 23/11. |
 | Integración DW | Req. 6: 9 manifiestos, 5 dimensiones, 3 hechos y 8 lotes; cierre `EXITOSA` descrito en el registro. | Ejecutada con fixtures sintéticos; no equivale a prueba productiva. |
 | Calidad e integridad DW | Aserciones de rechazo de nota 101, transiciones SCD2, clasificación de retención, sellado/gates y publicación atómica. | Atribuibles al flujo de integración documentado y a pruebas transaccionales; conservar su alcance sintético. |
 | Funcional / permisos | Specs para GraphQL, login, callback, contexto, conectores y portales; seis capturas de fallos E2E de rectorado. | No afirmar aceptación funcional integral; investigar y documentar esos fallos antes de cerrar el resultado E2E. |
@@ -160,5 +219,33 @@ Las seis capturas de Playwright son candidatas a anexarse como evidencia de fall
 3. Repetir PRED-008 después de corregir/verificar disponibilidad de inferencia y fijar concurrencia, duración, volumen, recursos y umbrales antes de medir.
 4. Planificar una prueba de aceptación con usuarios institucionales, tareas por perfil, consentimiento/autorización y métricas acordadas.
 
-**Fuente de elaboración:** inventario local del repositorio al 11/11/2026; `docs/dw/hop-req-6-progress.md`; `docs/prediction/evidence/PRED-004-synthetic-comparison.json`; artefactos locales PRED-008 y capturas Playwright de rectorado. No se modificaron ni se reejecutaron las suites para crear este reporte.
+**Fuente de elaboración del corte histórico del 11/11:** inventario local del repositorio; `docs/dw/hop-req-6-progress.md`; `docs/prediction/evidence/PRED-004-synthetic-comparison.json`; artefactos locales PRED-008 y capturas Playwright de rectorado. Esa revisión no ejecutó ni modificó las suites.
+
+## Registro que debe completarse en la siguiente corrida
+
+Para que los resultados puedan incorporarse a la memoria y repetirse por otra persona, cada ejecución nueva debe registrar los siguientes datos. El SHA del commit, el comando completo y los archivos de evidencia deben corresponder a la misma corrida.
+
+| Campo del registro | Información a guardar |
+|---|---|
+| Identificador | ID único de la ejecución o del caso, relacionado con el requisito que verifica. |
+| Componente y alcance | Servicio, biblioteca, portal o flujo y comportamiento cubierto. |
+| Versión | SHA del commit evaluado y, cuando corresponda, versión de dependencias/imagen. |
+| Condiciones | Fecha, ambiente, configuración, servicios requeridos y tipo de datos (fixture sintético o fuente institucional autorizada). |
+| Procedimiento | Comando exacto y pasos manuales necesarios para repetir el caso. |
+| Criterio | Resultado esperado, definido antes de ejecutar la prueba. |
+| Resultado | Conteo aprobado/fallido/omitido/error; resultado obtenido y breve explicación de desviaciones. |
+| Evidencia | Ruta al log, reporte JUnit/JSON, reporte Playwright y capturas asociadas. |
+| Seguimiento | Incidencia relacionada, corrección aplicada y resultado de la repetición, si corresponde. |
+
+### Relación sugerida con la sección 3.6 del proyecto
+
+| Apartado | Evidencia que debe aparecer o enlazarse |
+|---|---|
+| 3.6.1–3.6.2 Plan, criterios, datos y ambiente | Criterios previos, versión evaluada, configuración y procedimiento reproducible. |
+| 3.6.3–3.6.7 Unitarias, integración, DW, portales y seguridad | Casos ejecutados por componente, conteos y logs/reportes correspondientes. |
+| 3.6.8 Pipeline predictivo | Suites del pipeline separadas del experimento de modelos; indicar si los datos son sintéticos o institucionales. |
+| 3.6.9–3.6.10 Rendimiento y usabilidad | Mediciones con umbrales acordados y evaluación con participantes; si no se ejecutaron, mantener estado pendiente. |
+| 3.6.11–3.6.12 Incidencias y matriz | Fallos, correcciones, repetición, estado final y enlace a cada evidencia. |
+
+Los logs de la corrida del 11/11/2026 permanecen en el directorio local temporal `.tmp` y no se versionan con este documento. Para la siguiente corrida, conservar los reportes relevantes en una ubicación estable y autorizada, sin incluir credenciales ni datos personales. Las capturas de interfaz complementan los logs; no los sustituyen. Si se incorporan al documento académico, actualizar el índice de figuras y anexos que corresponda.
 

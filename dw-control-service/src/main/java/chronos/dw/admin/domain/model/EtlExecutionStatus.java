@@ -6,5 +6,10 @@ public enum EtlExecutionStatus {
     PUBLICANDO,
     EXITOSA,
     FALLIDA,
-    CANCELADA
+    CANCELADA;
+
+    /** EXITOSA, FALLIDA or CANCELADA: the attempt finished and can be the parent of a reprocess. */
+    public boolean isTerminal() {
+        return this == EXITOSA || this == FALLIDA || this == CANCELADA;
+    }
 }

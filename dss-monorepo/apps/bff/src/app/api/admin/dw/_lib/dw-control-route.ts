@@ -135,13 +135,13 @@ export function mapDwControlError(error: unknown): NextResponse {
                   : status === 504
                     ? 'DW control service timed out'
                     : 'DW control service is unavailable';
-    // `detail` is the reason dw-control-service gave for a 400/409 (for example a schedule inside the DSA
+    // `detail` is the reason dw-control-service gave for a 400/404/409/422 (for example a schedule inside the DSA
     // operating hours); the connector only keeps it after screening it for internal data.
     return NextResponse.json(
       {
         error: message,
         code: error.code,
-        ...(error.detail && (status === 400 || status === 409 || status === 422)
+        ...(error.detail && (status === 400 || status === 404 || status === 409 || status === 422)
           ? { detail: error.detail }
           : {}),
       },

@@ -10,12 +10,6 @@ export default async function Page({ params }: { params: Promise<{ vista: string
   const view = findView(vista);
   if (!view || view.slug === 'resumen') notFound();
   return (
-    <div className="mx-auto w-full max-w-7xl space-y-6">
-      <header className="space-y-2">
-        <p className="text-sm font-medium text-muted-foreground">Rendimiento académico</p>
-        <h1 className="text-3xl font-semibold tracking-tight text-foreground">{view.title}</h1>
-      </header>
-      <RendimientoViewPanel key={view.slug} view={view} scope="career" />
-    </div>
+    <RendimientoViewPanel key={view.slug} view={view} scope="career" eyebrow="Rendimiento académico" />
   );
 }

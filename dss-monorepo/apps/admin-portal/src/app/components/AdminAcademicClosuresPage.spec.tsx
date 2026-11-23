@@ -230,6 +230,37 @@ describe('AdminAcademicClosuresPage', () => {
     );
   });
 
+  it('reopens a processed cut so it can be reprocessed, warning that the published data stays', async () => {
+    const processed = {
+      ...pending,
+      status: 'PROCESADO' as const,
+      processedRunId: '1dc8e24d-8673-4fe5-8397-f8d64cc64c5a',
+      processedAt: '2026-11-16T04:45:00Z',
+    };
+    listAcademicClosures.mockResolvedValue(closurePage([processed]));
+    render(<AdminAcademicClosuresPage />);
+    const row = await screen.findByRole('row', { name: /2026 · Periodo 2/ });
+    expect(within(row).queryByText('Informativo')).toBeNull();
+    fireEvent.click(
+      within(row).getByRole('button', { name: 'Reabrir corte 2026 periodo 2' }),
+    );
+    expect(
+      await screen.findByText(/Reabrirlo no borra lo publicado/),
+    ).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Motivo *'), {
+      target: { value: 'Reproceso por corrección de notas' },
+    });
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Confirmar reapertura' }),
+    );
+
+    await waitFor(() =>
+      expect(reopenAcademicPeriod).toHaveBeenCalledWith(12, {
+        reason: 'Reproceso por corrección de notas',
+      }),
+    );
+  });
+
   it('shows an informative empty state when there are no cuts', async () => {
     listAcademicClosures.mockResolvedValue(closurePage([]));
     render(<AdminAcademicClosuresPage />);

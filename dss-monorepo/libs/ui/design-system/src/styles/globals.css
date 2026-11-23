@@ -154,6 +154,8 @@
 }
 
 .dark {
+  /* Native controls (select lists, scrollbars, date pickers) follow the theme. */
+  color-scheme: dark;
   --background: var(--dss-navy-950);
   /* Dark steps of the same eight hues, validated on #060b14 and #0b1a38. */
   --chart-1: #3987e5;

@@ -433,7 +433,7 @@ async function upstreamError(response: Response): Promise<DwControlClientError> 
     return new DwControlClientError(status, problem.code);
   const error = upstreamErrorCode(status);
   const detail =
-    (status === 400 || status === 409 || status === 422) &&
+    (status === 400 || status === 404 || status === 409 || status === 422) &&
     isSafeUpstreamDetail(problem?.detail)
       ? problem.detail
       : undefined;
@@ -465,7 +465,7 @@ async function readProblem(
 }
 
 /**
- * dw-control-service details for 400/409 are authored messages (for example "La ejecución del lunes ... cae dentro
+ * dw-control-service details for 400/404/409/422 are authored messages (for example "La ejecución del lunes ... cae dentro
  * del horario operativo de la DSA"). They are still bounded and screened for anything that looks like an internal
  * leak before reaching the browser.
  */

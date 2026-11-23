@@ -1,21 +1,38 @@
 'use client';
 import { usePathname, useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useAuth, ProtectedRoute, LandingLoginRedirect } from '@dss-monorepo/auth';
+import {
+  useAuth,
+  ProtectedRoute,
+  LandingLoginRedirect,
+} from '@dss-monorepo/auth';
 import {
   AccessDenied,
   DashboardTemplate,
   Loader,
   type NavigationGroup,
 } from '@dss-monorepo/design-system/portal';
-import { OlapSidebarProvider, useOlapSidebar } from '@dss-monorepo/academic-analytics/olap-sidebar';
+import {
+  OlapSidebarProvider,
+  useOlapSidebar,
+} from '@dss-monorepo/academic-analytics/olap-sidebar';
 import { analyticsNavigation } from '@dss-monorepo/academic-analytics/panel/navigation';
+import {
+  AcademicScopeHeader,
+  AcademicScopeProvider,
+} from '@dss-monorepo/academic-analytics/panel/academic-scope';
 import { RoleGuard } from '@dss-monorepo/rbac';
 import { LayoutDashboard, Database } from 'lucide-react';
 import type { ReactNode } from 'react';
 
 export function PortalFrame({ children }: { children: ReactNode }) {
-  return <OlapSidebarProvider><PortalFrameContent>{children}</PortalFrameContent></OlapSidebarProvider>;
+  return (
+    <OlapSidebarProvider>
+      <AcademicScopeProvider roleLabel="Dirección de carrera">
+        <PortalFrameContent>{children}</PortalFrameContent>
+      </AcademicScopeProvider>
+    </OlapSidebarProvider>
+  );
 }
 
 function PortalFrameContent({ children }: { children: ReactNode }) {
@@ -51,14 +68,17 @@ function PortalFrameContent({ children }: { children: ReactNode }) {
           isActive: pathname === '/analisis-olap',
         },
       ],
-      content: pathname === '/analisis-olap' ? <div ref={setTarget} /> : undefined,
+      content:
+        pathname === '/analisis-olap' ? <div ref={setTarget} /> : undefined,
     },
   ];
   return (
     <ProtectedRoute
       loadingFallback={<Loader />}
       unauthenticatedFallback={
-        <LandingLoginRedirect landingUrl={process.env.NEXT_PUBLIC_LANDING_URL} />
+        <LandingLoginRedirect
+          landingUrl={process.env.NEXT_PUBLIC_LANDING_URL}
+        />
       }
     >
       <RoleGuard
@@ -84,6 +104,7 @@ function PortalFrameContent({ children }: { children: ReactNode }) {
           }
           navGroups={navGroups}
           surfaceMaterial="frosted"
+          headerContext={<AcademicScopeHeader />}
           user={
             user
               ? {
@@ -105,7 +126,10 @@ function PortalFrameContent({ children }: { children: ReactNode }) {
 }
 
 function navigatePortal(href: string, push: (path: string) => void): void {
-  if (typeof window !== 'undefined' && new URL(href, window.location.href).origin !== window.location.origin) {
+  if (
+    typeof window !== 'undefined' &&
+    new URL(href, window.location.href).origin !== window.location.origin
+  ) {
     window.location.assign(href);
     return;
   }

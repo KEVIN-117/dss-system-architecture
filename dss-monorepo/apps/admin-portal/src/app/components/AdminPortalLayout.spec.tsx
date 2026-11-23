@@ -37,6 +37,9 @@ vi.mock('@dss-monorepo/design-system', () => ({
   ),
 }));
 
+// The header indicator polls the BFF; its own spec covers it.
+vi.mock('./etl/EtlRunningIndicator', () => ({ EtlRunningIndicator: () => null }));
+
 import { ADMIN_PERMISSIONS, AdminPortalLayout } from './AdminPortalLayout';
 
 function session(roles: string[], permissions: string[]) {
@@ -118,6 +121,9 @@ describe('AdminPortalLayout', () => {
 
     expect(screen.getByText('ejecuciones')).toBeTruthy();
     expect(screen.getByText('Ejecuciones ETL')).toBeTruthy();
+    // LM-007: the Load Manager pages live in the dw-control-service group and open with the monitor permission.
+    expect(screen.getByText('Panel ETL')).toBeTruthy();
+    expect(screen.getByText('Programaciones ETL')).toBeTruthy();
     expect(screen.queryByText('Cierres académicos')).toBeNull();
     expect(screen.getByText('Resumen general')).toBeTruthy();
     unmount();

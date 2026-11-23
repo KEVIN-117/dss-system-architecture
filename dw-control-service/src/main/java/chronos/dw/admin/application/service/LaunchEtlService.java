@@ -15,13 +15,20 @@ import chronos.dw.admin.domain.exception.InvalidEtlLaunchRequestException;
 import chronos.dw.admin.domain.model.AcademicPeriodClosure;
 import chronos.dw.admin.domain.model.ClosureStatus;
 import chronos.dw.admin.domain.model.EtlExecutionKind;
+import chronos.dw.admin.domain.model.EtlExecutionSearchCriteria;
+import chronos.dw.admin.domain.model.EtlExecutionStatus;
 import chronos.dw.admin.domain.model.EtlExecutionSummary;
 import chronos.dw.admin.domain.model.EtlLaunch;
 import chronos.dw.admin.domain.model.EtlLaunchStatus;
 import chronos.dw.admin.domain.model.EtlProcess;
 import chronos.dw.admin.domain.model.LaunchEtlCommand;
+import java.time.Clock;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.function.Supplier;
 import org.slf4j.Logger;
@@ -38,6 +45,9 @@ public class LaunchEtlService implements LaunchEtlProcessUseCase {
 
     static final String SYSTEM_ACTOR = "dw-control-service";
 
+    /** Attempts of one closure checked before a load; a closure has a handful, far below this bound. */
+    private static final int CLOSURE_HISTORY_SIZE = 100;
+
     private static final Logger LOG = LoggerFactory.getLogger(LaunchEtlService.class);
 
     private final EtlProcessCatalogPort catalog;
@@ -46,6 +56,11 @@ public class LaunchEtlService implements LaunchEtlProcessUseCase {
     private final QueryAcademicClosurePort closures;
     private final QueryEtlExecutionsPort executions;
     private final Supplier<UUID> idGenerator;
+    private final Clock clock;
+
+    /** Effective dates in the DSA's zone, as the operator entered them. */
+    private static final DateTimeFormatter EFFECTIVE_FORMAT =
+            DateTimeFormatter.ofPattern("dd/MM/yyyy HH:mm '(America/La_Paz)'").withZone(ZoneId.of("America/La_Paz"));
 
     @Autowired
     public LaunchEtlService(
@@ -64,12 +79,24 @@ public class LaunchEtlService implements LaunchEtlProcessUseCase {
             QueryAcademicClosurePort closures,
             QueryEtlExecutionsPort executions,
             Supplier<UUID> idGenerator) {
+        this(catalog, launches, hop, closures, executions, idGenerator, Clock.systemUTC());
+    }
+
+    LaunchEtlService(
+            EtlProcessCatalogPort catalog,
+            EtlLaunchPort launches,
+            HopExecutionPort hop,
+            QueryAcademicClosurePort closures,
+            QueryEtlExecutionsPort executions,
+            Supplier<UUID> idGenerator,
+            Clock clock) {
         this.catalog = catalog;
         this.launches = launches;
         this.hop = hop;
         this.closures = closures;
         this.executions = executions;
         this.idGenerator = idGenerator;
+        this.clock = clock;
     }
 
     @Override
@@ -164,7 +191,18 @@ public class LaunchEtlService implements LaunchEtlProcessUseCase {
                 throw new InvalidEtlLaunchRequestException(
                         "Solo se puede cargar un periodo con cierre CERRADO (estado actual: " + closure.status() + ")");
             }
+            requireEffective(closure);
             UUID runId = idGenerator.get();
+            Optional<EtlExecutionSummary> previousLoad = previousLoadOf(closure);
+            if (previousLoad.isPresent()) {
+                // The closure was reopened and closed again after a successful load: create_hop_etl_execution only
+                // accepts it as a REPROCESO of an earlier attempt, so the operator (and the AUTO schedule) can keep
+                // asking for "load this closure" without choosing the parent run by hand.
+                Map<String, String> parameters =
+                        verticalParameters(runId, closure.gestion(), closure.periodo(), EtlExecutionKind.REPROCESO);
+                parameters.put("P_RETRY_OF_RUN_ID", previousLoad.get().runId().toString());
+                return new LaunchPlan(parameters, closure.id(), runId);
+            }
             Map<String, String> parameters = verticalParameters(runId, closure.gestion(), closure.periodo(), kind);
             return new LaunchPlan(parameters, closure.id(), runId);
         }
@@ -178,6 +216,13 @@ public class LaunchEtlService implements LaunchEtlProcessUseCase {
             if (original.requestedGestion() == null || original.requestedPeriodo() == null) {
                 throw new InvalidEtlLaunchRequestException("La ejecución a reintentar no tiene gestión y periodo");
             }
+            if (!original.status().isTerminal()) {
+                throw new InvalidEtlLaunchRequestException(
+                        "Solo se puede reprocesar una ejecución terminada (estado actual: " + original.status() + ")");
+            }
+            if (original.closureId() != null) {
+                requireReprocessableClosure(original.closureId());
+            }
             UUID runId = idGenerator.get();
             Map<String, String> parameters =
                     verticalParameters(runId, original.requestedGestion(), original.requestedPeriodo(), kind);
@@ -186,6 +231,50 @@ public class LaunchEtlService implements LaunchEtlProcessUseCase {
         }
         throw new InvalidEtlLaunchRequestException(
                 "La carga vertical admite CIERRE_ACADEMICO o REPROCESO desde el Load Manager");
+    }
+
+    /**
+     * Mirrors the gate of create_hop_etl_execution (0010): a closure reprocess needs the closure CERRADO again and not
+     * processed. Checking it here answers 422 with the reason instead of launching a Hop run that fails at preflight.
+     */
+    private void requireReprocessableClosure(long closureId) {
+        AcademicPeriodClosure closure =
+                closures.findById(closureId).orElseThrow(() -> new AcademicClosureNotFoundException(closureId));
+        if (closure.status() != ClosureStatus.CERRADO || closure.processedRunId() != null) {
+            throw new InvalidEtlLaunchRequestException("El cierre de gestión " + closure.gestion() + " periodo "
+                    + closure.periodo() + " está " + closure.status()
+                    + "; para reprocesarlo, reábrelo y vuelve a cerrarlo desde Cierres académicos");
+        }
+        requireEffective(closure);
+    }
+
+    /**
+     * Latest finished attempt of a closure that was already loaded successfully, or empty when the closure was never
+     * loaded (first load, or only failed attempts). An attempt still running blocks the launch, as in the 0010 gate.
+     */
+    private Optional<EtlExecutionSummary> previousLoadOf(AcademicPeriodClosure closure) {
+        List<EtlExecutionSummary> attempts = executions
+                .find(new EtlExecutionSearchCriteria(null, null, null, null, closure.id()), 0, CLOSURE_HISTORY_SIZE)
+                .items();
+        if (attempts.stream().anyMatch(attempt -> !attempt.status().isTerminal())) {
+            throw new InvalidEtlLaunchRequestException("El cierre de gestión " + closure.gestion() + " periodo "
+                    + closure.periodo() + " ya tiene una carga en curso; espera a que termine");
+        }
+        if (attempts.stream().noneMatch(attempt -> attempt.status() == EtlExecutionStatus.EXITOSA)) {
+            return Optional.empty();
+        }
+        // Newest first (requested_at DESC): the parent of the reprocess is the latest finished attempt.
+        return attempts.stream().findFirst();
+    }
+
+    /** Hop's preflight (0010) refuses a closure whose effective date is still in the future. */
+    private void requireEffective(AcademicPeriodClosure closure) {
+        if (closure.effectiveAt() != null && closure.effectiveAt().isAfter(clock.instant())) {
+            throw new InvalidEtlLaunchRequestException("El cierre de gestión " + closure.gestion() + " periodo "
+                    + closure.periodo() + " recién será efectivo el " + EFFECTIVE_FORMAT.format(closure.effectiveAt())
+                    + "; no se puede cargar antes de esa fecha. Si la fecha es un error, reábrelo y vuelve a cerrarlo"
+                    + " con la fecha correcta");
+        }
     }
 
     private LaunchPlan publishStaged(LaunchEtlCommand command) {

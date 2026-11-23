@@ -1,6 +1,7 @@
 package chronos.dw.admin.application.service;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -30,9 +31,11 @@ import chronos.dw.admin.domain.model.EtlLaunchStatus;
 import chronos.dw.admin.domain.model.EtlLaunchTrigger;
 import chronos.dw.admin.domain.model.LaunchEtlCommand;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayDeque;
+import java.util.Comparator;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.List;
@@ -118,6 +121,7 @@ class LaunchEtlServiceTest {
     @Test
     void reprocessTakesThePeriodFromThePreviousRun() {
         executions.put(PREVIOUS_RUN, execution(PREVIOUS_RUN, 2025, 1));
+        closures.put(5L, closure(5L, ClosureStatus.CERRADO));
 
         service.launch(LaunchEtlCommand.reprocess(PREVIOUS_RUN, "admin:test"));
 
@@ -125,6 +129,103 @@ class LaunchEtlServiceTest {
         assertEquals(PREVIOUS_RUN.toString(), hop.lastParameters.get("P_RETRY_OF_RUN_ID"));
         assertEquals("2025", hop.lastParameters.get("P_REQUESTED_GESTION"));
         assertEquals("1", hop.lastParameters.get("P_REQUESTED_PERIODO"));
+    }
+
+    @Test
+    void closureLoadedBeforeIsReloadedAsAReprocessOfItsLatestAttempt() {
+        closures.put(7L, closure(7L, ClosureStatus.CERRADO));
+        UUID older = UUID.fromString("44444444-4444-4444-8444-444444444444");
+        executions.put(older, attempt(older, 7L, EtlExecutionStatus.EXITOSA, "2026-11-01T00:00:00Z"));
+        executions.put(PREVIOUS_RUN, attempt(PREVIOUS_RUN, 7L, EtlExecutionStatus.FALLIDA, "2026-11-10T00:00:00Z"));
+
+        EtlLaunch launch = service.launch(LaunchEtlCommand.closureLoad(7L, "admin:test"));
+
+        assertEquals(7L, launch.closureId());
+        assertEquals("REPROCESO", hop.lastParameters.get("P_EXECUTION_KIND"));
+        assertEquals(PREVIOUS_RUN.toString(), hop.lastParameters.get("P_RETRY_OF_RUN_ID"));
+        assertEquals("2026", hop.lastParameters.get("P_REQUESTED_GESTION"));
+    }
+
+    @Test
+    void closureWithOnlyFailedAttemptsIsStillAFirstLoad() {
+        closures.put(7L, closure(7L, ClosureStatus.CERRADO));
+        executions.put(PREVIOUS_RUN, attempt(PREVIOUS_RUN, 7L, EtlExecutionStatus.FALLIDA, "2026-11-10T00:00:00Z"));
+
+        service.launch(LaunchEtlCommand.closureLoad(7L, "admin:test"));
+
+        assertEquals("CIERRE_ACADEMICO", hop.lastParameters.get("P_EXECUTION_KIND"));
+        assertFalse(hop.lastParameters.containsKey("P_RETRY_OF_RUN_ID"));
+    }
+
+    @Test
+    void closureWithAnAttemptInProgressIsRejected() {
+        closures.put(7L, closure(7L, ClosureStatus.CERRADO));
+        executions.put(
+                PREVIOUS_RUN, attempt(PREVIOUS_RUN, 7L, EtlExecutionStatus.EN_EJECUCION, "2026-11-10T00:00:00Z"));
+
+        assertThrows(
+                InvalidEtlLaunchRequestException.class,
+                () -> service.launch(LaunchEtlCommand.closureLoad(7L, "admin:test")));
+        assertTrue(hop.calls.isEmpty());
+    }
+
+    @Test
+    void closureWithAFutureEffectiveDateIsRejectedBeforeHop() {
+        Instant future = Instant.now().plus(Duration.ofHours(4));
+        closures.put(
+                9L,
+                new AcademicPeriodClosure(
+                        9L,
+                        2021,
+                        2,
+                        ClosureStatus.CERRADO,
+                        future,
+                        "dsa:test",
+                        "dsa:test",
+                        "Fixture",
+                        3,
+                        null,
+                        null,
+                        future,
+                        future));
+
+        InvalidEtlLaunchRequestException error = assertThrows(
+                InvalidEtlLaunchRequestException.class,
+                () -> service.launch(LaunchEtlCommand.closureLoad(9L, "admin:test")));
+
+        assertTrue(error.getMessage().contains("recién será efectivo"));
+        assertTrue(launches.rows.isEmpty());
+        assertTrue(hop.calls.isEmpty());
+    }
+
+    @Test
+    void reprocessOfAProcessedClosureIsRejectedBeforeHop() {
+        executions.put(PREVIOUS_RUN, execution(PREVIOUS_RUN, 2025, 1));
+        Instant at = Instant.parse("2026-11-01T00:00:00Z");
+        closures.put(
+                5L,
+                new AcademicPeriodClosure(
+                        5L,
+                        2025,
+                        1,
+                        ClosureStatus.PROCESADO,
+                        at,
+                        "dsa:test",
+                        "dsa:test",
+                        "Fixture",
+                        2,
+                        RUN_ID,
+                        at,
+                        at,
+                        at));
+
+        InvalidEtlLaunchRequestException error = assertThrows(
+                InvalidEtlLaunchRequestException.class,
+                () -> service.launch(LaunchEtlCommand.reprocess(PREVIOUS_RUN, "admin:test")));
+
+        assertTrue(error.getMessage().contains("reábrelo y vuelve a cerrarlo"));
+        assertTrue(launches.rows.isEmpty());
+        assertTrue(hop.calls.isEmpty());
     }
 
     @Test
@@ -237,6 +338,21 @@ class LaunchEtlServiceTest {
                 at);
     }
 
+    private static EtlExecutionSummary attempt(UUID runId, long closureId, EtlExecutionStatus status, String at) {
+        Instant requested = Instant.parse(at);
+        return new EtlExecutionSummary(
+                runId,
+                EtlExecutionKind.CIERRE_ACADEMICO,
+                status,
+                closureId,
+                2026,
+                2,
+                "hop",
+                requested,
+                requested,
+                status.isTerminal() ? requested : null);
+    }
+
     private QueryAcademicClosurePort closurePort() {
         return new QueryAcademicClosurePort() {
             @Override
@@ -255,7 +371,13 @@ class LaunchEtlServiceTest {
         return new QueryEtlExecutionsPort() {
             @Override
             public ExecutionPage<EtlExecutionSummary> find(EtlExecutionSearchCriteria criteria, int page, int size) {
-                throw new UnsupportedOperationException();
+                List<EtlExecutionSummary> items = executions.values().stream()
+                        .filter(execution -> criteria.closureId() == null
+                                || criteria.closureId().equals(execution.closureId()))
+                        .sorted(Comparator.comparing(EtlExecutionSummary::requestedAt)
+                                .reversed())
+                        .toList();
+                return new ExecutionPage<>(items, page, size, items.size(), 1);
             }
 
             @Override

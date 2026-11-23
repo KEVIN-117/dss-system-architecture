@@ -64,6 +64,8 @@ export const NativeSelect = React.forwardRef<HTMLSelectElement, NativeSelectProp
             aria-describedby={hintId}
             className={cn(
               'h-10 w-full min-w-44 cursor-pointer appearance-none rounded-lg border border-(--glass-border) bg-background/70 pr-9 pl-3 text-sm text-foreground transition-[border-color,box-shadow] duration-(--dur-fast)',
+              // The option list is drawn by the browser: give it opaque, theme-aware colours.
+              '[&_option]:bg-popover [&_option]:text-popover-foreground',
               'hover:border-role-accent/50 focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/30 focus-visible:outline-none',
               'disabled:cursor-not-allowed disabled:opacity-50',
               className,
