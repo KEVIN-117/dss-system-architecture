@@ -80,6 +80,7 @@ class TaskSpec:
 
 _CLASSIFIERS = ("random_forest", "xgboost")
 _REGRESSORS = ("ridge", "random_forest", "xgboost")
+_FORECASTERS = ("linear_trend", "linear_trend_lag", "seasonal_naive")
 
 _TASKS: tuple[TaskSpec, ...] = (
     TaskSpec(
@@ -171,6 +172,54 @@ _TASKS: tuple[TaskSpec, ...] = (
         target_unit="puntos de PPA",
         required_features=("ppa_acumulado",),
         sources=("dw.fact_retencion_desercion", "etl_control.academic_period_closure"),
+    ),
+    TaskSpec(
+        code="APPLICATIONS_BY_PROGRAM",
+        kind="forecast",
+        subject="series",
+        grain="series_program_period",
+        title="Pronóstico de postulaciones",
+        description="Postulaciones por programa en los próximos periodos, con bandas de confianza.",
+        target_field="value",
+        target_label="Número de postulaciones (dw.fact_admision) por programa y periodo cerrado.",
+        population_label="Programas de la cadencia con periodos de admisión procesados.",
+        algorithms=_FORECASTERS,
+        primary_metric="mae",
+        extractable=False,
+        target_unit="postulaciones",
+        sources=("dw.fact_admision", "etl_control.academic_period_closure"),
+    ),
+    TaskSpec(
+        code="ADMITTED_BY_PROGRAM",
+        kind="forecast",
+        subject="series",
+        grain="series_program_period",
+        title="Pronóstico de admitidos",
+        description="Postulantes admitidos por programa en los próximos periodos, con bandas de confianza.",
+        target_field="value",
+        target_label="Número de postulantes admitidos (dw.fact_admision.es_admitido) por programa y periodo cerrado.",
+        population_label="Programas de la cadencia con periodos de admisión procesados.",
+        algorithms=_FORECASTERS,
+        primary_metric="mae",
+        extractable=False,
+        target_unit="admitidos",
+        sources=("dw.fact_admision", "etl_control.academic_period_closure"),
+    ),
+    TaskSpec(
+        code="ENROLLED_BY_PROGRAM",
+        kind="forecast",
+        subject="series",
+        grain="series_program_period",
+        title="Pronóstico de matriculados",
+        description="Estudiantes matriculados con materias por programa en los próximos periodos.",
+        target_field="value",
+        target_label="Estudiantes distintos con materias cursadas (dw.fact_retencion_desercion) por programa y corte.",
+        population_label="Programas de la cadencia con cortes procesados.",
+        algorithms=_FORECASTERS,
+        primary_metric="mae",
+        extractable=False,
+        target_unit="estudiantes",
+        sources=("dw.fact_retencion_desercion", "dw.dim_estudiante", "etl_control.academic_period_closure"),
     ),
     TaskSpec(
         code="COURSE_FINAL_GRADE",

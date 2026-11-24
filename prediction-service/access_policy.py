@@ -27,6 +27,8 @@ from inference import (  # noqa: F401  (re-exported for callers of the access po
 
 PREDICTION_PUBLISH = "prediction:publish"
 PREDICTION_TRAIN = "prediction:train"
+#: PRED-104/PRED-106: read program forecasts (aggregated counts, no student data).
+PREDICTION_FORECAST_READ = "prediction:forecast:read"
 
 
 def permissions_client_id() -> str:

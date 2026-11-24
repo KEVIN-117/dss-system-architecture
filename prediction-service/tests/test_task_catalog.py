@@ -18,6 +18,7 @@ from feature_contract import (
 
 ALL_EVENTS = {PROGRAM_DROPOUT_EVENT, COURSE_ABANDONMENT_EVENT, COURSE_FAILURE_EVENT,
               STUDENT_BACKLOG_EVENT, STUDENT_GPA_EVENT, COURSE_FINAL_GRADE_EVENT}
+FORECAST_SERIES = {"APPLICATIONS_BY_PROGRAM", "ADMITTED_BY_PROGRAM", "ENROLLED_BY_PROGRAM"}
 from main import PredictionRequest, app
 from ml_tasks import UnknownTask, get_task, list_tasks, servable_event_codes, task_for_event_type
 from ml_tasks.catalog import event_code_pattern, event_type_pattern
@@ -30,7 +31,10 @@ SERVICE_ROOT = Path(__file__).resolve().parent.parent
 class TaskCatalogTests(unittest.TestCase):
     def test_registers_every_target(self) -> None:
         codes = {task.code for task in list_tasks()}
-        self.assertEqual(codes, ALL_EVENTS)
+        self.assertEqual(codes, ALL_EVENTS | FORECAST_SERIES)
+        for code in FORECAST_SERIES:
+            self.assertEqual(get_task(code).kind, "forecast")
+            self.assertFalse(get_task(code).servable or get_task(code).extractable, code)
         self.assertEqual(len(codes), len(list_tasks()))
         self.assertEqual(get_task(STUDENT_GPA_EVENT).kind, "regression")
         self.assertEqual(get_task(COURSE_FINAL_GRADE_EVENT).kind, "regression")
@@ -123,7 +127,7 @@ class TaskCatalogApiTests(unittest.TestCase):
         response = self.operator.get("/v1/ml-tasks")
         self.assertEqual(response.status_code, 200, response.text)
         tasks = {item["code"]: item for item in response.json()}
-        self.assertEqual(set(tasks), ALL_EVENTS)
+        self.assertEqual(set(tasks), ALL_EVENTS | FORECAST_SERIES)
         dropout = tasks[PROGRAM_DROPOUT_EVENT]
         self.assertEqual(dropout["kind"], "classification")
         self.assertEqual(dropout["serving_event_type"], "program_dropout")

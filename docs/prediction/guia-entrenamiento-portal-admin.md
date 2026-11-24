@@ -151,6 +151,22 @@ La promoción por CLI del registro de modelos sigue disponible para operadores, 
 
 El procedimiento, el rollback y las causas para volver a evaluar están en [PRED-005-operations.md](PRED-005-operations.md).
 
+## 6. Pronosticar postulaciones y matrícula (PRED-104)
+
+Los pronósticos no necesitan dataset ni activación. Hasta que lleguen las pantallas (PRED-107) se usan por API, con un token que tenga `prediction:train`:
+
+1. `POST /v1/forecast-jobs` con un `Idempotency-Key` y, por ejemplo:
+
+   ```json
+   {"cadence": "SEMESTRAL", "series_codes": ["APPLICATIONS_BY_PROGRAM", "ENROLLED_BY_PROGRAM"], "programs": [], "horizon": 4}
+   ```
+
+   Series disponibles: `APPLICATIONS_BY_PROGRAM` (postulaciones), `ADMITTED_BY_PROGRAM` (admitidos) y `ENROLLED_BY_PROGRAM` (matriculados con materias). `programs` vacío pronostica todas las carreras de la cadencia; `horizon` va de 1 a 8 cortes.
+2. Sigue el job con `GET /v1/jobs/{job_id}`. Las carreras sin datos o con muy pocos cortes no fallan el job: se omiten.
+3. Consulta el resultado con `GET /v1/forecasts?series=APPLICATIONS_BY_PROGRAM&program_ref=<carrera>`: historia, proyección con bandas del 80 % y 95 %, el modelo elegido y su error en el backtest. Sin `program_ref` obtienes el resumen de todas las carreras.
+
+Cada job nuevo reemplaza al anterior como pronóstico vigente de esa serie y carrera. Conviene relanzarlo después de procesar un cierre académico.
+
 ## Lo que hoy no se puede hacer desde el portal
 
 | Tarea | Estado actual |
