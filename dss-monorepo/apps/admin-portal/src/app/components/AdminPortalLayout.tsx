@@ -15,9 +15,12 @@ import {
   Grid3x3,
   KeyRound,
   LayoutDashboard,
+  LineChart,
+  ListChecks,
   ScrollText,
   ServerCog,
   ShieldCheck,
+  Sparkles,
   Users,
 } from 'lucide-react';
 import {
@@ -205,7 +208,15 @@ export function AdminPortalLayout({
           ]
         : []),
     ]),
+    // PRED-107: ML Studio guides the whole lifecycle; the other pages stay for direct access.
     ...group(canMl, 'Servicio de aprendizaje automático', [
+      navigationItem('ML Studio', '/ml-studio', <Sparkles aria-hidden="true" />),
+      navigationItem('Jobs ML', '/ml-jobs', <ListChecks aria-hidden="true" />),
+      navigationItem(
+        'Pronósticos',
+        '/ml-forecasts',
+        <LineChart aria-hidden="true" />,
+      ),
       navigationItem(
         'Operaciones ML',
         '/ml-operations',

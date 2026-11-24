@@ -18,25 +18,30 @@ import {
   type ModelEventCode,
   type ModelSummary,
 } from '../../data-access/ml-operations';
-import { modelLabel, percent } from './model-charts';
+import { rollbackModel } from '../../data-access/ml-studio';
+import { headlineMetrics, modelLabel } from './model-charts';
+
+/** Spanish names of the catalog events (PRED-101/103); unknown codes are shown as they are. */
+export const EVENT_NAMES: Record<string, string> = {
+  PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE: 'Deserción de carrera',
+  COURSE_ABANDONMENT: 'Abandono de materia',
+  COURSE_FAILURE: 'Reprobación de materia',
+  STUDENT_BACKLOG_NEXT_CUT: 'Rezago del estudiante',
+  STUDENT_GPA_NEXT_CUT: 'PPA del próximo corte',
+  COURSE_FINAL_GRADE: 'Nota final de materia',
+};
 
 export function scopeLabel(scopeKey: string | null | undefined): string {
   if (!scopeKey) return 'Sin alcance declarado';
   const [event, cadence] = scopeKey.split('|');
-  const eventName =
-    event === 'PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE'
-      ? 'Deserción de carrera'
-      : event === 'COURSE_ABANDONMENT'
-        ? 'Abandono de materia'
-        : event;
+  const eventName = EVENT_NAMES[event] ?? event;
   const cadenceName = cadence === 'SEMESTRAL' ? 'Semestral' : cadence === 'ANUAL' ? 'Anual' : cadence;
   return `${eventName} · ${cadenceName}`;
 }
 
 export function splitScope(scopeKey: string): { event_code: ModelEventCode; cadence: ModelCadence } | null {
   const [event, cadence] = scopeKey.split('|');
-  if ((event === 'PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE' || event === 'COURSE_ABANDONMENT') &&
-      (cadence === 'SEMESTRAL' || cadence === 'ANUAL')) {
+  if (/^[A-Z][A-Z0-9_]{2,63}$/.test(event ?? '') && (cadence === 'SEMESTRAL' || cadence === 'ANUAL')) {
     return { event_code: event, cadence };
   }
   return null;
@@ -110,13 +115,17 @@ export function ActivateModelDialog({
           </DialogDescription>
         </DialogHeader>
         <dl className="grid grid-cols-3 gap-3 rounded-lg border border-border bg-muted/30 p-3 text-sm">
-          <div><dt className="text-xs text-muted-foreground">Recall</dt><dd className="font-semibold">{percent(model.test_metrics.recall)}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">F1-Score</dt><dd className="font-semibold">{percent(model.test_metrics.f1_score)}</dd></div>
-          <div><dt className="text-xs text-muted-foreground">Precisión</dt><dd className="font-semibold">{percent(model.test_metrics.precision)}</dd></div>
+          {headlineMetrics(model).map((metric) => (
+            <div key={metric.label}>
+              <dt className="text-xs text-muted-foreground">{metric.label}</dt>
+              <dd className="font-semibold">{metric.value}</dd>
+            </div>
+          ))}
         </dl>
         {currentActive && currentActive.model_id !== model.model_id && (
           <p className="text-sm text-muted-foreground">
-            Reemplaza al modelo activo actual ({modelLabel(currentActive)}, recall {percent(currentActive.test_metrics.recall)}).
+            Reemplaza al modelo activo actual ({modelLabel(currentActive)}, {headlineMetrics(currentActive)[0].label.toLowerCase()}{' '}
+            {headlineMetrics(currentActive)[0].value}).
             Para volver atrás, actívalo de nuevo desde esta pantalla.
           </p>
         )}
@@ -202,6 +211,73 @@ export function DeactivateModelDialog({
           </Button>
           <Button type="button" variant="destructive" disabled={submitting || reason.trim().length < 3} onClick={() => void submit()}>
             {submitting ? 'Desactivando…' : 'Desactivar'}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Restores the version that was active before the current one for a scope (PRED-105). */
+export function RollbackModelDialog({
+  scopeKey,
+  open,
+  onOpenChange,
+  onDone,
+}: {
+  scopeKey: string | null;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  onDone: () => void;
+}) {
+  const [reason, setReason] = React.useState('');
+  const [submitting, setSubmitting] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+  React.useEffect(() => {
+    if (open) {
+      setReason('');
+      setError(null);
+    }
+  }, [open]);
+  const scope = scopeKey ? splitScope(scopeKey) : null;
+  if (!scope) return null;
+
+  async function submit() {
+    if (!scope || reason.trim().length < 3 || submitting) return;
+    setSubmitting(true);
+    setError(null);
+    try {
+      await rollbackModel({ ...scope, reason: reason.trim() });
+      onOpenChange(false);
+      onDone();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'No se pudo volver a la versión anterior.');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Volver a la versión anterior</DialogTitle>
+          <DialogDescription>
+            {scopeLabel(scopeKey)} volverá a responder con el modelo que estaba activo antes del actual.
+          </DialogDescription>
+        </DialogHeader>
+        <ReasonField id="rollback-reason" value={reason} onChange={setReason} />
+        {error && (
+          <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+        <DialogFooter>
+          <Button type="button" variant="outline" disabled={submitting} onClick={() => onOpenChange(false)}>
+            Cancelar
+          </Button>
+          <Button type="button" disabled={submitting || reason.trim().length < 3} onClick={() => void submit()}>
+            {submitting ? 'Restaurando…' : 'Hacer rollback'}
           </Button>
         </DialogFooter>
       </DialogContent>

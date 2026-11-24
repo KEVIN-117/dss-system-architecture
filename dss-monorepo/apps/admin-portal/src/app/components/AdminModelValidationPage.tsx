@@ -18,9 +18,11 @@ import {
   algorithmName,
   dateTime,
   decimal,
+  isRegressionModel,
   modelLabel,
   percent,
 } from './ml/model-charts';
+import { ResidualsChart } from './ml/studio-charts';
 
 const MAX_COMPARED = 4;
 
@@ -121,6 +123,8 @@ export function AdminModelValidationPage() {
   }, [visible]);
 
   const comparedModels = visible.filter((m) => compared.includes(m.model_id));
+  // PRED-103: regression scopes show MAE/RMSE/R² and residuals instead of classification metrics.
+  const regression = visible.some(isRegressionModel);
   const focused = visible.find((m) => m.model_id === focusedId) ?? null;
   const activeInScope = models.find((m) => m.scope_key === scope && m.is_active) ?? null;
 
@@ -191,7 +195,7 @@ export function AdminModelValidationPage() {
 
       {!loading && visible.length === 0 && (
         <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          No hay candidatos para este tipo de modelo. Entrena uno desde Operaciones ML.
+          No hay candidatos para este tipo de modelo. Entrena uno desde ML Studio.
         </p>
       )}
 
@@ -213,11 +217,23 @@ export function AdminModelValidationPage() {
                   <th className="px-4 py-3"><span className="sr-only">Comparar</span></th>
                   <th className="px-4 py-3">Modelo</th>
                   <th className="px-4 py-3">Datos</th>
-                  <th className="px-4 py-3 text-right">Recall</th>
-                  <th className="px-4 py-3 text-right">Precisión</th>
-                  <th className="px-4 py-3 text-right">F1-Score</th>
-                  <th className="px-4 py-3 text-right">PR-AUC</th>
-                  <th className="px-4 py-3 text-right">ROC-AUC</th>
+                  {regression ? (
+                    <>
+                      <th className="px-4 py-3 text-right">MAE</th>
+                      <th className="px-4 py-3 text-right">RMSE</th>
+                      <th className="px-4 py-3 text-right">R²</th>
+                      <th className="px-4 py-3 text-right">MAPE</th>
+                      <th className="px-4 py-3 text-right">RMSE validación</th>
+                    </>
+                  ) : (
+                    <>
+                      <th className="px-4 py-3 text-right">Recall</th>
+                      <th className="px-4 py-3 text-right">Precisión</th>
+                      <th className="px-4 py-3 text-right">F1-Score</th>
+                      <th className="px-4 py-3 text-right">PR-AUC</th>
+                      <th className="px-4 py-3 text-right">ROC-AUC</th>
+                    </>
+                  )}
                   <th className="px-4 py-3">Estado</th>
                 </tr>
               </thead>
@@ -244,11 +260,23 @@ export function AdminModelValidationPage() {
                       <p className="text-xs text-muted-foreground">{dateTime(model.created_at)}</p>
                     </td>
                     <td className="px-4 py-3">{evidenceBadge(model)}</td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums">{percent(model.test_metrics.recall)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{percent(model.test_metrics.precision)}</td>
-                    <td className="px-4 py-3 text-right font-semibold tabular-nums">{percent(model.test_metrics.f1_score)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{decimal(model.test_metrics.pr_auc)}</td>
-                    <td className="px-4 py-3 text-right tabular-nums">{decimal(model.test_metrics.roc_auc)}</td>
+                    {regression ? (
+                      <>
+                        <td className="px-4 py-3 text-right tabular-nums">{decimal(model.regression_metrics?.mae)}</td>
+                        <td className="px-4 py-3 text-right font-semibold tabular-nums">{decimal(model.regression_metrics?.rmse)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{decimal(model.regression_metrics?.r2)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{percent(model.regression_metrics?.mape)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{decimal(model.validation.mean_rmse)}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="px-4 py-3 text-right font-semibold tabular-nums">{percent(model.test_metrics.recall)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{percent(model.test_metrics.precision)}</td>
+                        <td className="px-4 py-3 text-right font-semibold tabular-nums">{percent(model.test_metrics.f1_score)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{decimal(model.test_metrics.pr_auc)}</td>
+                        <td className="px-4 py-3 text-right tabular-nums">{decimal(model.test_metrics.roc_auc)}</td>
+                      </>
+                    )}
                     <td className="px-4 py-3">{statusCell(model)}</td>
                   </tr>
                 ))}
@@ -258,7 +286,7 @@ export function AdminModelValidationPage() {
         </section>
       )}
 
-      {comparedModels.length > 0 && (
+      {comparedModels.length > 0 && !regression && (
         <div className="grid gap-6 xl:grid-cols-2">
           <Panel
             title="Métricas de la prueba final"
@@ -302,6 +330,24 @@ export function AdminModelValidationPage() {
             </p>
           )}
 
+          {isRegressionModel(focused) ? (
+            <>
+              <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                <Kpi label="MAE" value={decimal(focused.regression_metrics?.mae)} hint={`Validación: ${decimal(focused.validation.mean_mae)}`} />
+                <Kpi label="RMSE" value={decimal(focused.regression_metrics?.rmse)} hint={`Validación: ${decimal(focused.validation.mean_rmse)}`} />
+                <Kpi label="R²" value={decimal(focused.regression_metrics?.r2)} hint={`MAPE ${percent(focused.regression_metrics?.mape)}`} />
+                <Kpi
+                  label="Cobertura 80 %"
+                  value={percent(focused.regression_metrics?.interval_coverage?.['0.8'])}
+                  hint={`${focused.regression_metrics?.test_row_count ?? '—'} casos de prueba`}
+                />
+              </div>
+              <Panel title="Residuos por tramo" description="Error de la prueba final según el valor real; un sesgo positivo indica sobreestimación.">
+                <ResidualsChart metrics={focused.regression_metrics} unit={focused.target_unit} />
+              </Panel>
+            </>
+          ) : (
+          <>
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             <Kpi label="Recall" value={percent(focused.test_metrics.recall)} hint={`Validación: ${percent(focused.validation.mean_recall)}`} />
             <Kpi label="F1-Score" value={percent(focused.test_metrics.f1_score)} hint={`Validación: ${percent(focused.validation.mean_f1)}`} />
@@ -321,6 +367,8 @@ export function AdminModelValidationPage() {
               <PerClassChart model={focused} />
             </Panel>
           </div>
+          </>
+          )}
 
           <dl className="grid gap-x-8 gap-y-3 rounded-lg border border-border bg-background/60 p-4 text-sm sm:grid-cols-2">
             <div><dt className="text-muted-foreground">Objetivo</dt><dd className="font-mono text-xs">{focused.dataset.target_definition_ref ?? '—'}</dd></div>

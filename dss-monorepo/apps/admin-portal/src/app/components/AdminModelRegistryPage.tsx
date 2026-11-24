@@ -3,7 +3,7 @@
 import * as React from 'react';
 import Link from 'next/link';
 import { Badge, Button } from '@dss-monorepo/design-system';
-import { History, Power, RefreshCw, ServerCog } from 'lucide-react';
+import { History, Power, RefreshCw, RotateCcw, ServerCog } from 'lucide-react';
 
 import {
   getModelRegistry,
@@ -11,8 +11,8 @@ import {
   type ModelRegistrySnapshot,
   type ModelSummary,
 } from '../data-access/ml-operations';
-import { DeactivateModelDialog, scopeLabel } from './ml/model-actions';
-import { dateTime, decimal, modelLabel, percent } from './ml/model-charts';
+import { DeactivateModelDialog, RollbackModelDialog, scopeLabel } from './ml/model-actions';
+import { dateTime, headlineMetrics, modelLabel } from './ml/model-charts';
 
 const KNOWN_SCOPES = [
   'PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE|SEMESTRAL',
@@ -39,6 +39,7 @@ export function AdminModelRegistryPage() {
   const [loading, setLoading] = React.useState(true);
   const [error, setError] = React.useState<string | null>(null);
   const [deactivating, setDeactivating] = React.useState<string | null>(null);
+  const [rollingBack, setRollingBack] = React.useState<string | null>(null);
 
   const load = React.useCallback(async () => {
     setLoading(true);
@@ -76,7 +77,8 @@ export function AdminModelRegistryPage() {
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
             Cada tipo de modelo responde las predicciones con un único modelo activo. Desde aquí puedes
-            desactivarlo y revisar quién activó o desactivó cada modelo, y por qué.
+            volver a la versión anterior, desactivarlo y revisar quién activó o desactivó cada modelo, y por qué.
+            Los candidatos nuevos se entrenan y activan desde ML Studio.
           </p>
         </div>
         <Button variant="outline" onClick={() => void load()} disabled={loading}>
@@ -112,11 +114,16 @@ export function AdminModelRegistryPage() {
               {pointer && (
                 <>
                   <p className="mt-4 font-medium">{model ? modelLabel(model) : pointer.version}</p>
-                  <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
-                    <div><dt className="text-xs text-muted-foreground">Recall</dt><dd className="text-lg font-semibold tabular-nums">{percent(model?.test_metrics.recall)}</dd></div>
-                    <div><dt className="text-xs text-muted-foreground">F1-Score</dt><dd className="text-lg font-semibold tabular-nums">{percent(model?.test_metrics.f1_score)}</dd></div>
-                    <div><dt className="text-xs text-muted-foreground">PR-AUC</dt><dd className="text-lg font-semibold tabular-nums">{decimal(model?.test_metrics.pr_auc)}</dd></div>
-                  </dl>
+                  {model && (
+                    <dl className="mt-3 grid grid-cols-3 gap-3 text-sm">
+                      {headlineMetrics(model).map((metric) => (
+                        <div key={metric.label}>
+                          <dt className="text-xs text-muted-foreground">{metric.label}</dt>
+                          <dd className="text-lg font-semibold tabular-nums">{metric.value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  )}
                   <p className="mt-3 break-all text-xs text-muted-foreground">
                     Activado por <span className="font-mono">{pointer.approved_by}</span>
                     {pointer.activation_kind === 'ADMIN_ACTIVATION' ? ' desde el portal admin' : ' con evaluación PRED-004'}
@@ -127,6 +134,11 @@ export function AdminModelRegistryPage() {
                 <Button asChild variant="outline">
                   <Link href="/ml-models">{pointer ? 'Comparar y cambiar' : 'Elegir un modelo'}</Link>
                 </Button>
+                {pointer && (
+                  <Button variant="outline" onClick={() => setRollingBack(key)}>
+                    <RotateCcw aria-hidden="true" className="mr-2 size-4" /> Rollback
+                  </Button>
+                )}
                 {pointer && (
                   <Button variant="destructive" onClick={() => setDeactivating(key)}>
                     <Power aria-hidden="true" className="mr-2 size-4" /> Desactivar
@@ -189,6 +201,12 @@ export function AdminModelRegistryPage() {
         )}
       </section>
 
+      <RollbackModelDialog
+        scopeKey={rollingBack}
+        open={rollingBack !== null}
+        onOpenChange={(open) => !open && setRollingBack(null)}
+        onDone={() => void load()}
+      />
       <DeactivateModelDialog
         scopeKey={deactivating}
         model={deactivatingModel}

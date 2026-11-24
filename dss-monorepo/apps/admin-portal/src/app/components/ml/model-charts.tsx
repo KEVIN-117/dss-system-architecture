@@ -11,6 +11,7 @@ import type { ModelSummary } from '../../data-access/ml-operations';
 export function algorithmName(algorithm: string | null | undefined): string {
   if (algorithm === 'random_forest') return 'Random Forest';
   if (algorithm === 'xgboost') return 'XGBoost';
+  if (algorithm === 'ridge') return 'Regresión Ridge';
   return algorithm ?? 'Algoritmo';
 }
 
@@ -32,6 +33,27 @@ export function dateTime(value: string | null | undefined): string {
   return Number.isNaN(date.getTime())
     ? '—'
     : new Intl.DateTimeFormat('es-BO', { dateStyle: 'medium', timeStyle: 'short' }).format(date);
+}
+
+export function isRegressionModel(model: Pick<ModelSummary, 'task_kind'>): boolean {
+  return model.task_kind === 'regression';
+}
+
+/** The three metrics that summarise a candidate: recall/F1/precision, or MAE/RMSE/R² for regression. */
+export function headlineMetrics(model: ModelSummary): Array<{ label: string; value: string }> {
+  if (isRegressionModel(model)) {
+    const metrics = model.regression_metrics;
+    return [
+      { label: 'MAE', value: decimal(metrics?.mae) },
+      { label: 'RMSE', value: decimal(metrics?.rmse) },
+      { label: 'R²', value: decimal(metrics?.r2) },
+    ];
+  }
+  return [
+    { label: 'Recall', value: percent(model.test_metrics.recall) },
+    { label: 'F1-Score', value: percent(model.test_metrics.f1_score) },
+    { label: 'Precisión', value: percent(model.test_metrics.precision) },
+  ];
 }
 
 /** Short, stable label for a candidate in chart legends and axes. */

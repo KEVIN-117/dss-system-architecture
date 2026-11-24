@@ -370,13 +370,13 @@ export function AdminOverviewPage() {
     },
     {
       title: 'Servicio de aprendizaje automático',
-      href: '/ml-operations',
+      href: '/ml-studio',
       icon: BrainCircuit,
       report: {
-        state: 'degraded' as const,
-        metric: 'Conjunto de datos sintético',
+        state: 'available' as const,
+        metric: 'ML Studio',
         description:
-          'Los procesos de entrenamiento están habilitados. El catálogo institucional de modelos y conjuntos de datos pertenece a la siguiente etapa.',
+          'Extracción desde el almacén, exploración, entrenamiento, comparación y activación de modelos, además de pronósticos por carrera.',
       },
     },
   ];

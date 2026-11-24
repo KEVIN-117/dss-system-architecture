@@ -3,7 +3,7 @@ const BFF_BASE_URL =
 const TRAINING_JOBS_URL = `${BFF_BASE_URL}/api/prediction/v1/training-jobs`;
 const DATASETS_URL = `${BFF_BASE_URL}/api/prediction/v1/datasets`;
 
-export type MlAlgorithm = 'random_forest' | 'xgboost';
+export type MlAlgorithm = 'random_forest' | 'xgboost' | 'ridge';
 export interface TrainingJobRequest {
   dataset_ref: string;
   algorithm: MlAlgorithm;
@@ -106,9 +106,8 @@ export async function getMlTrainingJob(jobId: string): Promise<TrainingJob> {
 
 const MODELS_URL = `${BFF_BASE_URL}/api/prediction/v1/models`;
 
-export type ModelEventCode =
-  | 'PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE'
-  | 'COURSE_ABANDONMENT';
+/** Event code of a catalog task (PRED-101); the catalog is served by GET /v1/ml-tasks. */
+export type ModelEventCode = string;
 export type ModelCadence = 'SEMESTRAL' | 'ANUAL';
 
 export interface ModelTestMetrics {
@@ -133,7 +132,22 @@ export interface ModelClassMetrics {
   support: number | null;
 }
 
+export interface RegressionMetrics {
+  mae: number | null;
+  rmse: number | null;
+  r2: number | null;
+  mape: number | null;
+  bias: number | null;
+  interval_coverage: Record<string, number> | null;
+  residuals_by_bucket: Array<{ observed_min: number; observed_max: number; count: number; mae: number; bias: number }> | null;
+  test_row_count: number | null;
+}
+
 export interface ModelSummary {
+  /** PRED-103: regression candidates carry regression_metrics instead of classification metrics. */
+  task_kind?: 'classification' | 'regression';
+  regression_metrics?: RegressionMetrics | null;
+  target_unit?: string | null;
   model_id: string;
   version: string;
   algorithm: MlAlgorithm;
@@ -160,6 +174,8 @@ export interface ModelSummary {
   validation: {
     mean_recall: number | null;
     mean_f1: number | null;
+    mean_rmse?: number | null;
+    mean_mae?: number | null;
     method: string | null;
     n_splits: number | null;
     candidate_count: number | null;
@@ -235,10 +251,10 @@ export async function deactivateModel(input: {
 }
 
 export function isMlAlgorithm(value: string): value is MlAlgorithm {
-  return value === 'random_forest' || value === 'xgboost';
+  return value === 'random_forest' || value === 'xgboost' || value === 'ridge';
 }
 
-async function responseError(response: Response): Promise<Error> {
+export async function responseError(response: Response): Promise<Error> {
   try {
     const body: unknown = await response.json();
     if (isRecord(body)) {
