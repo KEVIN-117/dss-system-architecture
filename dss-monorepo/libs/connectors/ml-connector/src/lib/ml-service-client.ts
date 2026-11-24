@@ -1,9 +1,12 @@
-import type {
-  MlProblem,
-  PredictionRequest,
-  PredictionResponse,
-  TrainingJob,
-  TrainingJobRequest,
+import {
+  COURSE_EVENT_TYPES,
+  PREDICTION_EVENT_TYPES,
+  type MlProblem,
+  type PredictionEventType,
+  type PredictionRequest,
+  type PredictionResponse,
+  type TrainingJob,
+  type TrainingJobRequest,
 } from '../models/prediction.js';
 
 const CONTRACT_VERSION = '1.0';
@@ -27,6 +30,14 @@ export class MlServiceClientError extends Error {
   }
 }
 
+/** Invalid input rejected before calling prediction-service (maps to HTTP 400). */
+export class MlRequestValidationError extends TypeError {
+  constructor(message: string) {
+    super(message);
+    this.name = 'MlRequestValidationError';
+  }
+}
+
 export class MlServiceTimeoutError extends Error {
   constructor() {
     super('Prediction service request timed out');
@@ -41,14 +52,23 @@ export function isPredictionRequest(
     !isRecord(value) ||
     !hasOnlyKeys(value, [
       'contract_version',
+      'event_type',
       'subject_ref',
       'program_ref',
+      'course_ref',
       'academic_cut',
     ])
   ) {
     return false;
   }
+  const eventType = (value.event_type ?? 'program_dropout') as PredictionEventType;
+  if (!PREDICTION_EVENT_TYPES.includes(eventType)) return false;
+  const needsCourse = COURSE_EVENT_TYPES.includes(eventType);
+  const courseOk = needsCourse
+    ? isBoundedString(value.course_ref, 1, 128)
+    : value.course_ref === undefined;
   return (
+    courseOk &&
     value.contract_version === CONTRACT_VERSION &&
     isBoundedString(value.subject_ref, 1, 128) &&
     isBoundedString(value.program_ref, 1, 64) &&
@@ -63,11 +83,45 @@ export function isTrainingJobRequest(
 ): value is TrainingJobRequest {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ['dataset_ref', 'algorithm', 'configuration_ref']) &&
+    hasOnlyKeys(value, [
+      'dataset_ref',
+      'algorithm',
+      'configuration_ref',
+      'search_space',
+    ]) &&
     isBoundedString(value.dataset_ref, 1, 256) &&
-    (value.algorithm === 'random_forest' || value.algorithm === 'xgboost') &&
+    isMlAlgorithm(value.algorithm) &&
     (value.configuration_ref === undefined ||
-      isBoundedString(value.configuration_ref, 1, 128))
+      isBoundedString(value.configuration_ref, 1, 128)) &&
+    (value.search_space === undefined || isSearchSpace(value.search_space))
+  );
+}
+
+/** Algorithm names accepted by prediction-service; it checks them against the dataset's task. */
+export function isMlAlgorithm(value: unknown): value is TrainingJobRequest['algorithm'] {
+  return value === 'random_forest' || value === 'xgboost' || value === 'ridge';
+}
+
+/** A small hyperparameter grid; prediction-service validates names and ranges per algorithm. */
+export function isSearchSpace(value: unknown): boolean {
+  if (!isRecord(value)) return false;
+  const entries = Object.entries(value);
+  return (
+    entries.length >= 1 &&
+    entries.length <= 8 &&
+    entries.every(
+      ([name, values]) =>
+        /^[a-z_]{1,32}$/.test(name) &&
+        Array.isArray(values) &&
+        values.length >= 1 &&
+        values.length <= 10 &&
+        values.every(
+          (item) =>
+            item === null ||
+            (typeof item === 'number' && Number.isFinite(item)) ||
+            (typeof item === 'string' && item.length <= 16),
+        ),
+    )
   );
 }
 
@@ -146,7 +200,8 @@ export async function getTrainingJob(
   return response;
 }
 
-async function requestJson(
+/** Low-level JSON request to prediction-service, shared by every typed operation. */
+export async function requestJson(
   serviceUrl: string,
   path: string,
   accessToken: string,
@@ -256,34 +311,33 @@ function assertTrainingJobRequest(value: TrainingJobRequest): void {
 }
 
 function isPredictionResponse(value: unknown): value is PredictionResponse {
+  // Newer service versions add fields (PRED-103 added task_kind, predicted_value,
+  // prediction_interval and unit); unknown fields are tolerated, known ones validated.
+  if (!isRecord(value)) return false;
+  const regression = value.task_kind === 'regression';
+  const classOk = regression
+    ? value.predicted_class === undefined || value.predicted_class === null
+    : value.predicted_class === 'POSITIVE_EVENT' ||
+      value.predicted_class === 'NEGATIVE_EVENT';
+  const valueOk = regression
+    ? typeof value.predicted_value === 'number' &&
+      Number.isFinite(value.predicted_value)
+    : value.predicted_value === undefined || value.predicted_value === null;
   return (
-    isRecord(value) &&
-    hasOnlyKeys(value, [
-      'contract_version',
-      'prediction_id',
-      'subject_ref',
-      'program_ref',
-      'event_type',
-      'course_ref',
-      'event_code',
-      'predicted_class',
-      'event_probability',
-      'model',
-      'academic_cut',
-      'generated_at',
-    ]) &&
+    (value.task_kind === undefined ||
+      value.task_kind === 'classification' ||
+      regression) &&
+    classOk &&
+    valueOk &&
     value.contract_version === CONTRACT_VERSION &&
     isUuid(value.prediction_id) &&
     isBoundedString(value.subject_ref, 1, 128) &&
     isBoundedString(value.program_ref, 1, 64) &&
-    (value.event_type === 'course_abandonment' ||
-      value.event_type === 'program_dropout') &&
+    PREDICTION_EVENT_TYPES.includes(value.event_type as PredictionEventType) &&
     (value.course_ref === undefined ||
       value.course_ref === null ||
       isBoundedString(value.course_ref, 1, 128)) &&
     isBoundedString(value.event_code, 1, 128) &&
-    (value.predicted_class === 'POSITIVE_EVENT' ||
-      value.predicted_class === 'NEGATIVE_EVENT') &&
     (value.event_probability === undefined ||
       value.event_probability === null ||
       (typeof value.event_probability === 'number' &&
@@ -297,27 +351,17 @@ function isPredictionResponse(value: unknown): value is PredictionResponse {
   );
 }
 
-function isTrainingJob(value: unknown): value is TrainingJob {
+export function isTrainingJob(value: unknown): value is TrainingJob {
+  // PRED-102+ added job_kind, params, result_ref and study_id; non-training
+  // jobs carry an empty algorithm. Unknown fields are tolerated.
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, [
-      'job_id',
-      'contract_version',
-      'dataset_ref',
-      'algorithm',
-      'status',
-      'progress',
-      'created_at',
-      'started_at',
-      'finished_at',
-      'submitted_by',
-      'model_candidate',
-      'error',
-    ]) &&
     isUuid(value.job_id) &&
     value.contract_version === CONTRACT_VERSION &&
     isBoundedString(value.dataset_ref, 1, 256) &&
-    (value.algorithm === 'random_forest' || value.algorithm === 'xgboost') &&
+    (value.algorithm === '' || isMlAlgorithm(value.algorithm)) &&
+    (value.job_kind === undefined ||
+      ['TRAIN', 'EXTRACT_DATASET', 'FORECAST'].includes(String(value.job_kind))) &&
     ['QUEUED', 'RUNNING', 'SUCCEEDED', 'FAILED', 'CANCELLED'].includes(
       String(value.status),
     ) &&
@@ -339,41 +383,23 @@ function isTrainingJob(value: unknown): value is TrainingJob {
       isModelReference(value.model_candidate)) &&
     (value.error === undefined ||
       value.error === null ||
-      isMlProblem(value.error))
+      isRecord(value.error))
   );
 }
 
-function isMlProblem(value: unknown): value is MlProblem {
+/** RFC 7807 problem from prediction-service; any upper-case code is accepted. */
+export function isMlProblem(value: unknown): value is MlProblem {
   return (
     isRecord(value) &&
     isBoundedString(value.type, 1, 512) &&
-    hasOnlyKeys(value, [
-      'type',
-      'title',
-      'status',
-      'detail',
-      'code',
-      'request_id',
-    ]) &&
     isBoundedString(value.title, 1, 160) &&
     Number.isInteger(value.status) &&
-    (!('detail' in value) || isBoundedString(value.detail, 0, 500)) &&
-    [
-      'INVALID_REQUEST',
-      'INVALID_TOKEN',
-      'INSUFFICIENT_SCOPE',
-      'RESOURCE_NOT_FOUND',
-      'INCOMPATIBLE_SCHEMA',
-      'INELIGIBLE_PROFILE',
-      'DATA_UNAVAILABLE',
-      'NO_ACTIVE_MODEL',
-      'JOB_CAPACITY',
-      'JOB_FAILED',
-      'CONFLICT',
-      'TIMEOUT',
-      'INTERNAL_ERROR',
-    ].includes(String(value.code)) &&
-    isBoundedString(value.request_id, 1, 128)
+    (value.detail === undefined ||
+      value.detail === null ||
+      typeof value.detail === 'string') &&
+    typeof value.code === 'string' &&
+    /^[A-Z][A-Z0-9_]{1,63}$/.test(value.code) &&
+    (value.request_id === undefined || isBoundedString(value.request_id, 1, 128))
   );
 }
 
@@ -394,7 +420,7 @@ function isIsoDate(value: unknown): value is string {
   return typeof value === 'string' && !Number.isNaN(Date.parse(value));
 }
 
-function isUuid(value: unknown): value is string {
+export function isUuid(value: unknown): value is string {
   return (
     typeof value === 'string' &&
     /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
@@ -403,11 +429,11 @@ function isUuid(value: unknown): value is string {
   );
 }
 
-function isRecord(value: unknown): value is Record<string, unknown> {
+export function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isBoundedString(
+export function isBoundedString(
   value: unknown,
   min: number,
   max: number,

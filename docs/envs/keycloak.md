@@ -42,10 +42,10 @@ Desde IAM-002 (decisiones D1 y D4 de `docs/auth/rbac-iam-admin-proposal.md`), el
 
 | Rol | Permisos |
 |---|---|
-| DIRECTOR | `analytics:read`, `analytics:career` |
+| DIRECTOR | `analytics:read`, `analytics:career`, `prediction:forecast:read` |
 | DECANO | DIRECTOR + `analytics:faculty`, `pipelines:read` |
 | RECTOR | DECANO + `analytics:global`, `connectors:read` |
-| SUPERADMIN | `connectors:read`, `connectors:write`, `pipelines:read`, `pipelines:execute`, `prediction:train`, `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` (Load Manager, LM-005) |
+| SUPERADMIN | `connectors:read`, `connectors:write`, `pipelines:read`, `pipelines:execute`, `prediction:train`, `prediction:forecast:read`, `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` (Load Manager, LM-005) |
 
 - **Permisos que se asignan por usuario:** `olap:admin`, `olap:user`, `dw:closure:read`, `dw:closure:manage` y `prediction:publish` (IAM-013: iniciar el scoring poblacional). Ningún rol los incluye.
 - **Load Manager (LM-005):** `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` vienen en SUPERADMIN. A otros usuarios se asignan por separado: lectura y monitoreo, lanzar y detener cargas, y administrar programaciones. `iam-002-permission-catalog.sh` aplica estos cambios a un realm ya importado; se vuelve a ejecutar sin efectos duplicados.
