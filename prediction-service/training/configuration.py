@@ -18,8 +18,9 @@ def resolve_training_configuration(job_config: dict[str, Any] | None) -> dict[st
     """
     job_config = job_config or {}
     config_ref = job_config.get("configuration_ref")
+    inline = {key: job_config[key] for key in ("search_space", "study_id") if job_config.get(key) is not None}
     if config_ref in (None, ""):
-        return {}
+        return inline
     if not isinstance(config_ref, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]{0,127}", config_ref):
         raise ValueError("configuration_ref must be an opaque identifier using letters, digits, dot, underscore, or hyphen.")
     root_value = os.getenv("PREDICTION_CONFIG_ROOT")
@@ -35,4 +36,9 @@ def resolve_training_configuration(job_config: dict[str, Any] | None) -> dict[st
         raise ValueError("Referenced training configuration must be a JSON object.")
     value["configuration_ref"] = config_ref
     value["configuration_digest"] = hashlib.sha256(raw).hexdigest()
+    # An inline search space (validated by the API) narrows the catalog one.
+    if "search_space" in inline:
+        value["search_space"] = {**(value.get("search_space") or {}), **inline["search_space"]}
+    if "study_id" in inline:
+        value["study_id"] = inline["study_id"]
     return value

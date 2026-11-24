@@ -88,8 +88,61 @@ class TrainingJobRequest(BaseModel):
     """Body for POST /v1/training-jobs."""
 
     dataset_ref: str = Field(min_length=1, max_length=256)
-    algorithm: str = Field(pattern=r"^(random_forest|xgboost)$")
+    # ridge only applies to regression tasks; the API checks it against the task.
+    algorithm: str = Field(pattern=r"^(random_forest|xgboost|ridge)$")
     configuration_ref: str | None = Field(default=None, max_length=128)
+    # PRED-103: inline hyperparameter grid, validated per algorithm.
+    search_space: dict[str, list[Any]] | None = None
+
+
+class TrainingStudyRequest(BaseModel):
+    """Body for POST /v1/training-studies: one job per algorithm on one dataset."""
+    model_config = ConfigDict(extra="forbid")
+    dataset_ref: str = Field(min_length=1, max_length=256)
+    algorithms: list[str] = Field(min_length=1, max_length=3)
+    configuration_ref: str | None = Field(default=None, max_length=128)
+    search_spaces: dict[str, dict[str, list[Any]]] | None = None
+
+
+class TrainingStudyResponse(BaseModel):
+    study_id: str
+    dataset_ref: str
+    task_code: str | None = None
+    jobs: list["TrainingJobResponse"]
+
+
+# Inline search spaces: allowed parameters and value checks per algorithm.
+def _int_range(low: int, high: int, allow_none: bool = False):
+    return lambda v: (v is None and allow_none) or (isinstance(v, int) and not isinstance(v, bool) and low <= v <= high)
+
+
+def _float_range(low: float, high: float, low_inclusive: bool = False):
+    def check(v: Any) -> bool:
+        return (isinstance(v, (int, float)) and not isinstance(v, bool)
+                and (v >= low if low_inclusive else v > low) and v <= high)
+    return check
+
+
+_SEARCH_SPACE_RULES: dict[str, dict[str, Any]] = {
+    "ridge": {"alpha": _float_range(0.0, 1e6)},
+    "random_forest": {
+        "n_estimators": _int_range(10, 1000),
+        "max_depth": _int_range(1, 64, allow_none=True),
+        "min_samples_split": _int_range(2, 100),
+        "min_samples_leaf": _int_range(1, 100),
+        "max_features": lambda v: v in (None, "sqrt", "log2") or _float_range(0.0, 1.0)(v),
+    },
+    "xgboost": {
+        "n_estimators": _int_range(10, 1000),
+        "max_depth": _int_range(1, 16),
+        "learning_rate": _float_range(0.0, 1.0),
+        "subsample": _float_range(0.0, 1.0),
+        "colsample_bytree": _float_range(0.0, 1.0),
+        "min_child_weight": _float_range(0.0, 100.0, low_inclusive=True),
+    },
+}
+_MAX_VALUES_PER_PARAMETER = 10
+_MAX_GRID_CANDIDATES = 64
 
 
 class AcademicCutRef(BaseModel):
@@ -131,8 +184,13 @@ class PredictionResponse(BaseModel):
     event_type: str = Field(default="program_dropout", pattern=event_type_pattern())
     course_ref: str | None = None
     event_code: str
-    predicted_class: str = Field(pattern=r"^(POSITIVE_EVENT|NEGATIVE_EVENT)$")
+    task_kind: str = "classification"
+    predicted_class: str | None = Field(default=None, pattern=r"^(POSITIVE_EVENT|NEGATIVE_EVENT)$")
     event_probability: float | None = Field(default=None, ge=0, le=1)
+    # Regression tasks (PRED-103): value and residual intervals by level.
+    predicted_value: float | None = None
+    prediction_interval: dict[str, dict[str, float]] | None = None
+    unit: str | None = None
     model: ModelReference
     academic_cut: AcademicCutRef
     generated_at: datetime
@@ -141,7 +199,8 @@ class PredictionResponse(BaseModel):
 class PredictionBatchRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     contract_version: str = Field(default="1.0", pattern=r"^1\.0$")
-    event_type: str = Field(default="program_dropout", pattern=r"^program_dropout$")
+    # Student-level tasks (PRED-103); course-level tasks are scored on demand only.
+    event_type: str = Field(default="program_dropout", pattern=r"^(program_dropout|student_backlog|student_gpa)$")
     program_ref: str = Field(min_length=1, max_length=64)
     academic_cut: AcademicCutRef
 
@@ -164,6 +223,7 @@ class TrainingJobResponse(BaseModel):
     job_kind: str = "TRAIN"
     params: dict[str, Any] | None = None
     result_ref: str | None = None
+    study_id: str | None = None
 
 
 class ProblemResponse(BaseModel):
@@ -499,7 +559,7 @@ def submit_prediction_batch(
     try:
         service = _publication_service()
         batch = service.submit(authorization[7:].strip(), body.program_ref,
-                               body.academic_cut.cut_id, idempotency_key)
+                               body.academic_cut.cut_id, idempotency_key, body.event_type)
         _dispatch_pending_prediction_batches(service.store)
         return JSONResponse(status_code=202, content=batch, headers={"Cache-Control": "no-store"})
     except InferenceFailure as exc:
@@ -525,6 +585,7 @@ def get_current_prediction_publication(
     cut_id: str = Query(min_length=1, max_length=128),
     limit: int = Query(default=100, ge=1, le=1000),
     offset: int = Query(default=0, ge=0, le=25000),
+    event_type: str = Query(default="program_dropout", pattern=r"^(program_dropout|student_backlog|student_gpa)$"),
     authorization: str | None = Header(default=None, alias="Authorization"),
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
 ) -> Any:
@@ -533,7 +594,7 @@ def get_current_prediction_publication(
     if not authorization or not authorization.startswith("Bearer "):
         return _make_problem(401, "Unauthorized", "INVALID_TOKEN", request_id)
     try:
-        result = _publication_service().current(authorization[7:].strip(), program_ref, cut_id, limit, offset)
+        result = _publication_service().current(authorization[7:].strip(), program_ref, cut_id, limit, offset, event_type)
         return JSONResponse(content=result, headers={"Cache-Control": "no-store"})
     except InferenceFailure as exc:
         return _publication_error(exc, request_id)
@@ -632,6 +693,7 @@ def _training_job_response(record: Any) -> TrainingJobResponse:
         model_candidate=model_candidate, error=record.error,
         job_kind=getattr(record, "job_kind", "TRAIN"), params=getattr(record, "params", None) or None,
         result_ref=getattr(record, "result_ref", None),
+        study_id=(record.config or {}).get("study_id") if isinstance(record.config, dict) else None,
     )
 
 
@@ -671,6 +733,8 @@ class MlTaskSummary(BaseModel):
     target_definition_ref: str
     population_definition_ref: str
     sources: list[str]
+    target_unit: str | None = None
+    required_features: list[str] = []
 
 
 @app.get(
@@ -694,6 +758,54 @@ def list_ml_tasks(
     except InferenceFailure as exc:
         return _failure_response(exc, request_id, "ML task catalog request rejected")
     return [task.to_public() for task in list_tasks()]
+
+
+def _training_task_for(dataset_ref: str) -> Any | None:
+    """Catalog task of a known dataset, or None when the API cannot read it."""
+    folder = _dataset_dir(dataset_ref)
+    if folder is None:
+        return None
+    try:
+        manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+        return get_task(str((manifest.get("target_definition") or {}).get("event_code")))
+    except (OSError, ValueError, KeyError):
+        return None
+
+
+def _validate_training_request(dataset_ref: str, algorithm: str, search_space: dict[str, list[Any]] | None) -> str | None:
+    """Return an error message when the algorithm or the grid do not fit the dataset's task."""
+    task = _training_task_for(dataset_ref)
+    if task is not None and algorithm not in task.algorithms:
+        return f"Algorithm {algorithm} is not available for {task.code}; use one of {list(task.algorithms)}."
+    if task is None and algorithm == "ridge":
+        return "ridge is only available for regression tasks of a known dataset."
+    if not search_space:
+        return None
+    rules = _SEARCH_SPACE_RULES[algorithm]
+    combinations = 1
+    for name, values in search_space.items():
+        if name not in rules:
+            return f"Unknown hyperparameter '{name}' for {algorithm}; allowed: {sorted(rules)}."
+        if not values or len(values) > _MAX_VALUES_PER_PARAMETER:
+            return f"Hyperparameter '{name}' needs 1 to {_MAX_VALUES_PER_PARAMETER} candidate values."
+        if not all(rules[name](value) for value in values):
+            return f"Hyperparameter '{name}' has a value outside its allowed range."
+        combinations *= len(values)
+    if combinations > _MAX_GRID_CANDIDATES:
+        return f"The search space has {combinations} candidates; at most {_MAX_GRID_CANDIDATES} are allowed."
+    return None
+
+
+def _training_job_config(configuration_ref: str | None, search_space: dict[str, list[Any]] | None,
+                         study_id: str | None = None) -> dict[str, Any]:
+    # Without the new options the config (and its idempotency digest) keeps the
+    # pre-PRED-103 shape.
+    config: dict[str, Any] = {"configuration_ref": configuration_ref}
+    if search_space:
+        config["search_space"] = search_space
+    if study_id:
+        config["study_id"] = study_id
+    return config
 
 
 @app.post(
@@ -730,14 +842,17 @@ def submit_training_job(
         principal = _authenticate_ml_operator(authorization)
     except InferenceFailure as exc:
         return _failure_response(exc, request_id, "Training job request rejected")
+    if (problem := _validate_training_request(body.dataset_ref, body.algorithm, body.search_space)) is not None:
+        return _make_problem(422, "Invalid training request", "INVALID_TRAINING_REQUEST", request_id, detail=problem)
     store = JobStore()
+    job_config = _training_job_config(body.configuration_ref, body.search_space)
 
     # Idempotency keys are scoped per authenticated operator so one caller
     # cannot replay or observe another operator's submission.
     scope = f"{os.getenv('PREDICTION_IDEMPOTENCY_SCOPE', 'development')}:{principal.subject}"
     existing = store.find_by_idempotency_key(idempotency_key, scope)
     if existing is not None:
-        digest = store.request_digest(body.dataset_ref, body.algorithm, {"configuration_ref": body.configuration_ref})
+        digest = store.request_digest(body.dataset_ref, body.algorithm, job_config)
         if existing.request_digest != digest:
             return _make_problem(409, "Idempotency conflict", "CONFLICT", request_id,
                                  detail="Idempotency-Key was already used for a different request.")
@@ -773,7 +888,7 @@ def submit_training_job(
         model_candidate=None,
         error=None,
         idempotency_key=idempotency_key,
-        config={"configuration_ref": body.configuration_ref},
+        config=job_config,
         dataset_version=body.dataset_ref,
         dependency_versions={},
     )
@@ -793,6 +908,99 @@ def submit_training_job(
         created_at=record.created_at,
         submitted_by=record.submitted_by,
     )
+
+
+@app.post(
+    "/v1/training-studies",
+    status_code=202,
+    response_model=TrainingStudyResponse,
+    summary="Entrenar varios algoritmos sobre un mismo dataset",
+    description=(
+        "Requiere el permiso prediction:train. Crea un job TRAIN por algoritmo, agrupados por study_id, para comparar "
+        "candidatos entrenados sobre la misma partición. La Idempotency-Key cubre el estudio completo."
+    ),
+    responses={
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        409: COMMON_ERROR_RESPONSES[409],
+        422: COMMON_ERROR_RESPONSES[422],
+        429: {"model": ProblemResponse, "description": "Capacidad de workers agotada"},
+    },
+)
+def submit_training_study(
+    body: TrainingStudyRequest,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=16, max_length=96),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    from training.job_store import JobStatus, TrainingJobRecord
+
+    request_id = x_request_id or str(uuid4())
+    try:
+        principal = _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Training study request rejected")
+    algorithms = list(dict.fromkeys(body.algorithms))
+    if len(algorithms) != len(body.algorithms) or any(a not in _SEARCH_SPACE_RULES for a in algorithms):
+        return _make_problem(422, "Invalid training request", "INVALID_TRAINING_REQUEST", request_id,
+                             detail="algorithms must be distinct values among ridge, random_forest and xgboost.")
+    spaces = body.search_spaces or {}
+    if set(spaces) - set(algorithms):
+        return _make_problem(422, "Invalid training request", "INVALID_TRAINING_REQUEST", request_id,
+                             detail="search_spaces may only reference requested algorithms.")
+    for algorithm in algorithms:
+        if (problem := _validate_training_request(body.dataset_ref, algorithm, spaces.get(algorithm))) is not None:
+            return _make_problem(422, "Invalid training request", "INVALID_TRAINING_REQUEST", request_id, detail=problem)
+
+    store = JobStore()
+    scope = f"{os.getenv('PREDICTION_IDEMPOTENCY_SCOPE', 'development')}:{principal.subject}"
+    # The study id is derived from the key, so a retried request maps to the same jobs.
+    study_id = hashlib.sha256(f"{scope}|{idempotency_key}".encode()).hexdigest()[:32]
+    existing = [store.find_by_idempotency_key(f"{idempotency_key}:{algorithm}", scope) for algorithm in algorithms]
+    if any(existing):
+        if not all(existing) or any(
+            record.request_digest != store.request_digest(
+                body.dataset_ref, algorithm, _training_job_config(body.configuration_ref, spaces.get(algorithm), study_id))
+            for record, algorithm in zip(existing, algorithms)
+        ):
+            return _make_problem(409, "Idempotency conflict", "CONFLICT", request_id,
+                                 detail="Idempotency-Key was already used for a different training study.")
+        _dispatch_pending(store)
+        task = _training_task_for(body.dataset_ref)
+        return TrainingStudyResponse(study_id=study_id, dataset_ref=body.dataset_ref,
+                                     task_code=task.code if task else None,
+                                     jobs=[_training_job_response(record) for record in existing])
+    try:
+        max_concurrent = _positive_int_env("WORKER_MAX_CONCURRENT_JOBS", 1)
+        max_queued = _positive_int_env("PREDICTION_MAX_QUEUED_JOBS", 4, minimum=0)
+    except ValueError as exc:
+        return _make_problem(503, "Job capacity misconfigured", "CONFIGURATION_ERROR", request_id, detail=str(exc))
+    if len(store.list_active()) + len(algorithms) > max_concurrent + max_queued:
+        return _make_problem(429, "Job capacity exhausted", "JOB_CAPACITY", request_id,
+                             detail=f"The study needs {len(algorithms)} job slots; at most {max_concurrent} running and "
+                                    f"{max_queued} queued jobs are allowed.")
+    records = []
+    for algorithm in algorithms:
+        config = _training_job_config(body.configuration_ref, spaces.get(algorithm), study_id)
+        record = TrainingJobRecord(
+            job_id=str(uuid4()), dataset_ref=body.dataset_ref, algorithm=algorithm, status=JobStatus.QUEUED,
+            created_at=datetime.now(timezone.utc).isoformat(), started_at=None, finished_at=None,
+            submitted_by=principal.subject, model_candidate=None, error=None,
+            idempotency_key=f"{idempotency_key}:{algorithm}", config=config, dataset_version=body.dataset_ref,
+            dependency_versions={},
+        )
+        record.request_digest = store.request_digest(body.dataset_ref, algorithm, config)
+        try:
+            records.append(store.create(record, scope))
+        except IdempotencyConflict:
+            return _make_problem(409, "Idempotency conflict", "CONFLICT", request_id,
+                                 detail="Idempotency-Key was already used for a different training study.")
+    logger.info("Training study %s queued %s jobs request_id=%s", study_id, len(records), request_id)
+    _dispatch_pending(store)
+    task = _training_task_for(body.dataset_ref)
+    return TrainingStudyResponse(study_id=study_id, dataset_ref=body.dataset_ref,
+                                 task_code=task.code if task else None,
+                                 jobs=[_training_job_response(record) for record in records])
 
 
 # ---------------------------------------------------------------------------
@@ -1024,6 +1232,7 @@ def submit_dataset_extraction(
 def list_jobs(
     kind: str | None = Query(default=None, pattern=r"^(TRAIN|EXTRACT_DATASET|FORECAST)$"),
     status: str | None = Query(default=None, pattern=r"^(QUEUED|RUNNING|SUCCEEDED|FAILED|CANCELLED)$"),
+    study_id: str | None = Query(default=None, pattern=r"^[0-9a-f]{32}$"),
     limit: int = Query(default=50, ge=1, le=200),
     authorization: str | None = Header(default=None, alias="Authorization"),
     x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
@@ -1033,7 +1242,10 @@ def list_jobs(
         _authenticate_ml_operator(authorization)
     except InferenceFailure as exc:
         return _failure_response(exc, request_id, "Job list request rejected")
-    return [_training_job_response(record) for record in JobStore().list_recent(kind, status, limit)]
+    records = JobStore().list_recent(kind, status, 200 if study_id else limit)
+    if study_id:
+        records = [r for r in records if isinstance(r.config, dict) and r.config.get("study_id") == study_id][:limit]
+    return [_training_job_response(record) for record in records]
 
 
 @app.get(

@@ -197,7 +197,11 @@ def profile_dataset(manifest: Mapping[str, Any], rows: Iterable[Mapping[str, Any
             pairs = [(x, y) for x, y in zip(numbers, encoded_target) if x is not None and y is not None]
             correlation = pearson([x for x, _ in pairs], [y for _, y in pairs])
             entry["target_correlation"] = _round(correlation)
-            if correlation is not None and abs(correlation) >= LEAKAGE_CORRELATION:
+            if name == definition.get("source_feature"):
+                # Next-cut targets are the future value of this very column: a
+                # high correlation is the expected persistence, not leakage.
+                entry["label_source_feature"] = True
+            elif correlation is not None and abs(correlation) >= LEAKAGE_CORRELATION:
                 warnings.append({"code": "POSSIBLE_LEAKAGE", "field": name,
                                  "message": f"La variable tiene correlación {correlation:.2f} con el objetivo; "
                                             "revise que no se calcule a partir del resultado."})

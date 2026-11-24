@@ -479,3 +479,11 @@ def train_model(
         dependency_lock=dep_versions,
         duration_seconds=duration,
     )
+
+
+def train_for_partition(partition: PreparedPartition, algorithm: str, **kwargs: Any) -> TrainingResult:
+    """Classifier or regressor training, by the task kind of the prepared partition."""
+    if partition.partition_metadata.get("task_kind") == "regression":
+        from training.regression_trainer import train_regression_model
+        return train_regression_model(partition, algorithm, **kwargs)
+    return train_model(partition, algorithm, **kwargs)

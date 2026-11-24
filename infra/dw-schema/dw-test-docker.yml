@@ -53,6 +53,7 @@ services:
         psql -v ON_ERROR_STOP=1 -f /tests/prediction_inference_read_access_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/prediction_publications_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/prediction_job_kinds_test.sql
+        psql -v ON_ERROR_STOP=1 -f /tests/prediction_regression_targets_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/student_scd2_lock_volume_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/admission_application_link_test.sql
         psql -v ON_ERROR_STOP=1 -f /tests/coursework_batch_staging_test.sql

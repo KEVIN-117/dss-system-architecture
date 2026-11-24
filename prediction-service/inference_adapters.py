@@ -23,6 +23,7 @@ from feature_contract import (
 )
 import access_policy
 from ml_tasks import UnknownTask, task_for_event_type
+from feature_contract import ENROLLMENT_CUT_EVENTS, STUDENT_CUT_EVENTS, contract_query
 from inference import (
     AuthorizationPolicy,
     InferenceFailure,
@@ -275,13 +276,19 @@ class DwPredictionDataProvider:
                       event_type: str = "program_dropout", course_ref: str | None = None) -> Mapping[str, Any]:
         if not subject_ref.isdecimal() or int(subject_ref) <= 0:
             raise InferenceFailure("INVALID_REQUEST", 400, "subject_ref must identify a positive academic student ID.")
-        if event_type != "course_abandonment" and course_ref is not None:
-            raise InferenceFailure("INVALID_REQUEST", 400, "course_ref is only valid for course_abandonment.")
+        try:
+            task = task_for_event_type(event_type)
+        except UnknownTask as exc:
+            raise InferenceFailure("INVALID_REQUEST", 400, "The requested prediction event is not supported.") from exc
+        if not task.requires_course_ref and course_ref is not None:
+            raise InferenceFailure("INVALID_REQUEST", 400, "course_ref is only valid for course-level events.")
         feature_names = self._serving_schema(manifest, event_type, context)
         if event_type == "course_abandonment":
             return self._load_course_features(subject_ref, context, feature_names, course_ref)
+        if task.code in ENROLLMENT_CUT_EVENTS:
+            return self._load_enrollment_features(task.code, subject_ref, context, feature_names, course_ref)
 
-        sql = program_dropout_query(feature_names)
+        sql = contract_query(task.code, feature_names)
         params = {"program": context.program_code, "closure": int(context.cut_id), "subject": int(subject_ref), "limit": 2}
         try:
             with self._connect() as connection:
@@ -298,7 +305,8 @@ class DwPredictionDataProvider:
         return {name: rows[0][name] for name in feature_names}
 
     def load_population_features(self, context: ProgramContext, manifest: Mapping[str, Any],
-                                 limit: int = 25000) -> tuple[dict[str, Mapping[str, Any]], dict[str, int], list[str]]:
+                                 limit: int = 25000, event_type: str = "program_dropout",
+                                 ) -> tuple[dict[str, Mapping[str, Any]], dict[str, int], list[str]]:
         """Load every eligible student's features for one program/cut in a single query.
 
         Uses the exact query and eligibility rule of ``load_features``. Returns
@@ -306,8 +314,11 @@ class DwPredictionDataProvider:
         """
         if not self.database_url:
             raise InferenceFailure("DATA_UNAVAILABLE", 503, "The read-only prediction DW connection is not configured.")
-        feature_names = self._serving_schema(manifest, "program_dropout", context)
-        sql = program_dropout_query(feature_names)
+        task = task_for_event_type(event_type)
+        if task.code not in STUDENT_CUT_EVENTS:
+            raise InferenceFailure("INVALID_REQUEST", 400, "Population scoring is available for student-level events only.")
+        feature_names = self._serving_schema(manifest, event_type, context)
+        sql = contract_query(task.code, feature_names)
         params = {"program": context.program_code, "closure": int(context.cut_id), "subject": None, "limit": limit + 1}
         try:
             with self._connect() as connection:
@@ -329,6 +340,29 @@ class DwPredictionDataProvider:
         source_runs = sorted({row["source_run_id"] for row in rows if row.get("source_run_id")})
         return features, ineligible, source_runs
 
+    def _load_enrollment_features(self, event_code: str, subject_ref: str, context: ProgramContext,
+                                  feature_names: list[str], course_ref: str | None) -> Mapping[str, Any]:
+        """One student-course row of the course-failure contract query at the cut."""
+        if not course_ref or not course_ref.strip():
+            raise InferenceFailure("INVALID_REQUEST", 400, "course_ref is required for course-level events.")
+        sql = contract_query(event_code, feature_names)
+        params = {"program": context.program_code, "closure": int(context.cut_id), "subject": int(subject_ref),
+                  "course": course_ref.strip(), "limit": 2}
+        try:
+            with self._connect() as connection:
+                cursor = connection.execute(sql, params)
+                columns = [column.name for column in cursor.description]
+                rows = [dict(zip(columns, values)) for values in cursor.fetchall()]
+        except Exception as exc:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "Trusted course feature data could not be loaded from the DW.") from exc
+        if len(rows) != 1:
+            raise InferenceFailure("RESOURCE_NOT_FOUND", 404, "No enrolment of the student in that course exists at the requested cut.")
+        from training.course_extract import course_ineligibility
+        reason = course_ineligibility(rows[0])
+        if reason is not None:
+            raise InferenceFailure("INELIGIBLE_PROFILE", 422, _COURSE_INELIGIBILITY_DETAIL.get(reason, "The enrolment is outside the prediction population."))
+        return {name: rows[0][name] for name in feature_names}
+
     def _load_course_features(self, subject_ref: str, context: ProgramContext, feature_names: list[str],
                               course_ref: str | None) -> Mapping[str, Any]:
         if not course_ref or not course_ref.isdecimal() or int(course_ref) <= 0:
@@ -348,6 +382,13 @@ class DwPredictionDataProvider:
             raise InferenceFailure("INELIGIBLE_PROFILE", 422, "The student's academic cadence is mixed or differs from the requested cut.")
         return {name: row[index] for index, name in enumerate(feature_names)}
 
+
+_COURSE_INELIGIBILITY_DETAIL = {
+    "OTHER_CADENCE_PROGRAM": "Course-level predictions are available for semester programs only.",
+    "MISSING_START": "The student's start in the program cannot be established.",
+    "LEFT_CENSORED_START": "The student's start predates the loaded DW history, so the window cannot be established.",
+    "OUTSIDE_WINDOW": "The student is outside the first-three-academic-years prediction window.",
+}
 
 _INELIGIBILITY_DETAIL = {
     "NO_ENROLLMENT_DATE": "The student has no trusted enrollment date.",

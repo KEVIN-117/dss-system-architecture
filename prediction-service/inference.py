@@ -83,17 +83,21 @@ class PredictionService:
         except InvalidModelArtifact as exc:
             raise InferenceFailure("DATA_UNAVAILABLE", 503, "The active model bundle is unavailable.") from exc
         features = self.data.load_features(subject_ref, context, bundle.manifest, event_type, course_ref)
-        predicted_class, probability, event_code = score_loaded_model(bundle, features)
+        scored = score_bundle(bundle, features)
         return {
             "contract_version": "1.0",
             "prediction_id": uuid4(),
             "subject_ref": subject_ref,
             "program_ref": program_ref,
             "event_type": event_type,
-            "event_code": event_code,
+            "event_code": scored["event_code"],
             "course_ref": course_ref,
-            "predicted_class": predicted_class,
-            "event_probability": probability,
+            "task_kind": scored["task_kind"],
+            "predicted_class": scored["predicted_class"],
+            "event_probability": scored["event_probability"],
+            "predicted_value": scored["predicted_value"],
+            "prediction_interval": scored["prediction_interval"],
+            "unit": scored.get("unit"),
             "model": {"model_id": bundle.model_id, "version": bundle.version},
             "academic_cut": {"cut_id": context.cut_id},
             "generated_at": datetime.now(timezone.utc),
@@ -168,9 +172,40 @@ def validate_feature_row(manifest: Mapping[str, Any], features: Mapping[str, Any
     return ordered
 
 
+def score_bundle(bundle: Any, features: Mapping[str, Any]) -> dict[str, Any]:
+    """Score one trusted feature row with any bundle kind (PRED-103).
+
+    Classification bundles return ``predicted_class`` and ``event_probability``;
+    regression bundles return ``predicted_value`` and the bundled
+    out-of-fold residual intervals around it.
+    """
+    manifest = bundle.manifest
+    if manifest.get("task_kind") != "regression":
+        predicted_class, probability, event_code = score_loaded_model(bundle, features)
+        return {"task_kind": "classification", "event_code": event_code, "predicted_class": predicted_class,
+                "event_probability": probability, "predicted_value": None, "prediction_interval": None}
+    names = validate_feature_row(manifest, features)
+    try:
+        row = {name: float(features[name]) if isinstance(features[name], Decimal) else features[name] for name in names}
+        frame = pd.DataFrame([row], columns=names).copy(deep=True)
+        value = float(bundle.model.predict(bundle.pipeline.transform(frame))[0])
+    except Exception as exc:
+        raise InferenceFailure("INTERNAL_ERROR", 500, "The active model could not score the trusted feature row.") from exc
+    if not math.isfinite(value):
+        raise InferenceFailure("INTERNAL_ERROR", 500, "The model produced an invalid predicted value.")
+    offsets = (manifest.get("prediction_interval") or {}).get("offsets") or {}
+    interval = {level: {"lower": value + float(bounds[0]), "upper": value + float(bounds[1])}
+                for level, bounds in sorted(offsets.items())}
+    return {"task_kind": "regression", "event_code": manifest["classes"]["event_code"], "predicted_class": None,
+            "event_probability": None, "predicted_value": value, "prediction_interval": interval,
+            "unit": (manifest.get("target_definition") or {}).get("unit")}
+
+
 def score_loaded_model(bundle: Any, features: Mapping[str, Any]) -> tuple[str, float | None, str]:
     """Transform a fresh one-row frame and map output/probability via manifest."""
     manifest = bundle.manifest
+    if manifest.get("task_kind") == "regression":
+        raise InferenceFailure("INCOMPATIBLE_SCHEMA", 503, "A regression bundle has no class prediction.")
     names = validate_feature_row(manifest, features)
     positive = manifest["classes"]["positive_class"]
     negative = manifest["classes"]["negative_class"]

@@ -35,6 +35,7 @@ from ml_tasks import get_task
 from feature_contract import (
     COURSE_FAILURE_EVENT,
     COURSE_FAILURE_FEATURES,
+    COURSE_FINAL_GRADE_EVENT,
     contract_reference,
     course_failure_query,
     field_definitions,
@@ -69,6 +70,9 @@ _FIELDS = [
 ]
 _TARGET_FIELD = {"name": "target_class", "logical_type": "category", "role": "target", "nullable": False,
                  "available_at_cut": False}
+_TARGET_VALUE_FIELD = {"name": "target_value", "logical_type": "number", "role": "target", "nullable": False,
+                       "available_at_cut": False}
+COURSE_EVENTS = (COURSE_FAILURE_EVENT, COURSE_FINAL_GRADE_EVENT)
 
 
 def course_result(row: Mapping[str, Any]) -> str | None:
@@ -108,8 +112,16 @@ def build_course_failure_snapshot(
     target_definition_ref: str | None = None,
     population_definition_ref: str | None = None,
     pseudonym_key: bytes | None = None,
+    task_code: str = COURSE_FAILURE_EVENT,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
-    """Pure function: query rows (plus ``program_ref``) to a prepared dataset."""
+    """Pure function: query rows (plus ``program_ref``) to a prepared dataset.
+
+    ``task_code`` selects the label: COURSE_FAILURE (RISK/NO_RISK from the
+    course result) or COURSE_FINAL_GRADE (the recorded ``nota_final``).
+    """
+    if task_code not in COURSE_EVENTS:
+        raise ValueError(f"Unsupported course task {task_code}.")
+    regression = task_code == COURSE_FINAL_GRADE_EVENT
     if not cuts:
         raise ValueError("At least one processed cut is required.")
     key = pseudonym_key or secrets.token_bytes(32)
@@ -124,6 +136,10 @@ def build_course_failure_snapshot(
         if result is None:
             exclusions["UNKNOWN_RESULT"] += 1
             continue
+        grade = _json_value(source.get("final_grade")) if regression else None
+        if regression and (grade is None or isinstance(grade, bool) or not isinstance(grade, (int, float))):
+            exclusions["NO_FINAL_GRADE"] += 1
+            continue
         student_ref = hashlib.sha256(key + f"{source['program_ref']}:{source['subject_ref']}".encode()).hexdigest()[:32]
         row = {
             "student_ref": student_ref,
@@ -135,23 +151,28 @@ def build_course_failure_snapshot(
             "source_run_id": str(source["source_run_id"]),
             "population_status": "ELIGIBLE",
             "course_result": result,
-            "target_class": NEGATIVE_CLASS if result == "APROBADA" else POSITIVE_CLASS,
         }
+        if regression:
+            row["target_value"] = float(grade)
+        else:
+            row["target_class"] = NEGATIVE_CLASS if result == "APROBADA" else POSITIVE_CLASS
         for name in feature_names:
             row[name] = _json_value(source.get(name))
         rows.append(row)
     rows.sort(key=lambda item: (item["student_ref"], item["program_ref"], item["course_ref"], item["cut_id"]))
     latest = max(cuts, key=lambda cut: (str(cut["effective_at"]), str(cut["closure_id"])))
-    task = get_task(COURSE_FAILURE_EVENT)
+    task = get_task(task_code)
     target_definition_ref = target_definition_ref or task.target_definition_ref
     population_definition_ref = population_definition_ref or task.population_definition_ref
     dataset_id = str(uuid4())
-    digest = hashlib.sha256("".join(json.dumps(r, sort_keys=True, separators=(",", ":")) for r in rows).encode()).hexdigest()
+    from dataset_contract import compute_snapshot_digest
+    # Same canonical JSONL digest the prepared-dataset contract verifies.
+    digest = compute_snapshot_digest(rows)
     manifest: dict[str, Any] = {
         "contract_version": "1.0",
         "dataset_id": dataset_id,
         "snapshot_ref": f"dw-extract:{dataset_id}",
-        "source": {"system": "dw", "contract_ref": f"feature_contract:{contract_reference(COURSE_FAILURE_EVENT, feature_names)['version']}"},
+        "source": {"system": "dw", "contract_ref": f"feature_contract:{contract_reference(task_code, feature_names)['version']}"},
         "grain": "student_course_academic_period",
         "evaluation_unit": "student_course_academic_period",
         "academic_cut": {"status": "PROCESADO", "closure_id": str(latest["closure_id"]),
@@ -161,10 +182,16 @@ def build_course_failure_snapshot(
         "created_at": datetime.now(timezone.utc).isoformat(),
         "row_count": len(rows),
         "exclusions": dict(sorted(exclusions.items())),
-        "fields": [*_FIELDS, *field_definitions(COURSE_FAILURE_EVENT, feature_names), _TARGET_FIELD],
+        "fields": [*_FIELDS, *field_definitions(task_code, feature_names),
+                   _TARGET_VALUE_FIELD if regression else _TARGET_FIELD],
         "feature_fields": list(feature_names),
-        "target_field": "target_class",
+        "target_field": task.target_field,
         "target_definition": {
+            "kind": "regression",
+            "event_code": task_code,
+            "unit": task.target_unit,
+            "label_source": "dw.fact_cursado.nota_final of the enrolment",
+        } if regression else {
             "positive_class": POSITIVE_CLASS,
             "negative_class": NEGATIVE_CLASS,
             "event_code": COURSE_FAILURE_EVENT,
@@ -175,7 +202,7 @@ def build_course_failure_snapshot(
         "target_approved": True,
         "eligibility_approved": True,
         "fixture_only": False,
-        "feature_contract": contract_reference(COURSE_FAILURE_EVENT, feature_names),
+        "feature_contract": contract_reference(task_code, feature_names),
         "content_digest": digest,
     }
     return manifest, rows
@@ -199,7 +226,8 @@ def extract_from_dw(dsn: str, programs: list[str], feature_names: list[str],
         for program in programs:
             for closure_id, effective_at in connection.execute(_CLOSURES_SQL, {"program": program}).fetchall():
                 cuts[closure_id] = {"closure_id": closure_id, "effective_at": effective_at}
-                cursor = connection.execute(sql, {"program": program, "closure": int(closure_id), "limit": row_limit + 1})
+                cursor = connection.execute(sql, {"program": program, "closure": int(closure_id), "subject": None,
+                                                 "course": None, "limit": row_limit + 1})
                 columns = [column.name for column in cursor.description]
                 batch = [dict(zip(columns, values), program_ref=program) for values in cursor.fetchall()]
                 if len(batch) > row_limit:

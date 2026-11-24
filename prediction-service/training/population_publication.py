@@ -54,20 +54,22 @@ class PopulationPublicationService:
             "cuts": cuts,
         }
 
-    def submit(self, access_token: str, program_ref: str, closure_id: str, idempotency_key: str) -> dict[str, Any]:
+    def submit(self, access_token: str, program_ref: str, closure_id: str, idempotency_key: str,
+               event_type: str = "program_dropout") -> dict[str, Any]:
         principal = self.identity.authenticate(access_token)
         # prediction:publish, always within the academic scope.
         if not access_policy.has_permission(principal, access_policy.PREDICTION_PUBLISH):
             raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The account cannot start population scoring.")
+        event_code = _population_event_code(event_type)
         context = self.data.resolve_context(program_ref, closure_id)
         self.policy.authorize(principal, context)
         try:
-            bundle = self.registry.active("PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", context.cadence)
+            bundle = self.registry.active(event_code, context.cadence)
         except NoActiveModel as exc:
-            raise InferenceFailure("NO_ACTIVE_MODEL", 503, "No approved program-dropout model is active for this cadence.") from exc
+            raise InferenceFailure("NO_ACTIVE_MODEL", 503, "No approved model is active for this event and cadence.") from exc
         except InvalidModelArtifact as exc:
             raise InferenceFailure("ACTIVE_MODEL_UNAVAILABLE", 503, "The active model bundle is unavailable.") from exc
-        digest = self.store.digest(program_ref, context.cut_id, bundle.model_id, bundle.version)
+        digest = self.store.digest(program_ref, context.cut_id, bundle.model_id, bundle.version, event_code)
         scope = principal.subject
         existing = self.store.find_by_key(idempotency_key, scope)
         if existing:
@@ -76,7 +78,7 @@ class PopulationPublicationService:
             return _public_batch(existing)
         batch = {
             "batch_id": str(uuid4()), "idempotency_key": idempotency_key,
-            "request_digest": digest, "event_code": "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE",
+            "request_digest": digest, "event_code": event_code,
             "program_ref": program_ref, "closure_id": context.cut_id,
             "model_id": bundle.model_id, "model_version": bundle.version,
             "submitted_by": principal.subject,
@@ -91,11 +93,13 @@ class PopulationPublicationService:
             # A concurrent request reused the key with a different body.
             raise InferenceFailure("IDEMPOTENCY_CONFLICT", 409, "Idempotency-Key was already used for a different publication request.") from exc
 
-    def current(self, access_token: str, program_ref: str, closure_id: str, limit: int = 100, offset: int = 0) -> dict[str, Any]:
+    def current(self, access_token: str, program_ref: str, closure_id: str, limit: int = 100, offset: int = 0,
+                event_type: str = "program_dropout") -> dict[str, Any]:
         principal = self.identity.authenticate(access_token)
+        event_code = _population_event_code(event_type)
         context = self.data.resolve_context(program_ref, closure_id)
         self.policy.authorize(principal, context)
-        batch = self.store.current(program_ref, context.cut_id)
+        batch = self.store.current(program_ref, context.cut_id, event_code)
         if not batch:
             return {"publication": None}
         publication = self.store.get(batch["batch_id"], include_results=True, limit=limit, offset=offset)
@@ -109,6 +113,19 @@ class PopulationPublicationService:
         context = self.data.resolve_context(batch["program_ref"], str(batch["closure_id"]))
         self.policy.authorize(principal, context)
         return _public_batch(self.store.get(batch_id, include_results=True, limit=limit, offset=offset) or batch)
+
+
+def _population_event_code(event_type: str) -> str:
+    """Catalog event of a student-level task; course-level tasks have no population batch."""
+    from feature_contract import STUDENT_CUT_EVENTS
+    from ml_tasks import UnknownTask, task_for_event_type
+    try:
+        task = task_for_event_type(event_type)
+    except UnknownTask as exc:
+        raise InferenceFailure("INVALID_REQUEST", 400, "The requested prediction event is not supported.") from exc
+    if task.code not in STUDENT_CUT_EVENTS:
+        raise InferenceFailure("INVALID_REQUEST", 400, "Population publication is available for student-level events only.")
+    return task.code
 
 
 def _public_batch(batch: dict[str, Any]) -> dict[str, Any]:

@@ -15,12 +15,12 @@ class FakePublicationService:
         # committed outbox from this store after the service creates a batch.
         self.store = object()
 
-    def submit(self, token, program_ref, cut_id, idempotency_key):
+    def submit(self, token, program_ref, cut_id, idempotency_key, event_type="program_dropout"):
         if token != "valid-token":
             raise InferenceFailure("INVALID_TOKEN", 401, "invalid")
         return {"batch_id": "9f321dd1-51cc-4da5-85d2-c6b686cbdf40", "status": "QUEUED", "program_ref": program_ref, "closure_id": cut_id}
 
-    def current(self, token, program_ref, cut_id, limit, offset):
+    def current(self, token, program_ref, cut_id, limit, offset, event_type="program_dropout"):
         if token != "valid-token":
             raise InferenceFailure("INVALID_TOKEN", 401, "invalid")
         return {"publication": None}

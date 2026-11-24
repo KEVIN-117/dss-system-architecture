@@ -51,6 +51,10 @@ class TaskSpec:
     extractable: bool = True
     definition_version: str = "v1"
     sources: tuple[str, ...] = field(default_factory=tuple)
+    # Regression only: unit of the predicted value, shown next to it.
+    target_unit: str | None = None
+    # Features a task cannot drop: its label is derived from them.
+    required_features: tuple[str, ...] = ()
 
     @property
     def servable(self) -> bool:
@@ -69,12 +73,13 @@ class TaskSpec:
         data["servable"] = self.servable
         data["target_definition_ref"] = self.target_definition_ref
         data["population_definition_ref"] = self.population_definition_ref
-        for key in ("algorithms", "cadences", "sources"):
+        for key in ("algorithms", "cadences", "sources", "required_features"):
             data[key] = list(data[key])
         return data
 
 
 _CLASSIFIERS = ("random_forest", "xgboost")
+_REGRESSORS = ("ridge", "random_forest", "xgboost")
 
 _TASKS: tuple[TaskSpec, ...] = (
     TaskSpec(
@@ -128,6 +133,61 @@ _TASKS: tuple[TaskSpec, ...] = (
         cadences=("SEMESTRAL",),
         positive_class="RISK",
         negative_class="NO_RISK",
+        serving_event_type="course_failure",
+        requires_course_ref=True,
+        sources=("dw.fact_cursado", "dw.dim_materia"),
+    ),
+    TaskSpec(
+        code="STUDENT_BACKLOG_NEXT_CUT",
+        kind="classification",
+        subject="student",
+        grain="student_program_cut",
+        title="Rezago del estudiante",
+        description="Riesgo de que el estudiante acumule más materias arrastradas en el siguiente corte.",
+        target_field="target_class",
+        target_label="RISK si materias_arrastradas sube en el siguiente corte de la cadencia; NO_RISK si no sube.",
+        population_label="Estudiantes en sus tres primeros años del programa presentes en el corte y en el siguiente.",
+        algorithms=_CLASSIFIERS,
+        primary_metric="recall",
+        positive_class="RISK",
+        negative_class="NO_RISK",
+        serving_event_type="student_backlog",
+        required_features=("materias_arrastradas",),
+        sources=("dw.fact_retencion_desercion", "etl_control.academic_period_closure"),
+    ),
+    TaskSpec(
+        code="STUDENT_GPA_NEXT_CUT",
+        kind="regression",
+        subject="student",
+        grain="student_program_cut",
+        title="PPA del siguiente corte",
+        description="Estimación del promedio ponderado acumulado (PPA) del estudiante en el siguiente corte.",
+        target_field="target_value",
+        target_label="ppa_acumulado del estudiante en el siguiente corte de la cadencia.",
+        population_label="Estudiantes en sus tres primeros años del programa con PPA en el corte siguiente.",
+        algorithms=_REGRESSORS,
+        primary_metric="rmse",
+        serving_event_type="student_gpa",
+        target_unit="puntos de PPA",
+        required_features=("ppa_acumulado",),
+        sources=("dw.fact_retencion_desercion", "etl_control.academic_period_closure"),
+    ),
+    TaskSpec(
+        code="COURSE_FINAL_GRADE",
+        kind="regression",
+        subject="enrollment",
+        grain="enrollment_cut",
+        title="Nota final en materia",
+        description="Estimación de la nota final que obtendrá el estudiante en una materia inscrita (programas semestrales).",
+        target_field="target_value",
+        target_label="nota_final de la inscripción (dw.fact_cursado).",
+        population_label="Inscripciones con nota final registrada de programas semestrales con corte procesado.",
+        algorithms=_REGRESSORS,
+        primary_metric="rmse",
+        cadences=("SEMESTRAL",),
+        serving_event_type="course_final_grade",
+        requires_course_ref=True,
+        target_unit="puntos de nota",
         sources=("dw.fact_cursado", "dw.dim_materia"),
     ),
 )

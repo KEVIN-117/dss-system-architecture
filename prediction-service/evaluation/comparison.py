@@ -1,4 +1,9 @@
-"""Create a traceable RF/XGBoost comparison from completed job artifacts."""
+"""Create a traceable comparison of completed candidates trained on one partition.
+
+Classification candidates are ranked by validation recall/F1 (or an error-cost
+policy); regression candidates (PRED-103) by validation out-of-fold RMSE, then
+MAE. The outer test is copied into the report and never ranks candidates.
+"""
 
 from __future__ import annotations
 
@@ -17,13 +22,13 @@ def _read(path: Path, name: str) -> dict[str, Any]:
 
 
 def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None) -> dict[str, Any]:
-    """Compare exactly one RF and one XGB candidate on an identical holdout.
+    """Compare two or more candidates trained on an identical holdout.
 
     Candidate ranking uses the configured validation-only policy. Test metrics are
     copied into the report and never influence selection or institutional status.
     """
-    if len(artifact_dirs) != 2:
-        raise ValueError("Exactly two completed model artifact directories are required.")
+    if len(artifact_dirs) < 2:
+        raise ValueError("At least two completed model artifact directories are required.")
     entries = []
     for directory in artifact_dirs:
         path = Path(directory)
@@ -43,13 +48,19 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
             "validation": {
                 "mean_recall": tuning.get("best_mean_recall"),
                 "mean_f1": tuning.get("best_mean_f1"),
+                "mean_rmse": tuning.get("best_mean_rmse"),
+                "mean_mae": tuning.get("best_mean_mae"),
                 "selection_metric": protocol.get("selection_metric"),
                 "validation_cost": tuning.get("best_validation_cost"),
             },
         })
-    algorithms = {entry["manifest"].get("algorithm") for entry in entries}
-    if algorithms != {"random_forest", "xgboost"}:
-        raise ValueError("Comparison requires one random_forest and one xgboost artifact.")
+    model_keys = [(entry["manifest"].get("model_id"), entry["manifest"].get("version")) for entry in entries]
+    if len(set(model_keys)) != len(model_keys):
+        raise ValueError("Each compared artifact must be a different candidate.")
+    kinds = {entry["manifest"].get("task_kind") or "classification" for entry in entries}
+    if len(kinds) != 1:
+        raise ValueError("Classification and regression candidates cannot be compared together.")
+    regression = kinds == {"regression"}
     required_identity = ("partition_id", "dataset_digest", "target_definition_ref")
     identity = {
         key: entries[0]["protocol"].get(key)
@@ -81,11 +92,20 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
     for entry in entries:
         if entry["config"].get("tuning", {}).get("outer_test_used_for_selection") is True:
             raise ValueError("An artifact indicates that the outer test influenced model selection.")
-        if entry["validation"]["mean_recall"] is None or entry["validation"]["mean_f1"] is None:
+        required = ("mean_rmse", "mean_mae") if regression else ("mean_recall", "mean_f1")
+        if any(entry["validation"][key] is None for key in required):
             raise ValueError("Artifacts must include validation metrics for candidate selection.")
 
-    cost_policy = identity["decision_policy"] is not None and identity["decision_policy"].get("kind", "cost") == "cost"
-    if not cost_policy:
+    cost_policy = (not regression and identity["decision_policy"] is not None
+                   and identity["decision_policy"].get("kind", "cost") == "cost")
+    if regression:
+        ranked = sorted(entries, key=lambda e: (e["validation"]["mean_rmse"], e["validation"]["mean_mae"]))
+        best_key = (ranked[0]["validation"]["mean_rmse"], ranked[0]["validation"]["mean_mae"])
+        selection_rule = (
+            "Validation out-of-fold RMSE, then MAE. If both tie, no unique candidate is selected. "
+            "Outer test does not participate."
+        )
+    elif not cost_policy:
         ranked = sorted(entries, key=lambda e: (-e["validation"]["mean_recall"], -e["validation"]["mean_f1"]))
         best_key = (-ranked[0]["validation"]["mean_recall"], -ranked[0]["validation"]["mean_f1"])
         selection_rule = (
@@ -101,7 +121,9 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
             "Approved validation cost, then validation out-of-fold recall and F1. "
             "If all tie, no unique candidate is selected. Outer test does not participate."
         )
-    if not cost_policy:
+    if regression:
+        tied = [entry for entry in ranked if (entry["validation"]["mean_rmse"], entry["validation"]["mean_mae"]) == best_key]
+    elif not cost_policy:
         tied = [entry for entry in ranked if (-entry["validation"]["mean_recall"], -entry["validation"]["mean_f1"]) == best_key]
     else:
         tied = [entry for entry in ranked if (entry["validation"]["validation_cost"], -entry["validation"]["mean_recall"], -entry["validation"]["mean_f1"]) == best_key]
@@ -123,6 +145,7 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
         "evidence_kind": evidence_kind,
         "decision_status": "EVIDENCIA_INSUFICIENTE",
         "decision_reason": decision_reason,
+        "task_kind": "regression" if regression else "classification",
         "evaluation_identity": identity,
         "dataset": dataset_identity,
         "selection_rule": selection_rule,
@@ -144,7 +167,7 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
                 "test_metrics_final_only": entry["metrics"],
                 "training_config": entry["config"],
             }
-            for entry in sorted(entries, key=lambda e: e["manifest"].get("algorithm", ""))
+            for entry in sorted(entries, key=lambda e: (e["manifest"].get("algorithm", ""), e["manifest"].get("model_id", "")))
         ],
     }
     if output_path is not None:
@@ -157,7 +180,7 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
 def main() -> None:
     parser = argparse.ArgumentParser(description="Compare completed prediction model artifacts.")
     parser.add_argument("--output", required=True, type=Path, help="Path for the traceable comparison JSON report.")
-    parser.add_argument("artifacts", nargs=2, type=Path, help="The RF and XGBoost artifact directories.")
+    parser.add_argument("artifacts", nargs="+", type=Path, help="Two or more candidate artifact directories.")
     args = parser.parse_args()
     report = compare_artifacts(args.artifacts, args.output)
     print(json.dumps({"output": str(args.output), "decision_status": report["decision_status"], "selected_candidate": report["selected_candidate_by_validation"]}, indent=2))

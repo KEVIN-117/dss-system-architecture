@@ -155,6 +155,10 @@ def validate_prepared_dataset(
         issue = ValidationIssue("INVALID_MANIFEST", "manifest", "Manifest must be an object.")
         return DatasetValidationReport("INVALID", 0, {}, {}, {}, (issue,))
 
+    task = _event_task(manifest)
+    if task is not None:
+        return _validate_event_dataset(manifest, rows, task)
+
     issues: list[ValidationIssue] = []
     _validate_manifest(manifest, issues)
 
@@ -350,7 +354,8 @@ def validate_prepared_dataset(
     )
 
 
-def _validate_manifest(manifest: Mapping[str, Any], issues: list[ValidationIssue]) -> None:
+def _validate_manifest(manifest: Mapping[str, Any], issues: list[ValidationIssue],
+                       expected_grain: str | None = _GRAIN) -> None:
     required = {
         "contract_version",
         "dataset_id",
@@ -385,8 +390,8 @@ def _validate_manifest(manifest: Mapping[str, Any], issues: list[ValidationIssue
             UUID(str(source.get("run_id")))
         except (ValueError, TypeError, AttributeError):
             issues.append(ValidationIssue("INVALID_SOURCE_RUN_ID", "source.run_id", "Source run reference must be a UUID."))
-    if manifest.get("grain") != _GRAIN:
-        issues.append(ValidationIssue("UNSUPPORTED_GRAIN", "grain", f"Expected grain '{_GRAIN}'."))
+    if manifest.get("grain") != expected_grain:
+        issues.append(ValidationIssue("UNSUPPORTED_GRAIN", "grain", f"Expected grain '{expected_grain}'."))
     cut = manifest.get("academic_cut")
     if not isinstance(cut, Mapping) or cut.get("status") != "PROCESADO" or cut.get("closure_id") in (None, ""):
         issues.append(ValidationIssue("INVALID_ACADEMIC_CUT", "academic_cut", "The manifest must reference a processed DW closure."))
@@ -522,3 +527,179 @@ def _matches_logical_type(value: Any, logical_type: Any) -> bool:
         except ValueError:
             return False
     return False
+
+
+# ---------------------------------------------------------------------------
+# PRED-103: event datasets (every catalog task other than program dropout)
+# ---------------------------------------------------------------------------
+
+_GRAIN_BY_TASK_GRAIN = {
+    "student_program_cut": "student_program_academic_cut",
+    "enrollment_cut": "student_course_academic_period",
+}
+_EVENT_REQUIRED_ROW_FIELDS = {
+    "student_ref", "program_ref", "cut_id", "academic_year", "academic_period", "source_run_id", "population_status",
+}
+
+
+def _event_task(manifest: Mapping[str, Any]) -> Any | None:
+    """Catalog task of a non-dropout dataset; None keeps the retention contract."""
+    definition = manifest.get("target_definition")
+    event_code = definition.get("event_code") if isinstance(definition, Mapping) else None
+    if not isinstance(event_code, str) or event_code == "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE":
+        return None
+    from ml_tasks import UnknownTask, get_task
+    try:
+        return get_task(event_code)
+    except UnknownTask:
+        return None
+
+
+def _validate_event_dataset(manifest: Mapping[str, Any], rows: Iterable[Mapping[str, Any]], task: Any) -> DatasetValidationReport:
+    """Contract of classification/regression datasets at student or enrolment grain.
+
+    Same structural guarantees as the retention contract (typed declared fields,
+    proven point-in-time features bound to the serving contract, canonical
+    digest, unique sorted grain keys, eligible-only rows) without the retention
+    outcome columns, and with a numeric target for regression tasks.
+    """
+    issues: list[ValidationIssue] = []
+    grain = _GRAIN_BY_TASK_GRAIN.get(task.grain)
+    _validate_manifest(manifest, issues, expected_grain=grain)
+    fields_value = manifest.get("fields", [])
+    fields = fields_value if isinstance(fields_value, list) else []
+    features_value = manifest.get("feature_fields", [])
+    feature_names = set(features_value) if isinstance(features_value, list) and all(isinstance(n, str) for n in features_value) else set()
+    target_field = manifest.get("target_field") if isinstance(manifest.get("target_field"), str) else None
+    field_by_name = {f.get("name"): f for f in fields if isinstance(f, Mapping) and isinstance(f.get("name"), str)}
+
+    for name in sorted(feature_names):
+        field = field_by_name.get(name)
+        if field is None:
+            issues.append(ValidationIssue("UNKNOWN_FEATURE", f"feature_fields.{name}", "Feature is absent from the manifest."))
+            continue
+        if field.get("role") != "feature":
+            issues.append(ValidationIssue("INVALID_FEATURE_ROLE", f"fields.{name}.role", "A predictor must have role 'feature'."))
+        if field.get("available_at_cut") is not True:
+            issues.append(ValidationIssue("TEMPORAL_AVAILABILITY_UNPROVEN", f"fields.{name}.available_at_cut", "Feature availability at the prediction cut is not proven.", blocking=True))
+    if not feature_names:
+        issues.append(ValidationIssue("NO_APPROVED_FEATURES", "feature_fields", "No predictors are declared.", blocking=True))
+    if target_field and target_field in feature_names:
+        issues.append(ValidationIssue("TARGET_LEAKAGE", f"feature_fields.{target_field}", "The target cannot also be a predictor."))
+    target = field_by_name.get(target_field) if target_field else None
+    if not target_field or target is None or target.get("role") != "target":
+        issues.append(ValidationIssue("INVALID_TARGET_FIELD", "target_field", "The target field must exist and have role 'target'."))
+    definition = manifest.get("target_definition") if isinstance(manifest.get("target_definition"), Mapping) else {}
+    regression = task.kind == "regression"
+    classes: tuple[str, ...] = ()
+    if regression:
+        if definition.get("kind") != "regression" or (target is not None and target.get("logical_type") not in {"number", "integer"}):
+            issues.append(ValidationIssue("TARGET_DEFINITION_INCOMPLETE", "target_definition", "A regression target must be declared numeric with kind 'regression'.", blocking=True))
+    else:
+        positive, negative = definition.get("positive_class"), definition.get("negative_class")
+        if not isinstance(positive, str) or not positive.strip() or not isinstance(negative, str) or not negative.strip() or positive == negative:
+            issues.append(ValidationIssue("TARGET_DEFINITION_INCOMPLETE", "target_definition", "The target requires distinct positive and negative classes.", blocking=True))
+        else:
+            classes = (positive, negative)
+    _validate_feature_contract(manifest, issues)
+
+    key_names = ("student_ref", "program_ref", "course_ref", "cut_id") if task.grain == "enrollment_cut" else ("student_ref", "program_ref", "cut_id")
+    required_fields = _EVENT_REQUIRED_ROW_FIELDS | set(key_names)
+    row_count = 0
+    population_counts: Counter[str] = Counter()
+    target_counts: Counter[str] = Counter()
+    target_values: set[float] = set()
+    missing_counts: Counter[str] = Counter()
+    seen: set[tuple[str, ...]] = set()
+    last_key: tuple[str, ...] | None = None
+    digest = hashlib.sha256()
+    for index, row in enumerate(rows):
+        row_count += 1
+        path = f"rows[{index}]"
+        if not isinstance(row, Mapping) or not all(isinstance(key, str) for key in row):
+            issues.append(ValidationIssue("INVALID_ROW", path, "Each record must be an object with string field names."))
+            continue
+        try:
+            digest.update(json.dumps(row, sort_keys=True, separators=(",", ":"), ensure_ascii=False, allow_nan=False,
+                                     default=_canonical_json_value).encode("utf-8") + b"\n")
+        except (TypeError, ValueError):
+            issues.append(ValidationIssue("NON_CANONICAL_ROW", path, "Record contains a value that cannot be canonically serialized."))
+        missing = sorted(required_fields - row.keys())
+        if missing:
+            issues.append(ValidationIssue("MISSING_ROW_FIELDS", path, f"Missing required fields: {', '.join(missing)}."))
+            continue
+        for name, field in field_by_name.items():
+            if name not in row:
+                if field.get("nullable") is not True:
+                    issues.append(ValidationIssue("MISSING_REQUIRED_FIELD", f"{path}.{name}", "Required field is missing."))
+                continue
+            value = row[name]
+            if value is None or (isinstance(value, str) and not value.strip()):
+                missing_counts[name] += 1
+                if field.get("nullable") is not True:
+                    issues.append(ValidationIssue("NULL_REQUIRED_FIELD", f"{path}.{name}", "Required field is null or empty."))
+            elif not _matches_logical_type(value, field.get("logical_type")):
+                issues.append(ValidationIssue("INVALID_FIELD_TYPE", f"{path}.{name}", "Value does not match the declared logical type."))
+        undeclared = sorted(row.keys() - field_by_name.keys())
+        if undeclared:
+            issues.append(ValidationIssue("UNDECLARED_ROW_FIELDS", path, f"Undeclared fields are present: {', '.join(undeclared)}."))
+        key = tuple(row[name] for name in key_names)
+        if any(not isinstance(value, str) or not value.strip() for value in key):
+            issues.append(ValidationIssue("INVALID_GRAIN_KEY", f"{path}.grain_key", "Grain references must be non-empty strings."))
+        elif key in seen:
+            issues.append(ValidationIssue("DUPLICATE_GRAIN_KEY", f"{path}.grain_key", "Duplicate grain record."))
+        else:
+            seen.add(key)
+            if last_key is not None and key < last_key:
+                issues.append(ValidationIssue("UNSORTED_SNAPSHOT", f"{path}.grain_key", "Snapshot rows must be ordered by their grain key."))
+            last_key = key
+        for name, minimum in (("academic_year", 2000), ("academic_period", 1)):
+            value = row[name]
+            if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
+                issues.append(ValidationIssue("INVALID_ACADEMIC_PERIOD", f"{path}.{name}", "Academic year/period is outside the DW contract range."))
+        try:
+            UUID(str(row["source_run_id"]))
+        except (ValueError, TypeError, AttributeError):
+            issues.append(ValidationIssue("INVALID_RUN_ID", f"{path}.source_run_id", "DW run reference must be a UUID."))
+        status = row["population_status"]
+        if not isinstance(status, str) or status not in _POPULATION_STATES:
+            issues.append(ValidationIssue("INVALID_POPULATION_STATUS", f"{path}.population_status", "Population status is not recognized."))
+        else:
+            population_counts[status] += 1
+            if status != "ELIGIBLE":
+                issues.append(ValidationIssue("POPULATION_NOT_ELIGIBLE", f"{path}.population_status", "Out-of-scope, ambiguous, or unresolved records must be excluded from the training snapshot and reported.", blocking=True))
+        if target_field and target_field in row:
+            value = row[target_field]
+            if regression:
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(float(value)):
+                    issues.append(ValidationIssue("INVALID_TARGET_VALUE", f"{path}.{target_field}", "Regression targets must be finite numbers."))
+                else:
+                    target_values.add(float(value))
+            elif not isinstance(value, str) or value not in classes:
+                issues.append(ValidationIssue("INVALID_TARGET_CLASS", f"{path}.{target_field}", "Target value is not one of the declared classes."))
+            else:
+                target_counts[value] += 1
+
+    declared_count = manifest.get("row_count")
+    if isinstance(declared_count, int) and not isinstance(declared_count, bool) and declared_count != row_count:
+        issues.append(ValidationIssue("ROW_COUNT_MISMATCH", "row_count", f"Manifest declares {declared_count} rows but {row_count} were read."))
+    declared_digest = manifest.get("content_digest")
+    if isinstance(declared_digest, str) and re.fullmatch(r"[a-f0-9]{64}", declared_digest) and digest.hexdigest() != declared_digest:
+        issues.append(ValidationIssue("CONTENT_DIGEST_MISMATCH", "content_digest", "Snapshot content does not match the manifest digest."))
+    if regression:
+        if len(target_values) < 2:
+            issues.append(ValidationIssue("INSUFFICIENT_TARGET_VARIANCE", f"rows.{target_field}", "A regression target needs at least two distinct observed values.", blocking=True))
+    else:
+        for class_name in classes:
+            if not target_counts.get(class_name):
+                issues.append(ValidationIssue("INSUFFICIENT_TARGET_CLASS_COVERAGE", f"rows.{target_field}", "A declared target class has no observations.", blocking=True))
+    has_errors = any(not issue.blocking for issue in issues)
+    has_blockers = any(issue.blocking for issue in issues)
+    return DatasetValidationReport(
+        status="INVALID" if has_errors else "BLOCKED" if has_blockers else "READY_FOR_PREPARATION",
+        row_count=row_count,
+        population_counts=dict(population_counts),
+        outcome_counts=dict(target_counts),
+        missing_counts=dict(missing_counts),
+        issues=tuple(issues),
+    )

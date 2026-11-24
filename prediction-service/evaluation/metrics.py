@@ -84,3 +84,49 @@ def classification_metrics(
         "support": {label: values["support"] for label, values in by_class.items()},
         "test_row_count": int(len(true)),
     }
+
+
+def regression_metrics(y_true: Any, y_pred: Any, buckets: int = 4) -> dict[str, Any]:
+    """MAE, RMSE, R², MAPE and residuals by bucket of the observed value (PRED-103).
+
+    MAPE skips observations equal to zero (undefined), reporting how many were
+    skipped. Buckets are quantiles of the observed target so error can be read
+    across low and high values; ``bias`` is the mean of prediction - observed.
+    """
+    true = np.asarray(y_true, dtype=float)
+    pred = np.asarray(y_pred, dtype=float)
+    if true.shape != pred.shape or true.size == 0:
+        raise ValueError("Regression metrics need equal, non-empty observed and predicted arrays.")
+    residuals = pred - true
+    mae = float(np.mean(np.abs(residuals)))
+    rmse = float(np.sqrt(np.mean(residuals ** 2)))
+    variance = float(np.sum((true - true.mean()) ** 2))
+    r2 = None if variance == 0 else float(1 - np.sum(residuals ** 2) / variance)
+    nonzero = true != 0
+    mape = float(np.mean(np.abs(residuals[nonzero] / true[nonzero]))) if nonzero.any() else None
+    edges = np.unique(np.quantile(true, np.linspace(0, 1, buckets + 1)))
+    by_bucket = []
+    for index in range(max(1, len(edges) - 1)):
+        low = edges[index] if len(edges) > 1 else true.min()
+        high = edges[index + 1] if len(edges) > 1 else true.max()
+        last = index == len(edges) - 2 or len(edges) <= 1
+        mask = (true >= low) & ((true <= high) if last else (true < high))
+        if not mask.any():
+            continue
+        bucket_residuals = residuals[mask]
+        by_bucket.append({
+            "observed_min": float(low), "observed_max": float(high), "count": int(mask.sum()),
+            "mae": float(np.mean(np.abs(bucket_residuals))), "bias": float(np.mean(bucket_residuals)),
+        })
+    return {
+        "mae": mae,
+        "rmse": rmse,
+        "r2": r2,
+        "r2_undefined_reason": None if r2 is not None else "observed target has zero variance",
+        "mape": mape,
+        "mape_skipped_zero_observations": int((~nonzero).sum()),
+        "bias": float(np.mean(residuals)),
+        "observed_mean": float(true.mean()),
+        "residuals_by_bucket": by_bucket,
+        "test_row_count": int(true.size),
+    }
