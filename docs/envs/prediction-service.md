@@ -6,11 +6,12 @@ El servicio se configura mediante variables de entorno, sin secretos en este con
 | --- | --- | --- | --- |
 | `PREDICTION_ENV` | `production` | `development`, `test`, `production` | No |
 | `PREDICTION_HOST` | `0.0.0.0` | Host no vacío; en Compose debe escuchar en todas las interfaces del contenedor | No |
-| `PREDICTION_PORT` | `8000` | Entero de 1 a 65535 | No |
+| `PREDICTION_PORT` | `8000` (fijo en Compose) | Entero de 1 a 65535 | No |
+| `PREDICTION_HOST_PORT` | `18007` | Puerto del host, publicado solo en `127.0.0.1` | No |
 | `PREDICTION_LOG_LEVEL` | `info` | `critical`, `error`, `warning`, `info`, `debug`, `trace` | No |
 | `PREDICTION_RELOAD` | `false` | Booleano: `true`/`false` (`1`/`0`, `yes`/`no`, `on`/`off` también aceptados) | No |
 
-Para ejecución local, `.env.example` usa `PREDICTION_ENV=development`; para Compose, el fallback es `production`. `PREDICTION_RELOAD=true` no es válido en `production`. Compose no publica el puerto del servicio al host: permanece accesible desde la red `dss-net` en `http://prediction-service:8000`.
+Para ejecución local, `.env.example` usa `PREDICTION_ENV=development`; para Compose, el fallback es `production`. `PREDICTION_RELOAD=true` no es válido en `production`. Dentro de la red `dss-net` el servicio responde en `http://prediction-service:8000`, y el BFF dockerizado lo usa así. Compose también lo publica en el host, solo en loopback, en `http://localhost:18007` (`PREDICTION_HOST_PORT`), para el BFF que corre fuera de Docker (`PREDICTION_SERVICE_URL=http://localhost:18007`). El DW y los workers no se publican.
 
 El servicio ya incluye inferencia individual (`POST /v1/predictions`), trabajos asíncronos y scoring poblacional. La ruta heredada `POST /predict` permanece deshabilitada para scoring confiable: devuelve un error si no puede resolver un bundle aprobado y features del DW desde una fuente confiable. La inferencia requiere configuración de identidad, acceso de lectura al DW y un modelo autorizado. El entorno `production` define el modo de arranque, pero por sí solo no significa que existan las aprobaciones, credenciales o evidencias necesarias para habilitar uso institucional.
 

@@ -355,10 +355,14 @@ services:
       context: ./prediction-service
       dockerfile: Dockerfile
     restart: on-failure
+    # The API listens on 8000 inside dss-net (the dockerized BFF uses prediction-service:8000) and is
+    # published on host loopback 18007 for the host-run BFF and local tools. The DW and workers stay private.
+    ports:
+      - "127.0.0.1:${PREDICTION_HOST_PORT:-18007}:8000"
     environment:
       PREDICTION_ENV: ${PREDICTION_ENV:-development}
       PREDICTION_HOST: 0.0.0.0
-      PREDICTION_PORT: ${PREDICTION_PORT:-18007}
+      PREDICTION_PORT: 8000
       PREDICTION_LOG_LEVEL: ${PREDICTION_LOG_LEVEL:-info}
       PREDICTION_RELOAD: ${PREDICTION_RELOAD:-false}
       PREDICTION_DATABASE_URL: ${PREDICTION_API_DATABASE_URL:-${PREDICTION_DATABASE_URL:-postgresql://${POSTGRES_DW_USER}:${POSTGRES_DW_PASSWORD}@postgres-dw:5432/${POSTGRES_DW_NAME}}}
