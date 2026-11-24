@@ -383,10 +383,13 @@ services:
       WORKER_ARTIFACTS_DIR: /app/artifacts
       PREDICTION_DATASET_ROOT: ${PREDICTION_DATASET_ROOT:-/app/snapshots}
       PREDICTION_CUSTOM_DATASET_ROOT: /app/custom-datasets
+      PREDICTION_EXTRACTED_DATASET_ROOT: /app/extracted-datasets
     volumes:
       - prediction_artifacts:/app/artifacts
       # Uploaded datasets: written by the API, read-only for the worker.
       - prediction_custom_datasets:/app/custom-datasets
+      # DW extractions (PRED-102): written by the worker, read-only for the API.
+      - prediction_extracted_datasets:/app/extracted-datasets:ro
     depends_on:
       postgres-dw:
         condition: service_healthy
@@ -424,9 +427,11 @@ services:
       PREDICTION_DATASET_ROOT: ${PREDICTION_DATASET_ROOT:-/app/snapshots}
       PREDICTION_CONFIG_ROOT: /app/configurations
       PREDICTION_CUSTOM_DATASET_ROOT: /app/custom-datasets
+      PREDICTION_EXTRACTED_DATASET_ROOT: /app/extracted-datasets
     volumes:
       - prediction_artifacts:/app/artifacts
       - prediction_custom_datasets:/app/custom-datasets:ro
+      - prediction_extracted_datasets:/app/extracted-datasets
       - ${PREDICTION_SNAPSHOT_DIR:-./infra/prediction-snapshots}:/app/snapshots:ro
       - ${PREDICTION_CONFIG_DIR:-./infra/prediction-configurations}:/app/configurations:ro
     cpus: ${WORKER_CPU_LIMIT:-2}
@@ -623,3 +628,4 @@ volumes:
   olap_home_empty:
   prediction_artifacts:
   prediction_custom_datasets:
+  prediction_extracted_datasets:

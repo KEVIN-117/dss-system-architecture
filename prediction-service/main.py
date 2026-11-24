@@ -15,6 +15,7 @@ from uuid import UUID, uuid4
 from io import BytesIO
 import hashlib
 import json
+import re
 import shutil
 import zipfile
 from fastapi import FastAPI, File, Header, HTTPException, Query, UploadFile
@@ -25,10 +26,11 @@ from config import (
     custom_dataset_roots,
     dataset_max_uncompressed_bytes,
     dataset_upload_max_bytes,
+    extracted_dataset_root,
     settings,
 )
 from dataset_contract import DatasetValidationReport, validate_prepared_dataset
-from ml_tasks import list_tasks, task_for_event_type
+from ml_tasks import get_task, list_tasks, task_for_event_type
 from ml_tasks.catalog import event_code_pattern, event_type_pattern
 from training.job_store import IdempotencyConflict, JobStore
 from training.model_registry import InvalidModelArtifact, ModelRegistry, NoActiveModel
@@ -159,6 +161,9 @@ class TrainingJobResponse(BaseModel):
     submitted_by: str
     model_candidate: ModelReference | None = None
     error: dict[str, Any] | None = None
+    job_kind: str = "TRAIN"
+    params: dict[str, Any] | None = None
+    result_ref: str | None = None
 
 
 class ProblemResponse(BaseModel):
@@ -625,6 +630,8 @@ def _training_job_response(record: Any) -> TrainingJobResponse:
         status=record.status.value, created_at=record.created_at, started_at=record.started_at,
         finished_at=record.finished_at, submitted_by=record.submitted_by,
         model_candidate=model_candidate, error=record.error,
+        job_kind=getattr(record, "job_kind", "TRAIN"), params=getattr(record, "params", None) or None,
+        result_ref=getattr(record, "result_ref", None),
     )
 
 
@@ -747,19 +754,9 @@ def submit_training_job(
         )
 
     # Backpressure: bound running + queued work so a stalled worker cannot
-    # accumulate an unbounded backlog of training jobs.
-    try:
-        max_concurrent = _positive_int_env("WORKER_MAX_CONCURRENT_JOBS", 1)
-        max_queued = _positive_int_env("PREDICTION_MAX_QUEUED_JOBS", 4, minimum=0)
-    except ValueError as exc:
-        return _make_problem(503, "Job capacity misconfigured", "CONFIGURATION_ERROR", request_id, detail=str(exc))
-    active_jobs = store.list_active()
-    capacity = max_concurrent + max_queued
-    if len(active_jobs) >= capacity:
-        return _make_problem(
-            429, "Job capacity exhausted", "JOB_CAPACITY", request_id,
-            detail=f"At most {max_concurrent} running and {max_queued} queued training jobs are allowed.",
-        )
+    # accumulate an unbounded backlog of jobs.
+    if (problem := _capacity_problem(store, request_id)) is not None:
+        return problem
 
     # Create the job record
     job_id = str(uuid4())
@@ -896,6 +893,315 @@ def cancel_training_job(
         return _make_problem(404, "Training job not found", "RESOURCE_NOT_FOUND", request_id)
     return _make_problem(409, "Training job cannot be cancelled", "JOB_NOT_CANCELLABLE", request_id,
                          detail=f"Only QUEUED jobs can be cancelled; current status is {record.status.value}.")
+
+
+# ---------------------------------------------------------------------------
+# PRED-102 — Dataset extraction jobs, job list and dataset exploration (EDA)
+# ---------------------------------------------------------------------------
+
+class DatasetExtractionRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    task_code: str = Field(min_length=1, max_length=64)
+    cadence: str = Field(pattern=r"^(ANUAL|SEMESTRAL)$")
+    programs: list[str] = Field(default_factory=list, max_length=200)
+    horizon_years: int | None = Field(default=None, ge=1, le=10)
+    features: list[str] = Field(default_factory=list, max_length=64)
+
+
+_JOB_KINDS = ("TRAIN", "EXTRACT_DATASET", "FORECAST")
+_JOB_STATUSES = ("QUEUED", "RUNNING", "SUCCEEDED", "FAILED", "CANCELLED")
+
+
+def _capacity_problem(store: JobStore, request_id: str) -> JSONResponse | None:
+    """Shared admission control for every operator job kind."""
+    try:
+        max_concurrent = _positive_int_env("WORKER_MAX_CONCURRENT_JOBS", 1)
+        max_queued = _positive_int_env("PREDICTION_MAX_QUEUED_JOBS", 4, minimum=0)
+    except ValueError as exc:
+        return _make_problem(503, "Job capacity misconfigured", "CONFIGURATION_ERROR", request_id, detail=str(exc))
+    if len(store.list_active()) >= max_concurrent + max_queued:
+        return _make_problem(
+            429, "Job capacity exhausted", "JOB_CAPACITY", request_id,
+            detail=f"At most {max_concurrent} running and {max_queued} queued jobs are allowed.",
+        )
+    return None
+
+
+@app.post(
+    "/v1/dataset-extractions",
+    status_code=202,
+    response_model=TrainingJobResponse,
+    summary="Extraer un dataset de entrenamiento desde el DW",
+    description=(
+        "Requiere el permiso prediction:train. Encola un job EXTRACT_DATASET que ejecuta en el worker la consulta "
+        "point-in-time de la tarea, valida el contrato, calcula el perfil exploratorio y publica el dataset como "
+        "custom:<dataset_id> (el result_ref del job)."
+    ),
+    responses={
+        400: COMMON_ERROR_RESPONSES[400],
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        409: COMMON_ERROR_RESPONSES[409],
+        422: COMMON_ERROR_RESPONSES[422],
+        429: {"model": ProblemResponse, "description": "Capacidad de workers agotada"},
+        503: COMMON_ERROR_RESPONSES[503],
+    },
+)
+def submit_dataset_extraction(
+    body: DatasetExtractionRequest,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=16, max_length=128),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    from training.dataset_extraction import ExtractionError, validate_params
+    from training.job_store import JobKind, JobStatus, TrainingJobRecord
+
+    request_id = x_request_id or str(uuid4())
+    try:
+        principal = _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Dataset extraction request rejected")
+    try:
+        params = validate_params(body.model_dump()).to_json()
+    except ExtractionError as exc:
+        return _make_problem(422, "Invalid extraction request", exc.code, request_id, detail=str(exc))
+    if extracted_dataset_root() is None:
+        return _make_problem(503, "Extraction storage not configured", "DATASET_STORAGE_UNAVAILABLE", request_id,
+                             detail="PREDICTION_EXTRACTED_DATASET_ROOT is not configured.")
+
+    store = JobStore()
+    scope = f"{os.getenv('PREDICTION_IDEMPOTENCY_SCOPE', 'development')}:{principal.subject}"
+    kind = JobKind.EXTRACT_DATASET.value
+    existing = store.find_by_idempotency_key(idempotency_key, scope)
+    if existing is not None:
+        digest = store.request_digest("extraction", "", {}, kind, params)
+        if existing.request_digest != digest:
+            return _make_problem(409, "Idempotency conflict", "CONFLICT", request_id,
+                                 detail="Idempotency-Key was already used for a different request.")
+        _dispatch_pending(store)
+        return _training_job_response(existing)
+    if (problem := _capacity_problem(store, request_id)) is not None:
+        return problem
+
+    dataset_id = str(uuid4())
+    record = TrainingJobRecord(
+        job_id=str(uuid4()),
+        dataset_ref=f"custom:{dataset_id}",
+        algorithm="",
+        status=JobStatus.QUEUED,
+        created_at=datetime.now(timezone.utc).isoformat(),
+        started_at=None,
+        finished_at=None,
+        submitted_by=principal.subject,
+        model_candidate=None,
+        error=None,
+        idempotency_key=idempotency_key,
+        config={},
+        dataset_version=f"custom:{dataset_id}",
+        dependency_versions={},
+        job_kind=kind,
+        params=params,
+    )
+    # The digest ignores the reserved dataset id so a retried request matches.
+    record.request_digest = store.request_digest("extraction", "", {}, kind, params)
+    try:
+        record = store.create(record, scope)
+    except IdempotencyConflict:
+        return _make_problem(409, "Idempotency conflict", "CONFLICT", request_id,
+                             detail="Idempotency-Key was already used for a different request.")
+    logger.info("Dataset extraction job %s queued task=%s request_id=%s", record.job_id, params["task_code"], request_id)
+    _dispatch_pending(store)
+    return _training_job_response(record)
+
+
+@app.get(
+    "/v1/jobs",
+    response_model=list[TrainingJobResponse],
+    summary="Listar los jobs de ML (entrenamiento, extracción y pronóstico)",
+    description="Requiere el permiso prediction:train. Jobs de todos los operadores, del más reciente al más antiguo.",
+    responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 503: COMMON_ERROR_RESPONSES[503]},
+)
+def list_jobs(
+    kind: str | None = Query(default=None, pattern=r"^(TRAIN|EXTRACT_DATASET|FORECAST)$"),
+    status: str | None = Query(default=None, pattern=r"^(QUEUED|RUNNING|SUCCEEDED|FAILED|CANCELLED)$"),
+    limit: int = Query(default=50, ge=1, le=200),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Job list request rejected")
+    return [_training_job_response(record) for record in JobStore().list_recent(kind, status, limit)]
+
+
+@app.get(
+    "/v1/jobs/{job_id}",
+    response_model=TrainingJobResponse,
+    summary="Consultar un job de ML de cualquier tipo",
+    responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 404: COMMON_ERROR_RESPONSES[404]},
+)
+def get_job(
+    job_id: str,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Job request rejected")
+    try:
+        UUID(job_id)
+    except ValueError:
+        return _make_problem(404, "Job not found", "RESOURCE_NOT_FOUND", request_id)
+    record = JobStore().get(job_id)
+    if record is None:
+        return _make_problem(404, "Job not found", "RESOURCE_NOT_FOUND", request_id)
+    return _training_job_response(record)
+
+
+@app.post(
+    "/v1/jobs/{job_id}/cancel",
+    response_model=TrainingJobResponse,
+    summary="Cancelar un job de ML en cola o en ejecución",
+    description=(
+        "Requiere el permiso prediction:train. Un job QUEUED no llega a ejecutarse. Un job RUNNING se cancela de forma "
+        "cooperativa: queda CANCELLED de inmediato y el worker descarta su resultado parcial (dataset o candidato)."
+    ),
+    responses={
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        404: COMMON_ERROR_RESPONSES[404],
+        409: {"model": ProblemResponse, "description": "El job ya terminó"},
+    },
+)
+def cancel_job(
+    job_id: str,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        principal = _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Job request rejected")
+    try:
+        UUID(job_id)
+    except ValueError:
+        return _make_problem(404, "Job not found", "RESOURCE_NOT_FOUND", request_id)
+    store = JobStore()
+    if store.cancel(job_id, include_running=True):
+        logger.info("Job %s cancelled by %s request_id=%s", job_id, principal.subject, request_id)
+        return _training_job_response(store.get(job_id))
+    record = store.get(job_id)
+    if record is None:
+        return _make_problem(404, "Job not found", "RESOURCE_NOT_FOUND", request_id)
+    return _make_problem(409, "Job cannot be cancelled", "JOB_NOT_CANCELLABLE", request_id,
+                         detail=f"The job already finished with status {record.status.value}.")
+
+
+_DATASET_NAME_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$")
+_BUILTIN_FIXTURES = {
+    "fixture:pred003_synthetic-v1": "pred003_synthetic",
+    "fixture:pred002_synthetic-v1": "pred002_synthetic",
+}
+
+
+def _dataset_dir(dataset_ref: str) -> Path | None:
+    """Trusted directory of a dataset reference (custom:<id>, <id> or built-in fixture)."""
+    if dataset_ref in _BUILTIN_FIXTURES:
+        folder = Path(__file__).parent / "tests" / "fixtures" / _BUILTIN_FIXTURES[dataset_ref]
+        return folder if (folder / "manifest.json").exists() else None
+    name = dataset_ref.removeprefix("custom:")
+    if not _DATASET_NAME_PATTERN.fullmatch(name):
+        return None
+    for root in custom_dataset_roots():
+        candidate = (root / name).resolve()
+        if root in candidate.parents and (candidate / "manifest.json").is_file() and (candidate / "rows.jsonl").is_file():
+            return candidate
+    return None
+
+
+def _read_dataset_files(folder: Path) -> tuple[dict[str, Any], list[dict[str, Any]]]:
+    manifest = json.loads((folder / "manifest.json").read_text(encoding="utf-8"))
+    rows = [json.loads(line) for line in (folder / "rows.jsonl").read_text(encoding="utf-8").splitlines() if line.strip()]
+    return manifest, rows
+
+
+def _dataset_profile(manifest: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any]:
+    from preparation.profiling import profile_dataset
+    try:
+        kind = get_task(str((manifest.get("target_definition") or {}).get("event_code"))).kind
+    except KeyError:
+        kind = None
+    return profile_dataset(manifest, rows, kind)
+
+
+@app.get(
+    "/v1/datasets/{dataset_ref}/profile",
+    summary="Perfil exploratorio (EDA) de un dataset",
+    description=(
+        "Requiere el permiso prediction:train. Cobertura por periodo y programa, distribución del objetivo, faltantes, "
+        "estadísticas e histogramas por variable, correlación con el objetivo y avisos (fuga, desbalance/SMOTE). "
+        "Solo agregados: no incluye filas."
+    ),
+    responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 404: COMMON_ERROR_RESPONSES[404]},
+)
+def get_dataset_profile(
+    dataset_ref: str,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Dataset request rejected")
+    folder = _dataset_dir(dataset_ref)
+    if folder is None:
+        return _make_problem(404, "Dataset not found", "RESOURCE_NOT_FOUND", request_id)
+    stored = folder / "profile.json"
+    if stored.is_file():
+        return JSONResponse(json.loads(stored.read_text(encoding="utf-8")), headers={"Cache-Control": "no-store"})
+    # Datasets published before PRED-102 have no stored profile; compute it on
+    # read (the dataset store may be read-only for the API).
+    manifest, rows = _read_dataset_files(folder)
+    return JSONResponse(_dataset_profile(manifest, rows), headers={"Cache-Control": "no-store"})
+
+
+@app.get(
+    "/v1/datasets/{dataset_ref}/sample",
+    summary="Muestra de filas seudonimizadas de un dataset",
+    description=(
+        "Requiere el permiso prediction:train. Devuelve las primeras filas con solo los campos declarados en el "
+        "manifest; los estudiantes aparecen con su pseudónimo, nunca con identificadores del DW."
+    ),
+    responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 404: COMMON_ERROR_RESPONSES[404]},
+)
+def get_dataset_sample(
+    dataset_ref: str,
+    limit: int = Query(default=50, ge=1, le=200),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Dataset request rejected")
+    folder = _dataset_dir(dataset_ref)
+    if folder is None:
+        return _make_problem(404, "Dataset not found", "RESOURCE_NOT_FOUND", request_id)
+    manifest, rows = _read_dataset_files(folder)
+    declared = [field.get("name") for field in manifest.get("fields", []) if isinstance(field, dict) and field.get("name")]
+    columns = [name for name in declared if name not in {"subject_ref"}]
+    sample = [{name: row.get(name) for name in columns} for row in rows[:limit]]
+    return JSONResponse(
+        {"dataset_id": manifest.get("dataset_id"), "row_count": len(rows), "columns": columns, "rows": sample},
+        headers={"Cache-Control": "no-store"},
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1064,6 +1370,8 @@ def _store_dataset(root: Path, dataset_id: str, manifest: dict[str, Any], rows: 
             for row in rows:
                 handle.write(json.dumps(row, separators=(",", ":"), ensure_ascii=False) + "\n")
         (staging / "upload.json").write_text(json.dumps(provenance, indent=2, sort_keys=True), encoding="utf-8")
+        (staging / "profile.json").write_text(
+            json.dumps(_dataset_profile(manifest, rows), indent=2, ensure_ascii=False), encoding="utf-8")
         try:
             # rename (not replace) fails if a concurrent upload published first.
             os.rename(staging, target)
@@ -1160,19 +1468,13 @@ async def upload_training_dataset(
 
 def _dispatch_pending(store: JobStore) -> None:
     """Publish committed outbox entries; failed publishes remain retryable."""
-    from training.tasks import train_model_task
+    from training.tasks import dispatch_job
     for job_id in store.pending_outbox():
         job = store.get(job_id)
         if job is None:
             continue
         try:
-            train_model_task.apply_async(
-                kwargs={"job_id": job.job_id, "dataset_ref": job.dataset_ref,
-                        "algorithm": job.algorithm, "config": job.config,
-                        "artifacts_dir": os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts")},
-                task_id=job.job_id,
-                queue="prediction.train_model",
-            )
+            dispatch_job(job, os.getenv("WORKER_ARTIFACTS_DIR", "/app/artifacts"))
             store.mark_published(job_id)
         except Exception as exc:
             logger.warning("Outbox dispatch pending for job %s: %s", job_id, exc)

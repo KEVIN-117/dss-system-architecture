@@ -45,11 +45,12 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `PREDICTION_IDEMPOTENCY_SCOPE` | `development` | Ámbito que delimita las claves de idempotencia. |
 | `PREDICTION_DATASET_ROOT` | `/app/snapshots` | Raíz de solo lectura para snapshots preparados por operadores (`custom/` se usa como respaldo de solo lectura). |
 | `PREDICTION_CUSTOM_DATASET_ROOT` | `/app/custom-datasets` | Almacén compartido de datasets subidos: lectura-escritura en la API, solo lectura en el worker (volumen `prediction_custom_datasets`). |
+| `PREDICTION_EXTRACTED_DATASET_ROOT` | `/app/extracted-datasets` | Datasets extraídos del DW por el worker (PRED-102): lectura-escritura en el worker, solo lectura en la API (volumen `prediction_extracted_datasets`). Sin esta variable la API rechaza las extracciones con `503`. |
 | `PREDICTION_DATASET_UPLOAD_MAX_BYTES` | `52428800` | Tamaño máximo del `.zip` subido; se rechaza con `413` sin cargarlo completo en memoria. |
 | `PREDICTION_DATASET_MAX_UNCOMPRESSED_BYTES` | `209715200` | Tamaño máximo descomprimido de `manifest.json` + `rows.jsonl` (protección contra zip bombs). |
 | `PREDICTION_CONFIG_ROOT` | `/app/configurations` (worker) | Catálogo de configuraciones versionadas; Compose lo monta en solo lectura. |
 | `PREDICTION_OUTBOX_POLL_SECONDS` | `5` | Intervalo de recuperación de mensajes pendientes en outbox. |
-| `PREDICTION_MAX_QUEUED_JOBS` | `4` | Jobs de entrenamiento en cola admitidos además de `WORKER_MAX_CONCURRENT_JOBS` en ejecución; al superarse responde `429 JOB_CAPACITY`. |
+| `PREDICTION_MAX_QUEUED_JOBS` | `4` | Jobs en cola (entrenamiento y extracción) admitidos además de `WORKER_MAX_CONCURRENT_JOBS` en ejecución; al superarse responde `429 JOB_CAPACITY`. |
 | `PREDICTION_DW_DATABASE_URL` | *(sin configurar)* | Conexión de solo lectura al DW para resolver cortes y features. Sin DSN, la inferencia falla cerrada. |
 | `KEYCLOAK_URL` | *(sin configurar)* | URL base del issuer Keycloak. |
 | `KEYCLOAK_REALM` | *(sin configurar)* | Realm usado para validar firma e issuer del bearer token. |
@@ -74,11 +75,11 @@ Los trabajos y el outbox transaccional viven en PostgreSQL, en `ml_workspace`; R
 | `WORKER_CPU_LIMIT` | `2` | Hilos/CPU máximos del estimador y cuota dura del contenedor. |
 | `WORKER_MEMORY_LIMIT_MB` | `2048` | Límite duro de memoria del contenedor en Compose. |
 | `WORKER_ARTIFACTS_DIR` | `/app/artifacts` | Ruta del volumen para persistencia de artefactos. |
-| `PREDICTION_DW_DATABASE_URL` | *(sin configurar)* | Conexión de solo lectura al DW requerida también por el worker para resolver la población y sus features. |
+| `PREDICTION_DW_DATABASE_URL` | *(sin configurar)* | Conexión de solo lectura al DW requerida también por el worker para resolver la población y sus features, y para las extracciones de datasets (PRED-102). |
 | `WORKER_RANDOM_SEED` | `42` | Semilla por defecto para reproducibilidad. |
 | `WORKER_MAX_JOB_ATTEMPTS` | `3` | Claims máximos por job o lote. Cuando el último intento muere (lease vencida), se marca `FAILED` con `ATTEMPTS_EXHAUSTED` en vez de reintentarse indefinidamente. |
 
-Las migraciones `0026` y `0027` crean el registro, el outbox y el grupo SQL `dw_prediction_runtime`, con acceso únicamente a esas tablas. Para entornos fuera de desarrollo, provisionar logins independientes para API/worker y asignarles ese grupo; no usar `dw_ml_writer` para el API. El API inserta job y outbox en una transacción; si falla el broker, el sondeo periódico vuelve a publicar el outbox con backoff exponencial. La entrega es al menos una vez: Celery usa `job_id` como identificador estable y el worker reclama el registro con una lease atómica. PostgreSQL es la fuente de estado y resultados, por eso Celery no usa backend RPC ni colas temporales de control/mingle. Si el worker cae, el reintento espera a que expire la lease y escribe en un directorio de artefactos por intento.
+La migración `0066` (PRED-102) añade `job_kind`, `params` y `result_ref` a `ml_workspace.training_job`; el algoritmo solo se restringe a `random_forest`/`xgboost` en los jobs `TRAIN`. Las extracciones usan la cola `prediction.train_model` (tarea `prediction.extract_dataset`) y la misma admisión de capacidad que el entrenamiento. Las migraciones `0026` y `0027` crean el registro, el outbox y el grupo SQL `dw_prediction_runtime`, con acceso únicamente a esas tablas. Para entornos fuera de desarrollo, provisionar logins independientes para API/worker y asignarles ese grupo; no usar `dw_ml_writer` para el API. El API inserta job y outbox en una transacción; si falla el broker, el sondeo periódico vuelve a publicar el outbox con backoff exponencial. La entrega es al menos una vez: Celery usa `job_id` como identificador estable y el worker reclama el registro con una lease atómica. PostgreSQL es la fuente de estado y resultados, por eso Celery no usa backend RPC ni colas temporales de control/mingle. Si el worker cae, el reintento espera a que expire la lease y escribe en un directorio de artefactos por intento.
 
 Cada claim incrementa `attempt`, que actúa como token de fencing: el resultado final (`SUCCEEDED`, `FAILED` o `PUBLISHED`) solo se escribe si la fila sigue `RUNNING` con ese mismo intento. Un worker cuya lease venció y fue reemplazado no puede sobrescribir al intento nuevo; su artefacto queda como candidato huérfano. La migración `0036` añade `attempt` a `ml_workspace.prediction_batch`.
 
@@ -115,10 +116,16 @@ Las listas de roles de la convivencia (`PREDICTION_ALLOWED_ROLES`, `PREDICTION_B
 - `GET /v1/training-jobs/{jobId}`: Consulta el estado, progreso, candidato generado o detalle de error según el estándar RFC 7807 Problem Details.
 - `POST /v1/training-jobs/{jobId}/cancel`: cancela un job `QUEUED` (`200`). Un job que ya está en ejecución o terminado responde `409 JOB_NOT_CANCELLABLE`; no se interrumpe un entrenamiento en curso.
 - `GET /v1/ml-tasks`: catálogo de tareas de predicción (`ml_tasks/`): tipo, grano, algoritmos, cadencias, clases y referencias de objetivo y población. Requiere `prediction:train`.
-- `GET /v1/datasets`: lista fixtures y datasets subidos o provisionados.
-- `POST /v1/datasets/upload`: recibe un `.zip` con un único `manifest.json` y un único `rows.jsonl`, aplica límites de tamaño, valida el contrato y registra el dataset de forma **inmutable** (`409` si el `dataset_id` ya existe). Guarda `upload.json` con el `sub` del operador, la fecha y el SHA-256 del archivo. El worker lo resuelve como `custom:<dataset_id>`.
+- `POST /v1/dataset-extractions` (PRED-102): encola un job `EXTRACT_DATASET`. Cuerpo: `task_code` (tarea extraíble del catálogo), `cadence`, `programs` (vacío = todos los programas de la cadencia), `horizon_years` (solo deserción) y `features` (vacío = todas). Requiere `Idempotency-Key`. El worker ejecuta la consulta point-in-time del contrato de features, valida el contrato de datos, calcula `profile.json` y publica el dataset de forma atómica como `custom:<dataset_id>`, que queda en `result_ref` del job. Responde `422` con el código del catálogo si la tarea o la cadencia no son válidas.
+- `GET /v1/jobs?kind=&status=&limit=`: jobs de todos los operadores (`TRAIN`, `EXTRACT_DATASET`, `FORECAST`), del más reciente al más antiguo; reemplaza la lista guardada en el navegador.
+- `GET /v1/jobs/{jobId}`: cualquier job, con `job_kind`, `params` y `result_ref`.
+- `POST /v1/jobs/{jobId}/cancel`: cancela un job `QUEUED` o `RUNNING`. La cancelación de un job en ejecución es cooperativa: la fila pasa a `CANCELLED` de inmediato, las escrituras con fencing del worker fallan y el worker descarta el dataset o candidato parcial. `409 JOB_NOT_CANCELLABLE` si el job ya terminó.
+- `GET /v1/datasets`: lista fixtures, datasets subidos y datasets extraídos.
+- `GET /v1/datasets/{datasetRef}/profile`: perfil exploratorio (EDA) del dataset: filas por periodo y programa, distribución del objetivo y recomendación de SMOTE, faltantes, estadísticas e histogramas por variable, correlación con el objetivo y avisos (`POSSIBLE_LEAKAGE`, `HIGH_MISSING`, `CONSTANT_FEATURE`, `CLASS_IMBALANCE`, `FEW_ROWS`, `SINGLE_PERIOD`). Solo agregados. Los datasets anteriores a PRED-102 se perfilan al leerlos.
+- `GET /v1/datasets/{datasetRef}/sample?limit=50`: primeras filas (máximo 200) con solo los campos declarados en el manifest; los estudiantes aparecen con su pseudónimo.
+- `POST /v1/datasets/upload`: recibe un `.zip` con un único `manifest.json` y un único `rows.jsonl`, aplica límites de tamaño, valida el contrato y registra el dataset de forma **inmutable** (`409` si el `dataset_id` ya existe). Guarda `upload.json` con el `sub` del operador, la fecha y el SHA-256 del archivo, y `profile.json` con su perfil exploratorio. El worker lo resuelve como `custom:<dataset_id>`.
 
-Los cuatro endpoints de entrenamiento y datasets validan el JWT de Keycloak dentro del propio servicio (no dependen solo del BFF) y exigen el permiso `prediction:train`: `401` sin token válido, `403` sin el permiso.
+Los endpoints de entrenamiento, extracción, jobs y datasets validan el JWT de Keycloak dentro del propio servicio (no dependen solo del BFF) y exigen el permiso `prediction:train`: `401` sin token válido, `403` sin el permiso.
 
 ## Contrato de features (paridad entrenamiento/servicio)
 

@@ -49,6 +49,24 @@ Con el historial completo tarda unos 15–20 minutos.
 
 Los estudiantes salen con pseudónimos. El archivo no contiene identificadores reales.
 
+### 1b. Extracción desde la API del servicio (PRED-102)
+
+El servicio ya extrae datasets sin el script ni el `.zip`. El formulario del portal llega con PRED-107; hasta entonces se llama directamente a prediction-service con un token que tenga `prediction:train` (las rutas del BFF llegan con PRED-106):
+
+1. `POST /v1/dataset-extractions` con un `Idempotency-Key` y un cuerpo como:
+
+   ```json
+   {"task_code": "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", "cadence": "SEMESTRAL", "programs": [], "horizon_years": 4}
+   ```
+
+   `programs` vacío extrae todas las carreras de la cadencia. Las tareas extraíbles son las del catálogo (`GET /v1/ml-tasks`, campo `extractable`): deserción del programa y riesgo en materia (solo `SEMESTRAL`).
+2. El servicio responde `202` con un job `EXTRACT_DATASET` en `QUEUED` y su `dataset_ref` reservado (`custom:<dataset_id>`). Sigue el estado con `GET /v1/jobs/{job_id}`.
+3. Al terminar en `SUCCEEDED`, `result_ref` es el dataset listo para entrenar. El worker ya lo validó contra el contrato de datos y calculó su perfil.
+4. Revisa el perfil exploratorio con `GET /v1/datasets/custom:<dataset_id>/profile` y una muestra con `GET /v1/datasets/custom:<dataset_id>/sample`. Presta atención a los avisos (`warnings`): posible fuga de información, variables con muchos faltantes o constantes, desbalance de clases y datasets con pocas filas o un único periodo.
+5. Si ya no lo necesitas, `POST /v1/jobs/{job_id}/cancel` detiene el job aunque esté en ejecución; no queda ningún dataset a medias.
+
+Los datasets extraídos así se guardan en el volumen `prediction_extracted_datasets` (escritura solo del worker) y aparecen en la lista de datasets del portal junto a los subidos. El worker necesita `PREDICTION_DW_DATABASE_URL`.
+
 ## 2. Revisar el resultado
 
 El script termina mostrando la carpeta, la cantidad de filas y la ruta del `.zip`. Antes de subirlo, revisa en `manifest.json`:
@@ -93,8 +111,8 @@ El servicio valida el dataset contra el contrato de datos antes de guardarlo. Si
 **Seguimiento:**
 - La tabla muestra **Solicitud**, **Algoritmo**, **Conjunto de datos**, **Estado** y **Candidato**.
 - Los estados posibles son `QUEUED`, `RUNNING`, `SUCCEEDED`, `FAILED` y `CANCELLED`.
-- El portal no tiene botón para cancelar. El servicio sí tiene `POST /v1/training-jobs/{job_id}/cancel`, que se puede usar con un token de una cuenta `SUPERADMIN`.
-- La lista de trabajos se guarda **en el navegador** donde los lanzaste. En otro navegador o equipo no aparece.
+- El portal todavía no tiene botón para cancelar. El servicio tiene `POST /v1/jobs/{job_id}/cancel`, que cancela también un entrenamiento en ejecución (su candidato se descarta).
+- La lista del portal todavía se guarda **en el navegador** donde lanzaste los trabajos. El servicio ya expone la lista completa de todos los operadores en `GET /v1/jobs`; el portal la usará con PRED-107.
 
 **Qué hace el entrenamiento:**
 - Separa los datos por estudiante y por tiempo: los cortes más recientes quedan para la prueba final.
@@ -126,11 +144,11 @@ El procedimiento, el rollback y las causas para volver a evaluar están en [PRED
 
 | Tarea | Estado actual |
 |---|---|
-| Extraer el dataset del DW | Solo por comando (paso 1) |
+| Extraer el dataset del DW y ver su perfil exploratorio | Por comando (paso 1) o por la API del servicio (paso 1b); el formulario del portal llega con PRED-107 |
 | Entrenar el modelo de **reprobación de materia** | Los entrenamientos del portal solo preparan datasets de deserción. El modelo por materia se entrena por comando, con la preparación por evento (`prepare_event_dataset`) |
 | Comparar candidatos o hacer rollback | Solo por comando (paso 5); pasa al portal con PRED-105 y PRED-107 |
-| Cancelar un entrenamiento | Solo por la API del servicio (paso 4) |
-| Ver los trabajos lanzados desde otro navegador | No disponible: la lista se guarda en el navegador que los lanzó |
+| Cancelar un entrenamiento o una extracción | Solo por la API del servicio (`POST /v1/jobs/{job_id}/cancel`) |
+| Ver los trabajos lanzados desde otro navegador | Solo por la API (`GET /v1/jobs`); el portal la adopta con PRED-107 |
 
 ## Antes de entrenar con datos nuevos
 
