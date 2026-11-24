@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.13.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.12.0...bff-v1.13.0) (2026-11-24)
+
+
+### Features
+
+* **bff, ml-connector, keycloak:** rutas /api/admin/ml/** y permiso prediction:forecast:read ([#399](https://github.com/KEVIN-117/dss-system-architecture/issues/399)) ([1806f1f](https://github.com/KEVIN-117/dss-system-architecture/commit/1806f1f690c389badccce6819cbea9034292d16f))
+
 ## [1.12.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.11.0...bff-v1.12.0) (2026-11-24)
 
 
