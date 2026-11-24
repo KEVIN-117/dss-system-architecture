@@ -7,7 +7,7 @@
   "dss-monorepo/apps/docs-portal": "1.6.0",
   "dw-control-service": "1.5.0",
   "dss-monorepo/apps/admin-portal": "1.9.0",
-  "dss-monorepo/apps/bff": "1.10.0",
+  "dss-monorepo/apps/bff": "1.11.0",
   "dss-monorepo/apps/decano-dashboard": "1.2.0",
   "dss-monorepo/apps/director-dashboard": "1.2.0",
   "dss-monorepo/apps/rector-dashboard": "1.4.0",
