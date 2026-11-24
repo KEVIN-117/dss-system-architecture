@@ -54,6 +54,7 @@ celery_app.conf.update(
         # Extractions share the training worker: both are long, DW/CPU-bound
         # operator jobs bounded by the same admission control.
         "prediction.extract_dataset": {"queue": "prediction.train_model"},
+        "prediction.forecast": {"queue": "prediction.train_model"},
         "prediction.publish_population": {"queue": "prediction.publish_population"},
     },
     task_queues=(
@@ -440,8 +441,64 @@ def extract_dataset_task(self: Any, job_id: str) -> dict[str, Any]:
         return {"job_id": job_id, "status": "FAILED", "error": error_detail}
 
 
+@celery_app.task(bind=True, name="prediction.forecast")
+def forecast_task(self: Any, job_id: str) -> dict[str, Any]:
+    """Fit and persist program forecasts for a FORECAST job (PRED-104)."""
+    from forecasting.service import ForecastCancelled, ForecastError, run_forecast_job, validate_forecast_params
+    from training.forecast_store import ForecastStore
+
+    store = JobStore()
+    attempt = store.claim_attempt(job_id, worker_settings.job_timeout_seconds + 300, worker_settings.max_job_attempts)
+    if attempt is None:
+        if store.fail_exhausted(job_id, worker_settings.max_job_attempts, _exhausted_error(job_id, "Forecast")):
+            return {"job_id": job_id, "status": "FAILED"}
+        current = store.get(job_id)
+        if current and current.status == JobStatus.RUNNING:
+            raise self.retry(countdown=60, max_retries=None)
+        return {"job_id": job_id, "status": current.status.value if current else "MISSING"}
+
+    record = store.get(job_id)
+    forecasts = ForecastStore()
+    try:
+        if record is None:
+            raise ForecastError("JOB_MISSING", "The forecast job no longer exists.")
+        params = validate_forecast_params(record.params)
+        summary = run_forecast_job(params, dsn=os.getenv("PREDICTION_DW_DATABASE_URL", ""), store=forecasts,
+                                   job_id=job_id, requested_by=record.submitted_by,
+                                   should_cancel=lambda: store.is_cancelled(job_id))
+        if not store.update_status(job_id, JobStatus.SUCCEEDED, expected_attempt=attempt,
+                                   finished_at=datetime.now(timezone.utc).isoformat(),
+                                   result_ref=f"forecast-job:{job_id}", lease_until=None):
+            if store.is_cancelled(job_id):
+                forecasts.delete_job_runs(job_id)
+                return {"job_id": job_id, "status": "CANCELLED"}
+            return {"job_id": job_id, "status": "SUPERSEDED", "attempt": attempt}
+        logger.info("Forecast job %s SUCCEEDED runs=%s skipped=%s", job_id, summary.runs, len(summary.skipped))
+        return {"job_id": job_id, "status": "SUCCEEDED", "runs": summary.runs, "skipped": summary.skipped}
+    except ForecastCancelled:
+        return {"job_id": job_id, "status": "CANCELLED"}
+    except Exception as exc:
+        logger.exception("Forecast job %s FAILED: %s", job_id, exc)
+        known = isinstance(exc, ForecastError)
+        error_detail = {
+            "type": "about:blank", "title": "Forecast failed", "status": 422 if known else 500,
+            "code": exc.code if known else "JOB_FAILED",
+            "detail": str(exc) if known else "Forecast failed; inspect worker logs using the request identifier.",
+            "request_id": job_id,
+        }
+        if not store.update_status(job_id, JobStatus.FAILED, expected_attempt=attempt,
+                                   finished_at=datetime.now(timezone.utc).isoformat(), error=error_detail,
+                                   lease_until=None):
+            return {"job_id": job_id, "status": "SUPERSEDED", "attempt": attempt}
+        return {"job_id": job_id, "status": "FAILED", "error": error_detail}
+
+
 def dispatch_job(record: Any, artifacts_dir: str) -> None:
     """Publish one committed job to the broker, by job kind."""
+    if record.job_kind == JobKind.FORECAST.value:
+        forecast_task.apply_async(kwargs={"job_id": record.job_id}, task_id=record.job_id,
+                                  queue="prediction.train_model")
+        return
     if record.job_kind == JobKind.EXTRACT_DATASET.value:
         extract_dataset_task.apply_async(kwargs={"job_id": record.job_id}, task_id=record.job_id,
                                          queue="prediction.train_model")

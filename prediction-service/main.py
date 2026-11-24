@@ -1417,6 +1417,132 @@ def get_dataset_sample(
 
 
 # ---------------------------------------------------------------------------
+# PRED-104 — Program forecasts (applications, admitted, enrolled)
+# ---------------------------------------------------------------------------
+
+class ForecastJobRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    cadence: str = Field(pattern=r"^(ANUAL|SEMESTRAL)$")
+    series_codes: list[str] = Field(default_factory=list, max_length=3)
+    programs: list[str] = Field(default_factory=list, max_length=200)
+    horizon: int = Field(default=4, ge=1, le=8)
+
+
+def _authenticate_forecast_reader(authorization: str | None) -> Principal:
+    """Forecasts are program aggregates: ML operators and prediction:forecast:read holders may read them."""
+    if not authorization or not authorization.startswith("Bearer ") or not authorization[7:].strip():
+        raise InferenceFailure("INVALID_TOKEN", 401, "A bearer access token is required.")
+    identity = getattr(app.state, "identity_provider", None) or KeycloakIdentityProvider()
+    principal = identity.authenticate(authorization[7:].strip())
+    if not (access_policy.has_permission(principal, access_policy.PREDICTION_TRAIN)
+            or access_policy.has_permission(principal, access_policy.PREDICTION_FORECAST_READ)):
+        raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The account cannot read program forecasts.")
+    return principal
+
+
+@app.post(
+    "/v1/forecast-jobs",
+    status_code=202,
+    response_model=TrainingJobResponse,
+    summary="Pronosticar postulaciones, admitidos y matriculados por programa",
+    description=(
+        "Requiere el permiso prediction:train. Encola un job FORECAST: por cada serie y programa de la cadencia, el "
+        "worker extrae la serie de los periodos cerrados del DW, elige el modelo lineal por backtesting rolling-origin "
+        "y guarda la historia y la proyección con bandas del 80 % y 95 %."
+    ),
+    responses={
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        409: COMMON_ERROR_RESPONSES[409],
+        422: COMMON_ERROR_RESPONSES[422],
+        429: {"model": ProblemResponse, "description": "Capacidad de workers agotada"},
+    },
+)
+def submit_forecast_job(
+    body: ForecastJobRequest,
+    idempotency_key: str = Header(alias="Idempotency-Key", min_length=16, max_length=128),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    from forecasting.service import ForecastError, validate_forecast_params
+    from training.job_store import JobKind, JobStatus, TrainingJobRecord
+
+    request_id = x_request_id or str(uuid4())
+    try:
+        principal = _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Forecast request rejected")
+    try:
+        params = validate_forecast_params(body.model_dump()).to_json()
+    except ForecastError as exc:
+        return _make_problem(422, "Invalid forecast request", exc.code, request_id, detail=str(exc))
+    store = JobStore()
+    scope = f"{os.getenv('PREDICTION_IDEMPOTENCY_SCOPE', 'development')}:{principal.subject}"
+    kind = JobKind.FORECAST.value
+    digest = store.request_digest("forecast", "", {}, kind, params)
+    existing = store.find_by_idempotency_key(idempotency_key, scope)
+    if existing is not None:
+        if existing.request_digest != digest:
+            return _make_problem(409, "Idempotency conflict", "CONFLICT", request_id,
+                                 detail="Idempotency-Key was already used for a different request.")
+        _dispatch_pending(store)
+        return _training_job_response(existing)
+    if (problem := _capacity_problem(store, request_id)) is not None:
+        return problem
+    record = TrainingJobRecord(
+        job_id=str(uuid4()), dataset_ref=f"forecast:{params['cadence']}", algorithm="", status=JobStatus.QUEUED,
+        created_at=datetime.now(timezone.utc).isoformat(), started_at=None, finished_at=None,
+        submitted_by=principal.subject, model_candidate=None, error=None, idempotency_key=idempotency_key,
+        config={}, dataset_version=f"forecast:{params['cadence']}", dependency_versions={}, job_kind=kind,
+        params=params,
+    )
+    record.request_digest = digest
+    try:
+        record = store.create(record, scope)
+    except IdempotencyConflict:
+        return _make_problem(409, "Idempotency conflict", "CONFLICT", request_id,
+                             detail="Idempotency-Key was already used for a different request.")
+    logger.info("Forecast job %s queued request_id=%s", record.job_id, request_id)
+    _dispatch_pending(store)
+    return _training_job_response(record)
+
+
+@app.get(
+    "/v1/forecasts",
+    summary="Consultar pronósticos vigentes por serie y programa",
+    description=(
+        "Requiere prediction:train o prediction:forecast:read. Con program_ref devuelve el último pronóstico del "
+        "programa con su historia y proyección (bandas del 80 % y 95 %), el modelo elegido y su backtest; sin "
+        "program_ref devuelve el resumen del último pronóstico de cada programa de la serie."
+    ),
+    responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 404: COMMON_ERROR_RESPONSES[404]},
+)
+def get_forecasts(
+    series: str = Query(pattern=r"^(APPLICATIONS_BY_PROGRAM|ADMITTED_BY_PROGRAM|ENROLLED_BY_PROGRAM)$"),
+    program_ref: str | None = Query(default=None, min_length=1, max_length=16),
+    cadence: str | None = Query(default=None, pattern=r"^(ANUAL|SEMESTRAL)$"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    from training.forecast_store import ForecastStore
+
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_forecast_reader(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Forecast request rejected")
+    store = ForecastStore()
+    if program_ref is None:
+        runs = store.list_latest(series, cadence)
+        return JSONResponse({"series": series, "forecasts": runs}, headers={"Cache-Control": "no-store"})
+    run = store.latest(series, program_ref, cadence)
+    if run is None:
+        return _make_problem(404, "Forecast not found", "RESOURCE_NOT_FOUND", request_id,
+                             detail="No forecast has been generated for this series and program.")
+    return JSONResponse(run, headers={"Cache-Control": "no-store"})
+
+
+# ---------------------------------------------------------------------------
 # Datasets Management — Upload & List
 # ---------------------------------------------------------------------------
 

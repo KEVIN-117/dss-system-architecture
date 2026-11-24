@@ -122,6 +122,8 @@ Las listas de roles de la convivencia (`PREDICTION_ALLOWED_ROLES`, `PREDICTION_B
 - `GET /v1/jobs/{jobId}`: cualquier job, con `job_kind`, `params` y `result_ref`.
 - `POST /v1/jobs/{jobId}/cancel`: cancela un job `QUEUED` o `RUNNING`. La cancelación de un job en ejecución es cooperativa: la fila pasa a `CANCELLED` de inmediato, las escrituras con fencing del worker fallan y el worker descarta el dataset o candidato parcial. `409 JOB_NOT_CANCELLABLE` si el job ya terminó.
 - `GET /v1/datasets`: lista fixtures, datasets subidos y datasets extraídos.
+- `POST /v1/forecast-jobs` (PRED-104): encola un job `FORECAST` (`prediction:train`). Cuerpo: `cadence`, `series_codes` (vacío = las tres series), `programs` (vacío = todos los de la cadencia) y `horizon` (1–8 cortes). Requiere `Idempotency-Key`.
+- `GET /v1/forecasts?series=…&program_ref=…&cadence=…`: con `program_ref`, el último pronóstico del programa con historia, proyección y bandas, modelo elegido y backtest; sin él, el resumen del último pronóstico de cada programa. Requiere `prediction:train` o `prediction:forecast:read` (el permiso se crea en Keycloak con PRED-106).
 - `GET /v1/datasets/{datasetRef}/profile`: perfil exploratorio (EDA) del dataset: filas por periodo y programa, distribución del objetivo y recomendación de SMOTE, faltantes, estadísticas e histogramas por variable, correlación con el objetivo y avisos (`POSSIBLE_LEAKAGE`, `HIGH_MISSING`, `CONSTANT_FEATURE`, `CLASS_IMBALANCE`, `FEW_ROWS`, `SINGLE_PERIOD`). Solo agregados. Los datasets anteriores a PRED-102 se perfilan al leerlos.
 - `GET /v1/datasets/{datasetRef}/sample?limit=50`: primeras filas (máximo 200) con solo los campos declarados en el manifest; los estudiantes aparecen con su pseudónimo.
 - `POST /v1/datasets/upload`: recibe un `.zip` con un único `manifest.json` y un único `rows.jsonl`, aplica límites de tamaño, valida el contrato y registra el dataset de forma **inmutable** (`409` si el `dataset_id` ya existe). Guarda `upload.json` con el `sub` del operador, la fecha y el SHA-256 del archivo, y `profile.json` con su perfil exploratorio. El worker lo resuelve como `custom:<dataset_id>`.
@@ -158,6 +160,20 @@ El abandono de materia usa el mismo catálogo para servir, pero su extractor de 
 - **Regresión** (`training/regression_trainer.py`). Algoritmos `ridge` (con escalado dentro del modelo), `random_forest` y `xgboost`. La partición externa es la misma temporal con estudiantes disjuntos; el ajuste usa `GroupKFold` por estudiante, nunca SMOTE, y elige por RMSE out-of-fold y luego MAE. Las métricas del test (`evaluation/metrics.py::regression_metrics`) son MAE, RMSE, R², MAPE, sesgo y residuos por tramo del valor observado. Los intervalos del 80 % y 95 % salen de cuantiles de los residuos out-of-fold del candidato elegido; el test reporta su cobertura real (`interval_coverage`).
 - **Comparación.** `evaluation.comparison` acepta dos o más candidatos del mismo tipo y la misma partición: clasificación por recall/F1 (o costo) de validación, regresión por RMSE/MAE de validación.
 - **Publicaciones.** La migración `0067` habilita lotes de `STUDENT_BACKLOG_NEXT_CUT` y `STUDENT_GPA_NEXT_CUT`, el algoritmo `ridge` en los jobs de entrenamiento y las columnas `predicted_value`/`prediction_interval` (cada fila lleva clase o valor, nunca ambos). La publicación vigente se consulta por evento.
+
+## Pronósticos de postulaciones y matrícula (PRED-104)
+
+| Serie | Fuente | Valor por programa y corte |
+|---|---|---|
+| `APPLICATIONS_BY_PROGRAM` | `dw.fact_admision` | postulaciones |
+| `ADMITTED_BY_PROGRAM` | `dw.fact_admision` | postulantes con `es_admitido` |
+| `ENROLLED_BY_PROGRAM` | `dw.fact_retencion_desercion` | estudiantes distintos (`id_alumno`) con materias cursadas |
+
+- **Solo periodos cerrados** (`forecasting/series_extract.py`): un corte entra cuando su cierre está `PROCESADO` y sus filas vienen de una ejecución ETL `EXITOSA`. La serie de cada programa va desde su primer corte observado hasta el último corte procesado de la cadencia; los cortes intermedios sin registros valen 0. Los programas deben tener el régimen de la cadencia pedida.
+- **Modelos** (`forecasting/models.py`): `linear_trend` (mínimos cuadrados sobre tendencia y, en semestral, un indicador del 2.º periodo), `linear_trend_lag` (agrega el valor anterior; el pronóstico multi-paso es recursivo) y `seasonal_naive` (mismo periodo del ciclo anterior) como respaldo para series cortas. Los valores y límites inferiores nunca bajan de 0.
+- **Selección por backtesting** (`forecasting/backtest.py`): en cada origen k el modelo se ajusta solo con los puntos anteriores a k y se evalúa en los siguientes, sin fuga. Gana el MAE más bajo; ante una diferencia menor al 1 % se prefiere el modelo más simple. El backtest reporta MAE, RMSE, MAPE, sesgo, MAE por horizonte y la cobertura real de las bandas.
+- **Bandas del 80 % y 95 %**: cuantiles empíricos de los residuos dentro de la muestra del modelo ajustado, ensanchados por √h.
+- **Persistencia** (migración `0068`): `ml_workspace.forecast_run` (modelo, selección y backtest por serie, programa y job) y `ml_workspace.forecast_point` (historia y proyección con bandas). El pronóstico publicado de una serie y programa es su última corrida; un job guarda todas sus corridas en una sola transacción y, si se cancela, no deja ninguna. No se usa el registro de modelos: el ajuste lineal es determinista y se recalcula en cada job.
 
 ## Pipeline de Preparación y Modelado
 

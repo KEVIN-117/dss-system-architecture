@@ -17,6 +17,7 @@ RUN pip install --no-cache-dir "uv==${UV_VERSION}" \
 
 COPY --chown=app:app access_policy.py config.py main.py dataset_contract.py feature_contract.py inference.py inference_adapters.py ./
 COPY --chown=app:app ml_tasks/ ./ml_tasks/
+COPY --chown=app:app forecasting/ ./forecasting/
 COPY --chown=app:app preparation/ ./preparation/
 COPY --chown=app:app training/ ./training/
 
