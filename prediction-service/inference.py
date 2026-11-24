@@ -11,6 +11,7 @@ from uuid import uuid4
 
 import pandas as pd
 
+from ml_tasks import UnknownTask, task_for_event_type
 from training.model_registry import InvalidModelArtifact, NoActiveModel
 
 
@@ -73,8 +74,10 @@ class PredictionService:
         context = self.data.resolve_context(program_ref, cut_id)
         self.authorization.authorize(principal, context)
         try:
-            event_code = "COURSE_ABANDONMENT" if event_type == "course_abandonment" else "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"
+            event_code = task_for_event_type(event_type).code
             bundle = self.registry.active(event_code=event_code, cadence=context.cadence)
+        except UnknownTask as exc:
+            raise InferenceFailure("INVALID_REQUEST", 400, "The requested prediction event is not supported.") from exc
         except NoActiveModel as exc:
             raise InferenceFailure("NO_ACTIVE_MODEL", 503, "No approved model is active.") from exc
         except InvalidModelArtifact as exc:

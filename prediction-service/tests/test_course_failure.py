@@ -75,7 +75,10 @@ class CourseFailureExtractionTests(unittest.TestCase):
         self.assertEqual(sorted((r["course_result"], r["target_class"]) for r in prepared),
                          [("ABANDONO", "RISK"), ("APROBADA", "NO_RISK"), ("REPROBADA", "RISK")])
         self.assertEqual(manifest["exclusions"], {"LEFT_CENSORED_START": 1, "UNKNOWN_RESULT": 1})
-        self.assertFalse(manifest["target_approved"])
+        # Definitions come from the task catalog; no DSA approval is required.
+        self.assertTrue(manifest["target_approved"])
+        self.assertEqual(manifest["target_definition_ref"], "catalog:COURSE_FAILURE:target:v1")
+        self.assertEqual(manifest["population_definition_ref"], "catalog:COURSE_FAILURE:population:v1")
         self.assertTrue(all(len(r["student_ref"]) == 32 and "subject_ref" not in r for r in prepared))
 
 

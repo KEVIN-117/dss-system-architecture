@@ -165,13 +165,8 @@ def _prepare_binary_dataset(
         ].copy()
     if df.empty:
         raise ValueError("No evaluable, eligible rows remain after filtering.")
-    # Exploratory runs train on real data before DSA approval to inspect
-    # behaviour. They are marked end to end and can never be promoted.
-    if not is_exploratory(manifest):
-        if manifest.get("target_approved") is not True:
-            raise ValueError("A DSA-approved target definition (target_approved: true) is required before preparation.")
-        if manifest.get("eligibility_approved") is not True:
-            raise ValueError("A DSA-approved population rule (eligibility_approved: true) is required before preparation.")
+    # No external DSA approval is required: target and population definitions
+    # come from the task catalog. Legacy exploratory snapshots keep their label.
 
     feature_names: list[str] = manifest.get("feature_fields", [])
     if not feature_names:

@@ -24,7 +24,7 @@ class ModelAdminApiTests(unittest.TestCase):
         self.operator = TestClient(app, headers={"Authorization": "Bearer operator-token"})
         self.rector = TestClient(app, headers={"Authorization": "Bearer rector-token"})
         build_candidate(self.root, "approved", "model-a")
-        build_candidate(self.root, "explore", "model-b", dataset={**APPROVED_DATASET, "exploratory_only": True})
+        build_candidate(self.root, "synthetic", "model-b", dataset={**APPROVED_DATASET, "fixture_only": True})
 
     def tearDown(self) -> None:
         del app.state.identity_provider
@@ -69,7 +69,7 @@ class ModelAdminApiTests(unittest.TestCase):
         self.assertEqual(listing["active_by_scope"], {})
         self.assertEqual([e["action"] for e in listing["events"]], ["ACTIVATE", "DEACTIVATE"])
 
-    def test_unapproved_candidate_and_missing_scope_are_conflicts(self) -> None:
+    def test_synthetic_candidate_and_missing_scope_are_conflicts(self) -> None:
         rejected = self.operator.post("/v1/models/activate",
                                       json={"model_id": "model-b", "version": "v1", "reason": "intento"})
         self.assertEqual(rejected.status_code, 409)

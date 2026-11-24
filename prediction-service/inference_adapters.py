@@ -14,8 +14,6 @@ import psycopg
 from jwt import PyJWKClient
 
 from feature_contract import (
-    COURSE_ABANDONMENT_EVENT,
-    PROGRAM_DROPOUT_EVENT,
     FeatureContractError,
     course_abandonment_query,
     cadence_for,
@@ -24,6 +22,7 @@ from feature_contract import (
     verify_reference,
 )
 import access_policy
+from ml_tasks import UnknownTask, task_for_event_type
 from inference import (
     AuthorizationPolicy,
     InferenceFailure,
@@ -244,7 +243,10 @@ class DwPredictionDataProvider:
 
     def _serving_schema(self, manifest: Mapping[str, Any], event_type: str, context: ProgramContext) -> list[str]:
         """Validate the bundle against the request and the running feature contract."""
-        expected_event = COURSE_ABANDONMENT_EVENT if event_type == "course_abandonment" else PROGRAM_DROPOUT_EVENT
+        try:
+            expected_event = task_for_event_type(event_type).code
+        except UnknownTask as exc:
+            raise InferenceFailure("INVALID_REQUEST", 400, "The requested prediction event is not supported.") from exc
         if manifest.get("classes", {}).get("event_code") != expected_event:
             raise InferenceFailure("INCOMPATIBLE_SCHEMA", 503, "The active model does not serve the requested prediction event.")
         scope = manifest.get("serving_scope", {})

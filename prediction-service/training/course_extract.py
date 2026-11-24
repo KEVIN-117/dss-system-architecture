@@ -9,9 +9,9 @@ NO_RISK when it was passed. Courses without a known result are excluded.
 Population (same window as program dropout): semester programs, the student's
 first three academic years in the program, and no left-censored history.
 
-Target and population approval are never asserted here: without
-``--dsa-approved`` and both definition references the dataset is BLOCKED and can
-only be used for exploratory runs.
+Target and population definitions come from the task catalog (``ml_tasks``);
+explicit ``--target-definition-ref`` / ``--population-definition-ref`` values
+override the ``catalog:`` references.
 
 Usage (read-only DW connection):
     python -m training.course_extract --program SIS --output <new dir>
@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any, Iterable, Mapping
 from uuid import uuid4
 
+from ml_tasks import get_task
 from feature_contract import (
     COURSE_FAILURE_EVENT,
     COURSE_FAILURE_FEATURES,
@@ -106,7 +107,6 @@ def build_course_failure_snapshot(
     cuts: list[Mapping[str, Any]],
     target_definition_ref: str | None = None,
     population_definition_ref: str | None = None,
-    dsa_approved: bool = False,
     pseudonym_key: bytes | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
     """Pure function: query rows (plus ``program_ref``) to a prepared dataset."""
@@ -142,7 +142,9 @@ def build_course_failure_snapshot(
         rows.append(row)
     rows.sort(key=lambda item: (item["student_ref"], item["program_ref"], item["course_ref"], item["cut_id"]))
     latest = max(cuts, key=lambda cut: (str(cut["effective_at"]), str(cut["closure_id"])))
-    approved = bool(dsa_approved and target_definition_ref and population_definition_ref)
+    task = get_task(COURSE_FAILURE_EVENT)
+    target_definition_ref = target_definition_ref or task.target_definition_ref
+    population_definition_ref = population_definition_ref or task.population_definition_ref
     dataset_id = str(uuid4())
     digest = hashlib.sha256("".join(json.dumps(r, sort_keys=True, separators=(",", ":")) for r in rows).encode()).hexdigest()
     manifest: dict[str, Any] = {
@@ -170,8 +172,8 @@ def build_course_failure_snapshot(
         },
         "target_definition_ref": target_definition_ref,
         "population_definition_ref": population_definition_ref,
-        "target_approved": approved,
-        "eligibility_approved": approved,
+        "target_approved": True,
+        "eligibility_approved": True,
         "fixture_only": False,
         "feature_contract": contract_reference(COURSE_FAILURE_EVENT, feature_names),
         "content_digest": digest,
@@ -213,19 +215,15 @@ def main() -> None:
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--target-definition-ref")
     parser.add_argument("--population-definition-ref")
-    parser.add_argument("--dsa-approved", action="store_true")
     parser.add_argument("--dsn", default=os.getenv("PREDICTION_DW_DATABASE_URL", ""))
     args = parser.parse_args()
     if not args.dsn:
         parser.error("Set PREDICTION_DW_DATABASE_URL or pass --dsn (read-only DW connection).")
-    if args.dsa_approved and not (args.target_definition_ref and args.population_definition_ref):
-        parser.error("--dsa-approved requires --target-definition-ref and --population-definition-ref.")
     features = args.feature or list(COURSE_FAILURE_FEATURES)
     contract_rows, cuts = extract_from_dw(args.dsn, args.program, features)
     manifest, rows = build_course_failure_snapshot(
         contract_rows, programs=args.program, feature_names=features, cuts=cuts,
         target_definition_ref=args.target_definition_ref, population_definition_ref=args.population_definition_ref,
-        dsa_approved=args.dsa_approved,
     )
     args.output.mkdir(parents=True, exist_ok=False)
     (args.output / "manifest.json").write_text(json.dumps(manifest, indent=2, sort_keys=True, ensure_ascii=False), encoding="utf-8")

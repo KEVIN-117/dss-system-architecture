@@ -141,7 +141,7 @@ class PreparedDatasetContractTests(unittest.TestCase):
         self.assertTrue(report.structurally_valid)
         self.assertEqual(report.population_counts, {"ELIGIBLE": 2})
 
-    def test_unapproved_target_and_population_block_preparation(self) -> None:
+    def test_dsa_approval_is_not_required_for_preparation(self) -> None:
         manifest = valid_manifest()
         manifest["target_approved"] = False
         manifest["target_definition_ref"] = None
@@ -153,8 +153,20 @@ class PreparedDatasetContractTests(unittest.TestCase):
             [row("pseudonym-a", "DESERTOR"), row("pseudonym-b", "RETENIDO")],
         )
 
-        self.assertEqual(report.status, "BLOCKED")
+        self.assertEqual(report.status, "READY_FOR_PREPARATION", [issue.code for issue in report.issues])
+        self.assertTrue(report.ready_for_preparation)
+
+    def test_missing_target_definition_blocks_preparation(self) -> None:
+        manifest = valid_manifest()
+        del manifest["target_definition"]
+
+        report = validate(
+            manifest,
+            [row("pseudonym-a", "DESERTOR"), row("pseudonym-b", "RETENIDO")],
+        )
+
         self.assertFalse(report.ready_for_preparation)
+        self.assertIn("TARGET_DEFINITION_INCOMPLETE", {issue.code for issue in report.issues})
 
     def test_out_of_scope_and_ambiguous_rows_are_counted_and_blocked(self) -> None:
         report = validate(

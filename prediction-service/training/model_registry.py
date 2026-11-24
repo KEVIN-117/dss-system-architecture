@@ -23,6 +23,7 @@ from typing import Any, Iterator
 
 import joblib
 
+from ml_tasks import CADENCES, UnknownTask, get_task, servable_event_codes
 from training.artifact_writer import _compute_bundle_digest
 
 
@@ -51,10 +52,11 @@ class LoadedModel:
 _thread_lock = threading.RLock()
 
 # Activation performed by an ML administrator from the admin portal, without a
-# PRED-004 report. Only candidates trained on approved (non-exploratory,
-# non-synthetic) data are eligible; the operator and reason are audited.
+# PRED-004 report. Any candidate trained on real (non-synthetic) data is
+# eligible -- no external DSA approval is required; the operator and reason are
+# audited instead.
 ADMIN_ACTIVATION = "ADMIN_ACTIVATION"
-_UNAPPROVED_EVIDENCE = {"synthetic_fixture", "exploratory_unapproved"}
+_NON_ACTIVATABLE_EVIDENCE = {"synthetic_fixture"}
 
 
 def _read_json(path: Path) -> Any:
@@ -76,15 +78,7 @@ def candidate_evidence(folder: Path) -> dict[str, Any]:
         evidence_kind = "exploratory_unapproved"
     target_ref = dataset.get("target_definition_ref")
     population_ref = dataset.get("population_definition_ref")
-    refs_ok = all(isinstance(ref, str) and ref.startswith("dsa:") for ref in (target_ref, population_ref))
-    if evidence_kind == "synthetic_fixture":
-        reason = "Entrenado con datos sintéticos de prueba."
-    elif evidence_kind == "exploratory_unapproved":
-        reason = "Entrenado con datos exploratorios sin aprobación del objetivo y la población."
-    elif not refs_ok:
-        reason = "El dataset no tiene referencias aprobadas de objetivo y población."
-    else:
-        reason = None
+    reason = "Entrenado con datos sintéticos de prueba." if evidence_kind in _NON_ACTIVATABLE_EVIDENCE else None
     return {
         "evidence_kind": evidence_kind,
         "dataset_id": dataset.get("dataset_id"),
@@ -177,10 +171,13 @@ class ModelRegistry:
             raise InvalidModelArtifact("Model class order or event definition is incomplete.")
         scope = manifest.get("serving_scope")
         if scope is not None:
-            expected_type = "course_abandonment" if classes["event_code"] == "COURSE_ABANDONMENT" else "program_dropout" if classes["event_code"] == "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE" else None
+            try:
+                expected_type = get_task(classes["event_code"]).serving_event_type
+            except UnknownTask:
+                expected_type = None
             if (not isinstance(scope, dict) or expected_type is None
                     or scope.get("event_type") != expected_type
-                    or scope.get("cadence") not in {"ANUAL", "SEMESTRAL"}
+                    or scope.get("cadence") not in CADENCES
                     or not isinstance(scope.get("evaluation_unit"), str)):
                 raise InvalidModelArtifact("Model serving scope conflicts with its event or cadence.")
         schema = manifest.get("input_schema", {})
@@ -262,7 +259,7 @@ class ModelRegistry:
                     or report.get("model_id") != pointer.get("model_id")
                     or report.get("version") != pointer.get("version")
                     or report.get("artifact_digest") != pointer.get("artifact_digest")
-                    or report.get("evidence_kind") in {"synthetic_fixture", "exploratory_unapproved"}):
+                    or report.get("evidence_kind") in _NON_ACTIVATABLE_EVIDENCE):
                 raise InvalidModelArtifact("Administrative activation record no longer authorizes this model.")
             return
         exact_candidate = any(
@@ -273,8 +270,7 @@ class ModelRegistry:
         )
         if (report.get("decision_status") != "APTO"
                 or report.get("crisp_dm_next_step", {}).get("deployment_allowed") is not True
-                or report.get("evidence_kind") in {"synthetic_fixture", "exploratory_unapproved"}
-                or report.get("dataset", {}).get("exploratory_only") is True
+                or report.get("evidence_kind") in _NON_ACTIVATABLE_EVIDENCE
                 or not exact_candidate):
             raise InvalidModelArtifact("Approved evaluation evidence no longer authorizes this model.")
 
@@ -309,7 +305,7 @@ class ModelRegistry:
 
     @staticmethod
     def _scope_key(event_code: str, cadence: str) -> str:
-        if event_code not in {"COURSE_ABANDONMENT", "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"} or cadence not in {"ANUAL", "SEMESTRAL"}:
+        if event_code not in servable_event_codes() or cadence not in CADENCES:
             raise NoActiveModel("No approved model exists for the requested event/cadence scope.")
         return f"{event_code}|{cadence}"
 
@@ -363,8 +359,6 @@ class ModelRegistry:
             raise InvalidModelArtifact("Evaluation evidence does not authorize deployment.")
         if report.get("evidence_kind") == "synthetic_fixture" or report.get("dataset", {}).get("fixture_only") is True:
             raise InvalidModelArtifact("Synthetic evidence cannot approve institutional deployment.")
-        if report.get("evidence_kind") == "exploratory_unapproved" or report.get("dataset", {}).get("exploratory_only") is True:
-            raise InvalidModelArtifact("Exploratory evidence without DSA approval cannot approve deployment.")
         matched = any(item.get("model_id") == model_id and item.get("version") == version and item.get("artifact_digest") == manifest["artifact_digest"] for item in report.get("models", []))
         if not matched:
             raise InvalidModelArtifact("Approval report does not identify this exact candidate digest.")
@@ -627,8 +621,8 @@ def main() -> None:
     parser.add_argument("--version")
     parser.add_argument("--approved-by")
     parser.add_argument("--evaluation-report", type=Path)
-    parser.add_argument("--event-code", choices=("COURSE_ABANDONMENT", "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"))
-    parser.add_argument("--cadence", choices=("ANUAL", "SEMESTRAL"))
+    parser.add_argument("--event-code", choices=sorted(servable_event_codes()))
+    parser.add_argument("--cadence", choices=CADENCES)
     args = parser.parse_args()
     registry = ModelRegistry(args.artifacts_dir)
     if args.action == "show":

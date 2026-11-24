@@ -115,13 +115,17 @@ class TrainerTests(unittest.TestCase):
         self.assertEqual(summary["validation_cost"], 1.0)
         self.assertEqual(_validated_decision_policy({"decision_policy": policy})["policy_ref"], policy["policy_ref"])
 
-    def test_unapproved_threshold_policy_is_rejected(self) -> None:
-        with self.assertRaisesRegex(ValueError, "approved=true"):
+    def test_cost_policy_needs_costs_but_no_dsa_approval(self) -> None:
+        with self.assertRaisesRegex(ValueError, "false_negative_cost"):
             _validated_decision_policy({"decision_policy": {"policy_ref": "dsa:pending"}})
+        policy = _validated_decision_policy({"decision_policy": {"false_negative_cost": 3, "false_positive_cost": 1}})
+        self.assertEqual(policy["kind"], "cost")
+        with self.assertRaisesRegex(ValueError, "policy_ref"):
+            _validated_decision_policy({"decision_policy": {"policy_ref": " ", "false_negative_cost": 1}})
 
     def test_alert_rate_policy_flags_the_requested_share(self) -> None:
-        policy = _validated_decision_policy({"decision_policy": {"alert_rate": 0.2}}, exploratory=True)
-        self.assertEqual((policy["kind"], policy["approved"]), ("alert_rate", False))
+        policy = _validated_decision_policy({"decision_policy": {"alert_rate": 0.2}})
+        self.assertEqual(policy["kind"], "alert_rate")
         scores = [i / 10 for i in range(10)]  # 0.0 .. 0.9
         truth = [0] * 7 + [1] * 3
         threshold, summary = _select_validation_threshold(truth, scores, policy)
@@ -130,15 +134,11 @@ class TrainerTests(unittest.TestCase):
         self.assertEqual((summary["false_negatives"], summary["false_positives"]), (1, 0))
         self.assertIsNone(summary["validation_cost"])
 
-    def test_alert_rate_policy_needs_approval_outside_exploratory_runs(self) -> None:
-        with self.assertRaisesRegex(ValueError, "approved=true"):
-            _validated_decision_policy({"decision_policy": {"alert_rate": 0.2}})
-        approved = _validated_decision_policy(
-            {"decision_policy": {"alert_rate": 0.2, "approved": True, "policy_ref": "dsa:alert-20"}})
-        self.assertTrue(approved["approved"])
+    def test_alert_rate_policy_is_validated_without_dsa_approval(self) -> None:
+        self.assertEqual(_validated_decision_policy({"decision_policy": {"alert_rate": 0.2}})["alert_rate"], 0.2)
         for rate in (0, 1, 1.5, True):
             with self.assertRaisesRegex(ValueError, "alert_rate"):
-                _validated_decision_policy({"decision_policy": {"alert_rate": rate}}, exploratory=True)
+                _validated_decision_policy({"decision_policy": {"alert_rate": rate}})
 
     def test_configuration_reference_loads_from_catalog_and_is_digested(self) -> None:
         import os
@@ -157,12 +157,13 @@ class TrainerTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "opaque identifier"):
             resolve_training_configuration({"configuration_ref": "../outside"})
 
-    def test_institutional_evaluation_requires_policy_before_test(self) -> None:
+    def test_institutional_evaluation_trains_without_a_dsa_policy(self) -> None:
         metadata = dict(self.partition.partition_metadata)
         metadata["evidence_kind"] = "institutional_unverified"
         institutional_partition = replace(self.partition, partition_metadata=metadata)
-        with self.assertRaisesRegex(ValueError, "before the final test is opened"):
-            train_model(institutional_partition, "random_forest", config={"search_space": {"n_estimators": [5]}})
+        result = train_model(institutional_partition, "random_forest",
+                             config={"search_space": {"n_estimators": [5]}}, cpu_limit=1, cv_splits=3)
+        self.assertEqual(result.metrics["threshold_origin"], "validation_recall_then_f1")
 
     def test_tuning_uses_grouped_cv_and_never_selects_on_outer_test(self) -> None:
         result = train_model(

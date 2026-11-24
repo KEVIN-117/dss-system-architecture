@@ -171,7 +171,7 @@ class ExtractionParityTests(unittest.TestCase):
         report = validate_prepared_dataset(manifest, prepared)
         self.assertFalse([i for i in report.issues if i.code == "OUTCOME_INCONSISTENCY"])
 
-    def test_snapshot_uses_shared_rule_and_is_ready_only_with_dsa_approval(self) -> None:
+    def test_snapshot_uses_shared_rule_and_is_ready_without_dsa_approval(self) -> None:
         rows = synthetic_contract_rows()
         manifest, prepared = build_program_dropout_snapshot(
             rows, program_ref="P01", cadence="SEMESTRAL", feature_names=FEATURES, cuts=CUTS,
@@ -179,7 +179,9 @@ class ExtractionParityTests(unittest.TestCase):
         )
         self.assertEqual(manifest["exclusions"], {"MIXED_CADENCE": 1, "NO_EVALUABLE_OUTCOME": 1, "OUTSIDE_WINDOW": 1})
         self.assertEqual(manifest["feature_contract"], contract_reference(PROGRAM_DROPOUT_EVENT, FEATURES))
-        self.assertEqual(validate_prepared_dataset(manifest, prepared).status, "BLOCKED")
+        report = validate_prepared_dataset(manifest, prepared)
+        self.assertEqual(report.status, "READY_FOR_PREPARATION", [i.code for i in report.issues])
+        self.assertEqual(manifest["target_definition_ref"], "catalog:PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE:target:v1")
         # Every kept row is one the serving rule would also score.
         kept = {(row["subject_ref"], row["cut_id"]) for row in rows if program_dropout_ineligibility(row) is None
                 and row["resultado_retencion"] != "NO_EVALUABLE"}
@@ -189,12 +191,14 @@ class ExtractionParityTests(unittest.TestCase):
         self.assertTrue(all(len(row["student_ref"]) == 32 and row["student_ref"] not in raw_ids for row in prepared))
         self.assertNotIn("subject_ref", prepared[0])
 
-        approved, approved_rows = build_program_dropout_snapshot(
+        # Explicit references override the catalog defaults.
+        custom, custom_rows = build_program_dropout_snapshot(
             rows, program_ref="P01", cadence="SEMESTRAL", feature_names=FEATURES, cuts=CUTS,
-            target_definition_ref="dsa:target-v1", population_definition_ref="dsa:population-v1",
-            dsa_approved=True, pseudonym_key=b"k" * 32,
+            target_definition_ref="custom:target-v1", population_definition_ref="custom:population-v1",
+            pseudonym_key=b"k" * 32,
         )
-        report = validate_prepared_dataset(approved, approved_rows)
+        self.assertEqual(custom["target_definition_ref"], "custom:target-v1")
+        report = validate_prepared_dataset(custom, custom_rows)
         self.assertEqual(report.status, "READY_FOR_PREPARATION", [i.code for i in report.issues])
 
     def test_cadence_follows_program_regime(self) -> None:
@@ -229,8 +233,7 @@ class ExtractionParityTests(unittest.TestCase):
             root = Path(tmp)
             manifest, prepared = build_program_dropout_snapshot(
                 synthetic_contract_rows(), program_ref="P01", cadence="SEMESTRAL", feature_names=FEATURES,
-                cuts=CUTS, target_definition_ref="dsa:target-v1", population_definition_ref="dsa:population-v1",
-                dsa_approved=True, pseudonym_key=b"k" * 32,
+                cuts=CUTS, pseudonym_key=b"k" * 32,
             )
             dataset_dir = root / "custom" / manifest["dataset_id"]
             write_snapshot(dataset_dir, manifest, prepared)

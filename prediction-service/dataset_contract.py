@@ -186,19 +186,17 @@ def validate_prepared_dataset(
         if target is None or target.get("role") != "target":
             issues.append(ValidationIssue("INVALID_TARGET_FIELD", "target_field", "The target field must exist and have role 'target'."))
 
-    if manifest.get("target_approved") is not True or not manifest.get("target_definition_ref"):
-        issues.append(ValidationIssue("TARGET_NOT_APPROVED", "target_definition_ref", "A DSA-approved target definition is required before preparation.", blocking=True))
-    if manifest.get("target_approved") is True and (not target_field or not isinstance(manifest.get("target_definition"), Mapping)):
-        issues.append(ValidationIssue("TARGET_DEFINITION_INCOMPLETE", "target_definition", "An approved target requires an explicit field and class definition."))
-    if manifest.get("target_approved") is True:
-        target_definition = manifest.get("target_definition")
-        if isinstance(target_definition, Mapping):
-            positive = target_definition.get("positive_class")
-            negative = target_definition.get("negative_class")
-            if not isinstance(positive, str) or not positive.strip() or not isinstance(negative, str) or not negative.strip() or positive == negative:
-                issues.append(ValidationIssue("INVALID_TARGET_CLASSES", "target_definition", "Approved positive and negative classes must be distinct non-empty strings."))
-    if manifest.get("eligibility_approved") is not True or not manifest.get("population_definition_ref"):
-        issues.append(ValidationIssue("POPULATION_NOT_APPROVED", "population_definition_ref", "A DSA-approved population rule is required before preparation.", blocking=True))
+    # Target and population definitions come from the task catalog (ml_tasks);
+    # no external DSA approval is required. A declared target must still be
+    # complete and unambiguous.
+    target_definition = manifest.get("target_definition")
+    if not target_field or not isinstance(target_definition, Mapping):
+        issues.append(ValidationIssue("TARGET_DEFINITION_INCOMPLETE", "target_definition", "The target requires an explicit field and class definition.", blocking=True))
+    else:
+        positive = target_definition.get("positive_class")
+        negative = target_definition.get("negative_class")
+        if not isinstance(positive, str) or not positive.strip() or not isinstance(negative, str) or not negative.strip() or positive == negative:
+            issues.append(ValidationIssue("INVALID_TARGET_CLASSES", "target_definition", "Positive and negative classes must be distinct non-empty strings."))
     if not feature_names:
         issues.append(ValidationIssue("NO_APPROVED_FEATURES", "feature_fields", "No predictors are declared.", blocking=True))
     _validate_feature_contract(manifest, issues)
