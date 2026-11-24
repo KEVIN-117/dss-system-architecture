@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.10.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.9.0...dw-migrator-v1.10.0) (2026-11-24)
+
+
+### Features
+
+* **prediction-service:** nuevos objetivos por estudiante y matrícula (clasificación y regresión) ([#395](https://github.com/KEVIN-117/dss-system-architecture/issues/395)) ([7a033e0](https://github.com/KEVIN-117/dss-system-architecture/commit/7a033e0f3eb30b6176121e0c0178ddf110550000))
+* **prediction-service:** pronóstico de postulaciones y matriculados con regresión lineal ([#396](https://github.com/KEVIN-117/dss-system-architecture/issues/396)) ([ec627cc](https://github.com/KEVIN-117/dss-system-architecture/commit/ec627cc15cf5635562f1e237bc434b203a5f4483))
+
 ## [1.9.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.8.0...dw-migrator-v1.9.0) (2026-11-24)
 
 
