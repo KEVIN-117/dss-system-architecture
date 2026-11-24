@@ -1,0 +1,271 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta name="description" content="Reporte de ejecución y evidencia de pruebas del Sistema de Soporte a las Decisiones de la UATF.">
+  <title>Reporte de pruebas · DSS UATF</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #182a38;
+      --muted: #566773;
+      --paper: #f4f6f5;
+      --surface: #fff;
+      --line: #d9e1df;
+      --teal: #087e78;
+      --teal-soft: #e2f3ef;
+      --amber: #a45b08;
+      --amber-soft: #fff1d7;
+      --red: #a63131;
+      --red-soft: #fbe9e7;
+      --blue: #315c83;
+      --blue-soft: #e8f0f7;
+      --shadow: 0 12px 34px rgba(24, 42, 56, .07);
+      --sans: "Aptos", "Segoe UI", system-ui, sans-serif;
+      --mono: "Cascadia Code", "SFMono-Regular", Consolas, monospace;
+    }
+    * { box-sizing: border-box; }
+    .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; color: var(--ink); background: var(--paper); font: 16px/1.55 var(--sans); }
+    a { color: #075f70; text-underline-offset: .2em; }
+    a:hover { color: #093f4b; }
+    a:focus-visible, button:focus-visible, summary:focus-visible { outline: 3px solid #df8c30; outline-offset: 3px; border-radius: 3px; }
+    .shell { width: min(1180px, calc(100% - 40px)); margin: 0 auto; }
+    .topbar { background: #152a38; color: #eaf1f0; border-bottom: 4px solid #39a69a; }
+    .topbar-inner { min-height: 58px; display: flex; align-items: center; justify-content: space-between; gap: 18px; }
+    .wordmark { display: flex; align-items: center; gap: 11px; font-size: .88rem; font-weight: 700; letter-spacing: .04em; }
+    .mark { min-width: 42px; min-height: 34px; padding: 8px; border: 1px solid #79c9bd; color: #a5e1d6; display: grid; place-items: center; font: 700 .75rem var(--mono); }
+    .topbar nav { display: flex; gap: 20px; font-size: .85rem; }
+    .topbar a { color: #d8e8e5; }
+    .hero { padding: 56px 0 45px; background: var(--surface); border-bottom: 1px solid var(--line); }
+    .breadcrumb { margin: 0; color: var(--muted); font: .8rem var(--mono); }
+    .breadcrumb span { color: var(--teal); }
+    .eyebrow { color: var(--teal); font: 700 .75rem var(--mono); letter-spacing: .1em; text-transform: uppercase; }
+    h1 { max-width: 850px; margin: 14px 0 12px; font-size: clamp(2.1rem, 4vw, 3.35rem); line-height: 1.02; letter-spacing: -.045em; font-weight: 690; }
+    .dek { max-width: 730px; margin: 0; color: var(--muted); font-size: 1.08rem; }
+    .hero-meta { display: flex; flex-wrap: wrap; gap: 8px 24px; margin-top: 25px; color: var(--muted); font-size: .85rem; }
+    .hero-meta strong { color: var(--ink); font-weight: 650; }
+    .hero-meta code { font: .83rem var(--mono); color: #24475c; }
+    main { padding: 35px 0 74px; }
+    .section-head { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin: 40px 0 18px; }
+    h2 { margin: 0; font-size: 1.42rem; line-height: 1.2; letter-spacing: -.025em; }
+    .section-head p { max-width: 540px; margin: 0; color: var(--muted); font-size: .92rem; }
+    .kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .kpi { min-height: 146px; padding: 21px 22px 18px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
+    .kpi .value { display: block; margin: 10px 0 4px; font: 650 2.5rem/1 var(--mono); letter-spacing: -.07em; }
+    .kpi .label { color: var(--muted); font-size: .9rem; }
+    .kpi .note { display: block; margin-top: 13px; font-size: .8rem; color: var(--muted); }
+    .kpi.green { border-top: 3px solid var(--teal); }
+    .kpi.amber { border-top: 3px solid #d5902f; }
+    .kpi.blue { border-top: 3px solid var(--blue); }
+    .callout { display: grid; grid-template-columns: 6px 1fr; margin-top: 18px; background: var(--teal-soft); }
+    .callout::before { content: ""; background: var(--teal); }
+    .callout div { padding: 17px 20px; }
+    .callout strong { display: block; margin-bottom: 3px; }
+    .callout p { margin: 0; color: #315c59; font-size: .92rem; }
+    .callout.caution { background: var(--amber-soft); }
+    .callout.caution::before { background: #c47b1a; }
+    .callout.caution p { color: #684b26; }
+    .panel { background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); }
+    .table-wrap { overflow-x: auto; }
+    .system-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .system-card { padding: 16px; background: var(--surface); border: 1px solid var(--line); box-shadow: var(--shadow); break-inside: avoid; }
+    .system-card header { display: flex; justify-content: space-between; align-items: start; gap: 10px; margin-bottom: 12px; }
+    .system-card h3 { margin: 0; font-size: 1rem; line-height: 1.25; }
+    .system-card .system-type { color: var(--muted); font: .75rem var(--mono); text-transform: uppercase; letter-spacing: .04em; }
+    .system-card p { margin: 8px 0 0; color: var(--muted); font-size: .875rem; line-height: 1.45; }
+    .system-card .metric { color: var(--ink); font: 600 .83rem var(--mono); }
+    .system-card .badge { margin-top: 5px; white-space: normal; }
+    .system-card .subresult { padding-top: 9px; margin-top: 9px; border-top: 1px solid #e8edeb; }
+    .system-card .subresult:first-of-type { padding-top: 0; margin-top: 0; border-top: 0; }
+    .system-card.compact { padding: 14px; }
+    .system-card.compact p { font-size: .8rem; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    th, td { padding: 13px 15px; text-align: left; vertical-align: top; border-bottom: 1px solid #e8edeb; }
+    th { color: #53656e; background: #f8faf9; font: 700 .8rem var(--mono); letter-spacing: .04em; text-transform: uppercase; }
+    tbody tr:last-child td { border-bottom: 0; }
+    tbody tr:hover { background: #f8fbfa; }
+    td:first-child { font-weight: 650; min-width: 190px; }
+    .count { font: .82rem var(--mono); white-space: nowrap; }
+    .badge { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; border-radius: 2px; font-size: .75rem; font-weight: 700; white-space: nowrap; }
+    .badge::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+    .ok { color: #096a60; background: var(--teal-soft); }
+    .warn { color: #87500d; background: var(--amber-soft); }
+    .fail { color: #982d2d; background: var(--red-soft); }
+    .info { color: #315c83; background: var(--blue-soft); }
+    .timeline { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+    .event { padding: 16px; background: var(--surface); border: 1px solid var(--line); }
+    .event time { display: block; margin-bottom: 8px; color: var(--teal); font: .8rem var(--mono); }
+    .event article h3 { margin: 0 0 7px; font-size: .98rem; }
+    .event article p { margin: 0; color: var(--muted); font-size: .875rem; }
+    .event article .badge { margin-top: 10px; }
+    .split { display: grid; grid-template-columns: 1.05fr .95fr; gap: 16px; }
+    .subpanel { padding: 22px; background: var(--surface); border: 1px solid var(--line); }
+    .subpanel h3 { margin: 0 0 12px; font-size: 1.02rem; }
+    .subpanel p { margin: 0 0 12px; color: var(--muted); font-size: .91rem; }
+    .subpanel ul { padding-left: 19px; margin: 8px 0 0; color: var(--muted); font-size: .9rem; }
+    .subpanel li + li { margin-top: 7px; }
+    .mono { font-family: var(--mono); font-size: .82em; }
+    details { border: 1px solid var(--line); background: var(--surface); }
+    details + details { border-top: 0; }
+    summary { cursor: pointer; padding: 15px 18px; font-weight: 650; }
+    details[open] summary { border-bottom: 1px solid var(--line); }
+    .details-body { padding: 15px 18px 18px; color: var(--muted); font-size: .9rem; }
+    .details-body p { margin: 0 0 10px; }
+    .log-links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+    .log-links a { padding: 8px 12px; border: 1px solid var(--line); background: #f8faf9; font: .875rem var(--mono); text-decoration: none; }
+    .scope-list { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; padding: 0; list-style: none; }
+    .scope-list li { padding: 13px 14px; border: 1px solid var(--line); background: var(--surface); font-size: .87rem; }
+    .scope-list strong { display: block; margin-bottom: 3px; }
+    .footer { padding: 22px 0 30px; border-top: 1px solid var(--line); color: var(--muted); font-size: .82rem; }
+    .footer-inner { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 10px 22px; }
+    .print-button { border: 1px solid #8ba09d; padding: 7px 12px; background: transparent; color: inherit; font: 600 .82rem var(--sans); cursor: pointer; }
+    .print-button:hover { background: rgba(255,255,255,.12); }
+    @media (max-width: 760px) {
+      .shell { width: min(100% - 28px, 1180px); }
+      .topbar nav { display: none; }
+      .hero { padding: 39px 0 32px; }
+      .kpis, .split { grid-template-columns: 1fr; }
+      .system-grid { grid-template-columns: 1fr; }
+      .kpi { min-height: auto; }
+      .section-head { display: block; }
+      .section-head p { margin-top: 8px; }
+      .timeline { grid-template-columns: 1fr; }
+      .scope-list { grid-template-columns: 1fr; }
+    }
+    @media (prefers-reduced-motion: reduce) { html { scroll-behavior: auto; } }
+    @media print {
+      @page { size: A4; margin: 15mm 13mm; }
+      body { background: #fff; font-size: 10pt; }
+      .shell { width: 100%; }
+      .topbar nav, .print-button { display: none !important; }
+      .topbar { print-color-adjust: exact; -webkit-print-color-adjust: exact; }
+      .hero { padding: 24px 0; }
+      h1 { font-size: 26pt; }
+      main { padding: 12px 0 30px; }
+      .kpi, .panel, .subpanel, details { box-shadow: none; break-inside: avoid; }
+      .system-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .system-card { padding: 12px; box-shadow: none; }
+      .system-card p { font-size: 9pt; }
+      .timeline { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+      .event { padding: 12px; break-inside: avoid; }
+      .section-head { margin-top: 24px; }
+      table { font-size: 9pt; }
+      th, td { padding: 8px 9px; }
+      details:not([open]) > :not(summary) { display: block; }
+      a { color: inherit; }
+      .footer { padding-top: 12px; }
+    }
+  </style>
+</head>
+<body>
+  <header class="topbar">
+    <div class="shell topbar-inner">
+      <div class="wordmark"><span class="mark" aria-hidden="true">DSS</span><span>UATF · VERIFICACIÓN DEL SISTEMA</span></div>
+      <nav aria-label="Secciones del reporte">
+        <a href="#resultados">Resultados</a><a href="#repeticiones">Repeticiones</a><a href="#limites">Alcance y límites</a><a href="#fuentes">Logs</a>
+      </nav>
+      <button class="print-button" type="button" onclick="window.print()">Imprimir / guardar PDF</button>
+    </div>
+  </header>
+
+  <section class="hero" aria-labelledby="title">
+    <div class="shell">
+      <p class="breadcrumb" aria-label="Ubicación"><span>DSS UATF</span> / Verificación técnica / 23.11.2026</p>
+      <h1 id="title">Resultados de pruebas</h1>
+      <p class="dek">Registro de pruebas automatizadas, integración y flujos de portal del Sistema de Soporte a las Decisiones. Los resultados se presentan por corrida y por alcance; una suite aprobada no equivale a aceptación institucional.</p>
+      <div class="hero-meta">
+        <span><strong>Versión repetida</strong> <code>d78d42ed</code> · PR #379</span>
+        <span><strong>Actualización del reporte</strong> 23 de noviembre de 2026</span>
+        <span><strong>Fuente principal</strong> logs locales enlazados al final</span>
+      </div>
+    </div>
+  </section>
+
+  <main class="shell">
+    <section id="resultados" aria-labelledby="results-title">
+      <div class="section-head">
+        <h2 id="results-title">Lectura rápida</h2>
+        <p>Las cifras pertenecen a suites distintas y no deben sumarse como si fueran una sola batería de pruebas.</p>
+      </div>
+      <div class="kpis">
+        <article class="kpi green"><span class="eyebrow">Repeticiones corregidas</span><span class="value">3 / 3</span><span class="label">flujos repetidos con resultado satisfactorio</span><span class="note">OLAP integración · DW vertical · E2E Administración</span></article>
+        <article class="kpi blue"><span class="eyebrow">Pruebas web</span><span class="value">431</span><span class="label">casos Vitest aprobados en apps y bibliotecas</span><span class="note">366 aplicaciones + 65 bibliotecas</span></article>
+        <article class="kpi amber"><span class="eyebrow">Validación institucional</span><span class="value">Pendiente</span><span class="label">rendimiento y usabilidad con criterios acordados</span><span class="note">No se infieren de pruebas automatizadas de desarrollo</span></article>
+      </div>
+      <div class="callout">
+        <div><strong>Qué significa “aprobado” aquí</strong><p>El comando terminó sin fallos dentro del alcance descrito. OLAP conserva una exclusión de 14 clases que dependen de cubos de demostración; sus casos deben adaptarse a los cubos académicos.</p></div>
+      </div>
+      <div class="callout caution">
+        <div><strong>La evidencia tiene límites</strong><p>Las pruebas del DW usan fixtures sintéticos. PRED-004 no identifica un modelo ganador. Los seis fallos E2E de Rectorado documentados son de una corrida anterior y no se repitieron.</p></div>
+      </div>
+    </section>
+
+    <section aria-labelledby="suite-title">
+      <div class="section-head"><h2 id="suite-title">Resultados por sistema · 23 de noviembre</h2><p>Las tarjetas resumen la primera corrida y las repeticiones posteriores sin mezclar alcances.</p></div>
+      <div class="system-grid" aria-label="Resultados de pruebas agrupados por sistema">
+        <article class="system-card"><header><div><span class="system-type">Identidad</span><h3>Auth Service</h3></div><span class="badge ok">Aprobada</span></header><p class="metric">23 nov · 352 pruebas · 0 fallos</p><p>El log registra <code>BUILD SUCCESS</code>.</p><p class="subresult"><strong>11 nov:</strong> 157/157 aprobadas.</p></article>
+        <article class="system-card"><header><div><span class="system-type">Operación DW</span><h3>DW Control Service</h3></div><span class="badge warn">2 omitidas</span></header><p class="metric">23 nov · 87 pruebas · 0 fallos</p><p>Las pruebas ejecutadas aprobaron; conservar la explicación de las dos omisiones.</p><p class="subresult"><strong>11 nov:</strong> 6/6 aprobadas.</p></article>
+        <article class="system-card"><header><div><span class="system-type">Identidad</span><h3>Keycloak Webhook</h3></div><span class="badge ok">Aprobada</span></header><p class="metric">23 nov · 33 pruebas · 0 fallos</p><p>El log registra <code>BUILD SUCCESS</code>.</p><p class="subresult"><strong>11 nov:</strong> 8/8 aprobadas.</p></article>
+        <article class="system-card"><header><div><span class="system-type">Analítica</span><h3>OLAP Service</h3></div><span class="badge warn">Cobertura reducida</span></header><p class="metric">Unitarias: 974 · 1 omitida</p><p class="subresult"><strong>Integración inicial:</strong> 64 aprobadas, 67 fallidas y 1 error. <strong>Repetición:</strong> 55/55 aprobadas en 14 clases.</p><p>Se excluyeron 14 clases que dependen de cubos demo; deben portarse a cubos académicos.</p><p class="subresult"><strong>11 nov:</strong> suite predeterminada 2.808/2.815; integración 67 aprobadas, 67 fallidas y 1 error.</p></article>
+        <article class="system-card"><header><div><span class="system-type">Predicción</span><h3>Prediction Service</h3></div><span class="badge ok">Suites aprobadas</span></header><p class="metric">Unitarias: 197 · ciclo de vida: 3 aserciones</p><p>El smoke test recorre reinicio, volumen compartido y persistencia del artefacto.</p><p class="subresult"><strong>Evaluación:</strong> PRED-004 concluye <code>EVIDENCIA_INSUFICIENTE</code> con datos sintéticos. PRED-008 es una caracterización de carga incompleta.</p><p class="subresult"><strong>11 nov:</strong> 112/112 unitarias y 3 aserciones del ciclo de vida.</p></article>
+        <article class="system-card"><header><div><span class="system-type">Integración de datos</span><h3>Data Warehouse / Hop</h3></div><span class="badge ok">Flujo repetido aprobado</span></header><p class="metric">Regresión de esquema: salida 0 · contrato: 9 consultas</p><p>El flujo vertical inicial no inició por el puerto ocupado. La repetición aisló puertos y pasó con 9 fuentes, 5 dimensiones, 3 lotes de hechos y controles SCD2/publicación atómica.</p><p class="subresult"><strong>Datos:</strong> fixtures sintéticos; el contrato fuente es de solo lectura.</p><p class="subresult"><strong>11 nov:</strong> validaciones DW/Hop aprobadas según el reporte.</p></article>
+        <article class="system-card"><header><div><span class="system-type">Aplicaciones web</span><h3>Portales y bibliotecas</h3></div><span class="badge ok">431 Vitest</span></header><p class="metric">Apps: 366/366 · bibliotecas: 65/65</p><p>Auth Models no encontró archivos de prueba y no se contabiliza.</p><p class="subresult"><strong>Playwright:</strong> BFF 9/9; Administración 27/27 tras una primera corrida sin resumen final.</p><p class="subresult"><strong>11 nov:</strong> Vitest apps 180/186 (6 fallos y 1 error), bibliotecas 47/47, Playwright 20/20 en Chromium.</p></article>
+        <article class="system-card"><header><div><span class="system-type">Pendientes de validación</span><h3>Rendimiento y aceptación</h3></div><span class="badge warn">Pendientes</span></header><p>La prueba de carga PRED-008 no fijó umbrales y registró HTTP 502 en inferencia. No existe una evaluación de usabilidad institucional documentada.</p><p class="subresult">No interpretar suites aprobadas como aceptación de usuarios ni como medición de capacidad productiva.</p></article>
+      </div>
+    </section>
+
+    <section id="repeticiones" aria-labelledby="repeat-title">
+      <div class="section-head"><h2 id="repeat-title">Qué se corrigió y se repitió</h2><p>Los tres resultados abiertos de la primera corrida se revisaron sobre el commit <span class="mono">d78d42ed</span>.</p></div>
+      <div class="timeline" aria-label="Tarjetas de las repeticiones">
+        <div class="event"><time datetime="2026-11-23">23 NOV · OLAP SERVICE</time><article><h3>55 de 55 pruebas de integración aprobadas</h3><p>Se movió <code>database-queries.properties</code> al classpath y se excluyeron 14 clases que dependen de cubos demo ausentes. Queda pendiente portarlas a cubos académicos.</p><span class="badge ok">BUILD SUCCESS</span></article></div>
+        <div class="event"><time datetime="2026-11-23">23 NOV · DATA WAREHOUSE</time><article><h3>Flujo vertical completado con puertos aislados</h3><p>La repetición ejecutó extracción Hop, dimensiones, hechos, controles de calidad y publicación; los contenedores se retiraron al terminar.</p><span class="badge ok">Aprobado con fixtures</span></article></div>
+        <div class="event"><time datetime="2026-11-23">23 NOV · ADMIN PORTAL</time><article><h3>27 de 27 escenarios aprobados</h3><p>Se corrigió el arranque del servidor de pruebas, se actualizó un selector del panel de usuarios y se limitó la concurrencia local.</p><span class="badge ok">27 / 27</span></article></div>
+      </div>
+    </section>
+
+    <section id="limites" aria-labelledby="limits-title">
+      <div class="section-head"><h2 id="limits-title">Alcance y límites de la evidencia</h2><p>Los resultados responden qué se probó y en qué condiciones. No acreditan por sí solos el comportamiento en producción.</p></div>
+      <ul class="scope-list">
+        <li><strong>Fixtures de datos</strong>Los flujos DW y el contrato de fuentes usan datos sintéticos o fixtures; no acceden a bases institucionales.</li>
+        <li><strong>Cobertura OLAP</strong>14 clases IT excluidas dependen de cubos de demostración. La API aún necesita esa cobertura contra cubos académicos.</li>
+        <li><strong>Modelos predictivos</strong>PRED-004 usa 40 observaciones sintéticas; registra <code>EVIDENCIA_INSUFICIENTE</code> y ningún ganador único.</li>
+        <li><strong>Rendimiento</strong>PRED-008 fue una caracterización incompleta, sin umbrales acordados y con respuestas HTTP 502 en inferencia.</li>
+        <li><strong>Usabilidad</strong>No hay evaluación documentada con participantes institucionales, tareas y criterios de aceptación.</li>
+        <li><strong>Rectorado</strong>Seis capturas históricas muestran fallos de escenarios de publicación predictiva; no se repitieron en esta ronda.</li>
+      </ul>
+      <div class="callout caution"><div><strong>Uso recomendado en el informe académico</strong><p>Usar la matriz de resultados y los logs para describir la verificación técnica. Presentar rendimiento, usabilidad y aceptación institucional como pendientes hasta contar con una evaluación formal.</p></div></div>
+    </section>
+
+    <section id="fuentes" aria-labelledby="sources-title">
+      <div class="section-head"><h2 id="sources-title">Logs y fuentes de esta vista</h2><p>Los enlaces apuntan a archivos locales del repositorio. Se comparten para ubicar la evidencia original, no para distribuir logs con datos sensibles.</p></div>
+      <details open><summary>Corrida y repeticiones del 23 de noviembre</summary><div class="details-body">
+        <p>Los logs iniciales, repetidos y del monorepo se mantienen diferenciados. Las rutas son relativas a este HTML.</p>
+        <div class="log-links">
+          <a href="../auth-service/test.log">Auth · inicial</a><a href="../dw-control-service/test.log">DW Control · inicial</a><a href="../keycloak-webhook/test.log">Webhook · inicial</a><a href="../olap-service/test.log">OLAP · unitarias</a><a href="../olap-service/test.integration.log">OLAP · integración inicial</a><a href="../olap-service/test.integration.rerun.log">OLAP · repetición</a><a href="../prediction-service/test.log">Predicción · unitarias</a><a href="../prediction-service/test_ml_lifecycle_smoke.log">ML lifecycle</a><a href="../test.dw_01.log">DW · regresión</a><a href="../test.dw_vetical.log">DW · inicio fallido</a><a href="../test.dw_vertical.rerun.log">DW · repetición</a><a href="../test.integration.log">DW · contrato fuente</a>
+        </div>
+        <p style="margin-top:14px">Logs web del monorepo:</p>
+        <div class="log-links">
+          <a href="../dss-monorepo/test.bff.log">BFF</a><a href="../dss-monorepo/test.admin_portal.log">Administración</a><a href="../dss-monorepo/test.director_portal.log">Dirección</a><a href="../dss-monorepo/test.decano_portal.log">Decanato</a><a href="../dss-monorepo/test.landing_portal.log">Landing</a><a href="../dss-monorepo/test.rector_portal.log">Rectorado</a><a href="../dss-monorepo/test.autth_models.log">Auth Models</a><a href="../dss-monorepo/test.auth_connector.log">Auth connector</a><a href="../dss-monorepo/test.de_control_connector.log">DW Control connector</a><a href="../dss-monorepo/test.ml_connector.log">ML connector</a><a href="../dss-monorepo/test.olap_connector.log">OLAP connector</a><a href="../dss-monorepo/test.olap_data_access.log">OLAP data access</a><a href="../dss-monorepo/test.e2e_bff.log">E2E BFF</a><a href="../dss-monorepo/test.e2e_admin.rerun.log">E2E Administración · repetición</a>
+        </div>
+      </div></details>
+      <details><summary>Informe fuente y antecedentes</summary><div class="details-body">
+        <p>El reporte Markdown contiene el detalle narrativo, inventario, interpretación de artefactos predictivos y matriz sugerida para la sección 3.6.</p>
+        <div class="log-links"><a href="testing-report.md">Abrir testing-report.md</a><a href="dw/hop-req-6-progress.md">Cierre de Req. 6 DW</a><a href="prediction/evidence/PRED-004-synthetic-comparison.json">Evidencia PRED-004</a></div>
+      </div></details>
+    </section>
+
+    <section aria-labelledby="method-title">
+      <div class="section-head"><h2 id="method-title">Cómo leer este reporte</h2></div>
+      <div class="panel table-wrap"><table>
+        <thead><tr><th scope="col">Etiqueta</th><th scope="col">Significado</th></tr></thead>
+        <tbody><tr><td><span class="badge ok">Aprobada</span></td><td>El log registra terminación exitosa y no reporta casos fallidos en el alcance indicado.</td></tr><tr><td><span class="badge warn">Parcial / pendiente</span></td><td>Hay omisiones, falta de resumen atribuible o el caso no se ejecutó en esa corrida.</td></tr><tr><td><span class="badge fail">Fallida</span></td><td>El log registra fallos; si hay repetición aprobada, se muestran ambos resultados y su relación.</td></tr><tr><td><span class="badge info">No contabilizada</span></td><td>No se encontraron casos o evidencia suficiente para contar la suite como ejecutada.</td></tr></tbody>
+      </table></div>
+    </section>
+  </main>
+  <footer class="footer"><div class="shell footer-inner"><span>Proyecto DSS · Universidad Autónoma Tomás Frías</span><span>Fuente de datos: <a href="testing-report.md">docs/testing-report.md</a> · actualización 23/11/2026</span></div></footer>
+</body>
+</html>

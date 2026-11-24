@@ -162,12 +162,26 @@ def custom_dataset_roots() -> list[Path]:
     explicit = os.getenv("PREDICTION_CUSTOM_DATASET_ROOT", "").strip()
     if explicit:
         roots.append(Path(explicit).resolve())
+    extracted = extracted_dataset_root()
+    if extracted is not None and extracted not in roots:
+        roots.append(extracted)
     snapshots = os.getenv("PREDICTION_DATASET_ROOT", "").strip()
     if snapshots:
         legacy = (Path(snapshots) / "custom").resolve()
         if legacy not in roots:
             roots.append(legacy)
     return roots
+
+
+def extracted_dataset_root() -> Path | None:
+    """Datasets extracted from the DW by the worker (PRED-102).
+
+    ``PREDICTION_EXTRACTED_DATASET_ROOT`` is written only by the worker and
+    mounted read-only in the API, so uploads and extractions never share a
+    writable store.
+    """
+    value = os.getenv("PREDICTION_EXTRACTED_DATASET_ROOT", "").strip()
+    return Path(value).resolve() if value else None
 
 
 def dataset_upload_max_bytes() -> int:

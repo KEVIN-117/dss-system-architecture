@@ -14,8 +14,8 @@ from celery import Celery
 from celery.signals import worker_ready
 from kombu import Exchange, Queue
 
-from config import WorkerSettings, custom_dataset_roots
-from training.job_store import JobStatus, JobStore
+from config import WorkerSettings, custom_dataset_roots, extracted_dataset_root
+from training.job_store import JobKind, JobStatus, JobStore
 
 logger = logging.getLogger(__name__)
 
@@ -51,6 +51,9 @@ celery_app.conf.update(
     task_default_queue="prediction.train_model",
     task_routes={
         "prediction.train_model": {"queue": "prediction.train_model"},
+        # Extractions share the training worker: both are long, DW/CPU-bound
+        # operator jobs bounded by the same admission control.
+        "prediction.extract_dataset": {"queue": "prediction.train_model"},
         "prediction.publish_population": {"queue": "prediction.publish_population"},
     },
     task_queues=(
@@ -257,6 +260,13 @@ def train_model_task(
             dependency_versions=train_result.dependency_lock,
             lease_until=None,
         ):
+            if store.is_cancelled(job_id):
+                # Cancelled while running: discard the candidate so a
+                # cancelled job leaves no model behind.
+                import shutil
+                shutil.rmtree(artifacts_path / attempt_artifact_id, ignore_errors=True)
+                logger.info("Training job %s was cancelled; candidate %s discarded", job_id, attempt_artifact_id)
+                return {"job_id": job_id, "status": "CANCELLED", "attempt": attempt}
             # The lease expired and a newer attempt owns the job; its result wins.
             logger.warning("Training job %s attempt %s lost its lease; result left as orphan candidate %s",
                            job_id, attempt, attempt_artifact_id)
@@ -359,6 +369,87 @@ def publish_population_task(self: Any, batch_id: str, artifacts_dir: str) -> dic
             return {"batch_id": batch_id, "status": "SUPERSEDED", "attempt": attempt}
         return {"batch_id": batch_id, "status": "FAILED"}
 
+@celery_app.task(bind=True, name="prediction.extract_dataset")
+def extract_dataset_task(self: Any, job_id: str) -> dict[str, Any]:
+    """Extract a prepared dataset from the DW for an EXTRACT_DATASET job (PRED-102)."""
+    from training.dataset_extraction import ExtractionCancelled, ExtractionError, run_extraction, validate_params
+
+    store = JobStore()
+    attempt = store.claim_attempt(job_id, worker_settings.job_timeout_seconds + 300, worker_settings.max_job_attempts)
+    if attempt is None:
+        if store.fail_exhausted(job_id, worker_settings.max_job_attempts, _exhausted_error(job_id, "Dataset extraction")):
+            logger.error("Extraction job %s FAILED: %s attempts exhausted", job_id, worker_settings.max_job_attempts)
+            return {"job_id": job_id, "status": "FAILED"}
+        current = store.get(job_id)
+        if current and current.status == JobStatus.RUNNING:
+            raise self.retry(countdown=60, max_retries=None)
+        return {"job_id": job_id, "status": current.status.value if current else "MISSING"}
+
+    record = store.get(job_id)
+    try:
+        if record is None:
+            raise ExtractionError("JOB_MISSING", "The extraction job no longer exists.")
+        output_root = extracted_dataset_root()
+        if output_root is None:
+            raise ExtractionError("DATASET_STORAGE_UNAVAILABLE", "PREDICTION_EXTRACTED_DATASET_ROOT is not configured.")
+        params = validate_params(record.params)
+        dataset_id = record.dataset_ref.removeprefix("custom:")
+        logger.info("Starting extraction job %s attempt=%s task=%s cadence=%s", job_id, attempt,
+                    params.task_code, params.cadence)
+        result = run_extraction(
+            params, dsn=os.getenv("PREDICTION_DW_DATABASE_URL", ""), output_root=output_root,
+            dataset_id=dataset_id, job_id=job_id, requested_by=record.submitted_by,
+            should_cancel=lambda: store.is_cancelled(job_id),
+        )
+        if not store.update_status(job_id, JobStatus.SUCCEEDED, expected_attempt=attempt,
+                                   finished_at=datetime.now(timezone.utc).isoformat(),
+                                   result_ref=result.dataset_ref, lease_until=None):
+            if store.is_cancelled(job_id):
+                import shutil
+                shutil.rmtree(output_root / dataset_id, ignore_errors=True)
+                logger.info("Extraction job %s was cancelled; dataset %s discarded", job_id, dataset_id)
+                return {"job_id": job_id, "status": "CANCELLED"}
+            logger.warning("Extraction job %s attempt %s lost its lease", job_id, attempt)
+            return {"job_id": job_id, "status": "SUPERSEDED", "attempt": attempt}
+        logger.info("Extraction job %s SUCCEEDED rows=%s dataset=%s", job_id, result.row_count, result.dataset_ref)
+        return {"job_id": job_id, "status": "SUCCEEDED", "dataset_ref": result.dataset_ref,
+                "row_count": result.row_count}
+    except ExtractionCancelled:
+        logger.info("Extraction job %s cancelled; partial output discarded", job_id)
+        return {"job_id": job_id, "status": "CANCELLED"}
+    except Exception as exc:
+        logger.exception("Extraction job %s FAILED: %s", job_id, exc)
+        known = isinstance(exc, ExtractionError)
+        error_detail = {
+            "type": "about:blank",
+            "title": "Dataset extraction failed",
+            "status": 422 if known else 500,
+            "code": exc.code if known else "JOB_FAILED",
+            "detail": str(exc) if known else "Extraction failed; inspect worker logs using the request identifier.",
+            "request_id": job_id,
+        }
+        if not store.update_status(job_id, JobStatus.FAILED, expected_attempt=attempt,
+                                   finished_at=datetime.now(timezone.utc).isoformat(),
+                                   error=error_detail, lease_until=None):
+            return {"job_id": job_id, "status": "SUPERSEDED", "attempt": attempt}
+        return {"job_id": job_id, "status": "FAILED", "error": error_detail}
+
+
+def dispatch_job(record: Any, artifacts_dir: str) -> None:
+    """Publish one committed job to the broker, by job kind."""
+    if record.job_kind == JobKind.EXTRACT_DATASET.value:
+        extract_dataset_task.apply_async(kwargs={"job_id": record.job_id}, task_id=record.job_id,
+                                         queue="prediction.train_model")
+        return
+    train_model_task.apply_async(
+        kwargs={"job_id": record.job_id, "dataset_ref": record.dataset_ref,
+                "algorithm": record.algorithm, "config": record.config,
+                "artifacts_dir": artifacts_dir},
+        task_id=record.job_id,
+        queue="prediction.train_model",
+    )
+
+
 @worker_ready.connect
 def _republish_pending_outbox(sender: Any = None, **kwargs: Any) -> None:
     """Recover committed jobs whose API process died before publishing."""
@@ -368,13 +459,7 @@ def _republish_pending_outbox(sender: Any = None, **kwargs: Any) -> None:
         if record is None:
             continue
         try:
-            train_model_task.apply_async(
-                kwargs={"job_id": record.job_id, "dataset_ref": record.dataset_ref,
-                        "algorithm": record.algorithm, "config": record.config,
-                        "artifacts_dir": worker_settings.artifacts_dir},
-                task_id=record.job_id,
-                queue="prediction.train_model",
-            )
+            dispatch_job(record, worker_settings.artifacts_dir)
             store.mark_published(pending_id)
         except Exception as exc:
             store.mark_published(pending_id, error=exc)
