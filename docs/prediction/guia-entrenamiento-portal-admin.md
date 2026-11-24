@@ -140,6 +140,14 @@ En **Servicio de aprendizaje automático → Validación de modelos**, elige el 
 - Se puede activar cualquier candidato entrenado con datos reales (incluidos los antiguos datasets marcados como exploratorios). No se requiere aprobación DSA.
 - Los candidatos entrenados con datos **sintéticos** no se pueden activar.
 
+### Comparar, revertir y consultar el historial (API, PRED-105)
+
+Hasta que lleguen las pantallas (PRED-107) se usan por API con `prediction:train`:
+
+- **Comparar:** `GET /v1/models/compare?ids=<model_id>,<model_id>` con candidatos entrenados sobre el mismo dataset (por ejemplo, los jobs de un mismo `study_id`). El ganador se elige solo con métricas de validación; el test externo se muestra pero no decide. `decision_status: APTO` indica que se puede activar el candidato de `selected_candidate_by_validation`.
+- **Revertir:** `POST /v1/models/rollback` con `{"event_code": "...", "cadence": "...", "reason": "..."}`. Vuelve al modelo activo anterior; si se repite, sigue retrocediendo. Después de desactivar un alcance, restaura el último modelo que estuvo activo.
+- **Historial:** `GET /v1/models/<model_id>/history` muestra cuándo se activó, se desactivó o se revirtió el modelo, quién lo hizo y por qué.
+
 ### Promover o revertir por comando
 
 La promoción por CLI del registro de modelos sigue disponible para operadores, y exige:
@@ -173,7 +181,7 @@ Cada job nuevo reemplaza al anterior como pronóstico vigente de esa serie y car
 |---|---|
 | Extraer el dataset del DW y ver su perfil exploratorio | Por comando (paso 1) o por la API del servicio (paso 1b); el formulario del portal llega con PRED-107 |
 | Entrenar el modelo de **reprobación de materia** | Los entrenamientos del portal solo preparan datasets de deserción. El modelo por materia se entrena por comando, con la preparación por evento (`prepare_event_dataset`) |
-| Comparar candidatos o hacer rollback | Solo por comando (paso 5); pasa al portal con PRED-105 y PRED-107 |
+| Comparar candidatos, hacer rollback o ver el historial | Por la API del servicio (PRED-105); el portal lo adopta con PRED-107 |
 | Cancelar un entrenamiento o una extracción | Solo por la API del servicio (`POST /v1/jobs/{job_id}/cancel`) |
 | Ver los trabajos lanzados desde otro navegador | Solo por la API (`GET /v1/jobs`); el portal la adopta con PRED-107 |
 

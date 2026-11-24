@@ -131,19 +131,27 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
     is_synthetic = all(e["dataset"].get("fixture_only") is True for e in entries)
     is_exploratory = not is_synthetic and all(e["dataset"].get("exploratory_only") is True for e in entries)
     evidence_kind = "synthetic_fixture" if is_synthetic else "exploratory_unapproved" if is_exploratory else "institutional_unverified"
-    decision_reason = (
-        "La evidencia corresponde a un fixture sintético y solo valida el software; no permite inferir utilidad institucional."
-        if is_synthetic else
-        "Entrenamiento exploratorio con datos reales sin aprobación DSA del objetivo, la población ni la política de costos; sirve para analizar el comportamiento del modelo y no autoriza su uso."
-        if is_exploratory else
-        "No se ha vinculado evidencia institucional autorizada ni criterios DSA de utilidad para emitir una decisión institucional."
-    )
+    # PRED-105: no external DSA decision is required. A unique winner chosen on
+    # validation, trained on real data, is deployable; synthetic evidence never is.
+    deployable = selected is not None and not is_synthetic
+    if is_synthetic:
+        decision_status = "EVIDENCIA_INSUFICIENTE"
+        decision_reason = ("La evidencia corresponde a un fixture sintético y solo valida el software; "
+                           "no permite inferir utilidad institucional.")
+    elif selected is None:
+        decision_status = "EVIDENCIA_INSUFICIENTE"
+        decision_reason = ("Los candidatos empatan en validación; no hay un único ganador. Revise las métricas "
+                           "o entrene con otra configuración antes de activar.")
+    else:
+        decision_status = "APTO"
+        decision_reason = ("Candidato elegido solo con métricas de validación sobre la misma partición; el test "
+                           "externo no participó. La activación queda auditada (operador, fecha y motivo).")
     report = {
         "report_version": "pred004-comparison-v1",
         "created_at": datetime.now(timezone.utc).isoformat(),
         "report_scope": "software_validation_only" if is_synthetic else "exploratory_analysis_only" if is_exploratory else "institutional_evaluation_incomplete",
         "evidence_kind": evidence_kind,
-        "decision_status": "EVIDENCIA_INSUFICIENTE",
+        "decision_status": decision_status,
         "decision_reason": decision_reason,
         "task_kind": "regression" if regression else "classification",
         "evaluation_identity": identity,
@@ -153,9 +161,11 @@ def compare_artifacts(artifact_dirs: list[Path], output_path: Path | None = None
         "selected_candidate_by_validation": selected["manifest"].get("model_id") if selected else None,
         "top_candidates_by_validation": [entry["manifest"].get("model_id") for entry in tied],
         "crisp_dm_next_step": {
-            "phase": "Business Understanding and Data Understanding",
-            "reason": "Obtain DSA-approved event, population, horizon, evaluation unit, error-cost policy and utility criteria; then use an authorized DW snapshot for the independent institutional assessment.",
-            "deployment_allowed": False,
+            "phase": "Deployment" if deployable else "Modeling",
+            "reason": ("Activate the selected candidate for its event and cadence; monitor its metrics on new cuts."
+                       if deployable else
+                       "No candidate can be deployed from this comparison; synthetic evidence or a validation tie."),
+            "deployment_allowed": deployable,
         },
         "models": [
             {
