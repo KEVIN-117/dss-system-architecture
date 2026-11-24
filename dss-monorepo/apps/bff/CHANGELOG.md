@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.12.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.11.0...bff-v1.12.0) (2026-11-24)
+
+
+### Features
+
+* **matrculas:** panel analitico matriculas ([#381](https://github.com/KEVIN-117/dss-system-architecture/issues/381)) ([09de083](https://github.com/KEVIN-117/dss-system-architecture/commit/09de0839fd6226e8efe9edba09b32c4e0c28d5e0))
+
 ## [1.11.0](https://github.com/KEVIN-117/dss-system-architecture/compare/bff-v1.10.0...bff-v1.11.0) (2026-11-22)
 
 
