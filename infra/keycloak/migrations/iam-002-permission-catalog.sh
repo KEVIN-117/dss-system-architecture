@@ -43,6 +43,7 @@ PERMISSIONS=(
   "connectors:write|Crear y modificar conectores de datos."
   "prediction:train|Entrenar modelos y gestionar datasets y modelos de predicción."
   "prediction:publish|Iniciar el scoring poblacional y publicar predicciones dentro del alcance académico."
+  "prediction:forecast:read|Consultar pronósticos de postulaciones, admitidos y matriculados por programa."
   "olap:admin|Administrar Saiku: datasources, estadísticas y endpoints de administración."
   "olap:user|Usar el workspace OLAP de Saiku."
   "dw:closure:read|Consultar cierres académicos y sus eventos."
@@ -61,10 +62,10 @@ PERMISSIONS=(
 )
 
 # Compuestos por rol del realm (mismo contenido que el export).
-DIRECTOR_PERMS="analytics:read analytics:career"
+DIRECTOR_PERMS="analytics:read analytics:career prediction:forecast:read"
 DECANO_PERMS="$DIRECTOR_PERMS analytics:faculty pipelines:read"
 RECTOR_PERMS="$DECANO_PERMS analytics:global connectors:read"
-SUPERADMIN_PERMS="connectors:read connectors:write pipelines:read pipelines:execute prediction:train iam:users:read iam:users:write iam:roles:read iam:roles:write iam:clients:read iam:clients:write iam:audit:read dw:etl-monitor:read dw:etl:execute dw:etl-schedule:manage"
+SUPERADMIN_PERMS="connectors:read connectors:write pipelines:read pipelines:execute prediction:train prediction:forecast:read iam:users:read iam:users:write iam:roles:read iam:roles:write iam:clients:read iam:clients:write iam:audit:read dw:etl-monitor:read dw:etl:execute dw:etl-schedule:manage"
 
 kc() { "$KCADM" "$@"; }
 log() { printf '[iam-002] %s\n' "$*"; }

@@ -65,10 +65,10 @@ En cumplimiento con el Principio de Mínimo Privilegio (PoLP):
 
 | Realm Role | Permisos de `dss-permissions` | Alcance Académico y Restricción (RNF4.1) |
 | :--- | :--- | :--- |
-| 👑 **`SUPERADMIN`** | `iam:*`, `connectors:*`, `pipelines:*`, `prediction:train` | **Técnico Global**. Sin acceso a dashboards académicos. Gestión de usuarios, roles, permisos, aplicaciones y auditoría. |
+| 👑 **`SUPERADMIN`** | `iam:*`, `connectors:*`, `pipelines:*`, `prediction:train`, `prediction:forecast:read` | **Técnico Global**. Sin acceso a dashboards académicos. Gestión de usuarios, roles, permisos, aplicaciones y auditoría. |
 | 🎓 **`RECTOR`** | DECANO + `analytics:global`, `connectors:read` | **Negocio Global**. Sin contexto académico. |
 | 🏛️ **`DECANO`** | DIRECTOR + `analytics:faculty`, `pipelines:read` | **Negocio Facultad**. Uno o más contextos de facultad. |
-| 📚 **`DIRECTOR`** | `analytics:read`, `analytics:career` | **Negocio Carrera**. Uno o más contextos de carrera. |
+| 📚 **`DIRECTOR`** | `analytics:read`, `analytics:career`, `prediction:forecast:read` | **Negocio Carrera**. Uno o más contextos de carrera. |
 
 Los permisos `olap:admin`, `olap:user`, `dw:*` y `prediction:publish` se asignan por usuario; `context:read` es solo para la cuenta de servicio de `olap-service`. El detalle y su verificación (`RealmPermissionCatalogTest`) están en `docs/envs/keycloak.md`.
 

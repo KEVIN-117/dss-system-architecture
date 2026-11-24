@@ -32,11 +32,13 @@ class RealmPermissionCatalogTest {
     private static final String CATALOG = "dss-permissions";
     private static final Pattern PERMISSION_NAME = Pattern.compile("^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*)+$");
 
-    private static final List<String> DIRECTOR = List.of("analytics:read", "analytics:career");
+    // PRED-106: every academic authority reads program forecasts (aggregates only).
+    private static final List<String> DIRECTOR = List.of("analytics:read", "analytics:career", "prediction:forecast:read");
     private static final List<String> DECANO = concat(DIRECTOR, "analytics:faculty", "pipelines:read");
     private static final List<String> RECTOR = concat(DECANO, "analytics:global", "connectors:read");
     private static final List<String> SUPERADMIN = List.of(
             "connectors:read", "connectors:write", "pipelines:read", "pipelines:execute", "prediction:train",
+            "prediction:forecast:read",
             "iam:users:read", "iam:users:write", "iam:roles:read", "iam:roles:write",
             "iam:clients:read", "iam:clients:write", "iam:audit:read",
             // LM-005: Load Manager (monitor, execute, schedule).

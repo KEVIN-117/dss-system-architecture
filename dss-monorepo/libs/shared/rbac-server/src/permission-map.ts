@@ -10,7 +10,7 @@ import type { RoleMatch } from './permissions.js';
 export const DSS_PERMISSIONS = [
   'analytics:read', 'analytics:global', 'analytics:faculty', 'analytics:career',
   'connectors:read', 'connectors:write', 'pipelines:read', 'pipelines:execute',
-  'prediction:train', 'prediction:publish',
+  'prediction:train', 'prediction:publish', 'prediction:forecast:read',
   'olap:admin', 'olap:user',
   'dw:closure:read', 'dw:closure:manage', 'dw:etl-monitor:read', 'dw:etl:execute', 'dw:etl-schedule:manage',
   'iam:users:read', 'iam:users:write', 'iam:roles:read', 'iam:roles:write',

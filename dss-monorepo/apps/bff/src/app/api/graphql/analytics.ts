@@ -74,6 +74,10 @@ export const analyticsTypeDefs = `#graphql
   type PredictionPublicationResult {
     publication: JSON
   }
+  """Latest forecast of a program (PRED-104): history, projection with 80/95 % bands, model and backtest. Null until one is generated."""
+  type ProgramForecastResult {
+    forecast: JSON
+  }
   input CubeAxisInput {
     dimension: String!
     hierarchy: String
@@ -107,6 +111,8 @@ export const analyticsTypeDefs = `#graphql
     olapCubeMembers(cubeId: ID!, dimension: String!, hierarchy: String!, level: String!, limit: Int): [OlapCubeMember!]!
     analyticQuery(input: AnalyticQueryInput!): AnalyticResult!
     predictionPublication(programRef: String!, cutId: String!, limit: Int, offset: Int): PredictionPublicationResult!
+    admissionForecast(programRef: String!, cadence: String, admitted: Boolean): ProgramForecastResult!
+    enrollmentForecast(programRef: String!, cadence: String): ProgramForecastResult!
   }
 `;
 
@@ -209,6 +215,16 @@ export function createAnalyticsResolvers() {
           throw new GraphQLError('Prediction Service is unavailable', { extensions: { code: 'PREDICTION_UNAVAILABLE', http: { status: 503 } } });
         }
       },
+      admissionForecast: (
+        _: unknown,
+        args: { programRef: string; cadence?: string | null; admitted?: boolean | null },
+        context: { authentication: AuthenticatedRequest },
+      ) => programForecast(args.admitted ? 'ADMITTED_BY_PROGRAM' : 'APPLICATIONS_BY_PROGRAM', args, context.authentication),
+      enrollmentForecast: (
+        _: unknown,
+        args: { programRef: string; cadence?: string | null },
+        context: { authentication: AuthenticatedRequest },
+      ) => programForecast('ENROLLED_BY_PROGRAM', args, context.authentication),
       analyticQuery: async (_: unknown, args: { input: AnalyticQueryInput }, context: { authentication: AuthenticatedRequest }) => {
         const { authentication } = context;
         const scope = deriveScopeForGraphQL(authentication.permissions, authentication.user.academicContexts ?? []);
@@ -329,6 +345,55 @@ export interface AnalyticQueryInput {
 
 function requireAnalyticsRead(permissions: PermissionSet): void {
   if (!hasPermission(permissions, 'analytics:read')) throw authorizationError('Analytics access is not permitted', 'FORBIDDEN');
+}
+
+/**
+ * Program forecasts for the dashboards (PRED-104/PRED-106). Requires prediction:forecast:read; a
+ * director (career scope) only reads the programs of their own careers. Faculty-level filtering of
+ * deans arrives with PRED-108; forecasts are aggregated counts without student data.
+ */
+async function programForecast(
+  series: 'APPLICATIONS_BY_PROGRAM' | 'ADMITTED_BY_PROGRAM' | 'ENROLLED_BY_PROGRAM',
+  args: { programRef: string; cadence?: string | null },
+  authentication: AuthenticatedRequest,
+): Promise<{ forecast: unknown }> {
+  if (!hasPermission(authentication.permissions, 'prediction:forecast:read')) {
+    throw authorizationError('Program forecasts are not permitted', 'FORBIDDEN');
+  }
+  const programRef = args.programRef.trim();
+  if (!/^[A-Za-z0-9._-]{1,16}$/.test(programRef)) {
+    throw new GraphQLError('A valid program is required', { extensions: { code: 'BAD_USER_INPUT' } });
+  }
+  if (args.cadence != null && args.cadence !== 'ANUAL' && args.cadence !== 'SEMESTRAL') {
+    throw new GraphQLError('cadence must be ANUAL or SEMESTRAL', { extensions: { code: 'BAD_USER_INPUT' } });
+  }
+  if (hasPermission(authentication.permissions, 'analytics:read')) {
+    const scope = deriveScopeForGraphQL(authentication.permissions, authentication.user.academicContexts ?? []);
+    if (scope.kind === 'career' && !scope.contexts.some((item) => item.careerId === programRef)) {
+      throw authorizationError('The program forecast is outside the assigned academic career', 'FORBIDDEN');
+    }
+  }
+  let baseUrl: string;
+  try { baseUrl = getPredictionServiceUrl(); }
+  catch { throw new GraphQLError('Prediction Service is unavailable', { extensions: { code: 'PREDICTION_UNAVAILABLE', http: { status: 503 } } }); }
+  const query = new URLSearchParams({ series, program_ref: programRef });
+  if (args.cadence) query.set('cadence', args.cadence);
+  try {
+    const response = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/forecasts?${query}`, {
+      headers: { Authorization: `Bearer ${authentication.token}` },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(15000),
+    });
+    if (response.status === 404) return { forecast: null };
+    if (!response.ok) {
+      const code = response.status === 403 ? 'FORBIDDEN' : 'PREDICTION_QUERY_FAILED';
+      throw new GraphQLError('Program forecast query failed', { extensions: { code, http: { status: response.status } } });
+    }
+    return { forecast: await response.json() };
+  } catch (error) {
+    if (error instanceof GraphQLError) throw error;
+    throw new GraphQLError('Prediction Service is unavailable', { extensions: { code: 'PREDICTION_UNAVAILABLE', http: { status: 503 } } });
+  }
 }
 
 function deriveScopeForGraphQL(permissions: PermissionSet, contexts: readonly AcademicContext[]): AcademicScope {

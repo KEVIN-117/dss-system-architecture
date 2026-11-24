@@ -39,7 +39,7 @@ flowchart LR
 |---|---|---|
 | Analítica | `analytics:read`, `analytics:global`, `analytics:faculty`, `analytics:career` | BFF (alcance OLAP/GraphQL), prediction-service |
 | Datos | `pipelines:read`, `pipelines:execute`, `connectors:read`, `connectors:write` | BFF |
-| Predicción | `prediction:train`, `prediction:publish` | prediction-service, BFF |
+| Predicción | `prediction:train`, `prediction:publish`, `prediction:forecast:read` (PRED-106: leer pronósticos de postulaciones y matrícula) | prediction-service, BFF |
 | OLAP | `olap:admin`, `olap:user` | olap-service, BFF (`/rest/saiku/admin/**`) |
 | Data Warehouse | `dw:closure:read`, `dw:closure:manage`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` | dw-control-service, BFF |
 | IAM | `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read` | auth-service, BFF, admin-portal |
@@ -51,10 +51,10 @@ Un permiso nuevo se crea desde el admin-portal (**Permisos**) y llega al token s
 
 | Rol | Portal | Permisos (compuestos) |
 |---|---|---|
-| `DIRECTOR` | director | `analytics:read`, `analytics:career` |
+| `DIRECTOR` | director | `analytics:read`, `analytics:career`, `prediction:forecast:read` |
 | `DECANO` | decano | DIRECTOR + `analytics:faculty`, `pipelines:read` |
 | `RECTOR` | rector | DECANO + `analytics:global`, `connectors:read` |
-| `SUPERADMIN` | admin | `iam:*`, `connectors:*`, `pipelines:*`, `prediction:train`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` |
+| `SUPERADMIN` | admin | `iam:*`, `connectors:*`, `pipelines:*`, `prediction:train`, `prediction:forecast:read`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` |
 
 - SUPERADMIN no tiene permisos académicos ni `olap:admin` (D4): administrar la plataforma no da acceso a los datos. Desde LM-005 sí opera el Load Manager: lanza, detiene y programa cargas ETL. Esos permisos no dan acceso a los datos del DW.
 - `olap:*`, `dw:*` y `prediction:publish` se asignan por usuario o en roles creados desde el portal.

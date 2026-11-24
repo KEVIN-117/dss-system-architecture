@@ -299,3 +299,43 @@ describe('BFF analytic GraphQL resolvers', () => {
     expect(executeServerOlapQuery).not.toHaveBeenCalled();
   });
 });
+
+describe('Program forecast resolvers (PRED-106)', () => {
+  const reader = { ...auth, permissions: [...auth.permissions, 'prediction:forecast:read'] };
+
+  it('reads the latest program forecast through Prediction Service', async () => {
+    vi.stubEnv('PREDICTION_SERVICE_URL', 'http://prediction-service:8000/');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ series_code: 'ADMITTED_BY_PROGRAM', points: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const result = await resolver().admissionForecast({}, { programRef: '025', cadence: 'SEMESTRAL', admitted: true }, ctx(reader));
+
+    expect(result).toEqual({ forecast: { series_code: 'ADMITTED_BY_PROGRAM', points: [] } });
+    expect(fetchMock).toHaveBeenCalledWith(
+      'http://prediction-service:8000/v1/forecasts?series=ADMITTED_BY_PROGRAM&program_ref=025&cadence=SEMESTRAL',
+      expect.objectContaining({ headers: { Authorization: `Bearer ${auth.token}` }, cache: 'no-store' }),
+    );
+  });
+
+  it('returns null when no forecast exists yet', async () => {
+    vi.stubEnv('PREDICTION_SERVICE_URL', 'http://prediction-service:8000');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 404 })));
+    await expect(resolver().enrollmentForecast({}, { programRef: '025' }, ctx(reader))).resolves.toEqual({ forecast: null });
+  });
+
+  it('requires prediction:forecast:read and the director career scope before calling Prediction Service', async () => {
+    vi.stubEnv('PREDICTION_SERVICE_URL', 'http://prediction-service:8000');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(resolver().enrollmentForecast({}, { programRef: '025' }, ctx()))
+      .rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    await expect(resolver().enrollmentForecast({}, { programRef: '999' }, ctx(reader)))
+      .rejects.toMatchObject({ extensions: { code: 'FORBIDDEN' } });
+    await expect(resolver().admissionForecast({}, { programRef: '../x' }, ctx(reader)))
+      .rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    await expect(resolver().admissionForecast({}, { programRef: '025', cadence: 'TRIMESTRAL' }, ctx(reader)))
+      .rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
