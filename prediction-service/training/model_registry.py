@@ -164,11 +164,22 @@ class ModelRegistry:
     def _validate(self, folder: Path, manifest: dict[str, Any], expected_digest: str | None = None) -> None:
         if not isinstance(manifest, dict) or manifest.get("contract_version") != "1.0":
             raise InvalidModelArtifact("Unsupported model manifest contract version.")
-        if manifest.get("algorithm") not in {"random_forest", "xgboost"}:
+        regression = manifest.get("task_kind") == "regression"
+        if manifest.get("algorithm") not in ({"ridge", "random_forest", "xgboost"} if regression else {"random_forest", "xgboost"}):
             raise InvalidModelArtifact("Unsupported model algorithm.")
         classes = manifest.get("classes", {})
-        if not isinstance(classes, dict) or not all(classes.get(key) for key in ("positive_class", "negative_class", "event_code")):
+        required_class_keys = ("event_code",) if regression else ("positive_class", "negative_class", "event_code")
+        if not isinstance(classes, dict) or not all(classes.get(key) for key in required_class_keys):
             raise InvalidModelArtifact("Model class order or event definition is incomplete.")
+        if regression:
+            interval = manifest.get("prediction_interval") or {}
+            offsets = interval.get("offsets") if isinstance(interval, dict) else None
+            if (not isinstance(offsets, dict) or not offsets
+                    or any(not isinstance(bounds, list) or len(bounds) != 2
+                           or not all(isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v) for v in bounds)
+                           or bounds[0] > bounds[1] for bounds in offsets.values())
+                    or "decision_threshold" in manifest):
+                raise InvalidModelArtifact("Regression bundle prediction interval is missing or invalid.")
         scope = manifest.get("serving_scope")
         if scope is not None:
             try:
@@ -222,9 +233,10 @@ class ModelRegistry:
                 metrics = json.loads((folder / "metrics.json").read_text(encoding="utf-8"))
                 if isinstance(metrics, dict) and "decision_threshold" in metrics and metrics["decision_threshold"] != manifest["decision_threshold"]:
                     raise InvalidModelArtifact("Serving decision threshold differs from the evaluated threshold.")
-            probability = manifest.get("probability_definition", {})
-            if probability.get("positive_class") != classes["positive_class"] or probability.get("class_order") != [classes["negative_class"], classes["positive_class"]]:
-                raise InvalidModelArtifact("Probability semantics or class ordering conflict with the manifest.")
+            if not regression:
+                probability = manifest.get("probability_definition") or {}
+                if probability.get("positive_class") != classes["positive_class"] or probability.get("class_order") != [classes["negative_class"], classes["positive_class"]]:
+                    raise InvalidModelArtifact("Probability semantics or class ordering conflict with the manifest.")
             lock = json.loads((folder / "dependency_lock.json").read_text(encoding="utf-8"))
             running_python = platform.python_version()
             if ".".join(lock.get("python", "").split(".")[:2]) != ".".join(running_python.split(".")[:2]):
@@ -474,7 +486,14 @@ class ModelRegistry:
             evidence = candidate_evidence(folder)
             per_class = metrics.get("per_class") or {}
             positive = per_class.get("1") or {}
+            task_kind = manifest.get("task_kind") or "classification"
             models.append({
+                "task_kind": task_kind,
+                "regression_metrics": {
+                    key: metrics.get(key)
+                    for key in ("mae", "rmse", "r2", "mape", "bias", "interval_coverage", "residuals_by_bucket", "test_row_count")
+                } if task_kind == "regression" else None,
+                "target_unit": (manifest.get("target_definition") or {}).get("unit"),
                 "model_id": manifest["model_id"],
                 "version": manifest["version"],
                 "algorithm": manifest.get("algorithm"),
@@ -512,6 +531,8 @@ class ModelRegistry:
                 "validation": {
                     "mean_recall": tuning.get("best_mean_recall"),
                     "mean_f1": tuning.get("best_mean_f1"),
+                    "mean_rmse": tuning.get("best_mean_rmse"),
+                    "mean_mae": tuning.get("best_mean_mae"),
                     "method": tuning.get("method"),
                     "n_splits": tuning.get("n_splits"),
                     "candidate_count": tuning.get("candidate_count"),
@@ -554,7 +575,10 @@ class ModelRegistry:
             "dataset_digest": evidence["dataset_digest"],
             "target_definition_ref": evidence["target_definition_ref"],
             "population_definition_ref": evidence["population_definition_ref"],
-            "test_metrics": {key: metrics.get(key) for key in ("recall", "precision", "f1_score", "roc_auc", "pr_auc", "holdout_alert_rate")},
+            "task_kind": manifest.get("task_kind") or "classification",
+            "test_metrics": {key: metrics.get(key) for key in (
+                ("mae", "rmse", "r2", "mape", "interval_coverage") if manifest.get("task_kind") == "regression"
+                else ("recall", "precision", "f1_score", "roc_auc", "pr_auc", "holdout_alert_rate"))},
             "activated_by": activated_by,
             "reason": reason.strip(),
             "activated_at": now,

@@ -67,6 +67,10 @@ def _compute_bundle_digest(manifest: dict[str, Any]) -> str:
         identity["decision_threshold"] = manifest["decision_threshold"]
     if "feature_contract" in manifest:
         identity["feature_contract"] = manifest["feature_contract"]
+    # PRED-103 regression bundles bind their semantics and serving intervals.
+    for key in ("task_kind", "target_definition", "prediction_interval"):
+        if key in manifest:
+            identity[key] = manifest[key]
     bundle = {"artifact_files": manifest["artifact_files"], "identity": identity}
     canonical = json.dumps(bundle, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
     return hashlib.sha256(canonical.encode("utf-8")).hexdigest()
@@ -177,12 +181,15 @@ def write_training_artifacts(
         "required": feature_names,
         "additional_properties": False,
     }
-    final_manifest["probability_definition"] = {
-        "positive_class": final_manifest.get("classes", {}).get("positive_class"),
-        "class_order": [final_manifest.get("classes", {}).get("negative_class"),
-                        final_manifest.get("classes", {}).get("positive_class")],
-        "meaning": "probability of the positive/event class",
-    }
+    if final_manifest.get("task_kind") == "regression":
+        final_manifest["probability_definition"] = None
+    else:
+        final_manifest["probability_definition"] = {
+            "positive_class": final_manifest.get("classes", {}).get("positive_class"),
+            "class_order": [final_manifest.get("classes", {}).get("negative_class"),
+                            final_manifest.get("classes", {}).get("positive_class")],
+            "meaning": "probability of the positive/event class",
+        }
     final_manifest["artifact_digest"] = _compute_bundle_digest(final_manifest)
 
     (staging_dir / "manifest.json").write_text(

@@ -45,9 +45,25 @@ class PredictionPublicationStore:
                     last_error TEXT, next_attempt_at TEXT);
                     CREATE TABLE IF NOT EXISTS prediction_results (
                     batch_id TEXT NOT NULL, subject_ref TEXT NOT NULL, program_ref TEXT NOT NULL,
-                    closure_id TEXT NOT NULL, predicted_class TEXT NOT NULL, event_probability REAL,
+                    closure_id TEXT NOT NULL, predicted_class TEXT, event_probability REAL,
                     model_id TEXT NOT NULL, model_version TEXT NOT NULL, generated_at TEXT NOT NULL,
+                    predicted_value REAL, prediction_interval TEXT,
                     PRIMARY KEY(batch_id,subject_ref));""")
+                # PRED-103: regression results have no class; upgrade older files.
+                result_columns = {row["name"]: row for row in c.execute("PRAGMA table_info(prediction_results)").fetchall()}
+                if "predicted_value" not in result_columns:
+                    c.executescript("""ALTER TABLE prediction_results RENAME TO prediction_results_pre_pred103;
+                        CREATE TABLE prediction_results (
+                        batch_id TEXT NOT NULL, subject_ref TEXT NOT NULL, program_ref TEXT NOT NULL,
+                        closure_id TEXT NOT NULL, predicted_class TEXT, event_probability REAL,
+                        model_id TEXT NOT NULL, model_version TEXT NOT NULL, generated_at TEXT NOT NULL,
+                        predicted_value REAL, prediction_interval TEXT,
+                        PRIMARY KEY(batch_id,subject_ref));
+                        INSERT INTO prediction_results (batch_id,subject_ref,program_ref,closure_id,predicted_class,
+                            event_probability,model_id,model_version,generated_at)
+                        SELECT batch_id,subject_ref,program_ref,closure_id,predicted_class,event_probability,
+                            model_id,model_version,generated_at FROM prediction_results_pre_pred103;
+                        DROP TABLE prediction_results_pre_pred103;""")
                 # Upgrade SQLite files created before leases/attempt fencing.
                 columns = {row["name"] for row in c.execute("PRAGMA table_info(prediction_batches)").fetchall()}
                 if "lease_until" not in columns:
@@ -65,8 +81,13 @@ class PredictionPublicationStore:
         return psycopg.connect(self.dsn, connect_timeout=5, autocommit=False, row_factory=dict_row)
 
     @staticmethod
-    def digest(program_ref: str, closure_id: str, model_id: str, model_version: str) -> str:
-        body = json.dumps([program_ref, closure_id, model_id, model_version], separators=(",", ":"))
+    def digest(program_ref: str, closure_id: str, model_id: str, model_version: str,
+               event_code: str = "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE") -> str:
+        parts = [program_ref, closure_id, model_id, model_version]
+        if event_code != "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE":
+            # Dropout digests stay byte-identical to the pre-PRED-103 format.
+            parts.append(event_code)
+        body = json.dumps(parts, separators=(",", ":"))
         return hashlib.sha256(body.encode()).hexdigest()
 
     def create(self, batch: Mapping[str, Any], scope: str) -> dict[str, Any]:
@@ -123,12 +144,13 @@ class PredictionPublicationStore:
                 result["has_more"] = offset + len(rows) < result["result_count"]
             return result
 
-    def current(self, program_ref: str, closure_id: str) -> dict[str, Any] | None:
+    def current(self, program_ref: str, closure_id: str,
+                event_code: str = "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE") -> dict[str, Any] | None:
         table = "prediction_batches" if self._sqlite else "ml_workspace.prediction_batch"
-        sql = (f"SELECT * FROM {table} WHERE program_ref=? AND closure_id=? AND status='PUBLISHED' ORDER BY published_at DESC LIMIT 1" if self._sqlite else
-               f"SELECT * FROM {table} WHERE program_ref=%s AND closure_id=%s AND status='PUBLISHED' ORDER BY published_at DESC LIMIT 1")
+        sql = (f"SELECT * FROM {table} WHERE program_ref=? AND closure_id=? AND event_code=? AND status='PUBLISHED' ORDER BY published_at DESC LIMIT 1" if self._sqlite else
+               f"SELECT * FROM {table} WHERE program_ref=%s AND closure_id=%s AND event_code=%s AND status='PUBLISHED' ORDER BY published_at DESC LIMIT 1")
         with self._connect() as c:
-            row = c.execute(sql, (program_ref, closure_id)).fetchone()
+            row = c.execute(sql, (program_ref, closure_id, event_code)).fetchone()
         return self._decode(row) if row else None
 
     def pending(self, limit: int = 100) -> list[str]:
@@ -221,9 +243,17 @@ class PredictionPublicationStore:
         with self._connect() as c:
             c.execute(f"DELETE FROM {results} WHERE batch_id={p}", (batch_id,))
             for row in rows:
-                c.execute(f"""INSERT INTO {results}(batch_id,subject_ref,program_ref,closure_id,predicted_class,event_probability,model_id,model_version,generated_at)
-                    VALUES ({','.join([p] * 9)})""", (batch_id, row["subject_ref"], row["program_ref"], row["closure_id"],
-                    row["predicted_class"], row.get("event_probability"), row["model_id"], row["model_version"], row["generated_at"]))
+                interval = row.get("prediction_interval")
+                if interval is not None:
+                    if self._sqlite:
+                        interval = json.dumps(interval, sort_keys=True)
+                    else:
+                        from psycopg.types.json import Jsonb
+                        interval = Jsonb(interval)
+                c.execute(f"""INSERT INTO {results}(batch_id,subject_ref,program_ref,closure_id,predicted_class,event_probability,model_id,model_version,generated_at,predicted_value,prediction_interval)
+                    VALUES ({','.join([p] * 11)})""", (batch_id, row["subject_ref"], row["program_ref"], row["closure_id"],
+                    row.get("predicted_class"), row.get("event_probability"), row["model_id"], row["model_version"], row["generated_at"],
+                    row.get("predicted_value"), interval))
             if self._sqlite:
                 c.execute(f"UPDATE {batches} SET status='PUBLISHED',result_count={p},source_execution_ids={p},finished_at={p},published_at={p},lease_until=NULL WHERE batch_id={p} AND status='RUNNING'" + fence,
                           (len(rows), json.dumps(list(source_execution_ids)), now, now, batch_id, *fence_args))
@@ -239,7 +269,7 @@ class PredictionPublicationStore:
         result = dict(row)
         if result.get("batch_id") is not None:
             result["batch_id"] = str(result["batch_id"])
-        for key in ("authorized_scope", "source_execution_ids", "error"):
+        for key in ("authorized_scope", "source_execution_ids", "error", "prediction_interval"):
             if isinstance(result.get(key), str):
                 try:
                     result[key] = json.loads(result[key])

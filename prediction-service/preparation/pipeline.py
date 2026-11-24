@@ -126,12 +126,33 @@ def prepare_event_dataset(
 
     Event-specific adapters must remove rows with an unknown target before
     calling this function. This is intended for distinct grains such as
-    student-course-period and must not reinterpret retention outcomes.
+    student-course-period and must not reinterpret retention outcomes. The
+    task kind (classification or regression) comes from the catalog.
     """
     return _prepare_binary_dataset(
         manifest, rows, seed, test_ratio, apply_balancing, imbalance_threshold,
-        require_retention_outcome=False,
+        require_retention_outcome=False, task_kind=task_kind_of(manifest),
     )
+
+
+def task_kind_of(manifest: Mapping[str, Any]) -> str:
+    """classification or regression, from the catalog task of the dataset event."""
+    definition = manifest.get("target_definition") or {}
+    if definition.get("kind") == "regression":
+        return "regression"
+    from ml_tasks import UnknownTask, get_task
+    try:
+        return get_task(str(definition.get("event_code"))).kind
+    except UnknownTask:
+        return "classification"
+
+
+def prepare_for_task(manifest: dict[str, Any], rows: list[dict[str, Any]], **kwargs: Any) -> PreparedPartition:
+    """Retention contract for program dropout; event preparation for every other task."""
+    event_code = (manifest.get("target_definition") or {}).get("event_code")
+    if event_code in (None, "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", "NEXT_CLOSURE_DROPOUT"):
+        return prepare_dataset(manifest, rows, **kwargs)
+    return prepare_event_dataset(manifest, rows, **kwargs)
 
 
 def _prepare_binary_dataset(
@@ -142,6 +163,7 @@ def _prepare_binary_dataset(
     apply_balancing: bool,
     imbalance_threshold: float,
     require_retention_outcome: bool,
+    task_kind: str = "classification",
 ) -> PreparedPartition:
     """Filter the declared population and make a student-grouped temporal holdout."""
     df = pd.DataFrame(rows)
@@ -190,11 +212,16 @@ def _prepare_binary_dataset(
 
     # This object is a template only and remains unfitted until each CV fold.
     preprocessing = build_preprocessing_pipeline(feature_names, categorical_features)
+    regression = task_kind == "regression"
+    if regression:
+        y_train = pd.to_numeric(y_train, errors="raise").astype(float)
+        y_test = pd.to_numeric(y_test, errors="raise").astype(float)
     report = BalanceReport(
-        original_distribution=_class_distribution(y_train),
+        original_distribution={} if regression else _class_distribution(y_train),
         balanced_distribution=None,
         technique=None,
-        reason_if_skipped="Balancing is deferred to each training fold.",
+        reason_if_skipped="Regression targets are never resampled." if regression
+        else "Balancing is deferred to each training fold.",
         k_neighbors_used=None,
         applied_to="fold_train_only",
     )
@@ -237,7 +264,9 @@ def _prepare_binary_dataset(
         "target_definition": manifest.get("target_definition"),
         "cadence": manifest.get("coverage", {}).get("cadence"),
         "event_code": (manifest.get("target_definition") or {}).get("event_code"),
-        "cv_method": "stratified_group_k_fold",
+        "cv_method": "group_k_fold" if regression else "stratified_group_k_fold",
+        "task_kind": task_kind,
+        "target_field": target_field,
         "evaluation_unit": manifest.get("evaluation_unit", "student_program_academic_cut"),
         "evidence_kind": evidence_kind(manifest),
     }
@@ -254,6 +283,6 @@ def _prepare_binary_dataset(
         balance_report=report,
         partition_metadata=metadata,
         manifest_ref=str(manifest.get("dataset_id", "unknown")),
-        apply_balancing=apply_balancing,
+        apply_balancing=apply_balancing and not regression,
         imbalance_threshold=imbalance_threshold,
     )

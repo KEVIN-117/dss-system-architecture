@@ -22,7 +22,12 @@ from ml_tasks import get_task
 
 PROGRAM_DROPOUT = "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"
 COURSE_FAILURE = "COURSE_FAILURE"
-EXTRACTABLE_TASKS = (PROGRAM_DROPOUT, COURSE_FAILURE)
+STUDENT_BACKLOG = "STUDENT_BACKLOG_NEXT_CUT"
+STUDENT_GPA = "STUDENT_GPA_NEXT_CUT"
+COURSE_FINAL_GRADE = "COURSE_FINAL_GRADE"
+STUDENT_TASKS = (PROGRAM_DROPOUT, STUDENT_BACKLOG, STUDENT_GPA)
+COURSE_TASKS = (COURSE_FAILURE, COURSE_FINAL_GRADE)
+EXTRACTABLE_TASKS = (*STUDENT_TASKS, *COURSE_TASKS)
 MAX_PROGRAMS = 200
 MAX_HORIZON_YEARS = 10
 
@@ -72,8 +77,8 @@ class ExtractionResult:
 
 
 def _feature_catalog(task_code: str) -> dict[str, Any]:
-    from feature_contract import COURSE_FAILURE_FEATURES, PROGRAM_DROPOUT_FEATURES
-    return PROGRAM_DROPOUT_FEATURES if task_code == PROGRAM_DROPOUT else COURSE_FAILURE_FEATURES
+    from feature_contract import FEATURES_BY_EVENT
+    return FEATURES_BY_EVENT[task_code]
 
 
 def validate_params(raw: dict[str, Any]) -> ExtractionParams:
@@ -102,6 +107,9 @@ def validate_params(raw: dict[str, Any]) -> ExtractionParams:
     unknown = sorted(set(features) - set(catalog))
     if unknown:
         raise ExtractionError("UNKNOWN_FEATURES", f"Unknown features for {task_code}: {unknown}.")
+    if features:
+        # The label of next-cut targets is derived from these columns.
+        features = tuple(dict.fromkeys((*features, *task.required_features)))
     return ExtractionParams(task_code, cadence, programs, horizon, features)
 
 
@@ -122,21 +130,28 @@ def build_snapshot(params: ExtractionParams, dsn: str,
     if not programs:
         raise ExtractionError("NO_PROGRAMS", f"The DW has no {params.cadence} programs to extract.")
     features = list(params.features or _feature_catalog(params.task_code))
-    if params.task_code == PROGRAM_DROPOUT:
+    if params.task_code in STUDENT_TASKS:
         from training import dw_extract
+        # Student-level targets share the program-dropout point-in-time query.
         contract_rows, cuts = (extract or dw_extract.extract_from_dw)(dsn, programs, params.cadence, features)
         if not cuts:
             raise ExtractionError("NO_PROCESSED_CUTS", "The selected programs have no processed cuts in the DW.")
-        return dw_extract.build_program_dropout_snapshot(
-            contract_rows, program_ref=programs, cadence=params.cadence, feature_names=features, cuts=cuts,
-            dropout_horizon_years=params.horizon_years,
+        if params.task_code == PROGRAM_DROPOUT:
+            return dw_extract.build_program_dropout_snapshot(
+                contract_rows, program_ref=programs, cadence=params.cadence, feature_names=features, cuts=cuts,
+                dropout_horizon_years=params.horizon_years,
+            )
+        from training.student_extract import build_student_next_cut_snapshot
+        return build_student_next_cut_snapshot(
+            contract_rows, task_code=params.task_code, program_ref=programs, cadence=params.cadence,
+            feature_names=features, cuts=cuts,
         )
     from training import course_extract
     contract_rows, cuts = (extract or course_extract.extract_from_dw)(dsn, programs, features)
     if not cuts:
         raise ExtractionError("NO_PROCESSED_CUTS", "The selected programs have no processed cuts in the DW.")
     return course_extract.build_course_failure_snapshot(
-        contract_rows, programs=programs, feature_names=features, cuts=cuts,
+        contract_rows, programs=programs, feature_names=features, cuts=cuts, task_code=params.task_code,
     )
 
 

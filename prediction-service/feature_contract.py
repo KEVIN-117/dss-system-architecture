@@ -24,6 +24,12 @@ CONTRACT_VERSION = "dw-point-in-time-v1"
 PROGRAM_DROPOUT_EVENT = "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"
 COURSE_ABANDONMENT_EVENT = "COURSE_ABANDONMENT"
 COURSE_FAILURE_EVENT = "COURSE_FAILURE"
+# PRED-103. Student-level targets reuse the program-dropout population and
+# point-in-time query unchanged (so serving dropout bundles keep their digest);
+# enrollment-level targets reuse the course-failure query.
+STUDENT_BACKLOG_EVENT = "STUDENT_BACKLOG_NEXT_CUT"
+STUDENT_GPA_EVENT = "STUDENT_GPA_NEXT_CUT"
+COURSE_FINAL_GRADE_EVENT = "COURSE_FINAL_GRADE"
 # Bump when the Python eligibility rule below changes.
 ELIGIBILITY_RULE_VERSION = "first-three-academic-years-v3"
 
@@ -96,7 +102,15 @@ FEATURES_BY_EVENT: dict[str, dict[str, FeatureSpec]] = {
     PROGRAM_DROPOUT_EVENT: PROGRAM_DROPOUT_FEATURES,
     COURSE_ABANDONMENT_EVENT: COURSE_ABANDONMENT_FEATURES,
     COURSE_FAILURE_EVENT: COURSE_FAILURE_FEATURES,
+    STUDENT_BACKLOG_EVENT: PROGRAM_DROPOUT_FEATURES,
+    STUDENT_GPA_EVENT: PROGRAM_DROPOUT_FEATURES,
+    COURSE_FINAL_GRADE_EVENT: COURSE_FAILURE_FEATURES,
 }
+
+#: Events scored with the student-program-cut query and eligibility rule.
+STUDENT_CUT_EVENTS = frozenset({PROGRAM_DROPOUT_EVENT, STUDENT_BACKLOG_EVENT, STUDENT_GPA_EVENT})
+#: Events scored with the student-course-cut (course failure) query and rule.
+ENROLLMENT_CUT_EVENTS = frozenset({COURSE_FAILURE_EVENT, COURSE_FINAL_GRADE_EVENT})
 
 
 # One row per student enrolled in the program at a processed closure. Every
@@ -267,8 +281,10 @@ WHERE EXISTS (SELECT 1 FROM etl_control.etl_execution run WHERE run.run_id=fc_ta
 """
 
 # Course failure batch query: every course row of a semester program at one
-# processed closure. Parameters: %(program)s, %(closure)s, %(limit)s. Label
-# columns (es_aprobado/es_reprobado/es_abandono) are audit outputs only.
+# processed closure. Parameters: %(program)s, %(closure)s, %(limit)s and the
+# optional serving filters %(subject)s / %(course)s (NULL = whole population).
+# Label columns (es_aprobado/es_reprobado/es_abandono/final_grade) are audit
+# outputs only; they are never selected as features.
 _COURSE_FAILURE_QUERY = """
 WITH c AS MATERIALIZED (
     SELECT closure_id, gestion, periodo, effective_at FROM etl_control.academic_period_closure
@@ -281,7 +297,8 @@ WITH c AS MATERIALIZED (
 ), hist AS MATERIALIZED (
     -- Every course attempt of the program up to and including the cut.
     SELECT e.id_alumno, m.id_materia, m.nivel_academico, cut.closure_id, cut.gestion, cut.periodo,
-           cut.effective_at < c.effective_at AS prior, fc.es_aprobado, fc.es_reprobado, fc.es_abandono, fc.run_id
+           cut.effective_at < c.effective_at AS prior, fc.es_aprobado, fc.es_reprobado, fc.es_abandono, fc.run_id,
+           fc.nota_final
     FROM dw.fact_cursado fc
     JOIN dw.dim_programa p ON p.programa_sk = fc.programa_sk AND p.member_type = 'STANDARD' AND p.id_programa = %(program)s
     JOIN dw.dim_estudiante e ON e.estudiante_sk = fc.estudiante_sk AND e.member_type = 'STANDARD'
@@ -329,13 +346,16 @@ WITH c AS MATERIALIZED (
 SELECT cur.id_alumno::text AS subject_ref, cur.id_materia::text AS course_ref, {columns},
        c.closure_id::text AS cut_id, c.gestion AS cut_year, c.periodo AS cut_period,
        st.start_t, coverage.t0 AS history_start_t, pcad.regimen AS program_regime,
-       cur.run_id::text AS source_run_id, cur.es_aprobado, cur.es_reprobado, cur.es_abandono
+       cur.run_id::text AS source_run_id, cur.es_aprobado, cur.es_reprobado, cur.es_abandono,
+       cur.nota_final AS final_grade
 FROM cur
 CROSS JOIN c CROSS JOIN pcad CROSS JOIN coverage
 JOIN st ON st.id_alumno = cur.id_alumno
 LEFT JOIN ss ON ss.id_alumno = cur.id_alumno AND ss.id_materia = cur.id_materia
 LEFT JOIN rate ON rate.id_materia = cur.id_materia
 LEFT JOIN prev ON prev.id_alumno = cur.id_alumno
+WHERE (%(subject)s::bigint IS NULL OR cur.id_alumno = %(subject)s::bigint)
+  AND (%(course)s::text IS NULL OR cur.id_materia::text = %(course)s::text)
 ORDER BY cur.id_alumno, cur.id_materia
 LIMIT %(limit)s
 """
@@ -344,6 +364,9 @@ QUERIES_BY_EVENT = {
     PROGRAM_DROPOUT_EVENT: _PROGRAM_DROPOUT_QUERY,
     COURSE_ABANDONMENT_EVENT: _COURSE_ABANDONMENT_QUERY,
     COURSE_FAILURE_EVENT: _COURSE_FAILURE_QUERY,
+    STUDENT_BACKLOG_EVENT: _PROGRAM_DROPOUT_QUERY,
+    STUDENT_GPA_EVENT: _PROGRAM_DROPOUT_QUERY,
+    COURSE_FINAL_GRADE_EVENT: _COURSE_FAILURE_QUERY,
 }
 
 
@@ -369,6 +392,13 @@ def course_abandonment_query(feature_names: list[str]) -> str:
 
 def course_failure_query(feature_names: list[str]) -> str:
     return _COURSE_FAILURE_QUERY.format(columns=_columns(COURSE_FAILURE_EVENT, feature_names))
+
+
+def contract_query(event_code: str, feature_names: list[str]) -> str:
+    """Point-in-time SQL of any event with a DW feature contract."""
+    if event_code not in QUERIES_BY_EVENT:
+        raise FeatureContractError(f"No point-in-time feature contract exists for {event_code}.")
+    return QUERIES_BY_EVENT[event_code].format(columns=_columns(event_code, feature_names))
 
 
 def contract_digest(event_code: str) -> str:

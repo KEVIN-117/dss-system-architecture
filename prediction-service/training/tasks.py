@@ -147,10 +147,10 @@ def train_model_task(
     artifacts_dir: str,
 ) -> dict[str, Any]:
     """Execute training in an isolated Celery worker process."""
-    from preparation.pipeline import prepare_dataset
+    from preparation.pipeline import prepare_for_task
     from training.artifact_writer import write_training_artifacts
     from training.configuration import resolve_training_configuration
-    from training.trainer import train_model
+    from training.trainer import train_for_partition
 
     store = JobStore()
     artifacts_path = Path(artifacts_dir)
@@ -183,7 +183,7 @@ def train_model_task(
             raise ValueError(f"Dataset is not READY_FOR_PREPARATION ({report.status}).")
 
         # 3. Data preparation (imputation, student-grouped temporal split, SMOTE on train)
-        partition = prepare_dataset(
+        partition = prepare_for_task(
             manifest=manifest,
             rows=rows,
             seed=seed,
@@ -191,7 +191,7 @@ def train_model_task(
         )
 
         # 4. Train model
-        train_result = train_model(
+        train_result = train_for_partition(
             partition=partition,
             algorithm=algorithm,
             config=config,
@@ -310,7 +310,8 @@ def train_model_task(
 @celery_app.task(bind=True, name="prediction.publish_population")
 def publish_population_task(self: Any, batch_id: str, artifacts_dir: str) -> dict[str, Any]:
     """Score one authorized program/cut and atomically expose the completed batch."""
-    from inference import score_loaded_model
+    from inference import score_bundle
+    from ml_tasks import get_task
     from inference_adapters import DwPredictionDataProvider
     from training.model_registry import ModelRegistry
     from training.prediction_publication_store import PredictionPublicationStore
@@ -332,25 +333,29 @@ def publish_population_task(self: Any, batch_id: str, artifacts_dir: str) -> dic
             raise ValueError("Prediction batch does not exist.")
         context = DwPredictionDataProvider().resolve_context(batch["program_ref"], str(batch["closure_id"]))
         registry = ModelRegistry(Path(artifacts_dir))
-        bundle = registry.active("PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", context.cadence)
+        event_code = batch.get("event_code") or "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"
+        bundle = registry.active(event_code, context.cadence)
         if bundle.model_id != batch["model_id"] or bundle.version != batch["model_version"]:
             raise ValueError("The approved active model changed before scoring; resubmit against the current model.")
         data = DwPredictionDataProvider()
         # One point-in-time query for the whole program/cut, with the exact SQL
         # and eligibility rule used by single-student inference.
-        population, ineligible, source_runs = data.load_population_features(context, bundle.manifest)
+        population, ineligible, source_runs = data.load_population_features(
+            context, bundle.manifest, event_type=get_task(event_code).serving_event_type)
         if ineligible:
             logger.info("Prediction batch %s excluded ineligible profiles: %s", batch_id, ineligible)
         generated_at = datetime.now(timezone.utc).isoformat()
         results: list[dict[str, Any]] = []
         for subject_ref, features in population.items():
-            predicted_class, probability, _ = score_loaded_model(bundle, features)
+            scored = score_bundle(bundle, features)
             results.append({
                 "subject_ref": subject_ref,
                 "program_ref": batch["program_ref"],
                 "closure_id": str(batch["closure_id"]),
-                "predicted_class": predicted_class,
-                "event_probability": probability,
+                "predicted_class": scored["predicted_class"],
+                "event_probability": scored["event_probability"],
+                "predicted_value": scored["predicted_value"],
+                "prediction_interval": scored["prediction_interval"],
                 "model_id": bundle.model_id,
                 "model_version": bundle.version,
                 "generated_at": generated_at,

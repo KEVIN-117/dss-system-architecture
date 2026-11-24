@@ -59,7 +59,17 @@ El servicio ya extrae datasets sin el script ni el `.zip`. El formulario del por
    {"task_code": "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE", "cadence": "SEMESTRAL", "programs": [], "horizon_years": 4}
    ```
 
-   `programs` vacío extrae todas las carreras de la cadencia. Las tareas extraíbles son las del catálogo (`GET /v1/ml-tasks`, campo `extractable`): deserción del programa y riesgo en materia (solo `SEMESTRAL`).
+   `programs` vacío extrae todas las carreras de la cadencia. Las tareas extraíbles son las del catálogo (`GET /v1/ml-tasks`, campo `extractable`):
+
+   | `task_code` | Qué predice | Cadencias |
+   |---|---|---|
+   | `PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE` | Deserción del programa (admite `horizon_years`) | ANUAL, SEMESTRAL |
+   | `STUDENT_BACKLOG_NEXT_CUT` | Si el estudiante acumulará más materias arrastradas en el siguiente corte | ANUAL, SEMESTRAL |
+   | `STUDENT_GPA_NEXT_CUT` | PPA del estudiante en el siguiente corte (regresión) | ANUAL, SEMESTRAL |
+   | `COURSE_FAILURE` | Si el estudiante reprobará o abandonará una materia inscrita | SEMESTRAL |
+   | `COURSE_FINAL_GRADE` | Nota final de una materia inscrita (regresión) | SEMESTRAL |
+
+   Para rezago y PPA, el último corte procesado no tiene etiqueta todavía (su siguiente corte no existe): esas filas aparecen en `exclusions` como `NEXT_CUT_NOT_OBSERVED`.
 2. El servicio responde `202` con un job `EXTRACT_DATASET` en `QUEUED` y su `dataset_ref` reservado (`custom:<dataset_id>`). Sigue el estado con `GET /v1/jobs/{job_id}`.
 3. Al terminar en `SUCCEEDED`, `result_ref` es el dataset listo para entrenar. El worker ya lo validó contra el contrato de datos y calculó su perfil.
 4. Revisa el perfil exploratorio con `GET /v1/datasets/custom:<dataset_id>/profile` y una muestra con `GET /v1/datasets/custom:<dataset_id>/sample`. Presta atención a los avisos (`warnings`): posible fuga de información, variables con muchos faltantes o constantes, desbalance de clases y datasets con pocas filas o un único periodo.
@@ -97,7 +107,8 @@ El servicio valida el dataset contra el contrato de datos antes de guardarlo. Si
 1. En **Operaciones ML**, pulsa **Nuevo entrenamiento**.
 2. Elige:
    - **Conjunto de datos de entrenamiento:** el `custom:<dataset_id>` del paso 3.
-   - **Algoritmo:** Random Forest o XGBoost. Para comparar, lanza un entrenamiento por cada algoritmo con el mismo dataset.
+   - **Algoritmo:** Random Forest o XGBoost en clasificación; en las tareas de regresión (PPA, nota final) también Ridge. Para comparar, lanza un entrenamiento por algoritmo con el mismo dataset, o usa `POST /v1/training-studies` para lanzarlos todos de una vez agrupados por `study_id`.
+   - **Hiperparámetros (opcional, por API):** `search_space` con los valores a probar por parámetro (por ejemplo `{"alpha": [0.1, 1, 10]}` para Ridge). El servicio rechaza parámetros desconocidos, valores fuera de rango y grillas de más de 64 combinaciones.
    - **Referencia de configuración (opcional):** una configuración con la política de alerta y los hiperparámetros a probar. Por ejemplo, para deserción semestral a 4 años:
 
      | Algoritmo | Referencia de configuración |
