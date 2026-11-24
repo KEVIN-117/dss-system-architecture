@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.11.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.10.0...admin-portal-v1.11.0) (2026-11-24)
+
+
+### Features
+
+* **prediction-service:** catálogo de tareas ML y eliminación del requisito DSA ([#389](https://github.com/KEVIN-117/dss-system-architecture/issues/389)) ([cb7f6e0](https://github.com/KEVIN-117/dss-system-architecture/commit/cb7f6e016877a58df1c3ca229db8fcaff1376460))
+
 ## [1.10.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.9.0...admin-portal-v1.10.0) (2026-11-24)
 
 
