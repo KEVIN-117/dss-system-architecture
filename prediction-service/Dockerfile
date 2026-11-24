@@ -16,6 +16,7 @@ RUN pip install --no-cache-dir "uv==${UV_VERSION}" \
     && uv sync --locked --extra ml --no-dev --no-install-project
 
 COPY --chown=app:app access_policy.py config.py main.py dataset_contract.py feature_contract.py inference.py inference_adapters.py ./
+COPY --chown=app:app ml_tasks/ ./ml_tasks/
 COPY --chown=app:app training/ ./training/
 
 ENV PATH="/app/.venv/bin:${PATH}" \

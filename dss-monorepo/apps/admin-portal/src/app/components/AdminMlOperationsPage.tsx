@@ -615,9 +615,8 @@ export function AdminMlOperationsPage() {
               onChange={(event) => setConfirmed(event.target.checked)}
             />
             <span>
-              Confirmo que el conjunto de datos y la configuración están autorizados para
-              este entrenamiento. Si uso datos institucionales, cuentan con
-              aprobación DSA vigente.
+              Confirmo que el conjunto de datos y la configuración son los correctos para
+              este entrenamiento.
             </span>
           </label>
           <DialogFooter>

@@ -28,6 +28,8 @@ from config import (
     settings,
 )
 from dataset_contract import DatasetValidationReport, validate_prepared_dataset
+from ml_tasks import list_tasks, task_for_event_type
+from ml_tasks.catalog import event_code_pattern, event_type_pattern
 from training.job_store import IdempotencyConflict, JobStore
 from training.model_registry import InvalidModelArtifact, ModelRegistry, NoActiveModel
 import access_policy
@@ -101,7 +103,7 @@ class PredictionRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     contract_version: str = Field(pattern=r"^1\.0$")
-    event_type: str = Field(default="program_dropout", pattern=r"^(course_abandonment|program_dropout)$")
+    event_type: str = Field(default="program_dropout", pattern=event_type_pattern())
     subject_ref: str = Field(min_length=1, max_length=128)
     program_ref: str = Field(min_length=1, max_length=64)
     course_ref: str | None = Field(default=None, min_length=1, max_length=128)
@@ -109,10 +111,11 @@ class PredictionRequest(BaseModel):
 
     @model_validator(mode="after")
     def validate_event_scope(self):
-        if self.event_type == "course_abandonment" and not self.course_ref:
-            raise ValueError("course_ref is required for course_abandonment")
-        if self.event_type == "program_dropout" and self.course_ref is not None:
-            raise ValueError("course_ref is only valid for course_abandonment")
+        task = task_for_event_type(self.event_type)
+        if task.requires_course_ref and not self.course_ref:
+            raise ValueError(f"course_ref is required for {self.event_type}")
+        if not task.requires_course_ref and self.course_ref is not None:
+            raise ValueError("course_ref is only valid for course-level events")
         return self
 
 
@@ -123,7 +126,7 @@ class PredictionResponse(BaseModel):
     prediction_id: UUID
     subject_ref: str
     program_ref: str
-    event_type: str = Field(default="program_dropout", pattern=r"^(course_abandonment|program_dropout)$")
+    event_type: str = Field(default="program_dropout", pattern=event_type_pattern())
     course_ref: str | None = None
     event_code: str
     predicted_class: str = Field(pattern=r"^(POSITIVE_EVENT|NEGATIVE_EVENT)$")
@@ -635,6 +638,55 @@ def _authenticate_ml_operator(authorization: str | None) -> Principal:
     if not access_policy.has_permission(principal, access_policy.PREDICTION_TRAIN):
         raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The account cannot operate model training or datasets.")
     return principal
+
+
+class MlTaskSummary(BaseModel):
+    """Prediction task (target) from the catalog, for admin portal forms."""
+    code: str
+    kind: str
+    subject: str
+    grain: str
+    title: str
+    description: str
+    target_field: str
+    target_label: str
+    population_label: str
+    algorithms: list[str]
+    primary_metric: str
+    cadences: list[str]
+    positive_class: str | None = None
+    negative_class: str | None = None
+    serving_event_type: str | None = None
+    servable: bool
+    requires_course_ref: bool
+    extractable: bool
+    definition_version: str
+    target_definition_ref: str
+    population_definition_ref: str
+    sources: list[str]
+
+
+@app.get(
+    "/v1/ml-tasks",
+    response_model=list[MlTaskSummary],
+    summary="Listar el catálogo de tareas de predicción",
+    description="Requiere el permiso prediction:train. Objetivos que se pueden extraer, entrenar y servir.",
+    responses={
+        401: COMMON_ERROR_RESPONSES[401],
+        403: COMMON_ERROR_RESPONSES[403],
+        503: COMMON_ERROR_RESPONSES[503],
+    },
+)
+def list_ml_tasks(
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "ML task catalog request rejected")
+    return [task.to_public() for task in list_tasks()]
 
 
 @app.post(
@@ -1166,7 +1218,7 @@ class ModelActivationRequest(BaseModel):
 
 class ModelDeactivationRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    event_code: str = Field(pattern=r"^(COURSE_ABANDONMENT|PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE)$")
+    event_code: str = Field(pattern=event_code_pattern())
     cadence: str = Field(pattern=r"^(ANUAL|SEMESTRAL)$")
     reason: str = Field(min_length=3, max_length=500)
 

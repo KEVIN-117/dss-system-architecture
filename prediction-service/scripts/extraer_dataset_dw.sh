@@ -4,16 +4,15 @@
 # Uso (Git Bash, desde cualquier carpeta):
 #   bash prediction-service/scripts/extraer_dataset_dw.sh \
 #       --cadencia SEMESTRAL --horizonte 4 --salida outputs/datasets/desercion-4a \
-#       [--ref-objetivo dsa:objetivo:AAAA-NNN:vN --ref-poblacion dsa:poblacion:AAAA-NNN:vN]
+#       [--ref-objetivo <ref> --ref-poblacion <ref>]
 #
-# Sin referencias, el dataset sale NO aprobado: sirve para exploración, pero el
-# portal lo rechaza. Con referencias, cada una tiene que estar registrada con
-# estado APROBADA en docs/prediction/decisiones-dsa/README.md. El script no
-# acepta una referencia que no esté en el registro.
+# El objetivo y la población salen del catálogo de tareas (ml_tasks): no se
+# requiere aprobación DSA. Las referencias opcionales solo reemplazan las
+# referencias catalog: por defecto.
 # Al terminar deja también <salida>.zip, listo para subir.
 set -euo pipefail
 
-usage() { sed -n '2,13p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
+usage() { sed -n '2,12p' "$0" | sed 's/^# \{0,1\}//'; exit "${1:-2}"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
 
 CADENCIA="" HORIZONTE="" SALIDA="" REF_OBJ="" REF_POB=""
@@ -38,31 +37,12 @@ esac
 [ -z "$HORIZONTE" ] || [[ "$HORIZONTE" =~ ^[1-9][0-9]*$ ]] || die "--horizonte debe ser un entero positivo (años)"
 
 REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-REGISTRO="$REPO/docs/prediction/decisiones-dsa/README.md"
 case "$SALIDA" in /*|[A-Za-z]:*) ;; *) SALIDA="$PWD/$SALIDA" ;; esac
 [ ! -e "$SALIDA" ] || die "la carpeta de salida ya existe: $SALIDA (los datasets no se sobrescriben)"
 
-# Una referencia solo es válida si el registro DSA la tiene con estado APROBADA.
-ref_aprobada() {
-    local ref="$1" tipo="$2"
-    [[ "$ref" == "dsa:$tipo:"* ]] || die "la referencia '$ref' debe empezar con dsa:$tipo:"
-    awk -F'|' -v ref="$ref" '
-        { gsub(/[ `]/, "", $2); gsub(/ /, "", $5) }
-        $2 == ref && $5 == "APROBADA" { found = 1 }
-        END { exit !found }' "$REGISTRO" \
-        || die "'$ref' no está registrada como APROBADA en docs/prediction/decisiones-dsa/README.md. No se puede marcar el dataset como aprobado sin una decisión DSA registrada."
-}
-
 APROBACION=()
-if [ -n "$REF_OBJ$REF_POB" ]; then
-    [ -n "$REF_OBJ" ] && [ -n "$REF_POB" ] || die "pasa las dos referencias (--ref-objetivo y --ref-poblacion), o ninguna"
-    ref_aprobada "$REF_OBJ" objetivo
-    ref_aprobada "$REF_POB" poblacion
-    APROBACION=(--dsa-approved --target-definition-ref "$REF_OBJ" --population-definition-ref "$REF_POB")
-    echo "Referencias verificadas en el registro DSA."
-else
-    echo "AVISO: sin referencias DSA. El dataset saldrá NO aprobado (solo exploración; el portal lo rechazará)."
-fi
+[ -z "$REF_OBJ" ] || APROBACION+=(--target-definition-ref "$REF_OBJ")
+[ -z "$REF_POB" ] || APROBACION+=(--population-definition-ref "$REF_POB")
 
 docker exec postgres-dw true 2>/dev/null || die "el contenedor postgres-dw no está corriendo"
 

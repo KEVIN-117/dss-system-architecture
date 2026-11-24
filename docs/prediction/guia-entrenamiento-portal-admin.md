@@ -8,7 +8,9 @@ Proceso completo:
 2. **Comprimirlo** en un `.zip`.
 3. **Subirlo** al portal.
 4. **Entrenar** el candidato desde el portal.
-5. **Evaluar y promover**. Hoy es un comando, y requiere aprobación DSA.
+5. **Activar** el candidato desde el portal (o promover/revertir por comando).
+
+> **Desde PRED-101 no se requiere aprobación DSA.** El objetivo y la población de cada tarea están definidos en el catálogo de tareas (`prediction-service/ml_tasks/`, consultable en `GET /v1/ml-tasks`). Basta el permiso `prediction:train`; quién activa, cuándo y con qué motivo queda auditado en el registro de modelos. Los modelos entrenados con datos sintéticos siguen sin poder activarse.
 
 ## 0. Requisitos previos
 
@@ -16,7 +18,6 @@ Proceso completo:
 |---|---|
 | Cuenta con rol `SUPERADMIN` | Solo esa cuenta ve **Operaciones ML** en el menú. El servicio de predicción exige el permiso `prediction:train`, que SUPERADMIN incluye. |
 | DW cargado con los cortes a usar | En el portal admin, **Cierres académicos**: los cortes deben estar en `PROCESADO`. **Ejecuciones ETL**: la última ejecución de cada corte debe ser `EXITOSA`. |
-| Definición del objetivo y de la población **aprobadas por DSA** | Necesitas las dos referencias de esas aprobaciones, registradas en [decisiones-dsa](decisiones-dsa/README.md). Sin ellas el portal rechaza el dataset (ver paso 3). No se inventan referencias. |
 | Entorno local | Git Bash, `uv`, Python y Docker con el contenedor `postgres-dw` corriendo. El DW debe estar accesible en `localhost:5434`. |
 
 ## 1. Extraer el dataset del DW (script)
@@ -26,17 +27,14 @@ El portal todavía no extrae datos del DW. La extracción y el `.zip` se hacen c
 Desde la raíz del repositorio:
 
 ```bash
-bash prediction-service/scripts/extraer_dataset_dw.sh --cadencia SEMESTRAL --horizonte 4 --salida outputs/datasets/desercion-4a --ref-objetivo "dsa:objetivo:2026-001:v1" --ref-poblacion "dsa:poblacion:2026-002:v1"
+bash prediction-service/scripts/extraer_dataset_dw.sh --cadencia SEMESTRAL --horizonte 4 --salida outputs/datasets/desercion-4a
 ```
 
-Con otras decisiones aprobadas, cambia las dos referencias (`<REF_OBJETIVO_DSA>`, `<REF_POBLACION_DSA>`) por las que correspondan.
-
 El script:
-1. **Verifica las referencias.** Cada una tiene que estar en el [registro de decisiones DSA](decisiones-dsa/README.md) con estado `APROBADA`. Si no está, se detiene sin extraer nada.
-2. **Arma la lista de carreras** de la cadencia elegida desde el DW.
-3. **Lee las credenciales del DW** del contenedor `postgres-dw`, sin mostrarlas.
-4. **Ejecuta el extractor** (`training.dw_extract`).
-5. **Deja el `.zip` listo** junto a la carpeta. Por ejemplo, `outputs/datasets/desercion-4a.zip`, con `manifest.json` y `rows.jsonl` en la raíz.
+1. **Arma la lista de carreras** de la cadencia elegida desde el DW.
+2. **Lee las credenciales del DW** del contenedor `postgres-dw`, sin mostrarlas.
+3. **Ejecuta el extractor** (`training.dw_extract`).
+4. **Deja el `.zip` listo** junto a la carpeta. Por ejemplo, `outputs/datasets/desercion-4a.zip`, con `manifest.json` y `rows.jsonl` en la raíz.
 
 Con el historial completo tarda unos 15–20 minutos.
 
@@ -45,24 +43,17 @@ Con el historial completo tarda unos 15–20 minutos.
 | `--cadencia SEMESTRAL` / `ANUAL` | Qué carreras entran: régimen `S` o `A`. Cada cadencia es un modelo distinto, no se mezclan |
 | `--horizonte 4` | Un estudiante cuenta como desertor si no vuelve a cursar en su carrera dentro de los 4 años siguientes al corte. Los cortes cuyo horizonte todavía no está en el DW se excluyen solos. Sin esta opción, el objetivo es "no está en el corte siguiente" |
 | `--salida <carpeta>` | Carpeta **nueva**. El script no sobrescribe un dataset existente |
-| `--ref-objetivo`, `--ref-poblacion` | Las referencias de las decisiones DSA, siempre las dos juntas. Sin ellas, el dataset sale **no aprobado**: sirve para explorar, pero el portal lo rechaza |
+| `--ref-objetivo`, `--ref-poblacion` | Opcionales. Reemplazan las referencias por defecto del catálogo (`catalog:<TAREA>:target:v1` y `catalog:<TAREA>:population:v1`). Solo sirven como etiqueta de trazabilidad: no cambian los datos ni bloquean el dataset |
 
-**De dónde salen `<REF_OBJETIVO_DSA>` y `<REF_POBLACION_DSA>`:**
-- Son los identificadores de dos decisiones formales de DSA (PRED-002, punto "Decisiones que requieren aprobación DSA"):
-  - **Objetivo:** qué es "riesgo" (por ejemplo, deserción a 4 años), sus clases y su horizonte.
-  - **Población:** qué estudiantes y cortes entran y cuáles se excluyen.
-- Tienen la forma `dsa:<tipo>:<AAAA>-<NNN>:v<versión>`, y solo valen las que tienen estado `APROBADA` en el [registro de decisiones DSA](decisiones-dsa/README.md). Ahí están el formato, la plantilla para registrar una decisión y las propuestas que esperan aprobación.
-- **No cambian los datos extraídos.** La definición real la ponen las opciones (`--horizonte`, `--cadencia`). Las referencias dejan constancia de qué decisión DSA autoriza esa definición, y se copian al dataset, al modelo y a la evaluación.
-- **Decisiones aprobadas hoy** para deserción semestral a 4 años: `dsa:objetivo:2026-001:v1` y `dsa:poblacion:2026-002:v1`. La política del 20 % (`dsa:politica:2026-003:v1`) se aplica en el entrenamiento, no en la extracción (ver el paso 4). Cualquier referencia que no esté en el registro con estado `APROBADA` se rechaza.
-- El extractor de Python, usado directamente, acepta cualquier texto no vacío en `--target-definition-ref` y `--population-definition-ref`. Por eso conviene usar siempre el script, que valida las referencias contra el registro.
+**Referencias de objetivo y población:** el manifest siempre lleva `target_definition_ref` y `population_definition_ref`. Por defecto apuntan a la definición de la tarea en el catálogo (`ml_tasks`). La definición real la ponen las opciones (`--horizonte`, `--cadencia`) y queda descrita en `target_definition`.
 
 Los estudiantes salen con pseudónimos. El archivo no contiene identificadores reales.
 
 ## 2. Revisar el resultado
 
 El script termina mostrando la carpeta, la cantidad de filas y la ruta del `.zip`. Antes de subirlo, revisa en `manifest.json`:
-- `target_approved` y `eligibility_approved` están en `true`, y las referencias son las que esperabas.
-- `target_definition` describe el objetivo aprobado; por ejemplo, `horizon_years` coincide con la decisión.
+- Las referencias `target_definition_ref` y `population_definition_ref` son las esperadas (por defecto, `catalog:...`).
+- `target_definition` describe el objetivo; por ejemplo, `horizon_years` coincide con el horizonte pedido.
 
 El servicio limita el tamaño del archivo subido y el del contenido descomprimido. Si el portal responde **413**, el dataset es demasiado grande para la configuración actual del servicio.
 
@@ -77,7 +68,7 @@ El servicio valida el dataset contra el contrato de datos antes de guardarlo. Si
 
 | Respuesta | Qué significa | Qué hacer |
 |---|---|---|
-| `TARGET_NOT_APPROVED` / `POPULATION_NOT_APPROVED` (422) | Faltan la aprobación DSA o sus referencias | Repite el paso 1 con `--ref-objetivo` y `--ref-poblacion` de decisiones aprobadas |
+| `TARGET_DEFINITION_INCOMPLETE` (422) | El manifest no declara `target_field` y `target_definition` con sus clases | Vuelve a extraer con el script; no edites el manifest a mano |
 | `DATASET_CONTRACT_VIOLATION` (422), otros códigos | El contenido no cumple el contrato | Lee los códigos del mensaje. No edites `rows.jsonl` a mano: corrige el origen y vuelve a extraer |
 | `DATASET_ALREADY_EXISTS` (409) | Ese `dataset_id` ya se subió | Los datasets no se pueden modificar. Una extracción nueva genera otro `dataset_id` |
 | `INVALID_FILE_TYPE` (400) | No es un `.zip` | Repite el paso 2 |
@@ -89,15 +80,15 @@ El servicio valida el dataset contra el contrato de datos antes de guardarlo. Si
 2. Elige:
    - **Conjunto de datos de entrenamiento:** el `custom:<dataset_id>` del paso 3.
    - **Algoritmo:** Random Forest o XGBoost. Para comparar, lanza un entrenamiento por cada algoritmo con el mismo dataset.
-   - **Referencia de configuración:** la configuración que aplica la política de alerta aprobada. Para deserción semestral a 4 años:
+   - **Referencia de configuración (opcional):** una configuración con la política de alerta y los hiperparámetros a probar. Por ejemplo, para deserción semestral a 4 años:
 
      | Algoritmo | Referencia de configuración |
      |---|---|
      | Random Forest | `desercion-semestral-4a-rf-v1` |
      | XGBoost | `desercion-semestral-4a-xgb-v1` |
 
-     Cada configuración es un archivo `.json` en `infra/prediction-configurations/`. Contiene la política del 20 % (`dsa:politica:2026-003:v1`) y los hiperparámetros a probar. Esos archivos no se suben a git, así que en otra máquina hay que crearlos de nuevo con el mismo contenido. **La referencia es obligatoria con datos reales.** Si la dejas vacía, el trabajo termina en `FAILED` con "Institutional evaluation requires an approved DSA decision_policy": el sistema no evalúa un modelo institucional sin una política aprobada.
-3. Revisa el resumen. Marca la confirmación de que el dataset está autorizado y tiene aprobación DSA vigente, y confirma.
+     Cada configuración es un archivo `.json` en `infra/prediction-configurations/`, con una `decision_policy` (por ejemplo, la política del 20 % de alertas) y los hiperparámetros a probar. Esos archivos no se suben a git, así que en otra máquina hay que crearlos de nuevo con el mismo contenido. **Si la dejas vacía**, el umbral se elige en validación por recall y luego F1 (`threshold_origin: validation_recall_then_f1`) con la grilla de hiperparámetros por defecto.
+3. Revisa el resumen y confirma.
 
 **Seguimiento:**
 - La tabla muestra **Solicitud**, **Algoritmo**, **Conjunto de datos**, **Estado** y **Candidato**.
@@ -113,9 +104,16 @@ El servicio valida el dataset contra el contrato de datos antes de guardarlo. Si
 
 Un `SUCCEEDED` **no activa** el modelo: el candidato queda registrado, pero no sirve predicciones.
 
-## 5. Evaluar y promover (comando, con aprobación DSA)
+## 5. Activar el candidato
 
-**No existe una opción de promoción en el portal, y es intencional.** La promoción la hace un operador con el CLI del registro de modelos, y solo si se cumple todo esto:
+En **Servicio de aprendizaje automático → Validación de modelos**, elige el candidato y pulsa **Activar**. Debes escribir un motivo. El registro guarda quién lo activó, cuándo y por qué, y el modelo pasa a servir predicciones para su evento y cadencia. **Desactivar** deja el alcance sin modelo activo.
+
+- Se puede activar cualquier candidato entrenado con datos reales (incluidos los antiguos datasets marcados como exploratorios). No se requiere aprobación DSA.
+- Los candidatos entrenados con datos **sintéticos** no se pueden activar.
+
+### Promover o revertir por comando
+
+La promoción por CLI del registro de modelos sigue disponible para operadores, y exige:
 
 - Hay un reporte de evaluación PRED-004 con decisión `APTO` y `deployment_allowed: true`.
 - El reporte selecciona un único candidato, y coincide exactamente con su `model_id`, su `version` y su `artifact_digest`.
@@ -130,8 +128,7 @@ El procedimiento, el rollback y las causas para volver a evaluar están en [PRED
 |---|---|
 | Extraer el dataset del DW | Solo por comando (paso 1) |
 | Entrenar el modelo de **reprobación de materia** | Los entrenamientos del portal solo preparan datasets de deserción. El modelo por materia se entrena por comando, con la preparación por evento (`prepare_event_dataset`) |
-| Entrenamientos **exploratorios**, sin aprobación DSA | Solo por comando. El portal los rechaza a propósito. Sus resultados quedan marcados `exploratory_unapproved` y nunca se pueden promover |
-| Promover o hacer rollback | Solo por comando, con evaluación PRED-004 aprobada (paso 5) |
+| Comparar candidatos o hacer rollback | Solo por comando (paso 5); pasa al portal con PRED-105 y PRED-107 |
 | Cancelar un entrenamiento | Solo por la API del servicio (paso 4) |
 | Ver los trabajos lanzados desde otro navegador | No disponible: la lista se guarda en el navegador que los lanzó |
 
@@ -141,4 +138,4 @@ El procedimiento, el rollback y las causas para volver a evaluar están en [PRED
   - Verifica en **Ejecuciones ETL** que todos terminaron `EXITOSA`.
   - Reinicia el servicio OLAP para que los portales los muestren. El reinicio no afecta al entrenamiento, que lee directamente del DW.
 - **Un dataset es una foto fija.** Para incorporar cortes nuevos hay que extraer, subir y entrenar otra vez.
-- **Si cambian las variables, el objetivo o la población**, PRED-005 exige repetir la evaluación PRED-004 antes de promover.
+- **Si cambian las variables, el objetivo o la población**, cambia el digest del contrato de features: hay que extraer y entrenar de nuevo, y activar el nuevo candidato.

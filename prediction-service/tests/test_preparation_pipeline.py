@@ -79,13 +79,11 @@ class PreparationPipelineTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, "At least two distinct academic periods"):
             prepare_dataset(self.manifest, rows)
 
-    def test_unapproved_target_raises_error(self) -> None:
-        bad_manifest = dict(self.manifest)
-        bad_manifest["target_approved"] = False
-
-        with self.assertRaises(ValueError) as ctx:
-            prepare_dataset(bad_manifest, self.rows)
-        self.assertIn("target_approved", str(ctx.exception))
+    def test_dsa_approval_is_not_required(self) -> None:
+        manifest = dict(self.manifest)
+        manifest.update(target_approved=False, eligibility_approved=False)
+        partition = prepare_dataset(manifest, self.rows, seed=42, test_ratio=0.25)
+        self.assertGreater(len(partition.X_train), 0)
 
     def test_exploratory_run_prepares_without_approval_and_is_marked(self) -> None:
         manifest = dict(self.manifest)
@@ -98,8 +96,8 @@ class PreparationPipelineTests(unittest.TestCase):
         manifest = dict(self.manifest)
         manifest.update(target_approved=False, fixture_only=False, exploratory_only=True,
                         snapshot_ref="dw:institutional")
-        with self.assertRaisesRegex(ValueError, "target_approved"):
-            prepare_dataset(manifest, self.rows)
+        partition = prepare_dataset(manifest, self.rows, seed=42, test_ratio=0.25)
+        self.assertNotEqual(partition.partition_metadata["evidence_kind"], "exploratory_unapproved")
 
     def test_reproducible_with_same_seed(self) -> None:
         p1 = prepare_dataset(self.manifest, self.rows, seed=42)

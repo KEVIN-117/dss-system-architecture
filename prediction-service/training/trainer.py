@@ -22,6 +22,7 @@ from sklearn.model_selection import StratifiedGroupKFold
 from threadpoolctl import threadpool_limits
 from xgboost import XGBClassifier
 
+from ml_tasks import UnknownTask, get_task
 from preparation.balancer import BalanceReport, _class_distribution, apply_smote_if_warranted
 from preparation.pipeline import PreparedPartition, build_preprocessing_pipeline
 from evaluation.metrics import classification_metrics
@@ -150,12 +151,13 @@ def _fold_count(y: pd.Series, groups: pd.Series, requested: int) -> int:
     return min(requested, int(class_counts.min()), *(int(value) for value in groups_per_class))
 
 
-def _validated_decision_policy(config: dict[str, Any], exploratory: bool = False) -> dict[str, Any] | None:
-    """Approved cost policy, or an alert-rate policy (share of rows flagged).
+def _validated_decision_policy(config: dict[str, Any]) -> dict[str, Any] | None:
+    """Error-cost policy, or an alert-rate policy (share of rows flagged).
 
     An alert-rate policy (``alert_rate`` in (0, 1)) sets the threshold so that
     that share of validation rows is flagged; it models a fixed intervention
-    capacity. Exploratory runs may use an unapproved alert-rate policy only.
+    capacity. No external DSA approval is required; ``policy_ref`` is an
+    optional label kept for traceability.
     """
     policy = config.get("decision_policy")
     if policy is None:
@@ -166,12 +168,9 @@ def _validated_decision_policy(config: dict[str, Any], exploratory: bool = False
         rate = policy["alert_rate"]
         if isinstance(rate, bool) or not isinstance(rate, (int, float)) or not 0 < float(rate) < 1:
             raise ValueError("decision_policy.alert_rate must be a number between 0 and 1.")
-        approved = policy.get("approved") is True and isinstance(policy.get("policy_ref"), str) and policy["policy_ref"].strip()
-        if not approved and not exploratory:
-            raise ValueError("decision_policy requires approved=true and a non-empty DSA policy_ref.")
-        return {**policy, "kind": "alert_rate", "alert_rate": float(rate), "approved": bool(approved)}
-    if policy.get("approved") is not True or not isinstance(policy.get("policy_ref"), str) or not policy["policy_ref"].strip():
-        raise ValueError("decision_policy requires approved=true and a non-empty DSA policy_ref.")
+        return {**policy, "kind": "alert_rate", "alert_rate": float(rate)}
+    if "policy_ref" in policy and not (isinstance(policy["policy_ref"], str) and policy["policy_ref"].strip()):
+        raise ValueError("decision_policy.policy_ref must be a non-empty string when given.")
     costs = {}
     for name in ("false_negative_cost", "false_positive_cost"):
         value = policy.get(name)
@@ -214,10 +213,10 @@ def _select_validation_threshold(y_true: list[int], probabilities: list[float], 
 
 def _threshold_origin(policy: dict[str, Any] | None) -> str:
     if policy is None:
-        return "validation_recall_then_f1_descriptive; DSA cost policy pending"
+        return "validation_recall_then_f1"
     if policy["kind"] == "alert_rate":
-        return "approved_validation_alert_rate_policy" if policy["approved"] else "unapproved_exploratory_alert_rate_policy"
-    return "approved_validation_cost_policy"
+        return "validation_alert_rate_policy"
+    return "validation_cost_policy"
 
 
 def _select_validation_threshold_by_metrics(y_true: list[int], probabilities: list[float]) -> float:
@@ -283,10 +282,7 @@ def train_model(
         raise ValueError("cpu_limit must be >= 1 and cv_splits must be >= 2.")
 
     y_train, y_test, target_meta = _encode_targets(partition)
-    decision_policy = _validated_decision_policy(
-        config, exploratory=partition.partition_metadata.get("evidence_kind") == "exploratory_unapproved")
-    if partition.partition_metadata.get("evidence_kind") not in {"synthetic_fixture", "exploratory_unapproved"} and decision_policy is None:
-        raise ValueError("Institutional evaluation requires an approved DSA decision_policy before the final test is opened.")
+    decision_policy = _validated_decision_policy(config)
     groups = partition.train_groups.reset_index(drop=True)
     x_train = partition.X_train.reset_index(drop=True)
     y_train = y_train.reset_index(drop=True)
@@ -408,9 +404,13 @@ def train_model(
     version = f"{algorithm}-{datetime.now(timezone.utc).strftime('%Y%m%d%H%M%S')}-{seed}"
     serving_scope = None
     cadence = partition.partition_metadata.get("cadence")
-    if target_meta["event_code"] in {"COURSE_ABANDONMENT", "PROGRAM_DROPOUT_NEXT_EXPECTED_CLOSURE"} and cadence in {"ANUAL", "SEMESTRAL"}:
+    try:
+        task = get_task(target_meta["event_code"])
+    except UnknownTask:
+        task = None
+    if task is not None and task.servable and cadence in task.cadences:
         serving_scope = {
-            "event_type": "course_abandonment" if target_meta["event_code"] == "COURSE_ABANDONMENT" else "program_dropout",
+            "event_type": task.serving_event_type,
             "cadence": cadence,
             "evaluation_unit": partition.partition_metadata.get("evaluation_unit"),
         }

@@ -91,8 +91,11 @@ class AdminActivationTests(unittest.TestCase):
         self.assertEqual(models["model-a"]["confusion_matrix"]["values"], [[78, 9], [5, 8]])
         self.assertEqual([c["class_name"] for c in models["model-a"]["per_class"]], ["NO_RISK", "RISK"])
         self.assertEqual(models["model-a"]["scope_key"], f"{EVENT}|SEMESTRAL")
-        self.assertFalse(models["model-b"]["activatable"])
-        self.assertIn("exploratorios", models["model-b"]["not_activatable_reason"])
+        # Without the DSA requirement, real exploratory data is activatable;
+        # only synthetic fixtures stay blocked.
+        self.assertTrue(models["model-b"]["activatable"])
+        self.assertIsNone(models["model-b"]["not_activatable_reason"])
+        self.assertEqual(models["model-b"]["dataset"]["evidence_kind"], "exploratory_unapproved")
         self.assertFalse(models["model-c"]["activatable"])
         self.assertIn("sintéticos", models["model-c"]["not_activatable_reason"])
 
@@ -109,14 +112,20 @@ class AdminActivationTests(unittest.TestCase):
         # The model keeps loading after a restart of the registry.
         self.assertEqual(ModelRegistry(self.root).active(EVENT, "SEMESTRAL").model_id, "model-a")
 
-    def test_unapproved_data_cannot_be_activated(self) -> None:
-        self._candidate("explore", "model-b", dataset={**APPROVED_DATASET, "exploratory_only": True})
+    def test_synthetic_data_cannot_be_activated(self) -> None:
         self._candidate("synthetic", "model-c", dataset={**APPROVED_DATASET, "fixture_only": True})
-        self._candidate("norefs", "model-d", dataset={"dataset_ref": "custom:x", "dataset_digest": "d", "fixture_only": False})
-        for model_id in ("model-b", "model-c", "model-d"):
-            with self.assertRaises(InvalidModelArtifact):
-                self.registry.activate(model_id, "v1", "admin-subject", "intento")
+        with self.assertRaises(InvalidModelArtifact):
+            self.registry.activate("model-c", "v1", "admin-subject", "intento")
         self.assertFalse(self.registry.active_path.exists())
+
+    def test_real_data_without_dsa_references_can_be_activated(self) -> None:
+        self._candidate("explore", "model-b", dataset={**APPROVED_DATASET, "exploratory_only": True})
+        self._candidate("norefs", "model-d", version="v2",
+                        dataset={"dataset_ref": "custom:x", "dataset_digest": "d", "fixture_only": False})
+        self.registry.activate("model-b", "v1", "admin-subject", "Exploratorio sin DSA")
+        self.assertEqual(self.registry.active(EVENT, "SEMESTRAL").model_id, "model-b")
+        self.registry.activate("model-d", "v2", "admin-subject", "Sin referencias DSA")
+        self.assertEqual(self.registry.active(EVENT, "SEMESTRAL").model_id, "model-d")
 
     def test_activation_requires_operator_and_reason(self) -> None:
         self._candidate("approved", "model-a")
@@ -154,7 +163,7 @@ class AdminActivationTests(unittest.TestCase):
         pointer = self.registry.activate("model-a", "v1", "admin-subject", "activar")
         record = self.root / pointer["approval_report_ref"]
         data = json.loads(record.read_text(encoding="utf-8"))
-        data["evidence_kind"] = "exploratory_unapproved"
+        data["evidence_kind"] = "synthetic_fixture"
         record.write_text(json.dumps(data), encoding="utf-8")
         with self.assertRaises(InvalidModelArtifact):
             ModelRegistry(self.root).active(EVENT, "SEMESTRAL")

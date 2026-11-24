@@ -7,10 +7,9 @@ the feature contract digest, which training copies into the model bundle and
 serving verifies, so a model can only be served with features computed exactly
 as they were during training.
 
-Target and population approval are never asserted by this tool: the manifest is
-marked DSA-approved only when the operator passes ``--dsa-approved`` together
-with both approved definition references. Without them the dataset is valid but
-BLOCKED by the prepared-dataset contract.
+Target and population definitions come from the task catalog (``ml_tasks``):
+the manifest carries ``catalog:`` references to them unless the operator passes
+explicit ``--target-definition-ref`` / ``--population-definition-ref`` values.
 
 Usage (read-only DW connection):
     python -m training.dw_extract --program P01 --cadence SEMESTRAL --output /app/custom-datasets/<uuid>
@@ -31,6 +30,7 @@ from typing import Any, Iterable, Mapping
 from uuid import uuid4
 
 from dataset_contract import compute_snapshot_digest, validate_prepared_dataset
+from ml_tasks import get_task
 from feature_contract import (
     CADENCE_BY_REGIME,
     CADENCE_PERIODS,
@@ -127,7 +127,6 @@ def build_program_dropout_snapshot(
     cuts: list[Mapping[str, Any]],
     target_definition_ref: str | None = None,
     population_definition_ref: str | None = None,
-    dsa_approved: bool = False,
     pseudonym_key: bytes | None = None,
     dropout_horizon_years: int | None = None,
 ) -> tuple[dict[str, Any], list[dict[str, Any]]]:
@@ -204,7 +203,9 @@ def build_program_dropout_snapshot(
     rows.sort(key=lambda item: (item["student_ref"], item["program_ref"], item["cut_id"]))
 
     latest = max(cuts, key=lambda cut: (str(cut["effective_at"]), str(cut["closure_id"])))
-    approved = bool(dsa_approved and target_definition_ref and population_definition_ref)
+    task = get_task(PROGRAM_DROPOUT_EVENT)
+    target_definition_ref = target_definition_ref or task.target_definition_ref
+    population_definition_ref = population_definition_ref or task.population_definition_ref
     dataset_id = str(uuid4())
     programs = [program_ref] if isinstance(program_ref, str) else list(program_ref)
     manifest: dict[str, Any] = {
@@ -240,8 +241,8 @@ def build_program_dropout_snapshot(
         },
         "target_definition_ref": target_definition_ref,
         "population_definition_ref": population_definition_ref,
-        "target_approved": approved,
-        "eligibility_approved": approved,
+        "target_approved": True,
+        "eligibility_approved": True,
         "fixture_only": False,
         "feature_contract": contract_reference(PROGRAM_DROPOUT_EVENT, feature_names),
         "content_digest": compute_snapshot_digest(rows),
@@ -299,8 +300,6 @@ def main() -> None:
     parser.add_argument("--output", required=True, type=Path, help="New directory for manifest.json and rows.jsonl.")
     parser.add_argument("--target-definition-ref")
     parser.add_argument("--population-definition-ref")
-    parser.add_argument("--dsa-approved", action="store_true",
-                        help="Assert that both referenced definitions were approved by DSA.")
     parser.add_argument("--dropout-horizon-years", type=int,
                         help="Label DESERTOR when the student does not return to the program within N years "
                              "(default: the DW next-cut retention outcome).")
@@ -308,14 +307,12 @@ def main() -> None:
     args = parser.parse_args()
     if not args.dsn:
         parser.error("Set PREDICTION_DW_DATABASE_URL or pass --dsn (read-only DW connection).")
-    if args.dsa_approved and not (args.target_definition_ref and args.population_definition_ref):
-        parser.error("--dsa-approved requires --target-definition-ref and --population-definition-ref.")
     features = args.feature or list(PROGRAM_DROPOUT_FEATURES)
     contract_rows, cuts = extract_from_dw(args.dsn, args.program, args.cadence, features)
     manifest, rows = build_program_dropout_snapshot(
         contract_rows, program_ref=args.program, cadence=args.cadence, feature_names=features, cuts=cuts,
         target_definition_ref=args.target_definition_ref, population_definition_ref=args.population_definition_ref,
-        dsa_approved=args.dsa_approved, dropout_horizon_years=args.dropout_horizon_years,
+        dropout_horizon_years=args.dropout_horizon_years,
     )
     write_snapshot(args.output, manifest, rows)
     report = validate_prepared_dataset(manifest, rows)
