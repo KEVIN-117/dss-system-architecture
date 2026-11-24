@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.8.0...dw-migrator-v1.9.0) (2026-11-24)
+
+
+### Features
+
+* **prediction-service:** extracción de datasets por API y perfil exploratorio (EDA) ([#393](https://github.com/KEVIN-117/dss-system-architecture/issues/393)) ([37c4e57](https://github.com/KEVIN-117/dss-system-architecture/commit/37c4e57c10a9822f4819a93f43b1f8bf30441a0e))
+
 ## [1.8.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-migrator-v1.7.1...dw-migrator-v1.8.0) (2026-11-22)
 
 
