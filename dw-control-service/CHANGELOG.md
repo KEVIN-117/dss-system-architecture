@@ -7,6 +7,13 @@
 
 * **admin-portal:** sección Load Manager e indicador de ETL en el header (LM-007) ([#379](https://github.com/KEVIN-117/dss-system-architecture/issues/379)) ([58e9dd3](https://github.com/KEVIN-117/dss-system-architecture/commit/58e9dd3429ee27d8cb0294f7f765220cb3a8355f))
 
+## [1.6.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-control-service-v1.5.0...dw-control-service-v1.6.0) (2026-11-24)
+
+
+### Features
+
+* **admin-portal:** sección Load Manager e indicador de ETL en el header (LM-007) ([#379](https://github.com/KEVIN-117/dss-system-architecture/issues/379)) ([58e9dd3](https://github.com/KEVIN-117/dss-system-architecture/commit/58e9dd3429ee27d8cb0294f7f765220cb3a8355f))
+
 ## [1.5.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-control-service-v1.4.0...dw-control-service-v1.5.0) (2026-11-22)
 
 
