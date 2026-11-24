@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.5.0](https://github.com/KEVIN-117/dss-system-architecture/compare/rector-dashboard-v1.4.0...rector-dashboard-v1.5.0) (2026-11-24)
+
+
+### Features
+
+* **admin-portal:** sección Load Manager e indicador de ETL en el header (LM-007) ([#379](https://github.com/KEVIN-117/dss-system-architecture/issues/379)) ([58e9dd3](https://github.com/KEVIN-117/dss-system-architecture/commit/58e9dd3429ee27d8cb0294f7f765220cb3a8355f))
+
 ## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/rector-dashboard-v1.3.1...rector-dashboard-v1.4.0) (2026-11-22)
 
 
