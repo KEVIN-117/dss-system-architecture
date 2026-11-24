@@ -5,6 +5,7 @@ import {
   Calculator,
   ChartColumn,
   ClipboardCheck,
+  ClipboardList,
   DoorOpen,
   GraduationCap,
   Layers,
@@ -36,7 +37,7 @@ export interface AnalyticsNavGroup {
 const icon = (Icon: typeof ChartColumn) => <Icon aria-hidden="true" />;
 
 /**
- * Sidebar groups for the Admisión, Rendimiento and Permanencia panels, shared by the rector,
+ * Sidebar groups for the Admisión, Matrícula, Rendimiento and Permanencia panels, shared by the rector,
  * decano and director portals. Scoped portals call the faculty ranking
  * "Carreras" because the panel ranks careers directly for them.
  */
@@ -59,6 +60,18 @@ export function analyticsNavigation(pathname: string, scope: AcademicScopeKind =
         item('Procedencia y nacimiento', '/reportes/admision/procedencia', icon(MapPin)),
         item('Tipo de colegio', '/reportes/admision/tipo-colegio', icon(School)),
         item('Modalidad de ingreso', '/reportes/admision/modalidad', icon(DoorOpen)),
+      ],
+    },
+    {
+      title: 'Matrícula',
+      items: [
+        item('Resumen', '/reportes/matricula', icon(ClipboardList)),
+        item(scope === 'global' ? 'Facultad y carrera' : 'Carreras', '/reportes/matricula/facultades', icon(Building2)),
+        item('Nuevos y antiguos', '/reportes/matricula/tipo-estudiante', icon(UsersRound)),
+        item('Por cohorte de ingreso', '/reportes/matricula/cohortes', icon(Layers)),
+        item('Perfil del estudiante', '/reportes/matricula/perfil', icon(UserRound)),
+        item('Procedencia', '/reportes/matricula/procedencia', icon(MapPin)),
+        item('Central y sedes', '/reportes/matricula/sedes', icon(Building2)),
       ],
     },
     {
