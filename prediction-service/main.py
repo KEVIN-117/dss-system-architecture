@@ -1953,6 +1953,142 @@ def deactivate_model(
 
 
 # ---------------------------------------------------------------------------
+# PRED-105 — Model comparison, rollback and history
+# ---------------------------------------------------------------------------
+
+class ModelRollbackRequest(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+    event_code: str = Field(pattern=event_code_pattern())
+    cadence: str = Field(pattern=r"^(ANUAL|SEMESTRAL)$")
+    reason: str = Field(min_length=3, max_length=500)
+
+
+@app.get(
+    "/v1/models/compare",
+    summary="Comparar candidatos entrenados sobre la misma partición",
+    description=(
+        "Requiere el permiso prediction:train. ids: 2 a 6 model_id separados por coma. Valida que compartan dataset, "
+        "objetivo y partición, y elige solo con métricas de validación (recall/F1 o costo en clasificación, RMSE/MAE en "
+        "regresión); las métricas del test externo se muestran pero no deciden. decision_status es APTO cuando hay un "
+        "único ganador entrenado con datos reales."
+    ),
+    responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 404: COMMON_ERROR_RESPONSES[404],
+               422: COMMON_ERROR_RESPONSES[422]},
+)
+def compare_models(
+    ids: str = Query(min_length=3, max_length=1000),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    from evaluation.comparison import compare_artifacts
+
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Model comparison rejected")
+    model_ids = list(dict.fromkeys(item.strip() for item in ids.split(",") if item.strip()))
+    if not 2 <= len(model_ids) <= 6 or any(not re.fullmatch(_MODEL_ID_PATTERN, item) for item in model_ids):
+        return _make_problem(422, "Invalid comparison request", "INVALID_COMPARISON", request_id,
+                             detail="ids must list between 2 and 6 distinct model identifiers.")
+    registry = _admin_registry()
+    folders = []
+    for model_id in model_ids:
+        try:
+            folder, _ = registry.find_model(model_id)
+        except InvalidModelArtifact:
+            return _make_problem(404, "Model not found", "RESOURCE_NOT_FOUND", request_id,
+                                 detail=f"No candidate with model_id {model_id}.")
+        folders.append(folder)
+    try:
+        report = compare_artifacts(folders)
+    except (ValueError, KeyError, OSError, json.JSONDecodeError) as exc:
+        return _make_problem(422, "Candidates cannot be compared", "INCOMPARABLE_MODELS", request_id, detail=str(exc))
+    # Local artifact paths are internal; the portal identifies candidates by model_id.
+    for model in report.get("models", []):
+        model.pop("training_config", None)
+    return JSONResponse(report, headers={"Cache-Control": "no-store"})
+
+
+@app.post(
+    "/v1/models/rollback",
+    summary="Revertir al modelo activo anterior de un tipo de evento y cadencia",
+    description=(
+        "Requiere el permiso prediction:train. Restaura el modelo que estaba activo antes del actual en la cadena de "
+        "activaciones del alcance; rollbacks sucesivos siguen retrocediendo. Tras una desactivación, restaura el último "
+        "modelo activo. Exige un motivo y queda auditado. 409 si no hay versión anterior."
+    ),
+    responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 409: COMMON_ERROR_RESPONSES[409],
+               503: COMMON_ERROR_RESPONSES[503]},
+)
+def rollback_model(
+    body: ModelRollbackRequest,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        principal = _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Model rollback rejected")
+    try:
+        pointer = _admin_registry().rollback(principal.subject, body.event_code, body.cadence, body.reason)
+    except NoActiveModel as exc:
+        return _make_problem(409, "No hay versión anterior", "NO_PREVIOUS_MODEL", request_id, detail=str(exc))
+    except InvalidModelArtifact as exc:
+        return _make_problem(409, "El modelo anterior no puede restaurarse", "MODEL_NOT_RESTORABLE", request_id,
+                             detail=str(exc))
+    except (OSError, json.JSONDecodeError):
+        logger.exception("Model rollback failed request_id=%s", request_id)
+        return _make_problem(503, "Registro de modelos no disponible", "MODEL_REGISTRY_UNAVAILABLE", request_id)
+    logger.info("Scope %s|%s rolled back to %s by %s request_id=%s", body.event_code, body.cadence,
+                pointer.get("model_id"), principal.subject, request_id)
+    return JSONResponse({"active": pointer}, headers={"Cache-Control": "no-store"})
+
+
+@app.get(
+    "/v1/models/{model_id}/history",
+    summary="Historial de activaciones de un modelo",
+    description=(
+        "Requiere el permiso prediction:train. Eventos auditados del registro (ACTIVATE, PROMOTE, ROLLBACK, "
+        "DEACTIVATE) en los que el modelo pasó a estar activo o dejó de estarlo, con operador, fecha y motivo."
+    ),
+    responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 404: COMMON_ERROR_RESPONSES[404]},
+)
+def model_history(
+    model_id: str,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+    x_request_id: str | None = Header(default=None, alias="X-Request-ID"),
+) -> Any:
+    request_id = x_request_id or str(uuid4())
+    try:
+        _authenticate_ml_operator(authorization)
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Model history rejected")
+    if not re.fullmatch(_MODEL_ID_PATTERN, model_id):
+        return _make_problem(404, "Model not found", "RESOURCE_NOT_FOUND", request_id)
+    registry = _admin_registry()
+    try:
+        _, manifest = registry.find_model(model_id)
+        events = registry.model_history(model_id)
+    except InvalidModelArtifact:
+        return _make_problem(404, "Model not found", "RESOURCE_NOT_FOUND", request_id)
+    except (OSError, json.JSONDecodeError):
+        logger.exception("Model history failed request_id=%s", request_id)
+        return _make_problem(503, "Registro de modelos no disponible", "MODEL_REGISTRY_UNAVAILABLE", request_id)
+    scope = manifest.get("serving_scope") or {}
+    return JSONResponse({
+        "model_id": model_id,
+        "version": manifest.get("version"),
+        "algorithm": manifest.get("algorithm"),
+        "event_code": (manifest.get("classes") or {}).get("event_code"),
+        "cadence": scope.get("cadence"),
+        "lifecycle_state": manifest.get("lifecycle_state"),
+        "events": events,
+    }, headers={"Cache-Control": "no-store"})
+
+
+# ---------------------------------------------------------------------------
 # Run with uvicorn
 # ---------------------------------------------------------------------------
 

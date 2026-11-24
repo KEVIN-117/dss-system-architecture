@@ -414,31 +414,92 @@ class ModelRegistry:
             _atomic_json(self.active_path, {"active": pointer, "active_by_scope": active_by_scope, "events": history})
         return pointer
 
-    def rollback(self, approved_by: str, event_code: str | None = None, cadence: str | None = None) -> dict[str, Any]:
+    @staticmethod
+    def _same_model(a: dict[str, Any] | None, b: dict[str, Any] | None) -> bool:
+        return bool(a and b) and (a.get("model_id"), a.get("version")) == (b.get("model_id"), b.get("version"))
+
+    def _rollback_target(self, history: list[dict[str, Any]], scope_key: str | None,
+                         current: dict[str, Any] | None) -> dict[str, Any] | None:
+        """Model active before ``current`` in the scope's activation chain.
+
+        The chain is every ACTIVATE/PROMOTE of the scope in order; ROLLBACK and
+        DEACTIVATE events do not extend it, so successive rollbacks keep walking
+        back (A <- B <- C) instead of toggling between the last two models.
+        With no active model (after a deactivation) the last activation returns.
+        """
+        chain = [event["active"] for event in history
+                 if event.get("action") in {"ACTIVATE", "PROMOTE"} and event.get("scope_key") == scope_key
+                 and isinstance(event.get("active"), dict)]
+        if not chain:
+            return None
+        if current is None:
+            return chain[-1]
+        positions = [index for index, pointer in enumerate(chain) if self._same_model(pointer, current)]
+        if not positions:
+            return chain[-1]
+        for pointer in reversed(chain[:positions[-1]]):
+            if not self._same_model(pointer, current):
+                return pointer
+        return None
+
+    def rollback(self, approved_by: str, event_code: str | None = None, cadence: str | None = None,
+                 reason: str | None = None) -> dict[str, Any]:
+        """Restore the model that was active before the current one in a scope (audited)."""
         if not approved_by.strip():
             raise ValueError("An operator identity is required for rollback.")
+        if reason is not None and not reason.strip():
+            raise ValueError("A rollback reason cannot be blank.")
         with _registry_lock(self.lock_path):
-            state = json.loads(self.active_path.read_text(encoding="utf-8"))
-            state = state if "active" in state else {"active": state, "events": []}
-            history = state.get("events", [])
+            state = self._read_state()
+            history = list(state.get("events") or [])
             scoped = event_code is not None or cadence is not None
             if scoped and (not event_code or not cadence):
                 raise ValueError("Scoped rollback requires both event_code and cadence.")
             scope_key = self._scope_key(event_code, cadence) if scoped else None
-            previous = next((event.get("previous") for event in reversed(history)
-                             if event.get("action") in {"PROMOTE", "ROLLBACK"}
-                             and event.get("scope_key") == scope_key and event.get("previous")), None)
-            if not previous:
+            current = (state.get("active_by_scope") or {}).get(scope_key) if scoped else state.get("active")
+            target = self._rollback_target(history, scope_key, current)
+            if not target:
                 raise NoActiveModel("No previous approved version is available for rollback.")
-            self._load(previous["model_id"], previous["version"], previous["artifact_digest"], True, previous.get("manifest_digest"), previous)
-            current = state.get("active_by_scope", {}).get(scope_key) if scoped else state.get("active")
-            pointer = {**previous, "activated_at": datetime.now(timezone.utc).isoformat(), "approved_by": approved_by}
-            history.append({"action": "ROLLBACK", "scope_key": scope_key, "previous": current, "active": pointer, "approved_by": approved_by})
-            active_by_scope = dict(state.get("active_by_scope", {}))
+            folder, manifest = self._find(target["model_id"], target["version"])
+            evidence = candidate_evidence(folder)
+            if not evidence["activatable"]:
+                raise InvalidModelArtifact(evidence["not_activatable_reason"])
+            # The restored bundle must still verify against its original approval record.
+            self._load(target["model_id"], target["version"], target["artifact_digest"], True,
+                       target.get("manifest_digest"), target)
+            now = datetime.now(timezone.utc).isoformat()
+            pointer = {**target, "activated_at": now, "approved_by": approved_by}
+            event = {"action": "ROLLBACK", "scope_key": scope_key, "previous": current, "active": pointer,
+                     "approved_by": approved_by, "at": now}
+            if reason is not None:
+                event["reason"] = reason.strip()
+            history.append(event)
+            active_by_scope = dict(state.get("active_by_scope") or {})
             if scoped:
                 active_by_scope[scope_key] = pointer
             _atomic_json(self.active_path, {"active": pointer, "active_by_scope": active_by_scope, "events": history})
             return pointer
+
+    def find_model(self, model_id: str) -> tuple[Path, dict[str, Any]]:
+        """Trusted bundle folder and manifest of a model id (any version, newest first)."""
+        matches = []
+        for manifest_path in self.root.glob("*/manifest.json"):
+            if manifest_path.is_symlink() or not manifest_path.resolve().is_relative_to(self.root):
+                continue
+            manifest = _read_json(manifest_path)
+            if isinstance(manifest, dict) and manifest.get("model_id") == model_id:
+                matches.append((manifest.get("created_at") or "", manifest_path.parent, manifest))
+        if not matches:
+            raise InvalidModelArtifact("No trusted artifact matches the requested model_id.")
+        _, folder, manifest = max(matches, key=lambda item: item[0])
+        return folder, manifest
+
+    def model_history(self, model_id: str) -> list[dict[str, Any]]:
+        """Audited registry events in which the model became active or stopped being active."""
+        events = self.registry_state()["events"]
+        return [event for event in events
+                if any(isinstance(event.get(key), dict) and event[key].get("model_id") == model_id
+                       for key in ("active", "previous"))]
 
     # ------------------------------------------------------------------
     # Admin portal: inspect candidates, activate and deactivate per scope.

@@ -2,6 +2,8 @@
 
 > **Cambio PRED-101 (épica ML Studio):** ya no se requiere aprobación DSA para activar o promover un modelo. El objetivo y la población salen del catálogo de tareas (`prediction-service/ml_tasks/`); los datasets llevan referencias `catalog:<TAREA>:target|population:vN`. Cualquier candidato entrenado con datos reales es activable desde el portal con el permiso `prediction:train`, y la activación queda auditada (operador, fecha y motivo). Solo la evidencia sintética (`synthetic_fixture`) sigue bloqueada. Las menciones a DSA de este documento describen revisiones académicas recomendadas, no un requisito técnico.
 
+> **Cambio PRED-105:** el rollback se hace también por API (`POST /v1/models/rollback`, con motivo obligatorio) y ahora revierte las activaciones hechas desde el portal (`ACTIVATE`); antes solo consideraba `PROMOTE`/`ROLLBACK`. Recorre la cadena de activaciones del alcance, así que rollbacks sucesivos siguen retrocediendo en vez de alternar entre los dos últimos modelos. El historial por modelo está en `GET /v1/models/{model_id}/history` y la comparación en `GET /v1/models/compare`.
+
 ## Estados y almacenamiento
 
 El worker publica cada intento como un directorio inmutable de candidato (`/artifacts/{job_id}-attempt-{n}`). El manifiesto identifica el algoritmo, versión, snapshot/dataset, definición y orden de clases, esquema de entrada, semántica de probabilidad, configuración, dependencias y evaluación. `artifact_digest` cubre los hashes SHA-256 de todos los payloads y los metadatos inmutables del manifiesto. `manifest.json` no se auto-hashea; al aprobar, su hash se registra junto al puntero activo.
