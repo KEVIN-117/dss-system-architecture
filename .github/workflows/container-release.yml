@@ -15,6 +15,7 @@ on:
       - "olap-service/**"
       - "etl-layer/apache-hop/**"
       - "infra/dw-schema/**"
+      - "infra/dw-control-db-provision/**"
       - "infra/dw-integration/**"
       - "infra/dw-test-data/**"
       - "docs/dw/**"
@@ -40,6 +41,11 @@ on:
         default: false
       publish_dw_migrator:
         description: Republish the current DW migrator release from the manifest
+        required: false
+        type: boolean
+        default: false
+      publish_dw_control_db_provision:
+        description: Republish the current DW control DB provision release from the manifest
         required: false
         type: boolean
         default: false
@@ -163,6 +169,10 @@ jobs:
       dw_migrator_version: ${{ steps.release.outputs['infra/dw-schema--version'] || steps.manifest.outputs.dw_migrator_version }}
       dw_migrator_major: ${{ steps.release.outputs['infra/dw-schema--major'] || steps.manifest.outputs.dw_migrator_major }}
       dw_migrator_minor: ${{ steps.release.outputs['infra/dw-schema--minor'] || steps.manifest.outputs.dw_migrator_minor }}
+      dw_control_db_provision_release_created: ${{ steps.release.outputs['infra/dw-control-db-provision--release_created'] }}
+      dw_control_db_provision_version: ${{ steps.release.outputs['infra/dw-control-db-provision--version'] || steps.manifest.outputs.dw_control_db_provision_version }}
+      dw_control_db_provision_major: ${{ steps.release.outputs['infra/dw-control-db-provision--major'] || steps.manifest.outputs.dw_control_db_provision_major }}
+      dw_control_db_provision_minor: ${{ steps.release.outputs['infra/dw-control-db-provision--minor'] || steps.manifest.outputs.dw_control_db_provision_minor }}
       dw_control_service_release_created: ${{ steps.release.outputs['dw-control-service--release_created'] }}
       dw_control_service_version: ${{ steps.release.outputs['dw-control-service--version'] || steps.manifest.outputs.dw_control_service_version }}
       dw_control_service_major: ${{ steps.release.outputs['dw-control-service--major'] || steps.manifest.outputs.dw_control_service_major }}
@@ -216,6 +226,7 @@ jobs:
           olap olap-service
           hop etl-layer/apache-hop
           dw_migrator infra/dw-schema
+          dw_control_db_provision infra/dw-control-db-provision
           dw_control_service dw-control-service
           dss_bff dss-monorepo/apps/bff
           dss_admin_portal dss-monorepo/apps/admin-portal
@@ -459,6 +470,45 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha,scope=dw-migrator
           cache-to: type=gha,mode=max,scope=dw-migrator
+          sbom: true
+          provenance: mode=max
+
+  publish-dw-control-db-provision:
+    name: Publish DW Control DB Provision
+    if: >-
+      needs.release-please.outputs.dw_control_db_provision_release_created == 'true' ||
+      (github.event_name == 'workflow_dispatch' && inputs.publish_dw_control_db_provision && needs.release-please.outputs.dw_control_db_provision_version != '0.0.0')
+    needs: [verify-apache-hop, release-please]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - uses: docker/metadata-action@v5
+        id: meta
+        with:
+          images: ${{ secrets.DOCKERHUB_USERNAME }}/dss-dw-control-db-provision
+          tags: |
+            type=raw,value=${{ needs.release-please.outputs.dw_control_db_provision_version }}
+            type=raw,value=${{ needs.release-please.outputs.dw_control_db_provision_major }}
+            type=raw,value=${{ needs.release-please.outputs.dw_control_db_provision_major }}.${{ needs.release-please.outputs.dw_control_db_provision_minor }}
+            type=raw,value=latest
+            type=sha,prefix=sha-,format=short
+      - uses: docker/build-push-action@v6
+        with:
+          context: infra/dw-control-db-provision
+          push: true
+          build-args: |
+            PROVISION_VERSION=${{ needs.release-please.outputs.dw_control_db_provision_version }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=dw-control-db-provision
+          cache-to: type=gha,mode=max,scope=dw-control-db-provision
           sbom: true
           provenance: mode=max
 

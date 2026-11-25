@@ -65,9 +65,12 @@ services:
     networks:
       - dss-net
 
-  # Local Compose only: reconcile the restricted runtime login after role migrations.
+  # Reconcile the restricted runtime login after role migrations.
   dw-control-db-provision:
-    image: postgres:15-alpine
+    image: ${DOCKERHUB_USERNAME:-local}/dss-dw-control-db-provision:${DW_CONTROL_DB_PROVISION_VERSION:-local}
+    build:
+      context: ./infra/dw-control-db-provision
+      dockerfile: Dockerfile
     depends_on:
       dw-migrator:
         condition: service_completed_successfully
@@ -78,10 +81,6 @@ services:
       PGUSER: ${POSTGRES_DW_USER}
       PGPASSWORD: ${POSTGRES_DW_PASSWORD}
       DW_CONTROL_DB_PASSWORD: ${DW_CONTROL_DB_PASSWORD:?DW_CONTROL_DB_PASSWORD must be set in the root .env}
-    volumes:
-      - ./infra/dw-schema/scripts/provision-local-dw-control-runtime.sql:/scripts/provision-local-dw-control-runtime.sql:ro
-    entrypoint: ["/bin/sh", "-c"]
-    command: ["psql -v ON_ERROR_STOP=1 -f /scripts/provision-local-dw-control-runtime.sql"]
     restart: "no"
     networks:
       - dss-net

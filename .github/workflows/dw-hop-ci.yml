@@ -14,6 +14,7 @@ on:
       - "docs/dw/**"
       - "etl-layer/apache-hop/**"
       - "infra/dw-schema/**"
+      - "infra/dw-control-db-provision/**"
       - "infra/dw-integration/**"
       - "infra/dw-test-data/**"
       - "auth-service/src/main/resources/db/migration/**"
@@ -76,6 +77,16 @@ jobs:
             "test -x /usr/local/bin/apply-migrations.sh; find /migrations -maxdepth 1 -type f -name '[0-9][0-9][0-9][0-9]_*.sql' | wc -l")
           test "$actual" -eq "$expected"
           echo "Verified $actual packaged SQL migrations."
+
+      - name: Build and verify DW Control DB Provision image
+        run: |
+          docker build \
+            --build-arg PROVISION_VERSION=ci-${{ github.sha }} \
+            --tag dss-dw-control-db-provision:${{ github.sha }} \
+            infra/dw-control-db-provision
+          docker run --rm --entrypoint sh dss-dw-control-db-provision:${{ github.sha }} -ec \
+            "test -x /usr/local/bin/provision-runtime.sh && test -f /scripts/provision-local-dw-control-runtime.sql"
+          echo "Verified packaged DW Control DB Provision image."
 
       - name: Verify packaged Hop project and runtime files
         run: |
