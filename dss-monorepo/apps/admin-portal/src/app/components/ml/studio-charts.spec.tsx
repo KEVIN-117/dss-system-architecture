@@ -12,6 +12,11 @@ vi.mock('@dss-monorepo/charts', () => ({
     };
     return <pre data-testid="chart" aria-label={ariaLabel} data-empty={String(Boolean(empty))}>{JSON.stringify(option(theme, 800))}</pre>;
   },
+  ForecastBandChart: ({ points, cadence }: { points: unknown[]; cadence?: string | null }) => (
+    <div data-testid="forecast-band-chart">{`${points.length} puntos · ${cadence}`}</div>
+  ),
+  forecastPeriodLabel: (point: { year: number; period: number }, cadence?: string | null) =>
+    cadence === 'ANUAL' ? String(point.year) : `${point.year}-${point.period}`,
 }));
 
 import { CorrelationChart, CountBarChart, ForecastChart, ResidualsChart, periodLabel } from './studio-charts';
@@ -50,21 +55,16 @@ describe('studio charts', () => {
     expect(screen.getByText('El candidato no publicó residuos por tramo.')).toBeTruthy();
   });
 
-  it('joins history and projection and stacks the prediction bands', () => {
+  // The band chart itself is specified in @dss-monorepo/charts (forecast-band-chart.spec.tsx).
+  it('delegates forecasts to the shared band chart', () => {
     const points: ForecastPoint[] = [
       { year: 2025, period: 1, kind: 'HISTORY', horizon: null, value: 100, interval: null },
-      { year: 2025, period: 2, kind: 'HISTORY', horizon: null, value: 110, interval: null },
-      { year: 2026, period: 1, kind: 'FORECAST', horizon: 1, value: 120, interval: { '0.8': { lower: 112, upper: 128 }, '0.95': { lower: 105, upper: 135 } } },
+      { year: 2026, period: 1, kind: 'FORECAST', horizon: 1, value: 120, interval: { '0.8': { lower: 112, upper: 128 } } },
     ];
     render(<ForecastChart points={points} cadence="SEMESTRAL" />);
 
-    const series = Object.fromEntries(drawn().series.map((item) => [item.name, item.data]));
-    expect(drawn().xAxis.data).toEqual(['2025-1', '2025-2', '2026-1']);
-    expect(series['Histórico']).toEqual([100, 110, null]);
-    expect(series['Proyección']).toEqual([null, 110, 120]);
-    expect(series['Banda 95 % base']).toEqual([null, null, 105]);
-    expect(series['Banda 95 %']).toEqual([null, null, 30]);
-    expect(series['Banda 80 %']).toEqual([null, null, 16]);
+    expect(screen.getByTestId('forecast-band-chart').textContent).toBe('2 puntos · SEMESTRAL');
     expect(periodLabel({ year: 2026, period: 1 }, 'ANUAL')).toBe('2026');
+    expect(periodLabel({ year: 2026, period: 2 }, 'SEMESTRAL')).toBe('2026-2');
   });
 });

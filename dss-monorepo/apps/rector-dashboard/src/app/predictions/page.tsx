@@ -4,12 +4,17 @@ import Link from 'next/link';
 
 import { useCallback, useEffect, useState } from 'react';
 
+import { ObjectiveSelector } from './objective-selector';
+import { describeResult, objectiveFor, type PredictionEventType } from './objectives';
+
 type PredictionResult = {
   subject_ref: string;
   program_ref: string;
   closure_id: string | number;
-  predicted_class: 'POSITIVE_EVENT' | 'NEGATIVE_EVENT';
+  predicted_class: 'POSITIVE_EVENT' | 'NEGATIVE_EVENT' | null;
   event_probability: number | null;
+  predicted_value?: number | null;
+  prediction_interval?: Record<string, { lower: number; upper: number }> | null;
   model_id: string;
   model_version: string;
   generated_at: string;
@@ -50,6 +55,8 @@ function predictionBffUrl(path: string): string {
 }
 
 export default function PredictionsPage() {
+  const [eventType, setEventType] = useState<PredictionEventType>('program_dropout');
+  const objective = objectiveFor(eventType);
   const [programRef, setProgramRef] = useState('');
   const [cutId, setCutId] = useState('');
   const [academicOptions, setAcademicOptions] = useState<AcademicOptions>({
@@ -132,14 +139,15 @@ export default function PredictionsPage() {
           credentials: 'include',
           cache: 'no-store',
           body: JSON.stringify({
-            query: `query PredictionPublication($programRef: String!, $cutId: String!, $limit: Int, $offset: Int) {
-            predictionPublication(programRef: $programRef, cutId: $cutId, limit: $limit, offset: $offset) { publication }
+            query: `query PredictionPublication($programRef: String!, $cutId: String!, $limit: Int, $offset: Int, $eventType: String) {
+            predictionPublication(programRef: $programRef, cutId: $cutId, limit: $limit, offset: $offset, eventType: $eventType) { publication }
           }`,
             variables: {
               programRef: programRef.trim(),
               cutId: cutId.trim(),
               limit: 100,
               offset: requestedOffset,
+              eventType,
             },
           }),
         });
@@ -166,7 +174,7 @@ export default function PredictionsPage() {
         setLoading(false);
       }
     },
-    [programRef, cutId],
+    [programRef, cutId, eventType],
   );
 
   const submitBatch = async () => {
@@ -188,7 +196,7 @@ export default function PredictionsPage() {
         credentials: 'include',
         body: JSON.stringify({
           contract_version: '1.0',
-          event_type: 'program_dropout',
+          event_type: eventType,
           program_ref: programRef.trim(),
           academic_cut: { cut_id: cutId.trim() },
         }),
@@ -248,16 +256,34 @@ export default function PredictionsPage() {
             ← Panel institucional
           </Link>
           <p className="text-xs font-semibold uppercase tracking-[0.24em] text-primary">
-            PRED-007 · Analítica autorizada
+            Predicciones · Analítica autorizada
           </p>
           <h1 className="text-3xl font-semibold tracking-tight md:text-4xl">
-            Riesgo de abandono del programa
+            {objective.title}
           </h1>
           <p className="max-w-3xl text-muted-foreground">
-            Consulta una publicación completa por programa y cierre. Las
-            predicciones apoyan la revisión académica y no reemplazan decisiones
-            institucionales.
+            {objective.description} Consulta una publicación completa por
+            programa y cierre. Las predicciones apoyan la revisión académica y
+            no reemplazan decisiones institucionales.
           </p>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <ObjectiveSelector
+              value={eventType}
+              disabled={loading}
+              onChange={(next) => {
+                setEventType(next);
+                setPublication(null);
+                setOffset(0);
+                setMessage('');
+              }}
+            />
+            <Link
+              className="text-sm text-primary hover:underline"
+              href="/predictions/pronosticos"
+            >
+              Ver pronóstico de postulaciones y matriculados →
+            </Link>
+          </div>
         </header>
 
         <section
@@ -386,33 +412,32 @@ export default function PredictionsPage() {
                         <tr>
                           <th className="px-5 py-3">Estudiante</th>
                           <th className="px-5 py-3">Programa</th>
-                          <th className="px-5 py-3">Resultado</th>
-                          <th className="px-5 py-3">Probabilidad</th>
+                          <th className="px-5 py-3">
+                            {objective.kind === 'regression' ? 'PPA proyectado' : 'Resultado'}
+                          </th>
+                          <th className="px-5 py-3">
+                            {objective.kind === 'regression' ? 'Intervalo' : 'Probabilidad'}
+                          </th>
                           <th className="px-5 py-3">Generada</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-800">
-                        {publication.results.map((row) => (
+                        {publication.results.map((row) => {
+                          const result = describeResult(row, objective);
+                          return (
                           <tr key={row.subject_ref}>
                             <td className="px-5 py-3 font-mono">
                               {row.subject_ref}
                             </td>
                             <td className="px-5 py-3">{row.program_ref}</td>
-                            <td className="px-5 py-3">
-                              {row.predicted_class === 'POSITIVE_EVENT'
-                                ? 'Evento previsto'
-                                : 'Sin evento previsto'}
-                            </td>
-                            <td className="px-5 py-3">
-                              {row.event_probability === null
-                                ? 'No disponible'
-                                : `${(row.event_probability * 100).toFixed(1)}%`}
-                            </td>
+                            <td className="px-5 py-3">{result.outcome}</td>
+                            <td className="px-5 py-3">{result.detail}</td>
                             <td className="px-5 py-3 text-muted-foreground">
                               {new Date(row.generated_at).toLocaleString()}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                     <div className="flex items-center justify-between border-t border-border px-5 py-3 text-xs text-muted-foreground">

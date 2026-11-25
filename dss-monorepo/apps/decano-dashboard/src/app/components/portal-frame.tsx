@@ -24,7 +24,7 @@ import {
   AcademicScopeProvider,
 } from '@dss-monorepo/academic-analytics/panel/academic-scope';
 import { RoleGuard } from '@dss-monorepo/rbac';
-import { LayoutDashboard, Database } from 'lucide-react';
+import { LayoutDashboard, Database, TrendingUp } from 'lucide-react';
 
 export function PortalFrame({ children }: { children: ReactNode }) {
   return (
@@ -39,7 +39,7 @@ export function PortalFrame({ children }: { children: ReactNode }) {
 function PortalFrameContent({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { setTarget, expanded, setExpanded } = useOlapSidebar();
   const navGroups: NavigationGroup[] = [
     {
@@ -51,6 +51,17 @@ function PortalFrameContent({ children }: { children: ReactNode }) {
           icon: <LayoutDashboard aria-hidden="true" />,
           isActive: pathname === '/',
         },
+        // PRED-108: forecasts of the programs in scope, for holders of prediction:forecast:read.
+        ...(hasPermission('prediction:forecast:read')
+          ? [
+              {
+                title: 'Pronósticos',
+                href: '/pronosticos',
+                icon: <TrendingUp aria-hidden="true" />,
+                isActive: pathname === '/pronosticos',
+              },
+            ]
+          : []),
       ],
     },
     ...analyticsNavigation(pathname, 'faculty'),

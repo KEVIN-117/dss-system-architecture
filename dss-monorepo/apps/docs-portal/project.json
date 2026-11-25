@@ -32,8 +32,10 @@
     },
     "dev": {
       "dependsOn": ["sync-openapi"],
+      "command": "next dev --webpack",
       "options": {
-        "port": 3005
+        "port": 3005,
+        "cwd": "apps/docs-portal"
       }
     },
     "serve": {

@@ -197,18 +197,51 @@ def _select_validation_threshold(y_true: list[int], probabilities: list[float], 
             "false_positives": int(((truth == 0) & (prediction == 1)).sum()),
             "validation_alert_rate": float(prediction.mean()),
         }
-    candidates = sorted({0.0, 1.0, *(float(value) for value in scores)})
-    ranked = []
-    for threshold in candidates:
+def _threshold_confusion_stats(
+    truth: np.ndarray,
+    scores: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Vectorized confusion-matrix stats for every unique candidate threshold in O(N log N)."""
+    candidates = np.unique(np.concatenate((np.array([0.0, 1.0], dtype=float), scores)))
+    order = np.argsort(-scores, kind="mergesort")
+    sorted_scores = scores[order]
+    sorted_truth = truth[order]
+    cum_tp = np.concatenate(([0], np.cumsum(sorted_truth, dtype=np.int64)))
+    cum_fp = np.concatenate(([0], np.cumsum(1 - sorted_truth, dtype=np.int64)))
+    counts = np.searchsorted(-sorted_scores, -candidates, side="right")
+    tp = cum_tp[counts]
+    fp = cum_fp[counts]
+    total_positives = int(truth.sum())
+    fn = total_positives - tp
+    recall = tp / total_positives if total_positives > 0 else np.zeros_like(tp, dtype=float)
+    denom = 2 * tp + fp + fn
+    f1 = np.where(denom > 0, (2.0 * tp) / denom, 0.0)
+    return candidates, fn, fp, recall, f1
+
+
+def _select_validation_threshold(y_true: list[int], probabilities: list[float], policy: dict[str, Any]) -> tuple[float, dict[str, float]]:
+    truth = np.asarray(y_true, dtype=int)
+    scores = np.asarray(probabilities, dtype=float)
+    if policy.get("kind") == "alert_rate":
+        # Smallest threshold that flags at most alert_rate of the rows.
+        ordered = np.sort(scores)[::-1]
+        flagged = max(1, int(np.floor(policy["alert_rate"] * len(ordered))))
+        threshold = float(np.nextafter(ordered[flagged], np.inf)) if flagged < len(ordered) else float(ordered[-1])
         prediction = (scores >= threshold).astype(int)
-        false_negative = int(((truth == 1) & (prediction == 0)).sum())
-        false_positive = int(((truth == 0) & (prediction == 1)).sum())
-        cost = policy["false_negative_cost"] * false_negative + policy["false_positive_cost"] * false_positive
-        recall = float(recall_score(truth, prediction, zero_division=0))
-        f1 = float(f1_score(truth, prediction, zero_division=0))
-        ranked.append((cost, -recall, -f1, threshold, false_negative, false_positive))
-    cost, _, _, threshold, fn, fp = min(ranked)
-    return threshold, {"validation_cost": float(cost), "false_negatives": fn, "false_positives": fp}
+        return threshold, {
+            "validation_cost": None,
+            "false_negatives": int(((truth == 1) & (prediction == 0)).sum()),
+            "false_positives": int(((truth == 0) & (prediction == 1)).sum()),
+            "validation_alert_rate": float(prediction.mean()),
+        }
+    candidates, fn, fp, recall, f1 = _threshold_confusion_stats(truth, scores)
+    cost = policy["false_negative_cost"] * fn + policy["false_positive_cost"] * fp
+    best = int(np.lexsort((candidates, -f1, -recall, cost))[0])
+    return float(candidates[best]), {
+        "validation_cost": float(cost[best]),
+        "false_negatives": int(fn[best]),
+        "false_positives": int(fp[best]),
+    }
 
 
 def _threshold_origin(policy: dict[str, Any] | None) -> str:
@@ -223,15 +256,9 @@ def _select_validation_threshold_by_metrics(y_true: list[int], probabilities: li
     """Descriptive-only threshold rule for synthetic evidence: recall, then F1."""
     truth = np.asarray(y_true, dtype=int)
     scores = np.asarray(probabilities, dtype=float)
-    candidates = sorted({0.0, 1.0, *(float(value) for value in scores)})
-    return max(
-        candidates,
-        key=lambda threshold: (
-            float(recall_score(truth, scores >= threshold, zero_division=0)),
-            float(f1_score(truth, scores >= threshold, zero_division=0)),
-            threshold,
-        ),
-    )
+    candidates, _, _, recall, f1 = _threshold_confusion_stats(truth, scores)
+    best = int(np.lexsort((-candidates, -f1, -recall))[0])
+    return float(candidates[best])
 
 
 def _metrics(

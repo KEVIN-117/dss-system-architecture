@@ -30,6 +30,8 @@ const JSONScalar = new GraphQLScalarType({
 // Every published academic cube must expose this internal measure so Saiku can
 // apply its k-anonymity policy. It must never be queryable or visible to clients.
 const PRIVACY_COUNT_MEASURE = 'Conteo de privacidad';
+/** Student-level objectives with population publications: dropout, backlog (rezago) and GPA (PPA). */
+const PREDICTION_EVENT_TYPES = new Set(['program_dropout', 'student_backlog', 'student_gpa']);
 
 export const analyticsTypeDefs = `#graphql
   scalar JSON
@@ -110,7 +112,7 @@ export const analyticsTypeDefs = `#graphql
     olapCubeSchema(cubeId: ID!): JSON!
     olapCubeMembers(cubeId: ID!, dimension: String!, hierarchy: String!, level: String!, limit: Int): [OlapCubeMember!]!
     analyticQuery(input: AnalyticQueryInput!): AnalyticResult!
-    predictionPublication(programRef: String!, cutId: String!, limit: Int, offset: Int): PredictionPublicationResult!
+    predictionPublication(programRef: String!, cutId: String!, limit: Int, offset: Int, eventType: String): PredictionPublicationResult!
     admissionForecast(programRef: String!, cadence: String, admitted: Boolean): ProgramForecastResult!
     enrollmentForecast(programRef: String!, cadence: String): ProgramForecastResult!
   }
@@ -178,9 +180,14 @@ export function createAnalyticsResolvers() {
       },
       predictionPublication: async (
         _: unknown,
-        args: { programRef: string; cutId: string; limit?: number | null; offset?: number | null },
+        args: { programRef: string; cutId: string; limit?: number | null; offset?: number | null; eventType?: string | null },
         context: { authentication: AuthenticatedRequest },
       ) => {
+        // PRED-108: the dashboard picks the objective; dropout stays the default for older clients.
+        const eventType = args.eventType ?? 'program_dropout';
+        if (!PREDICTION_EVENT_TYPES.has(eventType)) {
+          throw new GraphQLError('Unsupported prediction objective', { extensions: { code: 'BAD_USER_INPUT' } });
+        }
         // Resolve the analytics role/scope from trusted Auth Service data first.
         // Prediction Service repeats the scope check against the selected program/cut.
         const scope = deriveScopeForGraphQL(context.authentication.permissions, context.authentication.user.academicContexts ?? []);
@@ -198,6 +205,7 @@ export function createAnalyticsResolvers() {
           cut_id: args.cutId,
           limit: String(Math.min(Math.max(args.limit ?? 100, 1), 1000)),
           offset: String(Math.min(Math.max(args.offset ?? 0, 0), 25000)),
+          event_type: eventType,
         });
         try {
           const response = await fetch(`${baseUrl.replace(/\/$/, '')}/v1/prediction-publications?${query}`, {

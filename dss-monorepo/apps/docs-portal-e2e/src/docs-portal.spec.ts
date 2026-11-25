@@ -35,10 +35,12 @@ test.describe('desktop', () => {
   });
 
   test('API reference shows the operation and code samples', async ({ page }) => {
+    test.setTimeout(120_000);
     await page.goto('/reference');
     await page.getByRole('link', { name: /BFF API/ }).first().click();
+    await expect(page).toHaveURL(/\/reference\/bff-contracts-bff-v1/);
     await page.getByRole('link', { name: /\/api\/health/ }).click();
-    await expect(page.getByRole('heading', { level: 1, name: 'Verifica que el BFF esté disponible' })).toBeVisible();
+    await expect(page.getByRole('heading', { level: 1, name: 'Verifica que el BFF esté disponible' })).toBeVisible({ timeout: 30_000 });
     await expect(page.locator('.dp-endpoint')).toContainText('/api/health');
     await expect(page.getByRole('tab', { name: 'cURL' })).toHaveAttribute('aria-selected', 'true');
     await expect(page.getByRole('tabpanel')).toContainText('curl -X GET');

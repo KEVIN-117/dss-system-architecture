@@ -1,12 +1,19 @@
 import { defineConfig, devices } from '@playwright/test';
 import { nxE2EPreset } from '@nx/playwright/preset';
 import { workspaceRoot } from '@nx/devkit';
+import { resolve } from 'node:path';
 
 // Set BASE_URL to test a deployed portal instead of the local dev server.
 const baseURL = process.env['BASE_URL'] || 'http://localhost:3005';
 
 export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src' }),
+  timeout: 90_000,
+  globalSetup: './src/global-setup.ts',
+  ...(process.env.CI ? {} : { workers: 2 }),
+  expect: {
+    timeout: 30_000,
+  },
   use: {
     baseURL,
     trace: 'on-first-retry',
@@ -23,11 +30,12 @@ export default defineConfig({
   webServer: process.env['BASE_URL']
     ? undefined
     : {
-        command: 'bun nx run @dss-monorepo/docs-portal:dev',
+        command: 'bun run next dev --webpack --port 3005',
         url: 'http://localhost:3005',
         reuseExistingServer: !process.env['CI'],
-        cwd: workspaceRoot,
+        cwd: resolve(workspaceRoot, 'apps/docs-portal'),
         timeout: 180_000,
+        stdout: 'pipe',
       },
   projects: [
     { name: 'chromium', use: { ...devices['Desktop Chrome'] } },

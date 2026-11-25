@@ -13,7 +13,7 @@ import {
   type NavigationGroup,
 } from '@dss-monorepo/design-system/portal';
 import { RoleGuard } from '@dss-monorepo/rbac';
-import { LayoutDashboard, Database, BrainCircuit } from 'lucide-react';
+import { LayoutDashboard, Database, BrainCircuit, TrendingUp } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   OlapSidebarProvider,
@@ -38,7 +38,7 @@ export function PortalFrame({ children }: { children: ReactNode }) {
 function PortalFrameContent({ children }: { children: ReactNode }) {
   const pathname = usePathname() ?? '';
   const router = useRouter();
-  const { user, logout } = useAuth();
+  const { user, logout, hasPermission } = useAuth();
   const { setTarget, expanded, setExpanded } = useOlapSidebar();
   const links = [
     {
@@ -51,6 +51,16 @@ function PortalFrameContent({ children }: { children: ReactNode }) {
       href: '/predictions',
       icon: <BrainCircuit aria-hidden="true" />,
     },
+    // PRED-108: program forecasts, for holders of prediction:forecast:read.
+    ...(hasPermission('prediction:forecast:read')
+      ? [
+          {
+            title: 'Pronósticos',
+            href: '/predictions/pronosticos',
+            icon: <TrendingUp aria-hidden="true" />,
+          },
+        ]
+      : []),
   ];
   const navGroups: NavigationGroup[] = [
     {

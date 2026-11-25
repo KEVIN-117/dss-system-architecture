@@ -16,7 +16,8 @@
     "./panel": "./src/panel/index.ts",
     "./panel/navigation": "./src/panel/navigation.tsx",
     "./panel/data": "./src/panel/rendimiento-data.ts",
-    "./panel/academic-scope": "./src/panel/academic-scope.tsx"
+    "./panel/academic-scope": "./src/panel/academic-scope.tsx",
+    "./forecast": "./src/forecast/index.ts"
   },
   "nx": {
     "name": "academic-analytics",

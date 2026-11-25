@@ -147,6 +147,35 @@ describe('Prediction BFF route', () => {
     expect(new Headers(options.headers).get('authorization')).toBe('Bearer verified-access-token');
   });
 
+  it('forwards program forecast reads with their filters behind prediction:forecast:read', async () => {
+    process.env.PREDICTION_SERVICE_URL = 'http://prediction-service:8000';
+    authenticateRequest.mockResolvedValue(authentication);
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ series: 'ENROLLED_BY_PROGRAM', forecasts: [] }), { status: 200 }));
+    vi.stubGlobal('fetch', upstream);
+    const response = await GET(
+      new Request('http://localhost:3006/api/prediction/v1/forecasts?series=ENROLLED_BY_PROGRAM&cadence=ANUAL'),
+      { params: Promise.resolve({ path: ['v1', 'forecasts'] }) },
+    );
+    expect(response.status).toBe(200);
+    expect(requirePermissions).toHaveBeenCalledWith(authentication.value, ['prediction:forecast:read', 'prediction:train']);
+    const [url, options] = upstream.mock.calls[0] as [URL, RequestInit];
+    expect(url.toString()).toBe('http://prediction-service:8000/v1/forecasts?series=ENROLLED_BY_PROGRAM&cadence=ANUAL');
+    expect(new Headers(options.headers).get('authorization')).toBe('Bearer verified-access-token');
+  });
+
+  it('rejects forecast reads without prediction:forecast:read before calling the service', async () => {
+    process.env.PREDICTION_SERVICE_URL = 'http://prediction-service:8000';
+    authenticateRequest.mockResolvedValue(authentication);
+    requirePermissions.mockReturnValueOnce(NextResponse.json({ error: 'Forbidden' }, { status: 403 }) as never);
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    const response = await GET(new Request('http://localhost:3006/api/prediction/v1/forecasts?series=APPLICATIONS_BY_PROGRAM'), {
+      params: Promise.resolve({ path: ['v1', 'forecasts'] }),
+    });
+    expect(response.status).toBe(403);
+    expect(upstream).not.toHaveBeenCalled();
+  });
+
   it('keeps the model registry behind the prediction:train permission', async () => {
     process.env.PREDICTION_SERVICE_URL = 'http://prediction-service:8000';
     authenticateRequest.mockResolvedValue(authentication);
@@ -199,5 +228,29 @@ describe('Prediction BFF route', () => {
       params: Promise.resolve({ path: ['v1', 'models', 'activate'] }),
     });
     expect(activateViaGet.status).toBe(404);
+  });
+
+  it('forwards scoped forecast jobs and job polling with prediction:publish', async () => {
+    process.env.PREDICTION_SERVICE_URL = 'http://prediction-service:8000';
+    authenticateRequest.mockResolvedValue(authentication);
+    const upstream = vi.fn().mockResolvedValue(new Response(JSON.stringify({ job_id: '00000000-0000-0000-0000-000000000001', status: 'QUEUED' }), { status: 202 }));
+    vi.stubGlobal('fetch', upstream);
+
+    const postRes = await POST(
+      new Request('http://localhost:3006/api/prediction/v1/forecast-jobs', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'idempotency-key': 'forecast-portal-key-1' },
+        body: JSON.stringify({ cadence: 'SEMESTRAL', series_codes: ['APPLICATIONS_BY_PROGRAM'], horizon: 4 }),
+      }),
+      { params: Promise.resolve({ path: ['v1', 'forecast-jobs'] }) },
+    );
+    expect(postRes.status).toBe(202);
+    expect(requirePermissions).toHaveBeenCalledWith(authentication.value, ['prediction:publish', 'prediction:train']);
+
+    const getRes = await GET(
+      new Request('http://localhost:3006/api/prediction/v1/jobs/00000000-0000-0000-0000-000000000001'),
+      { params: Promise.resolve({ path: ['v1', 'jobs', '00000000-0000-0000-0000-000000000001'] }) },
+    );
+    expect(getRes.status).toBe(202);
   });
 });

@@ -117,21 +117,38 @@ def authorize_program_context(principal: Principal, context: ProgramContext) -> 
     context and every scope permission (IAM-009). SUPERADMIN has no academic permission, hence no
     academic access.
     """
+    if not program_in_scope(principal, context.faculty_id, context.program_code):
+        raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The requested academic program is outside the authorized scope.")
+
+
+def has_global_scope(principal: Principal) -> bool:
+    """``analytics:read`` plus ``analytics:global``: every program of the institution."""
+    return ANALYTICS_READ in principal.permissions and ANALYTICS_GLOBAL in principal.permissions
+
+
+def program_in_scope(principal: Principal, faculty_id: int | None, program_code: str) -> bool:
+    """Whether one program (and its faculty) is inside the principal's academic scope.
+
+    The rule behind :func:`authorize_program_context`, reusable where only the program and its
+    faculty are known (program forecasts). A program whose faculty is unknown is only visible
+    with the global scope.
+    """
     permissions = principal.permissions
-    if ANALYTICS_READ in permissions:
-        if ANALYTICS_GLOBAL in permissions:
-            return
-        if ANALYTICS_FACULTY in permissions and any(
-            item.get("facultyId") == context.faculty_id and item.get("careerId") is None
-            for item in principal.academic_contexts
-        ):
-            return
-        if ANALYTICS_CAREER in permissions and any(
-            item.get("facultyId") == context.faculty_id and item.get("careerId") == context.program_code
-            for item in principal.academic_contexts
-        ):
-            return
-    raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The requested academic program is outside the authorized scope.")
+    if ANALYTICS_READ not in permissions:
+        return False
+    if ANALYTICS_GLOBAL in permissions:
+        return True
+    if faculty_id is None:
+        return False
+    if ANALYTICS_FACULTY in permissions and any(
+        item.get("facultyId") == faculty_id and item.get("careerId") is None
+        for item in principal.academic_contexts
+    ):
+        return True
+    return ANALYTICS_CAREER in permissions and any(
+        item.get("facultyId") == faculty_id and item.get("careerId") == program_code
+        for item in principal.academic_contexts
+    )
 
 
 def validate_feature_row(manifest: Mapping[str, Any], features: Mapping[str, Any]) -> list[str]:

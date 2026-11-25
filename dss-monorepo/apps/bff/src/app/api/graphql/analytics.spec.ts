@@ -84,9 +84,29 @@ describe('BFF analytic GraphQL resolvers', () => {
 
     expect(result).toEqual({ publication: { status: 'PUBLISHED', result_count: 4 } });
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://prediction-service:8000/v1/prediction-publications?program_ref=025&cut_id=2020-2&limit=1000&offset=0',
+      'http://prediction-service:8000/v1/prediction-publications?program_ref=025&cut_id=2020-2&limit=1000&offset=0&event_type=program_dropout',
       expect.objectContaining({ headers: { Authorization: `Bearer ${auth.token}` }, cache: 'no-store' }),
     );
+  });
+
+  it('reads the publication of the selected objective (PRED-108)', async () => {
+    vi.stubEnv('PREDICTION_SERVICE_URL', 'http://prediction-service:8000');
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ publication: null }), { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await resolver().predictionPublication({}, { programRef: '025', cutId: '2020-2', eventType: 'student_gpa' }, ctx());
+
+    expect(String(fetchMock.mock.calls[0][0])).toContain('event_type=student_gpa');
+  });
+
+  it('rejects an unsupported prediction objective before calling Prediction Service', async () => {
+    vi.stubEnv('PREDICTION_SERVICE_URL', 'http://prediction-service:8000');
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(resolver().predictionPublication({}, { programRef: '025', cutId: '2020-2', eventType: 'course_failure' }, ctx()))
+      .rejects.toMatchObject({ extensions: { code: 'BAD_USER_INPUT' } });
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it('rejects publication reads for identities without analytics scope before calling Prediction Service', async () => {
