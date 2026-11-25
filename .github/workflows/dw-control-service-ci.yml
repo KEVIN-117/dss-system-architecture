@@ -42,13 +42,14 @@ jobs:
             dw-control-service/gradle/wrapper/gradle-wrapper.properties
             dw-control-service/settings.gradle
             dw-control-service/build.gradle
+            dw-control-service/gradle.properties
       - name: spotlessApply
         working-directory: dw-control-service
         run: bash ./gradlew --no-daemon spotlessApply
 
       - name: Run lint, tests, and build
         working-directory: dw-control-service
-        run: bash ./gradlew --no-daemon lint test bootJar
+        run: bash ./gradlew --no-daemon lint test bootJar --stacktrace
 
       - name: Build container image
         run: docker build --tag dss-dw-control-service:${{ github.sha }} ./dw-control-service

@@ -18,6 +18,10 @@ java {
 
 repositories {
     mavenCentral()
+    maven {
+        name = 'MavenCentralDirect'
+        url = uri('https://repo1.maven.org/maven2/')
+    }
 }
 
 ext {
