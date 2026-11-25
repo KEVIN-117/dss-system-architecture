@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.9.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.8.0...auth-service-v1.9.0) (2026-11-24)
+
+
+### Features
+
+* **bff, ml-connector, keycloak:** rutas /api/admin/ml/** y permiso prediction:forecast:read ([#399](https://github.com/KEVIN-117/dss-system-architecture/issues/399)) ([1806f1f](https://github.com/KEVIN-117/dss-system-architecture/commit/1806f1f690c389badccce6819cbea9034292d16f))
+
 ## [1.8.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.7.0...auth-service-v1.8.0) (2026-11-22)
 
 
