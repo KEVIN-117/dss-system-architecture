@@ -4,7 +4,7 @@
   "infra/keycloak": "1.8.0",
   "etl-layer/apache-hop": "1.4.0",
   "infra/dw-schema": "1.10.0",
-  "infra/dw-control-db-provision": "1.0.0",
+  "infra/dw-control-db-provision": "1.1.0",
   "dw-control-service": "1.6.0",
   "dss-monorepo/apps/docs-portal": "1.7.0",
   "dss-monorepo/apps/admin-portal": "1.11.0",
