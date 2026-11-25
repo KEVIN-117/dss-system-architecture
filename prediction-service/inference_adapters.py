@@ -399,6 +399,49 @@ _INELIGIBILITY_DETAIL = {
 }
 
 
+class DwProgramDirectory:
+    """Faculty of each DW program, used to scope program forecasts (PRED-108)."""
+
+    def __init__(self, database_url: str | None = None):
+        self.database_url = database_url or os.getenv("PREDICTION_DW_DATABASE_URL", "").strip()
+
+    def faculties(self, program_refs: list[str]) -> dict[str, int]:
+        """Map each known program (``id_programa``) to its faculty; unknown programs are omitted."""
+        if not program_refs:
+            return {}
+        if not self.database_url:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "The read-only prediction DW connection is not configured.")
+        sql = """
+            SELECT id_programa, id_facultad
+            FROM dw.dim_programa
+            WHERE member_type = 'STANDARD' AND id_programa = ANY(%s) AND id_facultad IS NOT NULL
+        """
+        try:
+            with psycopg.connect(self.database_url, connect_timeout=5, options="-c default_transaction_read_only=on") as connection:
+                rows = connection.execute(sql, (list(program_refs),)).fetchall()
+        except Exception as exc:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "The DW program catalog is unavailable.") from exc
+        return {str(program): int(faculty) for program, faculty in rows}
+
+    def programs_for_cadence(self, cadence: str) -> dict[str, int]:
+        """Map every standard DW program of ``cadence`` (ANUAL/SEMESTRAL) to its faculty."""
+        if not self.database_url:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "The read-only prediction DW connection is not configured.")
+        regime = "A" if cadence == "ANUAL" else "S"
+        sql = """
+            SELECT id_programa, id_facultad
+            FROM dw.dim_programa
+            WHERE member_type = 'STANDARD' AND regimen = %s AND id_facultad IS NOT NULL
+            ORDER BY id_programa
+        """
+        try:
+            with psycopg.connect(self.database_url, connect_timeout=5, options="-c default_transaction_read_only=on") as connection:
+                rows = connection.execute(sql, (regime,)).fetchall()
+        except Exception as exc:
+            raise InferenceFailure("DATA_UNAVAILABLE", 503, "The DW program catalog is unavailable.") from exc
+        return {str(program): int(faculty) for program, faculty in rows}
+
+
 def _required_env(name: str) -> str:
     value = os.getenv(name, "").strip()
     if not value:

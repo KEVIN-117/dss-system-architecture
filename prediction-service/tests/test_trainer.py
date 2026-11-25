@@ -115,6 +115,24 @@ class TrainerTests(unittest.TestCase):
         self.assertEqual(summary["validation_cost"], 1.0)
         self.assertEqual(_validated_decision_policy({"decision_policy": policy})["policy_ref"], policy["policy_ref"])
 
+    def test_threshold_selection_scales_to_large_validation_sets(self) -> None:
+        import time
+        import numpy as np
+        from training.trainer import _select_validation_threshold_by_metrics
+
+        rng = np.random.default_rng(42)
+        truth = rng.integers(0, 2, size=80_000).tolist()
+        scores = rng.random(80_000).tolist()
+        started = time.perf_counter()
+        threshold = _select_validation_threshold_by_metrics(truth, scores)
+        cost_threshold, _ = _select_validation_threshold(
+            truth, scores, {"kind": "cost", "false_negative_cost": 5.0, "false_positive_cost": 1.0}
+        )
+        elapsed = time.perf_counter() - started
+        self.assertTrue(0.0 <= threshold <= 1.0)
+        self.assertTrue(0.0 <= cost_threshold <= 1.0)
+        self.assertLess(elapsed, 2.0)
+
     def test_cost_policy_needs_costs_but_no_dsa_approval(self) -> None:
         with self.assertRaisesRegex(ValueError, "false_negative_cost"):
             _validated_decision_policy({"decision_policy": {"policy_ref": "dsa:pending"}})

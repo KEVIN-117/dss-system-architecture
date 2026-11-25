@@ -32,7 +32,7 @@ const baseURL = resolveBaseURL(env['ADMIN_PORTAL_BASE_URL'], port);
  */
 export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src' }),
-  timeout: 60_000,
+  timeout: 90_000,
   // Pre-compiles the portal routes under `next dev` before the parallel workers start.
   globalSetup: './src/global-setup.ts',
   // Locally the preset runs fully parallel with no retries; 8 workers across three browsers

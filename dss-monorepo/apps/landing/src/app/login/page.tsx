@@ -60,7 +60,7 @@ function LoginContent() {
 
   return (
     <GatewayScene
-      image="/images/portal-login.webp"
+      image="/images/dsa.png"
       imagePosition="origin-top object-[50%_30%] lg:object-[50%_0%]"
       tone={error ? 'error' : 'working'}
     >

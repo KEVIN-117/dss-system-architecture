@@ -35,8 +35,13 @@ from ml_tasks.catalog import event_code_pattern, event_type_pattern
 from training.job_store import IdempotencyConflict, JobStore
 from training.model_registry import InvalidModelArtifact, ModelRegistry, NoActiveModel
 import access_policy
-from inference import InferenceFailure, PredictionService, Principal
-from inference_adapters import ConfiguredAcademicPolicy, DwPredictionDataProvider, KeycloakIdentityProvider
+from inference import InferenceFailure, PredictionService, Principal, has_global_scope, program_in_scope
+from inference_adapters import (
+    ConfiguredAcademicPolicy,
+    DwPredictionDataProvider,
+    DwProgramDirectory,
+    KeycloakIdentityProvider,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1261,7 +1266,7 @@ def get_job(
 ) -> Any:
     request_id = x_request_id or str(uuid4())
     try:
-        _authenticate_ml_operator(authorization)
+        principal = _authenticate_forecast_writer(authorization, allow_only_train_msg="Job request rejected")
     except InferenceFailure as exc:
         return _failure_response(exc, request_id, "Job request rejected")
     try:
@@ -1271,6 +1276,12 @@ def get_job(
     record = JobStore().get(job_id)
     if record is None:
         return _make_problem(404, "Job not found", "RESOURCE_NOT_FOUND", request_id)
+    if (
+        not access_policy.has_permission(principal, access_policy.PREDICTION_TRAIN)
+        and getattr(record, "job_kind", "TRAIN") != "FORECAST"
+    ):
+        return _make_problem(403, "Job request rejected", "INSUFFICIENT_SCOPE", request_id,
+                             detail="The account can only inspect forecast jobs.")
     return _training_job_response(record)
 
 
@@ -1428,6 +1439,35 @@ class ForecastJobRequest(BaseModel):
     horizon: int = Field(default=4, ge=1, le=8)
 
 
+def _authenticate_forecast_writer(authorization: str | None, *, allow_only_train_msg: str = "") -> Principal:
+    """Forecast generation/polling: ML operators (prediction:train) or portal publishers (prediction:publish)."""
+    if not authorization or not authorization.startswith("Bearer ") or not authorization[7:].strip():
+        raise InferenceFailure("INVALID_TOKEN", 401, "A bearer access token is required.")
+    identity = getattr(app.state, "identity_provider", None) or KeycloakIdentityProvider()
+    principal = identity.authenticate(authorization[7:].strip())
+    if not (access_policy.has_permission(principal, access_policy.PREDICTION_TRAIN)
+            or access_policy.has_permission(principal, access_policy.PREDICTION_PUBLISH)):
+        raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The account cannot start or monitor forecast jobs.")
+    return principal
+
+
+def _scoped_forecast_programs(principal: Principal, cadence: str, requested: list[str]) -> list[str]:
+    """Ensure ``requested`` programs stay within the caller's academic scope."""
+    if access_policy.has_permission(principal, access_policy.PREDICTION_TRAIN) or has_global_scope(principal):
+        return requested
+    directory = getattr(app.state, "program_directory", None) or DwProgramDirectory()
+    if requested:
+        faculties = directory.faculties(sorted(set(requested)))
+        if any(not program_in_scope(principal, faculties.get(ref), ref) for ref in requested):
+            raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "One or more requested programs are outside the authorized scope.")
+        return requested
+    catalog = directory.programs_for_cadence(cadence)
+    scoped = sorted(ref for ref, fac in catalog.items() if program_in_scope(principal, fac, ref))
+    if not scoped:
+        raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "No academic programs of this cadence are inside the authorized scope.")
+    return scoped
+
+
 def _authenticate_forecast_reader(authorization: str | None) -> Principal:
     """Forecasts are program aggregates: ML operators and prediction:forecast:read holders may read them."""
     if not authorization or not authorization.startswith("Bearer ") or not authorization[7:].strip():
@@ -1438,6 +1478,20 @@ def _authenticate_forecast_reader(authorization: str | None) -> Principal:
             or access_policy.has_permission(principal, access_policy.PREDICTION_FORECAST_READ)):
         raise InferenceFailure("INSUFFICIENT_SCOPE", 403, "The account cannot read program forecasts.")
     return principal
+
+
+def _programs_in_forecast_scope(principal: Principal, program_refs: list[str]) -> set[str] | None:
+    """Programs of ``program_refs`` the caller may read; ``None`` means no restriction.
+
+    ML operators (prediction:train) and the global analytics scope read every program. Academic
+    authorities (prediction:forecast:read) see only programs inside their faculty or career
+    contexts, with the same rule as prediction publications (PRED-108).
+    """
+    if access_policy.has_permission(principal, access_policy.PREDICTION_TRAIN) or has_global_scope(principal):
+        return None
+    directory = getattr(app.state, "program_directory", None) or DwProgramDirectory()
+    faculties = directory.faculties(sorted(set(program_refs)))
+    return {ref for ref in program_refs if program_in_scope(principal, faculties.get(ref), ref)}
 
 
 @app.post(
@@ -1469,11 +1523,13 @@ def submit_forecast_job(
 
     request_id = x_request_id or str(uuid4())
     try:
-        principal = _authenticate_ml_operator(authorization)
+        principal = _authenticate_forecast_writer(authorization)
+        scoped_programs = _scoped_forecast_programs(principal, body.cadence, list(body.programs))
     except InferenceFailure as exc:
         return _failure_response(exc, request_id, "Forecast request rejected")
     try:
-        params = validate_forecast_params(body.model_dump()).to_json()
+        raw_params = {**body.model_dump(), "programs": scoped_programs}
+        params = validate_forecast_params(raw_params).to_json()
     except ForecastError as exc:
         return _make_problem(422, "Invalid forecast request", exc.code, request_id, detail=str(exc))
     store = JobStore()
@@ -1513,7 +1569,8 @@ def submit_forecast_job(
     description=(
         "Requiere prediction:train o prediction:forecast:read. Con program_ref devuelve el último pronóstico del "
         "programa con su historia y proyección (bandas del 80 % y 95 %), el modelo elegido y su backtest; sin "
-        "program_ref devuelve el resumen del último pronóstico de cada programa de la serie."
+        "program_ref devuelve el resumen del último pronóstico de cada programa de la serie. Los lectores sin "
+        "prediction:train ni alcance global solo ven los programas de su facultad o carrera (403 fuera de alcance)."
     ),
     responses={401: COMMON_ERROR_RESPONSES[401], 403: COMMON_ERROR_RESPONSES[403], 404: COMMON_ERROR_RESPONSES[404]},
 )
@@ -1528,13 +1585,23 @@ def get_forecasts(
 
     request_id = x_request_id or str(uuid4())
     try:
-        _authenticate_forecast_reader(authorization)
+        principal = _authenticate_forecast_reader(authorization)
     except InferenceFailure as exc:
         return _failure_response(exc, request_id, "Forecast request rejected")
     store = ForecastStore()
-    if program_ref is None:
-        runs = store.list_latest(series, cadence)
-        return JSONResponse({"series": series, "forecasts": runs}, headers={"Cache-Control": "no-store"})
+    try:
+        if program_ref is None:
+            runs = store.list_latest(series, cadence)
+            visible = _programs_in_forecast_scope(principal, [run["program_ref"] for run in runs])
+            runs = [run for run in runs if visible is None or run["program_ref"] in visible]
+            return JSONResponse({"series": series, "forecasts": runs}, headers={"Cache-Control": "no-store"})
+        # Scope first, so an out-of-scope caller cannot learn whether a forecast exists.
+        visible = _programs_in_forecast_scope(principal, [program_ref])
+    except InferenceFailure as exc:
+        return _failure_response(exc, request_id, "Forecast request rejected")
+    if visible is not None and program_ref not in visible:
+        return _make_problem(403, "Forecast request rejected", "INSUFFICIENT_SCOPE", request_id,
+                             detail="The requested academic program is outside the authorized scope.")
     run = store.latest(series, program_ref, cadence)
     if run is None:
         return _make_problem(404, "Forecast not found", "RESOURCE_NOT_FOUND", request_id,

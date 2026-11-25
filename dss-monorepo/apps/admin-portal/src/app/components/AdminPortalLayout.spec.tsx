@@ -112,6 +112,9 @@ describe('AdminPortalLayout', () => {
 
     expect(screen.getByText('modelos')).toBeTruthy();
     expect(screen.getByText('Operaciones ML')).toBeTruthy();
+    expect(screen.getByText('ML Studio')).toBeTruthy();
+    expect(screen.getByText('Jobs ML')).toBeTruthy();
+    expect(screen.getByText('Pronósticos')).toBeTruthy();
     expect(screen.queryByText('Usuarios')).toBeNull();
   });
 

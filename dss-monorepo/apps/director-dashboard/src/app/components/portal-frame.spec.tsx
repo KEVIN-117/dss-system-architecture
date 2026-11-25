@@ -2,7 +2,11 @@ import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReactNode } from 'react';
 
-const nav = vi.hoisted(() => ({ path: '/', push: vi.fn(), mounts: 0, loading: false }));
+const nav = vi.hoisted(() => ({
+  path: '/', push: vi.fn(), mounts: 0, loading: false,
+  permissions: ['prediction:forecast:read'] as string[],
+  groups: [] as { title: string; items: { title: string; href: string }[] }[],
+}));
 vi.mock('next/navigation', () => ({
   usePathname: () => nav.path,
   useRouter: () => ({ push: nav.push }),
@@ -11,6 +15,7 @@ vi.mock('@dss-monorepo/auth', () => ({
   useAuth: () => ({
     user: { firstName: 'Ana', lastName: 'Pérez', email: 'ana@example.test' },
     logout: vi.fn(),
+    hasPermission: (permission: string) => nav.permissions.includes(permission),
   }),
   ProtectedRoute: ({ children, loadingFallback }: { children: ReactNode; loadingFallback: ReactNode }) => <>{nav.loading ? loadingFallback : children}</>,
   LandingLoginRedirect: () => null,
@@ -23,8 +28,9 @@ vi.mock('@dss-monorepo/design-system/portal', async () => {
   return {
     AccessDenied: () => null,
     Loader: () => <span role="status">Verificando sesión…</span>,
-    DashboardTemplate: ({ children }: { children: ReactNode }) => {
+    DashboardTemplate: ({ children, navGroups }: { children: ReactNode; navGroups: typeof nav.groups }) => {
       React.useState(() => ++nav.mounts);
+      nav.groups = navGroups;
       return (
         <div>
           <nav>Menú persistente</nav>
@@ -62,6 +68,19 @@ describe('portal navigation shell', () => {
     expect(screen.getByText('Admisión')).toBeTruthy();
     expect(nav.mounts).toBe(1);
     view.unmount();
+  });
+  it('links the career forecast only for holders of prediction:forecast:read (PRED-108)', () => {
+    const links = () => nav.groups.flatMap((group) => group.items.map((item) => item.href));
+    nav.path = '/';
+    let view = render(<PortalBoundary><p>Resumen</p></PortalBoundary>);
+    expect(links()).toContain('/pronosticos');
+    view.unmount();
+
+    nav.permissions = [];
+    view = render(<PortalBoundary><p>Resumen</p></PortalBoundary>);
+    expect(links()).not.toContain('/pronosticos');
+    view.unmount();
+    nav.permissions = ['prediction:forecast:read'];
   });
   it('keeps login outside the authenticated shell', () => {
     nav.path = '/login';

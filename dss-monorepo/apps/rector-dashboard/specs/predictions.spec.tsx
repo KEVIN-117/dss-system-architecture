@@ -76,7 +76,42 @@ describe('Rector prediction publication states', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Consultar' }));
 
     expect(await screen.findByText('No disponible')).toBeTruthy();
-    expect(screen.getByText('Sin evento previsto')).toBeTruthy();
+    // PRED-108: results are worded for the selected objective (dropout by default).
+    expect(screen.getByText('Sin riesgo previsto')).toBeTruthy();
+  });
+
+  it('reads and renders the publication of the selected objective (PRED-108)', async () => {
+    mockBffResponses({ payload: { data: { predictionPublication: { publication: {
+      batch_id: 'batch-3', status: 'PUBLISHED', program_ref: 'P01', closure_id: 42,
+      model_id: 'gpa-model', model_version: 'v1', result_count: 1, result_offset: 0,
+      results: [{ subject_ref: '90002', program_ref: 'P01', closure_id: 42, predicted_class: null,
+        event_probability: null, predicted_value: 63.4, prediction_interval: { '0.8': { lower: 58, upper: 69 } },
+        model_id: 'gpa-model', model_version: 'v1', generated_at: '2026-11-03T00:00:00Z' }],
+    } } } } });
+    render(<PredictionsPage />);
+    await fillScope();
+    fireEvent.click(screen.getByRole('radio', { name: 'PPA' }));
+    expect(screen.getByRole('heading', { level: 1 }).textContent).toBe('Promedio ponderado acumulado proyectado');
+    fireEvent.click(screen.getByRole('button', { name: 'Consultar' }));
+
+    expect(await screen.findByText('PPA proyectado')).toBeTruthy();
+    expect(screen.getByText('63,4')).toBeTruthy();
+    expect(screen.getByText('80 %: 58,0 – 69,0')).toBeTruthy();
+    const graphqlCall = vi.mocked(fetch).mock.calls.find(([input]) => String(input).endsWith('/api/graphql'));
+    const body = JSON.parse(String((graphqlCall?.[1] as RequestInit).body));
+    expect(body.variables).toMatchObject({ programRef: 'P01', cutId: '42', eventType: 'student_gpa' });
+  });
+
+  it('starts the population batch of the selected objective', async () => {
+    mockBffResponses({ payload: { batch_id: 'batch-4', status: 'QUEUED', program_ref: 'P01', closure_id: '42', model_id: 'm', model_version: 'v1', result_count: 0 }, status: 202 });
+    render(<PredictionsPage />);
+    await fillScope();
+    fireEvent.click(screen.getByRole('radio', { name: 'Rezago' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Calcular y publicar' }));
+
+    expect(await screen.findByText('QUEUED')).toBeTruthy();
+    const batchCall = vi.mocked(fetch).mock.calls.find(([input]) => String(input).endsWith('/v1/prediction-batches'));
+    expect(JSON.parse(String((batchCall?.[1] as RequestInit).body)).event_type).toBe('student_backlog');
   });
 
   it('shows a failed batch as unpublished and explains that partial rows are not exposed', async () => {

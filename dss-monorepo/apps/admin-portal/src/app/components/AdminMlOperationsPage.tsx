@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import * as React from 'react';
 import {
   Badge,
@@ -131,6 +132,8 @@ export function AdminMlOperationsPage() {
   const [uploading, setUploading] = React.useState(false);
   const [uploadError, setUploadError] = React.useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = React.useState<string | null>(null);
+  /** ML Studio link that opens the uploaded dataset in the Explore step (PRED-107). */
+  const [uploadStudioHref, setUploadStudioHref] = React.useState<string | null>(null);
   const [uploadDropActive, setUploadDropActive] = React.useState(false);
   const uploadInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -221,6 +224,11 @@ export function AdminMlOperationsPage() {
       setUploadSuccess(
         `Conjunto de datos subido y validado exitosamente (${result.row_count} filas). ID: ${result.dataset_ref}`,
       );
+      setUploadStudioHref(
+        result.event_code
+          ? `/ml-studio?task=${encodeURIComponent(result.event_code)}&dataset=${encodeURIComponent(result.dataset_ref)}`
+          : null,
+      );
       await refreshDatasets();
       setDatasetRef(result.dataset_ref);
       setUploadFile(null);
@@ -293,8 +301,17 @@ export function AdminMlOperationsPage() {
             Operaciones de ML
           </h1>
           <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
-            Inicia y supervisa entrenamientos candidatos. Los modelos
-            resultantes no se activan automáticamente.
+            Sube un conjunto de datos preparado o lanza un entrenamiento
+            puntual. Para el ciclo completo (extraer, explorar, entrenar,
+            comparar y activar) usa{' '}
+            <Link href="/ml-studio" className="font-medium text-primary hover:underline">
+              ML Studio
+            </Link>
+            ; todos los jobs se ven en{' '}
+            <Link href="/ml-jobs" className="font-medium text-primary hover:underline">
+              Jobs ML
+            </Link>
+            .
           </p>
         </div>
         <Button
@@ -771,6 +788,14 @@ export function AdminMlOperationsPage() {
                 className="rounded-md border border-emerald-500/40 bg-emerald-500/10 p-3 text-sm text-emerald-600 dark:text-emerald-400"
               >
                 {uploadSuccess}
+                {uploadStudioHref && (
+                  <>
+                    {' '}
+                    <Link href={uploadStudioHref} className="font-medium underline">
+                      Explorar en ML Studio
+                    </Link>
+                  </>
+                )}
               </p>
             )}
 

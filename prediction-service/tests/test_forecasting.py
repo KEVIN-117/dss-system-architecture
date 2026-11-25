@@ -208,17 +208,45 @@ class ForecastJobTests(unittest.TestCase):
         self.assertEqual(len(self.store.list_latest(APPLICATIONS)), 1)
 
 
+FORECAST_READ = "prediction:forecast:read"
+
+
 class ForecastIdentity:
     PRINCIPALS = {
         "operator-token": Principal("operator-1", frozenset(), (), frozenset({"prediction:train"})),
-        "reader-token": Principal("rector-1", frozenset({"RECTOR"}), (), frozenset({"prediction:forecast:read"})),
+        "reader-token": Principal("rector-1", frozenset({"RECTOR"}), (),
+                                  frozenset({FORECAST_READ, "analytics:read", "analytics:global"})),
         "analytics-token": Principal("dean-1", frozenset({"DECANO"}), (), frozenset({"analytics:read"})),
+        # PRED-108: academic authorities read only the programs of their scope.
+        "dean-token": Principal("dean-2", frozenset({"DECANO"}), ({"facultyId": 1, "careerId": None},),
+                                frozenset({FORECAST_READ, "analytics:read", "analytics:faculty"})),
+        "director-token": Principal("director-1", frozenset({"DIRECTOR"}), ({"facultyId": 2, "careerId": "MED"},),
+                                    frozenset({FORECAST_READ, "analytics:read", "analytics:career"})),
+        "unscoped-reader-token": Principal("reader-2", frozenset(), (), frozenset({FORECAST_READ})),
+        "dean-publisher-token": Principal("dean-pub", frozenset({"DECANO"}), ({"facultyId": 1, "careerId": None},),
+                                          frozenset({FORECAST_READ, "prediction:publish", "analytics:read", "analytics:faculty"})),
+        "director-publisher-token": Principal("director-pub", frozenset({"DIRECTOR"}), ({"facultyId": 2, "careerId": "MED"},),
+                                              frozenset({FORECAST_READ, "prediction:publish", "analytics:read", "analytics:career"})),
+        "rector-publisher-token": Principal("rector-pub", frozenset({"RECTOR"}), (),
+                                            frozenset({FORECAST_READ, "prediction:publish", "analytics:read", "analytics:global"})),
     }
 
     def authenticate(self, token: str) -> Principal:
         if token not in self.PRINCIPALS:
             raise InferenceFailure("INVALID_TOKEN", 401, "invalid")
         return self.PRINCIPALS[token]
+
+
+class FakeProgramDirectory:
+    """SIS belongs to faculty 1 and MED to faculty 2."""
+
+    FACULTIES = {"SIS": 1, "MED": 2}
+
+    def faculties(self, program_refs: list[str]) -> dict[str, int]:
+        return {ref: self.FACULTIES[ref] for ref in program_refs if ref in self.FACULTIES}
+
+    def programs_for_cadence(self, cadence: str) -> dict[str, int]:
+        return dict(self.FACULTIES)
 
 
 class ForecastApiTests(unittest.TestCase):
@@ -231,12 +259,14 @@ class ForecastApiTests(unittest.TestCase):
         })
         self.env.start()
         app.state.identity_provider = ForecastIdentity()
+        app.state.program_directory = FakeProgramDirectory()
         self.dispatch = patch("training.tasks.forecast_task.apply_async")
         self.dispatch_mock = self.dispatch.start()
 
     def tearDown(self) -> None:
         self.dispatch.stop()
         del app.state.identity_provider
+        del app.state.program_directory
         self.env.stop()
         self.tmp.cleanup()
 
@@ -280,6 +310,35 @@ class ForecastApiTests(unittest.TestCase):
         self.assertEqual(self.client("analytics-token").get(f"/v1/forecasts?series={APPLICATIONS}").status_code, 403)
         self.assertEqual(TestClient(app).get(f"/v1/forecasts?series={APPLICATIONS}").status_code, 401)
 
+    def test_forecasts_are_filtered_by_academic_scope(self) -> None:
+        run_forecast_job(ForecastParams("SEMESTRAL", (APPLICATIONS,), ("SIS", "MED"), horizon=2),
+                         dsn="postgresql://fake", store=ForecastStore(), job_id="scope", requested_by="op",
+                         extract=ForecastJobTests.fake_extract)
+        listing = f"/v1/forecasts?series={APPLICATIONS}&cadence=SEMESTRAL"
+
+        def programs(token: str) -> list[str]:
+            response = self.client(token).get(listing)
+            self.assertEqual(response.status_code, 200, response.text)
+            return [run["program_ref"] for run in response.json()["forecasts"]]
+
+        # ML operators and the global scope read every program.
+        self.assertEqual(programs("operator-token"), ["MED", "SIS"])
+        self.assertEqual(programs("reader-token"), ["MED", "SIS"])
+        # A dean reads the programs of the faculty; a director only the career.
+        self.assertEqual(programs("dean-token"), ["SIS"])
+        self.assertEqual(programs("director-token"), ["MED"])
+        # prediction:forecast:read without an academic scope sees no program.
+        self.assertEqual(programs("unscoped-reader-token"), [])
+
+        def status(token: str, program: str) -> int:
+            return self.client(token).get(f"/v1/forecasts?series={APPLICATIONS}&program_ref={program}").status_code
+
+        self.assertEqual((status("dean-token", "SIS"), status("dean-token", "MED")), (200, 403))
+        self.assertEqual((status("director-token", "MED"), status("director-token", "SIS")), (200, 403))
+        # Out of scope is a 403 even when no forecast exists, so existence does not leak.
+        self.assertEqual(status("dean-token", "DER"), 403)
+        self.assertEqual(status("reader-token", "DER"), 404)
+
     def test_cancelled_forecast_job_discards_saved_runs(self) -> None:
         operator = self.client("operator-token")
         job = operator.post("/v1/forecast-jobs", json={"cadence": "SEMESTRAL", "series_codes": [APPLICATIONS],
@@ -298,6 +357,48 @@ class ForecastApiTests(unittest.TestCase):
             outcome = forecast_task.run(job_id=job["job_id"])
         self.assertEqual(outcome["status"], "CANCELLED")
         self.assertIsNone(ForecastStore().latest(APPLICATIONS, "SIS"))
+
+    def test_portal_publishers_can_submit_and_poll_scoped_forecast_jobs(self) -> None:
+        # Dean with prediction:publish submits empty programs -> automatically scoped to SIS.
+        dean = self.client("dean-publisher-token")
+        dean_res = dean.post(
+            "/v1/forecast-jobs",
+            json={"cadence": "SEMESTRAL", "series_codes": [APPLICATIONS], "programs": [], "horizon": 3},
+            headers={"Idempotency-Key": "pub-forecast-key-0001"},
+        )
+        self.assertEqual(dean_res.status_code, 202, dean_res.text)
+        dean_job = dean_res.json()
+        self.assertEqual(dean_job["params"]["programs"], ["SIS"])
+
+        # Dean can poll their FORECAST job via GET /v1/jobs/{job_id}.
+        poll = dean.get(f"/v1/jobs/{dean_job['job_id']}")
+        self.assertEqual(poll.status_code, 200, poll.text)
+        self.assertEqual(poll.json()["job_id"], dean_job["job_id"])
+
+        # Dean cannot request an out-of-scope program explicitly.
+        forbidden = dean.post(
+            "/v1/forecast-jobs",
+            json={"cadence": "SEMESTRAL", "series_codes": [APPLICATIONS], "programs": ["MED"], "horizon": 3},
+            headers={"Idempotency-Key": "pub-forecast-key-0002"},
+        )
+        self.assertEqual(forbidden.status_code, 403)
+
+        # Director is scoped to MED; Rector with global scope keeps programs=[].
+        director_res = self.client("director-publisher-token").post(
+            "/v1/forecast-jobs",
+            json={"cadence": "SEMESTRAL", "series_codes": [APPLICATIONS], "programs": [], "horizon": 2},
+            headers={"Idempotency-Key": "pub-forecast-key-0003"},
+        )
+        self.assertEqual(director_res.status_code, 202, director_res.text)
+        self.assertEqual(director_res.json()["params"]["programs"], ["MED"])
+
+        rector_res = self.client("rector-publisher-token").post(
+            "/v1/forecast-jobs",
+            json={"cadence": "SEMESTRAL", "series_codes": [APPLICATIONS], "programs": [], "horizon": 4},
+            headers={"Idempotency-Key": "pub-forecast-key-0004"},
+        )
+        self.assertEqual(rector_res.status_code, 202, rector_res.text)
+        self.assertEqual(rector_res.json()["params"]["programs"], [])
 
 
 if __name__ == "__main__":

@@ -54,6 +54,16 @@ async function handle(
     segments.length === 2 && segments[0] === 'v1' && segments[1] === 'prediction-publications';
   const isAcademicOptions =
     segments.length === 2 && segments[0] === 'v1' && segments[1] === 'academic-options';
+  // PRED-108: program forecasts for the academic dashboards (scoped by Prediction Service).
+  const isForecastQuery =
+    segments.length === 2 && segments[0] === 'v1' && segments[1] === 'forecasts';
+  const isForecastJobCollection =
+    segments.length === 2 && segments[0] === 'v1' && segments[1] === 'forecast-jobs';
+  const isJobItem =
+    segments.length === 3 &&
+    segments[0] === 'v1' &&
+    segments[1] === 'jobs' &&
+    /^[0-9a-f-]{36}$/i.test(segments[2]);
   const isDatasetCollection =
     segments.length === 2 && segments[0] === 'v1' && segments[1] === 'datasets';
   const isDatasetUpload =
@@ -67,9 +77,9 @@ async function handle(
   if (
     !(
       (request.method === 'POST' && (isPrediction || isTrainingCollection)) ||
-      (request.method === 'POST' && (isBatchCollection || isDatasetUpload || isModelAction)) ||
+      (request.method === 'POST' && (isBatchCollection || isDatasetUpload || isModelAction || isForecastJobCollection)) ||
       (request.method === 'GET' && isModelCollection) ||
-      (request.method === 'GET' && (isTrainingItem || isBatchItem || isPublicationQuery || isAcademicOptions || isDatasetCollection))
+      (request.method === 'GET' && (isTrainingItem || isBatchItem || isPublicationQuery || isAcademicOptions || isDatasetCollection || isForecastQuery || isJobItem))
     )
   ) {
     return withCors(
@@ -86,6 +96,15 @@ async function handle(
   // enforces; academic users only read predictions through the separate routes.
   if (isTrainingCollection || isTrainingItem || isDatasetCollection || isDatasetUpload || isModelCollection || isModelAction) {
     const forbidden = requirePermissions(authentication.value, ['prediction:train']);
+    if (forbidden) return withCors(request, forbidden);
+  }
+  // Forecasts are program aggregates; Prediction Service narrows them to the caller's academic scope.
+  if (isForecastQuery) {
+    const forbidden = requirePermissions(authentication.value, ['prediction:forecast:read', 'prediction:train']);
+    if (forbidden) return withCors(request, forbidden);
+  }
+  if (isForecastJobCollection || isJobItem) {
+    const forbidden = requirePermissions(authentication.value, ['prediction:publish', 'prediction:train']);
     if (forbidden) return withCors(request, forbidden);
   }
 
@@ -114,10 +133,10 @@ async function handle(
     requestId: request.headers.get('x-request-id') ?? undefined,
   };
 
-  if (isBatchCollection || isBatchItem || isPublicationQuery || isAcademicOptions || isDatasetCollection || isDatasetUpload || isModelCollection || isModelAction) {
+  if (isBatchCollection || isBatchItem || isPublicationQuery || isAcademicOptions || isDatasetCollection || isDatasetUpload || isModelCollection || isModelAction || isForecastQuery || isForecastJobCollection || isJobItem) {
     try {
       const upstream = new URL(`${segments.join('/')}`, `${serviceUrl.replace(/\/+$/, '')}/`);
-      if (isPublicationQuery) upstream.search = new URL(request.url).search;
+      if (isPublicationQuery || isForecastQuery) upstream.search = new URL(request.url).search;
       const headers = new Headers({
         Authorization: `Bearer ${authentication.value.token}`,
         'X-Request-ID': options.requestId ?? crypto.randomUUID(),

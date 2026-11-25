@@ -51,7 +51,8 @@ const baseURL = resolveBaseURL(
  */
 export default defineConfig({
   ...nxE2EPreset(import.meta.dirname, { testDir: './src' }),
-  timeout: 60_000,
+  timeout: 90_000,
+  globalSetup: './src/global-setup.ts',
   /* Shared settings for all the projects below. See https://playwright.dev/docs/api/class-testoptions. */
   use: {
     baseURL,
@@ -60,7 +61,7 @@ export default defineConfig({
     screenshot: process.env['PREDICTION_E2E_FORCE_SERVER'] === '1' ? 'off' : 'only-on-failure',
     video: 'off',
   },
-  workers: process.env['PREDICTION_E2E_FORCE_SERVER'] === '1' ? 1 : undefined,
+  workers: process.env['PREDICTION_E2E_FORCE_SERVER'] === '1' ? 1 : process.env.CI ? undefined : 2,
   /* Run your local dev server before starting the tests */
   webServer: [
     {

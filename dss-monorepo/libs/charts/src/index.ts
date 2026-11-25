@@ -14,6 +14,8 @@ export * from './lib/components/radar-chart';
 export * from './lib/components/heatmap-chart';
 export * from './lib/components/sunburst-chart';
 export * from './lib/components/sankey-chart';
+export * from './lib/components/forecast-band-chart';
+export * from './lib/components/forecast-stacked-chart';
 
 export * from './lib/components/base-chart';
 export * from './lib/components/saiku-chart';
