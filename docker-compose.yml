@@ -332,19 +332,19 @@ services:
   # Runtime DB credentials come from the ignored root .env and are written
   # only to the private datasource properties file inside the named volume.
   olap-home-init:
-    image: ${DOCKERHUB_USERNAME:-local}/dss-olap-service:${OLAP_SERVICE_VERSION:-local}
-    entrypoint: ["/bin/sh", "/docker/initialize-academic-olap.sh"]
-    user: "0:0"
+    image: ${DOCKERHUB_USERNAME:-local}/dss-olap-home-init:${OLAP_HOME_INIT_VERSION:-local}
+    build:
+      context: ./infra/olap
+      dockerfile: Dockerfile
     restart: "no"
     environment:
       OLAP_DB_USER: ${OLAP_DB_USER:-dw_olap_runtime}
       OLAP_DB_PASSWORD: ${OLAP_DB_PASSWORD:-}
       OLAP_DB_NAME: ${POSTGRES_DW_NAME:-}
+      OLAP_DB_HOST: ${POSTGRES_DW_HOST:-postgres-dw}
+      OLAP_DB_PORT: "5432"
     volumes:
       - olap_home_empty:/app/saiku-home
-      - ./docker/initialize-academic-olap.sh:/docker/initialize-academic-olap.sh:ro
-      - ./infra/olap/datasources/uatf-dw.sds:/source/uatf-dw.sds:ro
-      - ./infra/olap/schemas/uatf-rendimiento-academico.xml:/source/uatf-rendimiento-academico.xml:ro
     networks:
       - dss-net
 

@@ -34,6 +34,11 @@
       "component": "dw-control-db-provision",
       "package-name": "dss-dw-control-db-provision"
     },
+    "infra/olap": {
+      "release-type": "simple",
+      "component": "olap-home-init",
+      "package-name": "dss-olap-home-init"
+    },
     "dw-control-service": {
       "release-type": "simple",
       "component": "dw-control-service",

@@ -70,6 +70,17 @@ jobs:
       - name: Build OLAP service image
         run: docker build --tag dss-olap-service:${{ github.sha }} olap-service
 
+      - name: Build and verify OLAP Home Init image
+        run: |
+          docker build --tag dss-olap-home-init:${{ github.sha }} infra/olap
+          docker run --rm \
+            -v test_saiku_home:/app/saiku-home \
+            -e OLAP_DB_USER=dw_olap_runtime \
+            -e OLAP_DB_PASSWORD=0123456789abcdef \
+            -e OLAP_DB_NAME=dss_dw \
+            dss-olap-home-init:${{ github.sha }}
+          docker volume rm test_saiku_home
+
       - name: Upload tested OLAP launcher
         uses: actions/upload-artifact@v4
         with:
