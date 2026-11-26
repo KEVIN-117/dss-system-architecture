@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.6.1](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-control-service-v1.6.0...dw-control-service-v1.6.1) (2026-11-26)
+
+
+### Bug Fixes
+
+* **dw-control:** agregar reintentos tenacity y repositorio mirror para mitigar 429 de maven central ([2488df7](https://github.com/KEVIN-117/dss-system-architecture/commit/2488df79930569dc7c322fdfc71ff96efa3c4d45))
+
 ## [1.6.0](https://github.com/KEVIN-117/dss-system-architecture/compare/dw-control-service-v1.5.0...dw-control-service-v1.6.0) (2026-11-24)
 
 
