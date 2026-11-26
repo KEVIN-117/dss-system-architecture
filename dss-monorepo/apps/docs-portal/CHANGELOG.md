@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.8.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.7.0...docs-portal-v1.8.0) (2026-11-26)
+
+
+### Features
+
+* **admin-portal:** asistente ML Studio, jobs y pronósticos; prediction-service en 18007 ([#403](https://github.com/KEVIN-117/dss-system-architecture/issues/403)) ([1dfff7e](https://github.com/KEVIN-117/dss-system-architecture/commit/1dfff7e5fe010735b11395a421dba42b843d86d3))
+
 ## [1.7.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.6.0...docs-portal-v1.7.0) (2026-11-24)
 
 
