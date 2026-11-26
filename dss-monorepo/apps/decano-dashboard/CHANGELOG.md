@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.4.0](https://github.com/KEVIN-117/dss-system-architecture/compare/decano-dashboard-v1.3.0...decano-dashboard-v1.4.0) (2026-11-25)
+
+
+### Features
+
+* **admin-portal:** asistente ML Studio, jobs y pronósticos; prediction-service en 18007 ([#403](https://github.com/KEVIN-117/dss-system-architecture/issues/403)) ([1dfff7e](https://github.com/KEVIN-117/dss-system-architecture/commit/1dfff7e5fe010735b11395a421dba42b843d86d3))
+
 ## [1.3.0](https://github.com/KEVIN-117/dss-system-architecture/compare/decano-dashboard-v1.2.0...decano-dashboard-v1.3.0) (2026-11-24)
 
 
