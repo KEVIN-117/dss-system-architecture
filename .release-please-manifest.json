@@ -3,7 +3,7 @@
   "olap-service": "1.4.0",
   "infra/keycloak": "1.8.0",
   "etl-layer/apache-hop": "1.4.0",
-  "infra/dw-schema": "1.10.0",
+  "infra/dw-schema": "1.11.0",
   "infra/dw-control-db-provision": "1.1.0",
   "infra/olap": "1.1.0",
   "dw-control-service": "1.6.0",
