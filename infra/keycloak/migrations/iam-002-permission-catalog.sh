@@ -22,6 +22,8 @@
 # No toca los roles antiguos de uatf-auth-service, DW_* ni OLAP_* (se retiran en IAM-019).
 # LM-005 (#353): agrega dw:etl:execute y dw:etl-schedule:manage, y da a SUPERADMIN los tres permisos del
 # Load Manager (dw:etl-monitor:read, dw:etl:execute, dw:etl-schedule:manage). Volver a ejecutarlo los aplica.
+# IAM-020 (#404): agrega los permisos de acceso a aplicaciones portal:* y da uno a cada rol del sistema. Para
+# traducir también los roles propios, usa iam-020-portal-permissions.sh.
 set -euo pipefail
 
 REALM=uatf-dss-realm
@@ -59,13 +61,21 @@ PERMISSIONS=(
   "iam:clients:read|Consultar las aplicaciones (clientes) registradas."
   "iam:clients:write|Registrar y modificar aplicaciones y rotar sus secretos."
   "iam:audit:read|Consultar la auditoría de operaciones administrativas."
+  "portal:admin|Entrar al portal de administración (admin-portal)."
+  "portal:rector|Entrar al dashboard del rector."
+  "portal:decano|Entrar al dashboard del decano."
+  "portal:director|Entrar al dashboard del director de carrera."
 )
 
-# Compuestos por rol del realm (mismo contenido que el export).
-DIRECTOR_PERMS="analytics:read analytics:career prediction:forecast:read"
-DECANO_PERMS="$DIRECTOR_PERMS analytics:faculty pipelines:read"
-RECTOR_PERMS="$DECANO_PERMS analytics:global connectors:read"
-SUPERADMIN_PERMS="connectors:read connectors:write pipelines:read pipelines:execute prediction:train prediction:forecast:read iam:users:read iam:users:write iam:roles:read iam:roles:write iam:clients:read iam:clients:write iam:audit:read dw:etl-monitor:read dw:etl:execute dw:etl-schedule:manage"
+# Compuestos por rol del realm (mismo contenido que el export). Cada rol abre una sola aplicación (portal:*, IAM-020):
+# el permiso de portal no se hereda entre DIRECTOR, DECANO y RECTOR.
+DIRECTOR_ANALYTICS="analytics:read analytics:career prediction:forecast:read"
+DECANO_ANALYTICS="$DIRECTOR_ANALYTICS analytics:faculty pipelines:read"
+RECTOR_ANALYTICS="$DECANO_ANALYTICS analytics:global connectors:read"
+DIRECTOR_PERMS="$DIRECTOR_ANALYTICS portal:director"
+DECANO_PERMS="$DECANO_ANALYTICS portal:decano"
+RECTOR_PERMS="$RECTOR_ANALYTICS portal:rector"
+SUPERADMIN_PERMS="portal:admin connectors:read connectors:write pipelines:read pipelines:execute prediction:train prediction:forecast:read iam:users:read iam:users:write iam:roles:read iam:roles:write iam:clients:read iam:clients:write iam:audit:read dw:etl-monitor:read dw:etl:execute dw:etl-schedule:manage"
 
 kc() { "$KCADM" "$@"; }
 log() { printf '[iam-002] %s\n' "$*"; }

@@ -61,14 +61,15 @@ Los servicios autorizan solo con permisos de `dss-permissions` (y los roles del 
 ### Segregación de Funciones (Separation of Duties)
 En cumplimiento con el Principio de Mínimo Privilegio (PoLP):
 * El rol técnico `SUPERADMIN` **no tiene permisos académicos** (`analytics:*`) ni de administración OLAP (`olap:admin`). Un administrador IT no tiene acceso automático a los dashboards académicos.
-* La jerarquía aplica estrictamente a las autoridades académicas: cada rol incluye los permisos del anterior.
+* La jerarquía aplica estrictamente a las autoridades académicas: cada rol incluye los permisos de analítica del anterior.
+* Cada rol abre **una sola aplicación**, la de su permiso `portal:*` (IAM-020); ese permiso no se hereda.
 
 | Realm Role | Permisos de `dss-permissions` | Alcance Académico y Restricción (RNF4.1) |
 | :--- | :--- | :--- |
-| 👑 **`SUPERADMIN`** | `iam:*`, `connectors:*`, `pipelines:*`, `prediction:train`, `prediction:forecast:read` | **Técnico Global**. Sin acceso a dashboards académicos. Gestión de usuarios, roles, permisos, aplicaciones y auditoría. |
-| 🎓 **`RECTOR`** | DECANO + `analytics:global`, `connectors:read` | **Negocio Global**. Sin contexto académico. |
-| 🏛️ **`DECANO`** | DIRECTOR + `analytics:faculty`, `pipelines:read` | **Negocio Facultad**. Uno o más contextos de facultad. |
-| 📚 **`DIRECTOR`** | `analytics:read`, `analytics:career`, `prediction:forecast:read` | **Negocio Carrera**. Uno o más contextos de carrera. |
+| 👑 **`SUPERADMIN`** | `portal:admin`, `iam:*`, `connectors:*`, `pipelines:*`, `prediction:train`, `prediction:forecast:read` | **Técnico Global**. Sin acceso a dashboards académicos. Gestión de usuarios, roles, permisos, aplicaciones y auditoría. |
+| 🎓 **`RECTOR`** | `portal:rector` + analítica de DECANO + `analytics:global`, `connectors:read` | **Negocio Global**. Sin contexto académico. |
+| 🏛️ **`DECANO`** | `portal:decano` + analítica de DIRECTOR + `analytics:faculty`, `pipelines:read` | **Negocio Facultad**. Uno o más contextos de facultad. |
+| 📚 **`DIRECTOR`** | `portal:director`, `analytics:read`, `analytics:career`, `prediction:forecast:read` | **Negocio Carrera**. Uno o más contextos de carrera. |
 
 Los permisos `olap:admin`, `olap:user`, `dw:*` y `prediction:publish` se asignan por usuario; `context:read` es solo para la cuenta de servicio de `olap-service`. El detalle y su verificación (`RealmPermissionCatalogTest`) están en `docs/envs/keycloak.md`.
 

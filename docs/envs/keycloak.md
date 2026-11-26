@@ -19,7 +19,7 @@ El Compose raíz utiliza `KC_BOOTSTRAP_ADMIN_USERNAME` y `KC_BOOTSTRAP_ADMIN_PAS
 
 No se otorgan `realm-admin`, `manage-authorization`, `manage-identity-providers` ni `manage-events`. `RealmAuthServiceAdminAccessTest` (módulo `keycloak-webhook`) verifica este conjunto exacto. El secreto se exige al interpolar Compose y se usa al importar el realm.
 
-**Realms ya importados:** `--import-realm` no sobrescribe un realm existente. En un entorno que ya tiene `uatf-dss-realm`, aplicar a mano (consola o `kcadm`): volver confidencial `olap-service` con service account y el secreto anterior, desactivar standard flow y aplicar los scripts de `infra/keycloak/migrations/` en orden (`iam-002` crea el catálogo y da `context:read` a `service-account-olap-service`; `iam-019` retira los roles antiguos).
+**Realms ya importados:** `--import-realm` no sobrescribe un realm existente. En un entorno que ya tiene `uatf-dss-realm`, aplicar a mano (consola o `kcadm`): volver confidencial `olap-service` con service account y el secreto anterior, desactivar standard flow y aplicar los scripts de `infra/keycloak/migrations/` en orden (`iam-002` crea el catálogo y da `context:read` a `service-account-olap-service`; `iam-019` retira los roles antiguos; `iam-020` agrega los permisos de acceso a aplicaciones `portal:*`).
 
 Para `uatf-auth-service` (IAM-001), con `kcadm.sh` dentro del contenedor:
 
@@ -42,14 +42,28 @@ Desde IAM-002 (decisiones D1 y D4 de `docs/auth/rbac-iam-admin-proposal.md`), el
 
 | Rol | Permisos |
 |---|---|
-| DIRECTOR | `analytics:read`, `analytics:career`, `prediction:forecast:read` |
-| DECANO | DIRECTOR + `analytics:faculty`, `pipelines:read` |
-| RECTOR | DECANO + `analytics:global`, `connectors:read` |
-| SUPERADMIN | `connectors:read`, `connectors:write`, `pipelines:read`, `pipelines:execute`, `prediction:train`, `prediction:forecast:read`, `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` (Load Manager, LM-005) |
+| DIRECTOR | `portal:director`, `analytics:read`, `analytics:career`, `prediction:forecast:read` |
+| DECANO | `portal:decano` + los de analítica de DIRECTOR + `analytics:faculty`, `pipelines:read` |
+| RECTOR | `portal:rector` + los de analítica de DECANO + `analytics:global`, `connectors:read` |
+| SUPERADMIN | `portal:admin`, `connectors:read`, `connectors:write`, `pipelines:read`, `pipelines:execute`, `prediction:train`, `prediction:forecast:read`, `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` (Load Manager, LM-005) |
 
 - **Permisos que se asignan por usuario:** `olap:admin`, `olap:user`, `dw:closure:read`, `dw:closure:manage` y `prediction:publish` (IAM-013: iniciar el scoring poblacional). Ningún rol los incluye.
 - **Load Manager (LM-005):** `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` vienen en SUPERADMIN. A otros usuarios se asignan por separado: lectura y monitoreo, lanzar y detener cargas, y administrar programaciones. `iam-002-permission-catalog.sh` aplica estos cambios a un realm ya importado; se vuelve a ejecutar sin efectos duplicados.
 - **Permiso de servicio:** `context:read`, que tiene `service-account-olap-service`.
+- **Permisos de acceso a aplicaciones (IAM-020):** `portal:admin`, `portal:rector`, `portal:decano` y `portal:director`. Asignar un rol a una aplicación es que el rol contenga su `portal:*`; cada rol abre **una sola** aplicación, así que el permiso de portal no se hereda (RECTOR no incluye `portal:decano`). Por ahora solo llegan al token: la landing, los dashboards y el admin-portal empiezan a exigirlos en IAM-024.
+
+**Aplicaciones en un realm ya importado (IAM-020):**
+
+```sh
+docker exec -i -e DRY_RUN=1 uatf-keycloak bash -s < infra/keycloak/migrations/iam-020-portal-permissions.sh   # revisar
+docker exec -i -e KEYCLOAK_PORTAL_ROLES='{"VICERRECTOR":"RECTOR"}' uatf-keycloak bash -s < infra/keycloak/migrations/iam-020-portal-permissions.sh
+```
+
+El script es aditivo e idempotente:
+1. Crea los cuatro `portal:*` y da a cada rol del sistema el suyo.
+2. Traduce el mapeo del BFF: pasar en `KEYCLOAK_PORTAL_ROLES` el mismo valor que usa el entorno; cada rol mapeado recibe el `portal:*` de su destino.
+3. Traduce el atributo `portal` (`admin`, `rector`, `decano` o `director`) de los roles creados desde el admin-portal.
+4. Un rol que ya abre una aplicación no recibe otra; el conflicto se informa con `AVISO`. Al final lista los roles propios que siguen sin aplicación.
 
 **Roles antiguos retirados (IAM-019):** los roles de cliente `uatf-auth-service:{SUPERADMIN,RECTOR,DECANO,DIRECTOR,CONTEXT_READER}`, `olap-service:{OLAP_ADMIN,OLAP_USER}` y `dw-control-service:{DW_CLOSURE_READ,DW_CLOSURE_MANAGE,DW_ETL_MONITOR_READ}` ya no existen. Todos los servicios leen solo `dss-permissions` y los roles del realm. Los clientes siguen existiendo. Como esos roles añadían el `aud` de su cliente («audience resolve»), las audiencias ahora son explícitas: `dss-bff` incluye `uatf-auth-service`, `olap-service` y `dw-control-service`, y `olap-service` incluye `uatf-auth-service`.
 
@@ -67,7 +81,7 @@ El script es idempotente: agrega las audiencias que falten, da a cada usuario, c
 - Se eliminó el cliente público `uatf-dss-spa`, que no se usaba.
 - `dss-bff` agrega `uatf-auth-service` a `aud` con un audience mapper explícito.
 
-`RealmPermissionCatalogTest` (módulo `keycloak-webhook`) verifica este modelo y que el script de migración declare el mismo catálogo que el export.
+`RealmPermissionCatalogTest` (módulo `keycloak-webhook`) verifica este modelo, que cada rol del sistema abra exactamente una aplicación y que los scripts `iam-002` e `iam-020` declaren el mismo catálogo que el export.
 
 **Realms ya importados:** aplicar el script idempotente:
 

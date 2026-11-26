@@ -44,8 +44,16 @@ class RealmPermissionCatalogTest {
             // LM-005: Load Manager (monitor, execute, schedule).
             "dw:etl-monitor:read", "dw:etl:execute", "dw:etl-schedule:manage");
 
+    /** IAM-020: each system role opens exactly one application; the portal permission is not inherited. */
+    private static final Map<String, String> SYSTEM_ROLE_PORTALS = Map.of(
+            "SUPERADMIN", "portal:admin", "RECTOR", "portal:rector",
+            "DECANO", "portal:decano", "DIRECTOR", "portal:director");
+
     private static final Map<String, List<String>> EXPECTED_PERMISSIONS = Map.of(
-            "DIRECTOR", DIRECTOR, "DECANO", DECANO, "RECTOR", RECTOR, "SUPERADMIN", SUPERADMIN);
+            "DIRECTOR", concat(DIRECTOR, SYSTEM_ROLE_PORTALS.get("DIRECTOR")),
+            "DECANO", concat(DECANO, SYSTEM_ROLE_PORTALS.get("DECANO")),
+            "RECTOR", concat(RECTOR, SYSTEM_ROLE_PORTALS.get("RECTOR")),
+            "SUPERADMIN", concat(SUPERADMIN, SYSTEM_ROLE_PORTALS.get("SUPERADMIN")));
 
     /** Clients whose business roles were retired in IAM-019; the clients themselves stay. */
     private static final List<String> LEGACY_ROLE_CLIENTS = List.of("uatf-auth-service", "olap-service", "dw-control-service");
@@ -229,6 +237,55 @@ class RealmPermissionCatalogTest {
             }
         }
         return false;
+    }
+
+    @Test
+    void everyApplicationHasAnAccessPermissionAndEachSystemRoleOpensExactlyOne() throws Exception {
+        JsonNode realm = realm();
+        Set<String> portals = new TreeSet<>();
+        for (String permission : catalogPermissions(realm)) {
+            if (permission.startsWith("portal:")) {
+                portals.add(permission);
+            }
+        }
+        assertEquals(new TreeSet<>(SYSTEM_ROLE_PORTALS.values()), portals, "one portal:* permission per application");
+        for (JsonNode role : realm.path("roles").path("realm")) {
+            Set<String> opened = new TreeSet<>();
+            for (String permission : names(role.path("composites").path("client").path(CATALOG))) {
+                if (permission.startsWith("portal:")) {
+                    opened.add(permission);
+                }
+            }
+            String expected = SYSTEM_ROLE_PORTALS.get(role.path("name").asText());
+            if (expected != null) {
+                assertEquals(Set.of(expected), opened, role.path("name").asText() + " opens exactly its application");
+            } else {
+                assertTrue(opened.size() <= 1, role.path("name").asText() + " opens at most one application");
+            }
+        }
+    }
+
+    @Test
+    void portalMigrationDeclaresTheSameApplicationsAsTheExport() throws Exception {
+        Path script = Path.of("..", "infra", "keycloak", "migrations", "iam-020-portal-permissions.sh");
+        Pattern entry = Pattern.compile("^\\s*\"(portal:[a-z-]+)\\|([^|\"]+)\\|([A-Z_]+)\"\\s*$");
+        Map<String, String> descriptions = new java.util.TreeMap<>();
+        Map<String, String> owners = new java.util.TreeMap<>();
+        for (String line : Files.readAllLines(script)) {
+            var matcher = entry.matcher(line);
+            if (matcher.matches()) {
+                descriptions.put(matcher.group(1), matcher.group(2));
+                owners.put(matcher.group(3), matcher.group(1));
+            }
+        }
+        Map<String, String> exported = new java.util.TreeMap<>();
+        realm().path("roles").path("client").path(CATALOG).forEach(p -> {
+            if (p.path("name").asText().startsWith("portal:")) {
+                exported.put(p.path("name").asText(), p.path("description").asText());
+            }
+        });
+        assertEquals(exported, descriptions, "iam-020-portal-permissions.sh must match the realm export");
+        assertEquals(new java.util.TreeMap<>(SYSTEM_ROLE_PORTALS), owners, "system role of each application");
     }
 
     @Test
