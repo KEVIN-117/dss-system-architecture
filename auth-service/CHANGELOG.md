@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.10.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.9.0...auth-service-v1.10.0) (2026-11-26)
+
+
+### Features
+
+* Permisos de acceso a aplicaciones (portal:*) en Keycloak ([#420](https://github.com/KEVIN-117/dss-system-architecture/issues/420)) ([90e976a](https://github.com/KEVIN-117/dss-system-architecture/commit/90e976a4a18c2259d67478f0d53733d77993f0f7))
+
 ## [1.9.0](https://github.com/KEVIN-117/dss-system-architecture/compare/auth-service-v1.8.0...auth-service-v1.9.0) (2026-11-24)
 
 
