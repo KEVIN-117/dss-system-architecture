@@ -40,6 +40,24 @@ jobs:
           cache: maven
           cache-dependency-path: auth-service/pom.xml
 
+      - name: Cache Maven Wrapper
+        uses: actions/cache@v4
+        with:
+          path: ~/.m2/wrapper
+          key: ${{ runner.os }}-mvnw-${{ hashFiles('auth-service/.mvn/wrapper/maven-wrapper.properties') }}
+
+      - name: Bootstrap Maven Wrapper
+        working-directory: auth-service
+        run: |
+          for attempt in 1 2 3; do
+            if bash ./mvnw --version; then
+              exit 0
+            fi
+            echo "Maven Wrapper bootstrap attempt $attempt failed; retrying in $((attempt * 5))s..."
+            sleep $((attempt * 5))
+          done
+          exit 1
+
       - name: Validate Compose configuration
         env:
           # Required only to render Compose; no service is started in this step.
