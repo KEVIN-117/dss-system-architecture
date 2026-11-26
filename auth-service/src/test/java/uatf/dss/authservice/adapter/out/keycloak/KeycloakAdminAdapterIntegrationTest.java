@@ -136,7 +136,7 @@ class KeycloakAdminAdapterIntegrationTest {
                 });
         assertThat(module.roles().listRealmRoleClientComposites("DECANO", PERMISSIONS)).extracting(IdentityRole::name)
                 .containsExactlyInAnyOrder("analytics:read", "analytics:career", "analytics:faculty", "pipelines:read",
-                        "prediction:forecast:read");
+                        "prediction:forecast:read", "portal:decano");
     }
 
     @Test
@@ -193,7 +193,7 @@ class KeycloakAdminAdapterIntegrationTest {
         assertThat(module.roleMappings().listUserClientRoles(id, PERMISSIONS, true)).extracting(IdentityRole::name)
                 .as("effective permissions expand the DECANO composite")
                 .containsExactlyInAnyOrder("analytics:read", "analytics:career", "analytics:faculty", "pipelines:read",
-                        "prediction:forecast:read");
+                        "prediction:forecast:read", "portal:decano");
         assertThat(module.roleMappings().listUserClientRoles(id, PERMISSIONS, false)).isEmpty();
         assertThat(module.roles().listUsersWithRealmRole("DECANO", 0, 100)).extracting(IdentityUser::id).contains(id);
 

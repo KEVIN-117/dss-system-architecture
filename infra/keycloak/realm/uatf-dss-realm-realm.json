@@ -60,7 +60,8 @@
               "analytics:career",
               "analytics:faculty",
               "pipelines:read",
-              "prediction:forecast:read"
+              "prediction:forecast:read",
+              "portal:decano"
             ]
           }
         },
@@ -82,7 +83,8 @@
               "pipelines:read",
               "analytics:global",
               "connectors:read",
-              "prediction:forecast:read"
+              "prediction:forecast:read",
+              "portal:rector"
             ]
           }
         },
@@ -143,7 +145,8 @@
               "dw:etl-monitor:read",
               "dw:etl:execute",
               "dw:etl-schedule:manage",
-              "prediction:forecast:read"
+              "prediction:forecast:read",
+              "portal:admin"
             ]
           }
         },
@@ -161,7 +164,8 @@
             "dss-permissions": [
               "analytics:read",
               "analytics:career",
-              "prediction:forecast:read"
+              "prediction:forecast:read",
+              "portal:director"
             ]
           }
         },
@@ -765,6 +769,42 @@
           "id": "e146dc97-e66e-5372-9946-bdd4761c9bb0",
           "name": "iam:audit:read",
           "description": "Consultar la auditoría de operaciones administrativas.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "41148dd3-e6b8-597e-8a4b-4204d1953533",
+          "name": "portal:admin",
+          "description": "Entrar al portal de administración (admin-portal).",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "03f5c19c-6587-53b5-8806-1f21ad90fab9",
+          "name": "portal:rector",
+          "description": "Entrar al dashboard del rector.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "5e8a206c-1e38-548e-b7bd-f5bb4580cb82",
+          "name": "portal:decano",
+          "description": "Entrar al dashboard del decano.",
+          "composite": false,
+          "clientRole": true,
+          "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",
+          "attributes": {}
+        },
+        {
+          "id": "16ba3535-dfbd-509e-96bb-c6a629530d5b",
+          "name": "portal:director",
+          "description": "Entrar al dashboard del director de carrera.",
           "composite": false,
           "clientRole": true,
           "containerId": "275d6e53-757f-51dc-a989-2acdb0272bdb",

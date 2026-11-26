@@ -15,6 +15,8 @@ export const DSS_PERMISSIONS = [
   'dw:closure:read', 'dw:closure:manage', 'dw:etl-monitor:read', 'dw:etl:execute', 'dw:etl-schedule:manage',
   'iam:users:read', 'iam:users:write', 'iam:roles:read', 'iam:roles:write',
   'iam:clients:read', 'iam:clients:write', 'iam:audit:read',
+  // IAM-020: access to each application; a role opens exactly one.
+  'portal:admin', 'portal:rector', 'portal:decano', 'portal:director',
 ] as const;
 
 export type KnownDSSPermission = (typeof DSS_PERMISSIONS)[number];

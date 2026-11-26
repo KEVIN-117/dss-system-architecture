@@ -30,7 +30,7 @@ flowchart LR
 ## 1. Keycloak
 
 - Versión **26.7.4**, realm **`uatf-dss-realm`**. Export: `infra/keycloak/realm/uatf-dss-realm-realm.json`.
-- `--import-realm` no sobrescribe un realm existente. Los cambios de modelo se llevan a un entorno ya importado con los scripts idempotentes de `infra/keycloak/migrations/` (`iam-002-permission-catalog.sh`, `iam-019-retire-legacy-roles.sh`); ver `docs/envs/keycloak.md`.
+- `--import-realm` no sobrescribe un realm existente. Los cambios de modelo se llevan a un entorno ya importado con los scripts idempotentes de `infra/keycloak/migrations/` (`iam-002-permission-catalog.sh`, `iam-019-retire-legacy-roles.sh`, `iam-020-portal-permissions.sh`); ver `docs/envs/keycloak.md`.
 - `keycloak-webhook/src/test/java/uatf/keycloak/RealmPermissionCatalogTest.java` verifica el modelo del export y que los scripts coincidan con él.
 
 ### 1.1 Catálogo de permisos (`dss-permissions`, bearer-only)
@@ -44,6 +44,7 @@ flowchart LR
 | Data Warehouse | `dw:closure:read`, `dw:closure:manage`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` | dw-control-service, BFF |
 | IAM | `iam:users:read`, `iam:users:write`, `iam:roles:read`, `iam:roles:write`, `iam:clients:read`, `iam:clients:write`, `iam:audit:read` | auth-service, BFF, admin-portal |
 | Servicio | `context:read` | auth-service (endpoint interno) |
+| Aplicaciones (IAM-020) | `portal:admin`, `portal:rector`, `portal:decano`, `portal:director` | Llegan al token; la landing, los dashboards y el admin-portal los exigen desde IAM-024 |
 
 Un permiso nuevo se crea desde el admin-portal (**Permisos**) y llega al token sin desplegar nada; solo tiene efecto cuando un servicio lo exige.
 
@@ -51,13 +52,14 @@ Un permiso nuevo se crea desde el admin-portal (**Permisos**) y llega al token s
 
 | Rol | Portal | Permisos (compuestos) |
 |---|---|---|
-| `DIRECTOR` | director | `analytics:read`, `analytics:career`, `prediction:forecast:read` |
-| `DECANO` | decano | DIRECTOR + `analytics:faculty`, `pipelines:read` |
-| `RECTOR` | rector | DECANO + `analytics:global`, `connectors:read` |
-| `SUPERADMIN` | admin | `iam:*`, `connectors:*`, `pipelines:*`, `prediction:train`, `prediction:forecast:read`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` |
+| `DIRECTOR` | director | `portal:director`, `analytics:read`, `analytics:career`, `prediction:forecast:read` |
+| `DECANO` | decano | `portal:decano` + analítica de DIRECTOR + `analytics:faculty`, `pipelines:read` |
+| `RECTOR` | rector | `portal:rector` + analítica de DECANO + `analytics:global`, `connectors:read` |
+| `SUPERADMIN` | admin | `portal:admin`, `iam:*`, `connectors:*`, `pipelines:*`, `prediction:train`, `prediction:forecast:read`, `dw:etl-monitor:read`, `dw:etl:execute`, `dw:etl-schedule:manage` |
 
 - SUPERADMIN no tiene permisos académicos ni `olap:admin` (D4): administrar la plataforma no da acceso a los datos. Desde LM-005 sí opera el Load Manager: lanza, detiene y programa cargas ETL. Esos permisos no dan acceso a los datos del DW.
 - `olap:*`, `dw:*` y `prediction:publish` se asignan por usuario o en roles creados desde el portal.
+- **Aplicación del rol (IAM-020):** cada rol abre una sola aplicación, la de su permiso `portal:*`; ese permiso no se hereda entre RECTOR, DECANO y DIRECTOR. Mientras IAM-021…IAM-024 no estén desplegados, el portal todavía se decide por los cuatro roles y `KEYCLOAK_PORTAL_ROLES` (§3).
 - Roles, permisos y la matriz rol × permiso se editan en el admin-portal (**Roles**, **Permisos**, **Matriz de acceso**). Los roles del sistema (los cuatro de arriba) y los permisos `iam:*` y `context:read` no se pueden borrar, y SUPERADMIN siempre conserva `iam:*`.
 
 ### 1.3 Clientes
