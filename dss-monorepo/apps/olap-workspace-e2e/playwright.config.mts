@@ -25,6 +25,8 @@ export default defineConfig({
   webServer: {
     command: `node ../../node_modules/next/dist/bin/next dev --webpack --port ${port}`,
     url: baseURL,
+    // `next dev` compiles on first request; slow CI runners exceed the 60 s default.
+    timeout: 180_000,
     // Always start an isolated server: reusing any process on the URL can
     // silently test a different app or a stale Next.js build.
     reuseExistingServer: false,

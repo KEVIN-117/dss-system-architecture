@@ -33,6 +33,8 @@ export default defineConfig({
   webServer: {
     command: 'bun nx run @dss-monorepo/landing:dev',
     url: 'http://localhost:3000',
+    // `next dev` compiles on first request; slow CI runners exceed the 60 s default.
+    timeout: 180_000,
     reuseExistingServer: true,
     cwd: workspaceRoot,
     env: {
