@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.9.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.8.0...docs-portal-v1.9.0) (2026-11-28)
+
+
+### Features
+
+* **admin-portal:** elegir la aplicación del rol (IAM-022) ([#429](https://github.com/KEVIN-117/dss-system-architecture/issues/429)) ([4739a42](https://github.com/KEVIN-117/dss-system-architecture/commit/4739a4275d24a04b60e01511f32370402b077a6a))
+* Permisos de acceso a aplicaciones (portal:*) en Keycloak ([#423](https://github.com/KEVIN-117/dss-system-architecture/issues/423)) ([ea109bc](https://github.com/KEVIN-117/dss-system-architecture/commit/ea109bc373ddac78f59765216a497805e3339959))
+
 ## [1.8.0](https://github.com/KEVIN-117/dss-system-architecture/compare/docs-portal-v1.7.0...docs-portal-v1.8.0) (2026-11-26)
 
 
