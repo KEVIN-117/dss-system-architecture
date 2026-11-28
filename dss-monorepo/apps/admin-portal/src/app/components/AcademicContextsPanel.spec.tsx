@@ -18,6 +18,7 @@ const base: AdminUserDirectoryEntry = {
   lastName: 'Mamani',
   isActive: true,
   roles: ['DECANO'],
+  academicScope: 'FACULTY',
   academicContexts: [],
 };
 
@@ -53,7 +54,7 @@ describe('AcademicContextsPanel', () => {
   });
 
   it('requires a career per entry for a director and filters careers by faculty', async () => {
-    render(<AcademicContextsPanel user={{ ...base, roles: ['DIRECTOR'] }} canWrite onSaved={vi.fn()} />);
+    render(<AcademicContextsPanel user={{ ...base, roles: ['DIRECTOR'], academicScope: 'CAREER' }} canWrite onSaved={vi.fn()} />);
 
     fireEvent.click(await screen.findByRole('button', { name: 'Agregar carrera' }));
     fireEvent.change(screen.getByLabelText('Facultad 1'), { target: { value: '4' } });
@@ -87,9 +88,31 @@ describe('AcademicContextsPanel', () => {
     expect(auth.replaceAdminUserContexts).not.toHaveBeenCalled();
   });
 
-  it('explains that global roles take no context', () => {
-    render(<AcademicContextsPanel user={{ ...base, roles: ['RECTOR'] }} canWrite onSaved={vi.fn()} />);
-    expect(screen.getByText('Este rol no utiliza contexto académico.')).toBeTruthy();
+  it('lets a custom role with analytics:faculty receive faculties', async () => {
+    render(<AcademicContextsPanel
+      user={{ ...base, roles: ['VICEDECANO'], academicScope: 'FACULTY' }}
+      canWrite
+      onSaved={vi.fn()}
+    />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Agregar facultad' }));
+    fireEvent.change(screen.getByLabelText('Facultad 1'), { target: { value: '6' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar contextos' }));
+    await waitFor(() => expect(auth.replaceAdminUserContexts).toHaveBeenCalledWith(base.id, [
+      { facultyId: 6, careerId: null },
+    ]));
+  });
+
+  it('explains that a global scope takes no context', () => {
+    render(<AcademicContextsPanel user={{ ...base, roles: ['RECTOR'], academicScope: 'GLOBAL' }} canWrite onSaved={vi.fn()} />);
+    expect(screen.getByText('Este usuario no utiliza contexto académico.')).toBeTruthy();
+    expect(screen.getByText(/analytics:global/)).toBeTruthy();
+    expect(auth.getAcademicCatalog).not.toHaveBeenCalled();
+  });
+
+  it('asks for a role with analytics:faculty or analytics:career when the scope is none', () => {
+    render(<AcademicContextsPanel user={{ ...base, roles: ['ANALYST'], academicScope: 'NONE' }} canWrite onSaved={vi.fn()} />);
+    expect(screen.getByText(/analytics:faculty ni analytics:career/)).toBeTruthy();
     expect(auth.getAcademicCatalog).not.toHaveBeenCalled();
   });
 

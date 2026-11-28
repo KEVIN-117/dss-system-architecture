@@ -15,6 +15,7 @@ describe('Auth Service administration data access', () => {
         lastName: 'García',
         isActive: true,
         roles: ['DIRECTOR'],
+        academicScope: 'CAREER',
         academicContexts: [],
       }],
       page: 2,

@@ -8,6 +8,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.support.TransactionTemplate;
 import uatf.dss.authservice.TestcontainersConfiguration;
 import uatf.dss.authservice.application.port.in.AdminAuditPage;
@@ -15,10 +16,12 @@ import uatf.dss.authservice.application.port.in.ListAdminAuditQuery;
 import uatf.dss.authservice.application.port.in.SetUserAcademicContextsCommand;
 import uatf.dss.authservice.application.port.in.SetUserAcademicContextsUseCase;
 import uatf.dss.authservice.application.port.out.AdminAuditLogRepository;
+import uatf.dss.authservice.application.port.out.IdentityRoleMappingPort;
 import uatf.dss.authservice.application.port.out.UserRepository;
 import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
 import uatf.dss.authservice.domain.model.User;
 import uatf.dss.authservice.domain.model.audit.AdminAuditEntry;
+import uatf.dss.authservice.domain.model.identity.IdentityRole;
 import uatf.dss.authservice.domain.model.audit.AuditActor;
 import uatf.dss.authservice.domain.model.audit.AuditOutcome;
 import uatf.dss.authservice.domain.model.audit.AuditPayloadSanitizer;
@@ -32,6 +35,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
 @ActiveProfiles("test")
 @Import(TestcontainersConfiguration.class)
@@ -52,6 +56,9 @@ class AdminAuditLogIntegrationTest {
     private SetUserAcademicContextsUseCase setContexts;
     @Autowired
     private UserRepository userRepository;
+    // The academic scope is read live from Keycloak; here it is stubbed.
+    @MockitoBean
+    private IdentityRoleMappingPort identityMappings;
 
     @BeforeEach
     void cleanUp() {
@@ -194,6 +201,9 @@ class AdminAuditLogIntegrationTest {
         User rector = userRepository.save(User.create(null, UUID.randomUUID(), "rector", "rector@uatf.edu.bo",
                 "Rector", "UATF", true));
         userRepository.replaceRoleSnapshot(rector.id(), Set.of("RECTOR"));
+        when(identityMappings.listUserClientRoles(rector.keycloakId().toString(), "dss-permissions", true))
+                .thenReturn(List.of(new IdentityRole(UUID.randomUUID().toString(), "analytics:global", null, false,
+                        false, Map.of())));
 
         setContexts.execute(new SetUserAcademicContextsCommand(ANA, rector.id(), List.of()));
 

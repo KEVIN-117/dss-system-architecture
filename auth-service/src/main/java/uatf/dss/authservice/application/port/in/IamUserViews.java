@@ -1,5 +1,7 @@
 package uatf.dss.authservice.application.port.in;
 
+import uatf.dss.authservice.domain.model.AcademicScope;
+
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -13,6 +15,7 @@ public final class IamUserViews {
     /**
      * @param invitationSent only set on creation: {@code false} when the user was created but the invitation e-mail
      *                       could not be sent (it can be resent with the actions-email endpoint)
+     * @param academicScope  derived from the user's effective analytics permissions, not from role names
      */
     public record IamUser(
             UUID id,
@@ -23,7 +26,8 @@ public final class IamUserViews {
             boolean enabled,
             boolean emailVerified,
             Instant createdAt,
-            Boolean invitationSent) {
+            Boolean invitationSent,
+            AcademicScope academicScope) {
     }
 
     public record IamRole(String name, String description) {

@@ -6,48 +6,41 @@ import uatf.dss.authservice.application.port.in.SetUserAcademicContextsUseCase;
 import uatf.dss.authservice.application.port.out.AcademicCatalogRepository;
 import uatf.dss.authservice.application.port.out.AcademicContextRepository;
 import uatf.dss.authservice.application.port.out.UserRepository;
-import uatf.dss.authservice.domain.exception.conflict.UserRoleSnapshotNotFoundException;
 import uatf.dss.authservice.domain.exception.notfound.CareerNotFoundException;
 import uatf.dss.authservice.domain.exception.notfound.FacultyNotFoundException;
 import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
-import uatf.dss.authservice.domain.model.RoleType;
+import uatf.dss.authservice.domain.model.AcademicScope;
+import uatf.dss.authservice.domain.model.User;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 import uatf.dss.authservice.domain.model.audit.AuditTargetType;
 import uatf.dss.authservice.domain.validator.AcademicContextValidator;
 
-import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 
 public class SetUserAcademicContextsService implements SetUserAcademicContextsUseCase {
 
     static final String AUDIT_ACTION = "USER_ACADEMIC_CONTEXTS_REPLACED";
-    private static final Map<RoleType, Integer> ROLE_PRECEDENCE = Map.of(
-            RoleType.DIRECTOR, 1,
-            RoleType.DECANO, 2,
-            RoleType.RECTOR, 3,
-            RoleType.SUPERADMIN, 4);
 
     private final UserRepository userRepository;
     private final AcademicContextRepository contextRepository;
     private final AcademicCatalogRepository catalogRepository;
     private final AdminAuditRecorder auditRecorder;
+    private final AcademicScopeResolver scopeResolver;
 
     public SetUserAcademicContextsService(
             UserRepository userRepository,
             AcademicContextRepository contextRepository,
             AcademicCatalogRepository catalogRepository,
-            AdminAuditRecorder auditRecorder) {
+            AdminAuditRecorder auditRecorder,
+            AcademicScopeResolver scopeResolver) {
         this.userRepository = userRepository;
         this.contextRepository = contextRepository;
         this.catalogRepository = catalogRepository;
         this.auditRecorder = auditRecorder;
+        this.scopeResolver = scopeResolver;
     }
 
     @Override
@@ -63,17 +56,11 @@ public class SetUserAcademicContextsService implements SetUserAcademicContextsUs
     }
 
     private List<UserAcademicContext> replace(SetUserAcademicContextsCommand command) {
-        userRepository.findById(command.targetUserId()).orElseThrow(UserNotFoundException::new);
+        User target = userRepository.findById(command.targetUserId()).orElseThrow(UserNotFoundException::new);
 
-        // The local roles are a Keycloak audit/read-model snapshot, never the authority for this endpoint.
-        // @PreAuthorize on the controller authorizes the actor directly from the JWT.
-        Set<RoleType> effectiveRoles = userRepository.findRoleNamesByUserId(command.targetUserId()).stream()
-                .map(SetUserAcademicContextsService::toRoleType)
-                .filter(role -> role != null)
-                .collect(Collectors.toSet());
-        RoleType targetRole = effectiveRoles.stream()
-                .max(Comparator.comparingInt(ROLE_PRECEDENCE::get))
-                .orElseThrow(UserRoleSnapshotNotFoundException::new);
+        // The scope comes from the user's effective permissions read live from Keycloak, never from role names or the
+        // local snapshot. @PreAuthorize on the controller authorizes the actor directly from the JWT.
+        AcademicScope scope = scopeResolver.resolve(target.keycloakId().toString());
 
         List<UserAcademicContext> requestedContexts = command.contexts().stream()
                 .map(input -> new UserAcademicContext(
@@ -83,8 +70,8 @@ public class SetUserAcademicContextsService implements SetUserAcademicContextsUs
                         input.careerId()))
                 .toList();
 
-        // Count (0 for global roles, 1..N for DECANO/DIRECTOR), shape per role and no duplicates (IAM-009).
-        AcademicContextValidator.validateAll(requestedContexts, targetRole);
+        // Count (0 for GLOBAL/NONE, 1..N for FACULTY/CAREER), shape per scope and no duplicates (IAM-009).
+        AcademicContextValidator.validateAll(requestedContexts, scope);
         validateCatalogReferences(requestedContexts);
 
         return contextRepository.replaceAllForUser(command.targetUserId(), requestedContexts);
@@ -112,21 +99,6 @@ public class SetUserAcademicContextsService implements SetUserAcademicContextsUs
                     && !catalogRepository.existsActiveProgram(context.careerId(), context.facultyId())) {
                 throw new CareerNotFoundException();
             }
-        }
-    }
-
-    private static RoleType toRoleType(String roleName) {
-        if (roleName == null) {
-            return null;
-        }
-        String normalized = roleName.trim().toUpperCase(Locale.ROOT);
-        if (normalized.startsWith("ROLE_")) {
-            normalized = normalized.substring("ROLE_".length());
-        }
-        try {
-            return RoleType.valueOf(normalized);
-        } catch (IllegalArgumentException ignored) {
-            return null;
         }
     }
 }

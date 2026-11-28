@@ -35,7 +35,7 @@ Tareas habituales:
 
 | Quieres… | Haz esto |
 | --- | --- |
-| Dar acceso a una nueva autoridad | **Usuarios** → <Ui>Nuevo usuario</Ui> → rol (por ejemplo DECANO) en la pestaña **Roles** → facultad en **Contextos**. |
+| Dar acceso a una nueva autoridad | **Usuarios** → <Ui>Nuevo usuario</Ui> → rol (por ejemplo DECANO) en la pestaña **Roles** → facultad en **Contextos** (solo si el rol incluye `analytics:faculty` o `analytics:career`). |
 | Que alguien administre Saiku o los cierres del almacén | Asígnale `olap:admin` o `dw:closure:manage` en la pestaña **Permisos** del usuario, o crea un rol que los agrupe. Ningún rol del sistema los trae. |
 | Crear un cargo nuevo (por ejemplo VICERRECTOR) | **Roles** → <Ui>Nuevo rol</Ui> con su portal → sus permisos en **Matriz de acceso**. |
 | Conectar una aplicación nueva | **Aplicaciones** → <Ui>Nueva aplicación</Ui>; guarda el secreto en ese momento. |
@@ -64,7 +64,7 @@ El **Directorio de usuarios** se puede filtrar por texto (<Ui>Nombre, usuario o 
 - **Cuenta**: <Ui>Desactivar usuario</Ui> / <Ui>Activar usuario</Ui> (pide confirmación; desactivar impide iniciar sesión y conserva roles y contextos), <Ui>Reenviar invitación</Ui> y <Ui>Restablecer contraseña</Ui> (envían el correo correspondiente). No puedes desactivarte a ti mismo ni dejar la plataforma sin un SUPERADMIN habilitado: el portal muestra la regla que se aplicó.
 - **Roles**: marca los roles asignados directamente. <Ui>Roles efectivos</Ui> muestra además los heredados de otros roles (con borde, no se quitan desde aquí).
 - **Permisos**: permisos sueltos para excepciones, además de los que dan los roles. Lo habitual es asignar un rol.
-- **Contextos**: el alcance académico. Un Decano puede tener varias facultades y un Director varias carreras, incluso de facultades distintas (por ejemplo, un decano interino). Usa <Ui>Agregar facultad</Ui> o <Ui>Agregar carrera</Ui> y <Ui>Guardar contextos</Ui>; la lista reemplaza la anterior y no admite repetidos. Rector y Superadministrador no llevan contexto.
+- **Contextos**: el alcance académico. Depende de los permisos del usuario, no del nombre de su rol: con `analytics:faculty` puede tener varias facultades y con `analytics:career` varias carreras, incluso de facultades distintas (por ejemplo, un decano interino). Un rol personalizado (como VICEDECANO) que agrupe uno de esos permisos también sirve. Usa <Ui>Agregar facultad</Ui> o <Ui>Agregar carrera</Ui> y <Ui>Guardar contextos</Ui>; la lista reemplaza la anterior y no admite repetidos. Con `analytics:global` (Rector, Superadministrador) o sin ninguno de los dos permisos, el usuario no lleva contexto.
 
 Los cambios de roles y permisos llegan al usuario en su siguiente inicio de sesión o renovación de sesión (unos minutos).
 

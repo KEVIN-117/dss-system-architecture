@@ -102,7 +102,7 @@ Publica en `keycloak.user.events` (con DLX/DLQ y confirmación del broker) altas
 | Auditoría | consulta paginada y filtrable | `iam:audit:read` |
 
 - **Reglas de negocio**: no se puede borrar lo que está en uso sin `force`, ni lo del sistema; SUPERADMIN conserva `iam:*`; no se puede dejar la plataforma sin un SUPERADMIN habilitado ni desactivarse a uno mismo.
-- **Contexto académico**: `user_academic_contexts`, sin límite de uno por usuario (D2: un decano interino puede tener dos facultades). `GET /internal/users/{id}/academic-contexts` exige `context:read` **y** que `azp` esté en `AUTH_CONTEXT_READER_CLIENTS`.
+- **Contexto académico**: `user_academic_contexts`, sin límite de uno por usuario (D2: un decano interino puede tener dos facultades). La regla depende de los **permisos efectivos** del usuario (roles compuestos de `dss-permissions`, leídos de Keycloak), no del nombre del rol: `analytics:global` no lleva contextos, `analytics:faculty` lleva de 1 a 20 facultades, `analytics:career` de 1 a 20 carreras (con su facultad) y sin ninguno no lleva contexto (el primero que coincida gana; es el `AcademicScope` que también expone `GET /admin/users`). `GET /internal/users/{id}/academic-contexts` exige `context:read` **y** que `azp` esté en `AUTH_CONTEXT_READER_CLIENTS`.
 - **Auditoría**: tabla `admin_audit_log` (V7) con actor, acción, objetivo, antes/después saneados (`[REDACTED]` para secretos) y resultado (`PENDING`/`SUCCESS`/`FAILURE`).
 
 ---
@@ -133,6 +133,6 @@ El filtro por facultad/carrera de OLAP se aplica en el BFF; el backstop en Saiku
 
 ## 5. Qué queda fijo en el código
 
-1. `DSSRole` (los cuatro roles de portal) y su jerarquía (`libs/shared/rbac-server/src/permissions.ts`), y el enum `RoleType` de auth-service, que decide las reglas de contexto académico. Un rol nuevo **no** necesita código si se mapea a un portal con `KEYCLOAK_PORTAL_ROLES`; un portal nuevo sí.
+1. `DSSRole` (los cuatro roles de portal) y su jerarquía (`libs/shared/rbac-server/src/permissions.ts`), y el enum `RoleType` de auth-service, que solo lista los roles del sistema (no borrables) y ya no decide las reglas de contexto académico (esas salen de los permisos `analytics:*`). Un rol nuevo **no** necesita código si se mapea a un portal con `KEYCLOAK_PORTAL_ROLES`; un portal nuevo sí.
 2. Qué permiso exige cada endpoint: está en el código de cada servicio (y en `iam-operations.ts` para IAM), como corresponde. Lo que cambia sin desplegar es **quién** tiene cada permiso.
 3. Las apps controlan el acceso a las pantallas en el navegador; los datos los protege siempre el BFF y cada servicio.

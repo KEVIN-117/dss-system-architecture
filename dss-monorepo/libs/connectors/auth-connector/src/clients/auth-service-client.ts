@@ -27,6 +27,9 @@ export interface ReplaceUserAcademicContextsRequest {
   contexts: AcademicContextAssignment[];
 }
 
+/** Derived by auth-service from the user's effective analytics permissions, never from role names. */
+export type AcademicScope = 'GLOBAL' | 'FACULTY' | 'CAREER' | 'NONE';
+
 export interface AdminUserDirectoryEntry {
   id: string;
   username: string;
@@ -35,6 +38,7 @@ export interface AdminUserDirectoryEntry {
   lastName: string | null;
   isActive: boolean;
   roles: string[];
+  academicScope: AcademicScope;
   academicContexts: AcademicContext[];
 }
 
@@ -157,6 +161,7 @@ export async function listAdminUsers(
       lastName: user.lastName,
       isActive: user.isActive,
       roles: [...user.roles],
+      academicScope: user.academicScope,
       academicContexts: user.academicContexts.map((context) => ({ ...context })),
     })),
     page: payload.page,
@@ -227,6 +232,7 @@ export async function getAdminUser(
     lastName: payload.lastName,
     isActive: payload.isActive,
     roles: [...payload.roles],
+    academicScope: payload.academicScope,
     academicContexts: payload.academicContexts.map((context) => ({ ...context })),
   };
 }
@@ -339,6 +345,10 @@ export function isAcademicContextAssignmentRequest(
   );
 }
 
+function isAcademicScope(value: unknown): value is AcademicScope {
+  return value === 'GLOBAL' || value === 'FACULTY' || value === 'CAREER' || value === 'NONE';
+}
+
 function isAdminUserDirectoryEntry(value: unknown): value is AdminUserDirectoryEntry {
   return isRecord(value) &&
     isUuid(value.id) &&
@@ -348,6 +358,7 @@ function isAdminUserDirectoryEntry(value: unknown): value is AdminUserDirectoryE
     (value.lastName === null || isString(value.lastName)) &&
     typeof value.isActive === 'boolean' &&
     Array.isArray(value.roles) && value.roles.every(isString) &&
+    isAcademicScope(value.academicScope) &&
     Array.isArray(value.academicContexts) && value.academicContexts.every(isAcademicContext);
 }
 

@@ -34,7 +34,7 @@ El contexto servlet por defecto es `/api/v1` y el puerto es `8080`. `SPRING_PROF
 
 El servicio aplica Ports and Adapters:
 
-- **Dominio (`domain`)**: modelos `User`, `Email`, `Role`, `UserAcademicContext`, el enum `RoleType`, validadores y excepciones. Define reglas de correo, identificadores y contextos académicos sin depender de Spring ni de JPA.
+- **Dominio (`domain`)**: modelos `User`, `Email`, `Role`, `UserAcademicContext`, el enum `AcademicScope` (alcance derivado de permisos), el enum `RoleType` (solo los roles del sistema), validadores y excepciones. Define reglas de correo, identificadores y contextos académicos sin depender de Spring ni de JPA.
 - **Aplicación (`application`)**: puertos de entrada/salida, comandos y servicios para consultar perfiles, sincronizar usuarios, asignar contextos y registrar usuarios de ejemplo.
 - **Adaptadores de entrada (`adapter/in`)**: API REST y consumidor AMQP. Los controladores delegan en casos de uso; el consumidor convierte el mensaje de Keycloak en un comando.
 - **Adaptadores de salida (`adapter/out`)**: persistencia con Spring Data JPA, MapStruct y JDBC. Incluye acceso a usuarios/roles/contextos, catálogo académico y bandeja de eventos procesados.
@@ -154,9 +154,9 @@ El body contiene el conjunto completo a guardar:
 El caso de uso ejecuta, en este orden, las verificaciones relevantes:
 
 1. Confirma que el usuario objetivo exista.
-2. Lee sus roles locales reconocidos, sincronizados desde Keycloak, y selecciona el de mayor precedencia: `SUPERADMIN`, `RECTOR`, `DECANO`, `DIRECTOR`.
-3. Exige cero contextos para `SUPERADMIN`/`RECTOR` y entre uno y 20 para `DECANO`/`DIRECTOR` (IAM-009: por ejemplo, un decano interino de dos facultades o un director de dos carreras).
-4. Valida la forma de cada contexto (rector y superadmin sin facultad/programa; decano con facultad y sin programa; director con facultad y programa) y rechaza los repetidos (`400`). Las reglas viven en `AcademicContextValidator.validateAll`.
+2. Lee de Keycloak, en vivo, los permisos efectivos del usuario (roles compuestos del cliente `dss-permissions`) y deriva su `AcademicScope`: `analytics:global` es `GLOBAL`, `analytics:faculty` es `FACULTY`, `analytics:career` es `CAREER` y, si no tiene ninguno, `NONE` (gana el primero). Así un rol personalizado también sirve.
+3. Exige cero contextos para `GLOBAL`/`NONE` y entre uno y 20 para `FACULTY`/`CAREER` (IAM-009: por ejemplo, un decano interino de dos facultades o un director de dos carreras).
+4. Valida la forma de cada contexto (`GLOBAL`/`NONE` sin facultad/programa; `FACULTY` con facultad y sin programa; `CAREER` con facultad y programa) y rechaza los repetidos (`400`). Las reglas viven en `AcademicContextValidator.validateAll`.
 5. Comprueba que facultad y programa existan y estén activos en los catálogos locales; el programa debe pertenecer a la facultad indicada.
 6. Reemplaza el conjunto previo dentro de una transacción y registra `USER_ACADEMIC_CONTEXTS_REPLACED` en `admin_audit_log` (misma transacción) con actor, IP, objetivo y los contextos antes y después. Si la operación falla, el registro `FAILURE` se escribe en una transacción independiente y sobrevive al rollback.
 
@@ -275,7 +275,7 @@ El diagrama C4 de componentes actualizado está en [auth-service-componentes.mmd
 | API, seguridad y configuración | `adapter/in/web/*Controller.java`, `SecurityConfig.java`, `JwtConverter.java`, `application*.yaml`, `OpenApiConfig.java` |
 | Eventos | `adapter/in/messaging/KeycloakUserEventConsumer.java`, `RabbitMessagingConfiguration.java`, módulo `keycloak-webhook/src/main/java/uatf/keycloak/*` |
 | Casos de uso | `GetAuthUserProfileService.java`, `SyncUserService.java`, `SetUserAcademicContextsService.java` |
-| Dominio | `User.java`, `UserAcademicContext.java`, `RoleType.java`, `AcademicContextValidator.java`, excepciones de dominio |
+| Dominio | `User.java`, `UserAcademicContext.java`, `AcademicScope.java`, `RoleType.java`, `AcademicContextValidator.java`, excepciones de dominio |
 | Persistencia | `adapter/out/persistence/*`, `V1__init_schema.sql`–`V5__create_keycloak_event_inbox.sql` |
 | Catálogo académico | `V3__create_academic_catalog.sql`, `auth-service/ops/database/provision-hop-academic-catalog.sql`, workflow y pipelines `etl-layer/apache-hop/projects/dss-uatf-etl` |
 | Auditoría y contratos | `configuration/audit/*`, `logback-spring.xml`, `docs/keycloak/keycloak_specification.md` |

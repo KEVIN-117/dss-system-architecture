@@ -4,7 +4,8 @@ import uatf.dss.authservice.domain.exception.validation.InvalidRoleAssignmentExc
 
 /**
  * A realm role as synced from Keycloak. Since IAM-004 role names are data, not an enum: Keycloak can define new
- * roles without a code change. {@link RoleType} only lists the institutional roles that carry academic-context rules.
+ * roles without a code change. {@link RoleType} only lists the system (non-deletable) roles; academic-context rules come from
+ * permissions (see {@link AcademicScope}), not from role names.
  */
 public record Role(
         Integer id,

@@ -10,7 +10,6 @@ import {
   type AcademicContext,
   type AdminUserDirectoryEntry,
 } from '../data-access/auth-admin';
-import { effectiveRole } from './user-roles';
 
 /** auth-service accepts at most this many contexts per user (IAM-009). */
 export const MAX_CONTEXTS = 20;
@@ -28,13 +27,13 @@ interface AcademicContextsPanelProps {
 }
 
 /**
- * Several academic contexts per user (IAM-009): a dean holds one or more faculties, a director one or more
- * careers. The whole list replaces the current one in a single call.
+ * Several academic contexts per user (IAM-009): faculty scope (analytics:faculty) holds one or more faculties,
+ * career scope (analytics:career) one or more careers. The scope comes from `user.academicScope`, not from role names. The whole list replaces the current one in a single call.
  */
 export function AcademicContextsPanel({ user, canWrite, onSaved }: AcademicContextsPanelProps) {
-  const role = effectiveRole(user.roles);
-  const needsCareer = role === 'DIRECTOR';
-  const usesContexts = role === 'DECANO' || role === 'DIRECTOR';
+  const scope = user.academicScope;
+  const needsCareer = scope === 'CAREER';
+  const usesContexts = scope === 'FACULTY' || scope === 'CAREER';
   const nextKey = React.useRef(0);
   const toEntries = React.useCallback((contexts: AcademicContext[]): Entry[] =>
     contexts.map((context) => ({
@@ -70,11 +69,11 @@ export function AcademicContextsPanel({ user, canWrite, onSaved }: AcademicConte
   if (!usesContexts) {
     return (
       <div className="rounded-lg border bg-muted/30 p-4 text-sm" role="status">
-        <p className="font-medium">Este rol no utiliza contexto académico.</p>
+        <p className="font-medium">Este usuario no utiliza contexto académico.</p>
         <p className="mt-1 text-muted-foreground">
-          {role
-            ? 'Rector y Superadministrador tienen alcance institucional y no llevan contextos.'
-            : 'Asigna primero un rol académico (Decano o Director) para definir su alcance.'}
+          {scope === 'GLOBAL'
+            ? 'Ve todas las facultades (analytics:global) y no lleva contextos.'
+            : 'Sus roles no tienen analytics:faculty ni analytics:career. Asígnale un rol con alguno de esos permisos para poder definir contextos.'}
         </p>
       </div>
     );
@@ -123,8 +122,8 @@ export function AcademicContextsPanel({ user, canWrite, onSaved }: AcademicConte
     <form onSubmit={(event) => void save(event)} className="space-y-4" aria-label="Contextos académicos">
       <p className="text-sm text-muted-foreground">
         {needsCareer
-          ? 'Director: elige una o más carreras. Ve los datos de todas ellas.'
-          : 'Decano: elige una o más facultades. Ve los datos de todas ellas.'}
+          ? 'Alcance por carrera (analytics:career): elige una o más carreras. Ve los datos de todas ellas.'
+          : 'Alcance por facultad (analytics:faculty): elige una o más facultades. Ve los datos de todas ellas.'}
       </p>
       {catalogError && (
         <div role="alert" className="space-y-2 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">

@@ -91,6 +91,7 @@ describe('admin directory client', () => {
     lastName: 'Pérez',
     isActive: true,
     roles: ['DIRECTOR'],
+    academicScope: 'CAREER',
     academicContexts: [],
   };
 

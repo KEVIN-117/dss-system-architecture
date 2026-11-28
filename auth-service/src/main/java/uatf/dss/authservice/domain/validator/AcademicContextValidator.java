@@ -4,7 +4,7 @@ import uatf.dss.authservice.domain.exception.validation.InvalidAcademicContextEx
 import uatf.dss.authservice.domain.exception.validation.InvalidDeanAcademicContextException;
 import uatf.dss.authservice.domain.exception.validation.InvalidDirectorAcademicContextException;
 import uatf.dss.authservice.domain.exception.validation.InvalidRectorAcademicContextException;
-import uatf.dss.authservice.domain.model.RoleType;
+import uatf.dss.authservice.domain.model.AcademicScope;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 
 import java.util.HashSet;
@@ -13,12 +13,13 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Academic-scope rules (RNF4.1, decision D2 of the IAM epic).
+ * Academic-scope rules (RNF4.1, decision D2 of the IAM epic), driven by the user's effective permissions
+ * ({@link AcademicScope}), not by role names.
  *
  * <ul>
- *   <li>SUPERADMIN and RECTOR have global scope: no contexts.</li>
- *   <li>DECANO has one or more faculties (faculty only, no career).</li>
- *   <li>DIRECTOR has one or more careers (faculty and career).</li>
+ *   <li>GLOBAL ({@code analytics:global}) and NONE (no faculty/career permission): no contexts.</li>
+ *   <li>FACULTY ({@code analytics:faculty}) has one or more faculties (faculty only, no career).</li>
+ *   <li>CAREER ({@code analytics:career}) has one or more careers (faculty and career).</li>
  * </ul>
  *
  * A user may hold several contexts (for example an acting dean of two faculties), up to {@link #MAX_CONTEXTS},
@@ -33,20 +34,27 @@ public class AcademicContextValidator {
     }
 
     /** Validates the full set of contexts that will replace the user's current ones. */
-    public static void validateAll(List<UserAcademicContext> contexts, RoleType role) {
+    public static void validateAll(List<UserAcademicContext> contexts, AcademicScope scope) {
         Objects.requireNonNull(contexts, "contexts");
-        Objects.requireNonNull(role, "role");
-        switch (role) {
-            case SUPERADMIN, RECTOR -> {
+        Objects.requireNonNull(scope, "scope");
+        switch (scope) {
+            case GLOBAL -> {
                 if (!contexts.isEmpty()) {
                     throw new InvalidAcademicContextException(
-                            "Role " + role + " has global scope and takes no academic context.");
+                            "The user has global scope (analytics:global) and takes no academic context.");
                 }
             }
-            case DECANO, DIRECTOR -> {
+            case NONE -> {
+                if (!contexts.isEmpty()) {
+                    throw new InvalidAcademicContextException(
+                            "The user has no faculty/career analytics permission (analytics:faculty or "
+                                    + "analytics:career), so it takes no academic context.");
+                }
+            }
+            case FACULTY, CAREER -> {
                 if (contexts.isEmpty()) {
                     throw new InvalidAcademicContextException(
-                            "Role " + role + " requires at least one academic context.");
+                            "Scope " + scope + " requires at least one academic context.");
                 }
                 if (contexts.size() > MAX_CONTEXTS) {
                     throw new InvalidAcademicContextException(
@@ -56,7 +64,7 @@ public class AcademicContextValidator {
         }
         Set<String> seen = new HashSet<>();
         for (UserAcademicContext context : contexts) {
-            validate(context, role);
+            validate(context, scope);
             if (!seen.add(context.facultyId() + "/" + context.careerId())) {
                 throw new InvalidAcademicContextException(
                         "Duplicate academic context: faculty " + context.facultyId()
@@ -65,22 +73,22 @@ public class AcademicContextValidator {
         }
     }
 
-    /** Validates the shape of a single context for the given role. */
-    public static void validate(UserAcademicContext context, RoleType role){
-        if (context == null || role == null)
+    /** Validates the shape of a single context for the given scope. */
+    public static void validate(UserAcademicContext context, AcademicScope scope){
+        if (context == null || scope == null)
             return;
-        switch (role){
-            case RECTOR, SUPERADMIN -> {
+        switch (scope){
+            case GLOBAL, NONE -> {
                 if (context.facultyId() != null || context.careerId() != null){
                     throw new InvalidRectorAcademicContextException();
                 }
             }
-            case DECANO -> {
+            case FACULTY -> {
                 if (context.facultyId() == null || context.careerId() != null){
                     throw new InvalidDeanAcademicContextException();
                 }
             }
-            case DIRECTOR -> {
+            case CAREER -> {
                 if (context.facultyId() == null || context.careerId() == null){
                     throw new InvalidDirectorAcademicContextException();
                 }

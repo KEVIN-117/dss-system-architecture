@@ -18,10 +18,13 @@ public class AdminUserDirectoryService implements ListAdminUsersUseCase, GetAdmi
 
     private final UserRepository userRepository;
     private final AcademicContextRepository contextRepository;
+    private final AcademicScopeResolver scopeResolver;
 
-    public AdminUserDirectoryService(UserRepository userRepository, AcademicContextRepository contextRepository) {
+    public AdminUserDirectoryService(UserRepository userRepository, AcademicContextRepository contextRepository,
+                                     AcademicScopeResolver scopeResolver) {
         this.userRepository = userRepository;
         this.contextRepository = contextRepository;
+        this.scopeResolver = scopeResolver;
     }
 
     @Override
@@ -50,6 +53,6 @@ public class AdminUserDirectoryService implements ListAdminUsersUseCase, GetAdmi
                         .thenComparing(context -> context.careerId() == null ? "" : context.careerId()))
                 .toList();
         return new AdminUserDirectoryEntry(user.id(), user.username(), user.email().email(), user.firstName(), user.lastName(),
-                user.isActive(), sortedRoles, contexts);
+                user.isActive(), sortedRoles, scopeResolver.resolve(user.keycloakId().toString()), contexts);
     }
 }

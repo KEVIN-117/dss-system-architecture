@@ -13,6 +13,7 @@ import uatf.dss.authservice.application.service.GetAuthUserProfileService;
 import uatf.dss.authservice.application.service.GetUserAcademicScopeService;
 import uatf.dss.authservice.application.port.in.GetUserAcademicScopeUseCase;
 import uatf.dss.authservice.application.service.ListAcademicCatalogService;
+import uatf.dss.authservice.application.service.AcademicScopeResolver;
 import uatf.dss.authservice.application.service.AdminUserDirectoryService;
 import uatf.dss.authservice.application.service.SyncUserService;
 import uatf.dss.authservice.application.service.SetUserAcademicContextsService;
@@ -54,8 +55,16 @@ public class ApplicationConfig {
     }
 
     @Bean
-    public AdminUserDirectoryService adminUserDirectoryService(UserRepository userRepository, AcademicContextRepository contextRepository) {
-        return new AdminUserDirectoryService(userRepository, contextRepository);
+    public AcademicScopeResolver academicScopeResolver(
+            IdentityRoleMappingPort identityRoleMappings,
+            @Value("${jwt.auth.converter.permissions-client-id:dss-permissions}") String permissionsClientId) {
+        return new AcademicScopeResolver(identityRoleMappings, permissionsClientId);
+    }
+
+    @Bean
+    public AdminUserDirectoryService adminUserDirectoryService(UserRepository userRepository,
+            AcademicContextRepository contextRepository, AcademicScopeResolver academicScopeResolver) {
+        return new AdminUserDirectoryService(userRepository, contextRepository, academicScopeResolver);
     }
 
     @Bean
@@ -63,9 +72,10 @@ public class ApplicationConfig {
             UserRepository userRepository,
             AcademicContextRepository contextRepository,
             AcademicCatalogRepository catalogRepository,
-            AdminAuditRecorder adminAuditRecorder) {
+            AdminAuditRecorder adminAuditRecorder,
+            AcademicScopeResolver academicScopeResolver) {
         return new SetUserAcademicContextsService(userRepository, contextRepository, catalogRepository,
-                adminAuditRecorder);
+                adminAuditRecorder, academicScopeResolver);
     }
 
     @Bean
@@ -86,10 +96,11 @@ public class ApplicationConfig {
             UserRepository userRepository,
             SyncUserUseCase syncUserUseCase,
             AdminAuditRecorder adminAuditRecorder,
+            AcademicScopeResolver academicScopeResolver,
             @Value("${jwt.auth.converter.permissions-client-id:dss-permissions}") String permissionsClientId,
             @Value("${app.iam.invitation-lifespan:72h}") Duration invitationLifespan) {
         return new IamUserAdministrationService(identityUsers, identityRoles, identityRoleMappings, userRepository,
-                syncUserUseCase, adminAuditRecorder, permissionsClientId, invitationLifespan);
+                syncUserUseCase, adminAuditRecorder, academicScopeResolver, permissionsClientId, invitationLifespan);
     }
 
     @Bean
