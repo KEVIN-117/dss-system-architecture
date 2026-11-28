@@ -42,6 +42,8 @@ export default defineConfig({
   webServer: {
     command: 'bun nx run @dss-monorepo/decano-dashboard:dev',
     url: baseURL,
+    // `next dev` compiles on first request; slow CI runners exceed the 60 s default.
+    timeout: 180_000,
     reuseExistingServer: !process.env.CI,
     cwd: workspaceRoot,
   },
