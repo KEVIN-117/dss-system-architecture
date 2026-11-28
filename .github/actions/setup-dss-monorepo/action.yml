@@ -30,13 +30,12 @@ runs:
     # Nx keys its local cache database by machine id and ignores artifacts
     # produced on another machine. Hosted runners are ephemeral, so pin a
     # stable id to let a restored .nx cache be reused across runs.
+    # /var/lib/dbus/machine-id is a symlink to /etc/machine-id on hosted
+    # runners, so writing /etc/machine-id is enough (do not cp onto it).
     - name: Pin machine id for the Nx local cache
       shell: bash
       run: |
         echo "4e5843616368654753484131303030" | sudo tee /etc/machine-id > /dev/null
-        if [ -e /var/lib/dbus/machine-id ]; then
-          sudo cp /etc/machine-id /var/lib/dbus/machine-id
-        fi
 
     - name: Restore Nx local cache
       uses: actions/cache@v4
