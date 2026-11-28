@@ -129,5 +129,8 @@ export default defineConfig({
       name: 'Google Chrome',
       use: { ...devices['Desktop Chrome'], channel: 'chrome' },
     } */
-  ],
+  ].filter(
+    // CI runs Chromium only to keep the pipeline fast; all browsers run locally.
+    (project) => !process.env.CI || project.name === 'chromium',
+  ),
 });
