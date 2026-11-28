@@ -259,6 +259,8 @@ yarn-error.log*
 # Preview servers: absolute, per-machine paths
 .claude/launch.json
 **/.claude/launch.json
+# Local Claude config at the repo root (agents, settings): not versioned
+/.claude/
 .gemini/
 **/.gemini/
 .cursor/
