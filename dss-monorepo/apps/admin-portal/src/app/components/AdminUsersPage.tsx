@@ -72,6 +72,7 @@ function directoryEntry(user: IamUser): AdminUserDirectoryEntry {
     lastName: user.lastName,
     isActive: user.enabled,
     roles: [],
+    academicScope: user.academicScope,
     academicContexts: [],
   };
 }
