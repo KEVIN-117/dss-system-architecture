@@ -1,0 +1,50 @@
+name: Set up DSS monorepo
+description: >-
+  Installs Bun and the monorepo dependencies and restores the local Nx cache.
+  Expects the repository to be checked out with full history beforehand.
+
+inputs:
+  nx-cache-scope:
+    description: Distinguishes the Nx cache of each job or matrix shard.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - uses: oven-sh/setup-bun@v2
+      with:
+        bun-version: 1.3.14
+
+    - name: Restore Bun install cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.bun/install/cache
+        key: bun-${{ runner.os }}-${{ hashFiles('dss-monorepo/bun.lock') }}
+        restore-keys: bun-${{ runner.os }}-
+
+    - name: Install dependencies
+      shell: bash
+      working-directory: dss-monorepo
+      run: bun install --frozen-lockfile
+
+    # Nx keys its local cache database by machine id and ignores artifacts
+    # produced on another machine. Hosted runners are ephemeral, so pin a
+    # stable id to let a restored .nx cache be reused across runs.
+    - name: Pin machine id for the Nx local cache
+      shell: bash
+      run: |
+        echo "4e5843616368654753484131303030" | sudo tee /etc/machine-id > /dev/null
+        if [ -e /var/lib/dbus/machine-id ]; then
+          sudo cp /etc/machine-id /var/lib/dbus/machine-id
+        fi
+
+    - name: Restore Nx local cache
+      uses: actions/cache@v4
+      with:
+        path: |
+          dss-monorepo/.nx/cache
+          dss-monorepo/.nx/workspace-data
+        key: nx-${{ runner.os }}-${{ inputs.nx-cache-scope }}-${{ hashFiles('dss-monorepo/bun.lock') }}-${{ github.sha }}
+        restore-keys: |
+          nx-${{ runner.os }}-${{ inputs.nx-cache-scope }}-${{ hashFiles('dss-monorepo/bun.lock') }}-
+          nx-${{ runner.os }}-${{ inputs.nx-cache-scope }}-

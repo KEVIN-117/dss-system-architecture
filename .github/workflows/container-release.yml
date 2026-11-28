@@ -109,30 +109,115 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  changes:
+    name: Detect changed components
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      auth: ${{ steps.filter.outputs.auth }}
+      keycloak: ${{ steps.filter.outputs.keycloak }}
+      olap: ${{ steps.filter.outputs.olap }}
+      hop: ${{ steps.filter.outputs.hop }}
+      dw_control: ${{ steps.filter.outputs.dw_control }}
+      dss: ${{ steps.filter.outputs.dss }}
+    steps:
+      - uses: actions/checkout@v4
+      # On push the filter compares against the previous commit of main, so
+      # each verify job only runs for components touched by the merged change.
+      # Release PR merges edit each component's CHANGELOG and version files,
+      # which re-runs the verify job (and its artifact) its publish job needs.
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            shared: &shared
+              - ".github/workflows/container-release.yml"
+              - ".github/release-please-config.json"
+              - ".release-please-manifest.json"
+              - ".env.example"
+              - "docker-compose.yml"
+            auth:
+              - *shared
+              - ".github/workflows/auth-service-ci.yml"
+              - "auth-service/**"
+              - "infra/keycloak/realm/**"
+              - "infra/rabbitmq/**"
+              - "keycloak-webhook/pom.xml"
+              - "keycloak-webhook/src/**"
+            keycloak:
+              - *shared
+              - ".github/workflows/keycloak-ci.yml"
+              - "infra/keycloak/**"
+              - "keycloak-webhook/**"
+              - "auth-service/**"
+            olap:
+              - *shared
+              - ".github/workflows/olap-service-ci.yml"
+              - "olap-service/**"
+              - "docker/initialize-academic-olap.sh"
+              - "infra/olap/**"
+            hop:
+              - *shared
+              - ".github/workflows/dw-hop-ci.yml"
+              - "docs/dw/**"
+              - "etl-layer/apache-hop/**"
+              - "infra/dw-schema/**"
+              - "infra/dw-control-db-provision/**"
+              - "infra/dw-integration/**"
+              - "infra/dw-test-data/**"
+              - "auth-service/src/main/resources/db/migration/**"
+            dw_control:
+              - *shared
+              - ".github/workflows/dw-control-service-ci.yml"
+              - "dw-control-service/**"
+              - "infra/keycloak/realm/**"
+              - "docs/envs/dw-control-service.md"
+            dss:
+              - *shared
+              - ".github/workflows/ci.yml"
+              - ".github/workflows/publish-nextjs-app.yml"
+              - ".github/actions/setup-dss-monorepo/**"
+              - "dss-monorepo/**"
+
   verify-auth-service:
     name: Verify auth-service
+    needs: changes
+    if: needs.changes.outputs.auth == 'true' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/auth-service-ci.yml
 
   verify-keycloak:
     name: Verify Keycloak
+    needs: changes
+    if: needs.changes.outputs.keycloak == 'true' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/keycloak-ci.yml
 
   verify-olap-service:
     name: Verify OLAP service
+    needs: changes
+    if: needs.changes.outputs.olap == 'true' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/olap-service-ci.yml
     secrets:
       GH_PACKAGES_TOKEN: ${{ secrets.GH_PACKAGES_TOKEN }}
 
   verify-apache-hop:
     name: Verify Apache Hop and DW migrations
+    needs: changes
+    if: needs.changes.outputs.hop == 'true' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/dw-hop-ci.yml
 
   verify-dw-control-service:
     name: Verify DW Control Service
+    needs: changes
+    if: needs.changes.outputs.dw_control == 'true' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/dw-control-service-ci.yml
 
   verify-dss-monorepo:
     name: Verify affected DSS frontend projects
+    needs: changes
+    if: needs.changes.outputs.dss == 'true' || github.event_name == 'workflow_dispatch'
     uses: ./.github/workflows/ci.yml
     permissions:
       actions: read
@@ -141,8 +226,14 @@ jobs:
 
   release-please:
     name: Create component release PRs or GitHub releases
-    if: github.ref == 'refs/heads/main'
+    # Verify jobs are skipped for untouched components; only a failure or
+    # cancellation blocks the release.
+    if: >-
+      always() && github.ref == 'refs/heads/main' &&
+      !contains(needs.*.result, 'failure') &&
+      !contains(needs.*.result, 'cancelled')
     needs:
+      - changes
       - verify-auth-service
       - verify-keycloak
       - verify-olap-service

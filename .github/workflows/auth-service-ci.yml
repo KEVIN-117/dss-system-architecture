@@ -68,20 +68,21 @@ jobs:
           BFF_SESSION_SECRET: ci-placeholder-session-secret-32-characters
         run: docker compose --env-file .env.example config --quiet
 
-      - name: Build auth-service
+      # One Maven invocation compiles once; the suite includes ArchitectureTest.
+      - name: Build and run complete test suite
         working-directory: auth-service
-        run: bash ./mvnw --batch-mode --no-transfer-progress -DskipTests clean package
+        run: bash ./mvnw --batch-mode --no-transfer-progress clean package
 
-      - name: Run architecture checks
-        working-directory: auth-service
-        run: bash ./mvnw --batch-mode --no-transfer-progress -Dtest=ArchitectureTest test
-
-      - name: Run complete test suite
-        working-directory: auth-service
-        run: bash ./mvnw --batch-mode --no-transfer-progress test
+      - uses: docker/setup-buildx-action@v3
 
       - name: Build container image
-        run: docker build --tag dss-auth-service:${{ github.sha }} ./auth-service
+        uses: docker/build-push-action@v6
+        with:
+          context: auth-service
+          load: true
+          tags: dss-auth-service:${{ github.sha }}
+          cache-from: type=gha,scope=auth-service
+          cache-to: type=gha,mode=max,scope=auth-service
 
       - name: Upload application artifact
         uses: actions/upload-artifact@v4

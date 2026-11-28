@@ -20,11 +20,15 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: olap-service-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   verify:
     name: Verify Saiku OLAP and build image
     runs-on: ubuntu-latest
-    timeout-minutes: 60
+    timeout-minutes: 20
     steps:
       - name: Check out source
         uses: actions/checkout@v4
@@ -58,7 +62,10 @@ jobs:
 
       - name: Run complete OLAP verification suite
         working-directory: olap-service
-        run: mvn --batch-mode --no-transfer-progress -DskipTests=false verify
+        # The aggregate CycloneDX SBOM re-verifies every cached artifact against
+        # all remote repositories (~14 min) and is not consumed by any image;
+        # published images already carry a BuildKit SBOM (sbom: true).
+        run: mvn --batch-mode --no-transfer-progress -DskipTests=false -Dcyclonedx.skip=true verify
 
       - name: Stage launcher JAR for Docker build
         working-directory: olap-service
