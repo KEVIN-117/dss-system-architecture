@@ -396,17 +396,20 @@ paths:
       summary: Crea un rol del realm
       x-required-permission: iam:roles:write
       x-audit-action: ROLE_CREATED
+      description: >-
+        Todo rol pertenece a una sola aplicación (IAM-021): `portal` es obligatorio y el rol agrupa su permiso
+        `portal:<aplicación>`. Si no se puede asignar la aplicación, el rol no se crea.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [name]
+              required: [name, portal]
               properties:
                 name: { type: string, pattern: '^[A-Z][A-Z0-9_]{1,49}$' }
                 description: { type: string, maxLength: 255 }
-                portal: { type: string, pattern: '^[a-z][a-z0-9-]{0,49}$' }
+                portal: { $ref: '#/components/schemas/IamRolePortal' }
       responses:
         '201':
           description: Rol creado; `Location` apunta a `/admin/iam/roles/{name}`.
@@ -439,10 +442,13 @@ paths:
     patch:
       tags: [Roles y permisos]
       operationId: updateIamRole
-      summary: Actualiza la descripción o el portal de un rol
+      summary: Actualiza la descripción o la aplicación de un rol
       x-required-permission: iam:roles:write
       x-audit-action: ROLE_UPDATED
-      description: El nombre no cambia. Los campos omitidos no cambian; un `portal` vacío lo elimina.
+      description: >-
+        El nombre no cambia y los campos omitidos tampoco. Cambiar `portal` reemplaza el permiso `portal:*` del rol,
+        que siempre queda con uno solo. Un rol no puede quedar sin aplicación (400) y los roles del sistema
+        conservan la suya (409).
       parameters:
         - { name: name, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -453,7 +459,7 @@ paths:
               type: object
               properties:
                 description: { type: string, maxLength: 255 }
-                portal: { type: string, maxLength: 50 }
+                portal: { $ref: '#/components/schemas/IamRolePortal' }
       responses:
         '200':
           description: Rol actualizado.
@@ -512,6 +518,8 @@ paths:
       description: >-
         Agrega o quita solo la diferencia. Los usuarios con el rol reciben el cambio en su próximo token.
         SUPERADMIN no puede perder ningún permiso `iam:*` (409). Un permiso inexistente devuelve 404.
+        La aplicación no cambia aquí: los `portal:*` del rol se conservan aunque falten en la lista y agregar
+        otro devuelve 400.
       parameters:
         - { name: name, in: path, required: true, schema: { type: string } }
       requestBody:
@@ -556,6 +564,7 @@ paths:
       summary: Crea un permiso
       x-required-permission: iam:roles:write
       x-audit-action: PERMISSION_CREATED
+      description: Los `portal:*` representan las aplicaciones y no se crean a mano (400).
       requestBody:
         required: true
         content:
@@ -931,13 +940,21 @@ components:
           type: array
           description: Directos más los heredados por roles compuestos.
           items: { $ref: '#/components/schemas/IamRole' }
+    IamRolePortal:
+      type: string
+      enum: [admin, rector, decano, director]
+      description: Aplicación de un rol; el rol agrupa el permiso `portal:<aplicación>` (IAM-020/021).
     IamRoleView:
       type: object
       required: [name, system]
       properties:
         name: { type: string }
         description: { type: [string, 'null'] }
-        portal: { type: [string, 'null'], description: 'Portal al que se dirige a quien tiene el rol (atributo `portal`).' }
+        portal:
+          description: Aplicación que abre el rol, según su permiso `portal:*`; `null` si todavía no tiene.
+          oneOf:
+            - { $ref: '#/components/schemas/IamRolePortal' }
+            - { type: 'null' }
         system: { type: boolean, description: 'Rol del que depende la plataforma: se edita, pero no se elimina.' }
     IamPermissionView:
       type: object
@@ -947,7 +964,7 @@ components:
         description: { type: [string, 'null'] }
         resource: { type: string, example: 'dw:closure' }
         action: { type: string, example: 'manage' }
-        system: { type: boolean, description: 'Permiso del que depende la plataforma (`iam:*`, `context:read`).' }
+        system: { type: boolean, description: 'Permiso del que depende la plataforma (`iam:*`, `context:read`, `portal:*`): se edita, pero no se elimina.' }
     IamPermissionMatrix:
       type: object
       required: [roles, permissions, grants]

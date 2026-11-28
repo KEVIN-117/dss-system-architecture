@@ -59,7 +59,11 @@ describe('IAM request guards', () => {
     expect(isIamCreateRoleRequest({ name: 'VICERRECTOR', description: 'Vicerrectorado', portal: 'rector' })).toBe(true);
     expect(isIamCreateRoleRequest({ name: 'vicerrector' })).toBe(false);
     expect(isIamCreateRoleRequest({ name: 'VICERRECTOR', portal: 'Rector' })).toBe(false);
-    expect(isIamUpdateRoleRequest({ portal: '' })).toBe(true);
+    expect(isIamCreateRoleRequest({ name: 'VICERRECTOR', portal: 'becas' })).toBe(false);
+    expect(isIamCreateRoleRequest({ name: 'VICERRECTOR' })).toBe(false);
+    expect(isIamUpdateRoleRequest({ portal: 'decano' })).toBe(true);
+    expect(isIamUpdateRoleRequest({ description: 'Solo descripción' })).toBe(true);
+    expect(isIamUpdateRoleRequest({ portal: '' })).toBe(false);
     expect(isIamUpdateRoleRequest({ description: 'x'.repeat(256) })).toBe(false);
     expect(isIamUpdateRoleRequest({ name: 'RENAMED' })).toBe(false);
   });

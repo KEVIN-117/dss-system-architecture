@@ -39,11 +39,11 @@ export function createRole(draft: IamRoleDraft): Promise<IamRole> {
   });
 }
 
-/** An empty `portal` removes the portal attribute. */
+/** An empty `portal` leaves the role's application unchanged: a role cannot be left without one (IAM-021). */
 export function updateRole(name: string, change: { description: string; portal: string }): Promise<IamRole> {
   return iamRequest('PATCH', role(name), 'No se pudo actualizar el rol', {
     description: change.description.trim(),
-    portal: change.portal.trim(),
+    ...(change.portal.trim() ? { portal: change.portal.trim() } : {}),
   });
 }
 

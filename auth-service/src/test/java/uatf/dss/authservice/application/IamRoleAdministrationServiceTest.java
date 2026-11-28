@@ -40,8 +40,10 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anySet;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.atLeastOnce;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -82,12 +84,15 @@ class IamRoleAdministrationServiceTest {
     // ---- roles ---------------------------------------------------------------------------------------------
 
     @Test
-    void listsInstitutionalRolesWithPortalAndSystemFlagHidingKeycloakBuiltIns() {
+    void listsInstitutionalRolesWithTheApplicationOfTheirPortalPermissionHidingKeycloakBuiltIns() {
         when(roles.listRealmRoles()).thenReturn(List.of(
-                realm("RECTOR", "Rector", Map.of("portal", List.of("rector"))),
+                // The legacy attribute no longer decides the application: the portal:* composite does.
+                realm("RECTOR", "Rector", Map.of("portal", List.of("decano"))),
                 realm("COORDINADOR", null, Map.of()),
                 realm("default-roles-uatf-dss-realm", null, Map.of()),
                 realm("offline_access", null, Map.of())));
+        when(roles.listRealmRoleClientComposites("RECTOR", CATALOG))
+                .thenReturn(List.of(permission("analytics:read"), permission("portal:rector")));
 
         assertThat(service.listRoles()).containsExactly(
                 new IamRoleViews.Role("COORDINADOR", null, null, false),
@@ -95,41 +100,110 @@ class IamRoleAdministrationServiceTest {
     }
 
     @Test
-    void createsARoleWithItsPortalAndAuditsIt() {
-        IdentityRole created = realm("COORDINADOR_ACADEMICO", "Coordinación", Map.of("portal", List.of("director")));
+    void createsARoleThatOpensItsApplicationAndAuditsIt() {
+        IdentityRole created = realm("COORDINADOR_ACADEMICO", "Coordinación", Map.of());
         when(roles.findRealmRole("COORDINADOR_ACADEMICO")).thenReturn(Optional.of(created));
+        when(roles.listRealmRoleClientComposites("COORDINADOR_ACADEMICO", CATALOG))
+                .thenReturn(List.of(permission("portal:director")));
 
         IamRoleViews.Role view = service.createRole(new IamRoleCommands.CreateRole(ADMIN, " COORDINADOR_ACADEMICO ",
                 "Coordinación", "director"));
 
-        verify(roles).createRealmRole(new IdentityRoleDraft("COORDINADOR_ACADEMICO", "Coordinación",
-                Map.of("portal", List.of("director"))));
+        verify(roles).createRealmRole(new IdentityRoleDraft("COORDINADOR_ACADEMICO", "Coordinación", Map.of()));
+        verify(roles).addClientCompositesToRealmRole("COORDINADOR_ACADEMICO", CATALOG, Set.of("portal:director"));
         assertThat(view.portal()).isEqualTo("director");
         AdminAuditEntry audit = audits().getFirst();
         assertThat(audit.action()).isEqualTo("ROLE_CREATED");
         assertThat(audit.targetType()).isEqualTo(AuditTargetType.ROLE);
         assertThat(audit.outcome()).isEqualTo(AuditOutcome.SUCCESS);
+        assertThat(audit.after()).containsEntry("portal", "director");
     }
 
     @Test
-    void rejectsInvalidRoleNamesAndPortalsAsAuditedFailures() {
-        assertThatThrownBy(() -> service.createRole(new IamRoleCommands.CreateRole(ADMIN, "coordinador", null, null)))
+    void rejectsInvalidNamesAndMissingOrUnknownApplicationsAsAuditedFailures() {
+        assertThatThrownBy(() -> service.createRole(new IamRoleCommands.CreateRole(ADMIN, "coordinador", null, "admin")))
                 .isInstanceOf(ValidationException.class);
-        assertThatThrownBy(() -> service.createRole(new IamRoleCommands.CreateRole(ADMIN, "COORD", null, "Portal X")))
+        assertThatThrownBy(() -> service.createRole(new IamRoleCommands.CreateRole(ADMIN, "COORD", null, null)))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("admin, rector, decano, director");
+        assertThatThrownBy(() -> service.createRole(new IamRoleCommands.CreateRole(ADMIN, "COORD", null, " ")))
                 .isInstanceOf(ValidationException.class);
+        for (String unknown : List.of("becas", "Rector", "portal:rector")) {
+            assertThatThrownBy(() -> service.createRole(new IamRoleCommands.CreateRole(ADMIN, "COORD", null, unknown)))
+                    .as(unknown).isInstanceOf(ValidationException.class);
+        }
         verify(roles, never()).createRealmRole(any());
         assertThat(audits()).extracting(AdminAuditEntry::outcome).containsOnly(AuditOutcome.FAILURE);
     }
 
     @Test
-    void updateKeepsOtherAttributesAndUnchangedFieldsAndCanClearThePortal() {
+    void undoesTheCreationWhenTheApplicationCannotBeAssigned() {
+        doThrow(new IllegalStateException("Keycloak caído")).when(roles)
+                .addClientCompositesToRealmRole("COORD", CATALOG, Set.of("portal:admin"));
+
+        assertThatThrownBy(() -> service.createRole(new IamRoleCommands.CreateRole(ADMIN, "COORD", null, "admin")))
+                .isInstanceOf(IllegalStateException.class);
+
+        verify(roles).deleteRealmRole("COORD");
+        assertThat(audits().getFirst().outcome()).isEqualTo(AuditOutcome.FAILURE);
+    }
+
+    @Test
+    void updatingTheDescriptionKeepsTheApplicationAndOtherAttributesButDropsTheLegacyPortalAttribute() {
         IdentityRole current = realm("COORDINADOR", "Antes", Map.of("portal", List.of("director"), "color", List.of("azul")));
         when(roles.findRealmRole("COORDINADOR")).thenReturn(Optional.of(current));
+        when(roles.listRealmRoleClientComposites("COORDINADOR", CATALOG)).thenReturn(List.of(permission("portal:director")));
 
-        service.updateRole(new IamRoleCommands.UpdateRole(ADMIN, "COORDINADOR", null, ""));
+        IamRoleViews.Role view = service.updateRole(new IamRoleCommands.UpdateRole(ADMIN, "COORDINADOR", "Después", null));
 
-        verify(roles).updateRealmRole("COORDINADOR", new IdentityRoleDraft("COORDINADOR", "Antes",
+        verify(roles).updateRealmRole("COORDINADOR", new IdentityRoleDraft("COORDINADOR", "Después",
                 Map.of("color", List.of("azul"))));
+        verify(roles, never()).addClientCompositesToRealmRole(anyString(), anyString(), anySet());
+        verify(roles, never()).removeClientCompositesFromRealmRole(anyString(), anyString(), anySet());
+        assertThat(view.portal()).isEqualTo("director");
+    }
+
+    @Test
+    void movesARoleToAnotherApplicationLeavingExactlyOnePortalPermission() {
+        when(roles.findRealmRole("COORDINADOR")).thenReturn(Optional.of(realm("COORDINADOR", "Coord", Map.of())));
+        when(roles.listRealmRoleClientComposites("COORDINADOR", CATALOG)).thenReturn(
+                List.of(permission("analytics:read"), permission("portal:director"), permission("portal:rector")),
+                List.of(permission("analytics:read"), permission("portal:decano")));
+
+        IamRoleViews.Role view = service.updateRole(new IamRoleCommands.UpdateRole(ADMIN, "COORDINADOR", null, "decano"));
+
+        verify(roles).addClientCompositesToRealmRole("COORDINADOR", CATALOG, Set.of("portal:decano"));
+        verify(roles).removeClientCompositesFromRealmRole("COORDINADOR", CATALOG, Set.of("portal:director", "portal:rector"));
+        assertThat(view.portal()).isEqualTo("decano");
+        AdminAuditEntry audit = audits().getFirst();
+        assertThat(audit.before()).containsEntry("portal", "director");
+        assertThat(audit.after()).containsEntry("portal", "decano");
+    }
+
+    @Test
+    void aRoleCannotBeLeftWithoutAnApplicationNorMovedToAnUnknownOne() {
+        when(roles.findRealmRole("COORDINADOR")).thenReturn(Optional.of(realm("COORDINADOR", "Coord", Map.of())));
+
+        for (String invalid : List.of("", "becas")) {
+            assertThatThrownBy(() -> service.updateRole(new IamRoleCommands.UpdateRole(ADMIN, "COORDINADOR", null, invalid)))
+                    .as(invalid).isInstanceOf(ValidationException.class);
+        }
+        verify(roles, never()).updateRealmRole(anyString(), any());
+    }
+
+    @Test
+    void systemRolesKeepTheApplicationOfTheirPortal() {
+        when(roles.findRealmRole("RECTOR")).thenReturn(Optional.of(realm("RECTOR", "Rector", Map.of())));
+        when(roles.listRealmRoleClientComposites("RECTOR", CATALOG)).thenReturn(List.of(permission("portal:rector")));
+
+        assertThatThrownBy(() -> service.updateRole(new IamRoleCommands.UpdateRole(ADMIN, "RECTOR", null, "admin")))
+                .isInstanceOf(IamRuleViolationException.class)
+                .hasMessageContaining("rector");
+        verify(roles, never()).updateRealmRole(anyString(), any());
+
+        service.updateRole(new IamRoleCommands.UpdateRole(ADMIN, "RECTOR", "Rectorado", "rector"));
+        verify(roles).updateRealmRole("RECTOR", new IdentityRoleDraft("RECTOR", "Rectorado", Map.of()));
+        verify(roles, never()).addClientCompositesToRealmRole(anyString(), anyString(), anySet());
     }
 
     @Test
@@ -185,6 +259,25 @@ class IamRoleAdministrationServiceTest {
     }
 
     @Test
+    void thePermissionGridNeverChangesTheApplicationOfARole() {
+        when(roles.findRealmRole("COORDINADOR")).thenReturn(Optional.of(realm("COORDINADOR", null, Map.of())));
+        when(roles.listRealmRoleClientComposites("COORDINADOR", CATALOG))
+                .thenReturn(List.of(permission("analytics:read"), permission("portal:director")));
+
+        // Omitting the role's portal:* keeps it.
+        service.replaceRolePermissions(new IamRoleCommands.ReplaceRolePermissions(ADMIN, "COORDINADOR", Set.of()));
+        verify(roles).removeClientCompositesFromRealmRole("COORDINADOR", CATALOG, Set.of("analytics:read"));
+
+        // Adding another application is rejected.
+        assertThatThrownBy(() -> service.replaceRolePermissions(new IamRoleCommands.ReplaceRolePermissions(
+                ADMIN, "COORDINADOR", Set.of("analytics:read", "portal:admin"))))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("portal:admin");
+        verify(roles, never()).addClientCompositesToRealmRole(eq("COORDINADOR"), eq(CATALOG),
+                argThat(permissions -> permissions.contains("portal:admin")));
+    }
+
+    @Test
     void superadminKeepsEveryIamPermission() {
         when(roles.findRealmRole("SUPERADMIN")).thenReturn(Optional.of(realm("SUPERADMIN", null, Map.of())));
         when(roles.listRealmRoleClientComposites("SUPERADMIN", CATALOG))
@@ -218,6 +311,9 @@ class IamRoleAdministrationServiceTest {
         }
         assertThatThrownBy(() -> service.createPermission(new IamRoleCommands.CreatePermission(ADMIN, "reports:export", " ")))
                 .isInstanceOf(ValidationException.class);
+        assertThatThrownBy(() -> service.createPermission(new IamRoleCommands.CreatePermission(ADMIN, "portal:becas", "Becas")))
+                .isInstanceOf(ValidationException.class)
+                .hasMessageContaining("aplicaciones");
         verify(roles, never()).createClientRole(anyString(), any());
     }
 
@@ -225,10 +321,13 @@ class IamRoleAdministrationServiceTest {
     void systemPermissionsCannotBeDeleted() {
         when(roles.findClientRole(CATALOG, "iam:users:write")).thenReturn(Optional.of(permission("iam:users:write")));
         when(roles.findClientRole(CATALOG, "context:read")).thenReturn(Optional.of(permission("context:read")));
+        when(roles.findClientRole(CATALOG, "portal:admin")).thenReturn(Optional.of(permission("portal:admin")));
 
         assertThatThrownBy(() -> service.deletePermission(new IamRoleCommands.DeletePermission(ADMIN, "iam:users:write", true)))
                 .isInstanceOf(IamRuleViolationException.class);
         assertThatThrownBy(() -> service.deletePermission(new IamRoleCommands.DeletePermission(ADMIN, "context:read", true)))
+                .isInstanceOf(IamRuleViolationException.class);
+        assertThatThrownBy(() -> service.deletePermission(new IamRoleCommands.DeletePermission(ADMIN, "portal:admin", true)))
                 .isInstanceOf(IamRuleViolationException.class);
         verify(roles, never()).deleteClientRole(anyString(), anyString());
     }
@@ -251,6 +350,18 @@ class IamRoleAdministrationServiceTest {
     }
 
     @Test
+    void theMatrixReportsTheApplicationOfEachRole() {
+        when(roles.listRealmRoles()).thenReturn(List.of(realm("SUPERADMIN", null, Map.of())));
+        when(roles.listRealmRoleClientComposites("SUPERADMIN", CATALOG))
+                .thenReturn(List.of(permission("iam:roles:read"), permission("portal:admin")));
+
+        IamRoleViews.Matrix matrix = service.matrix();
+
+        assertThat(matrix.roles()).containsExactly(new IamRoleViews.Role("SUPERADMIN", null, "admin", true));
+        assertThat(matrix.grants()).containsEntry("SUPERADMIN", List.of("iam:roles:read", "portal:admin"));
+    }
+
+    @Test
     void buildsTheRolePermissionMatrix() {
         when(roles.listRealmRoles()).thenReturn(List.of(realm("DIRECTOR", null, Map.of()), realm("RECTOR", null, Map.of()),
                 realm("offline_access", null, Map.of())));
@@ -262,6 +373,7 @@ class IamRoleAdministrationServiceTest {
         IamRoleViews.Matrix matrix = service.matrix();
 
         assertThat(matrix.roles()).extracting(IamRoleViews.Role::name).containsExactly("DIRECTOR", "RECTOR");
+        assertThat(matrix.roles()).extracting(IamRoleViews.Role::portal).containsOnlyNulls();
         assertThat(matrix.permissions()).extracting(IamRoleViews.Permission::name)
                 .containsExactly("analytics:global", "analytics:read");
         assertThat(matrix.grants()).containsEntry("DIRECTOR", List.of("analytics:read"))

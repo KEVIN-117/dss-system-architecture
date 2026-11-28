@@ -105,7 +105,7 @@ class IamRoleControllerIntegrationTest {
 
     private void createRole(String name) throws Exception {
         mockMvc.perform(post(ROLES).with(admin()).contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of("name", name, "description", "Rol de prueba"))))
+                        .content(body(Map.of("name", name, "description", "Rol de prueba", "portal", "director"))))
                 .andExpect(status().isCreated());
     }
 
@@ -113,6 +113,11 @@ class IamRoleControllerIntegrationTest {
         mockMvc.perform(post(PERMISSIONS).with(admin()).contentType(MediaType.APPLICATION_JSON)
                         .content(body(Map.of("name", name, "description", "Permiso de prueba"))))
                 .andExpect(status().isCreated());
+    }
+
+    private List<String> portalPermissionsOf(String role) {
+        return identityRoles.listRealmRoleClientComposites(role, CATALOG).stream().map(IdentityRole::name)
+                .filter(name -> name.startsWith("portal:")).sorted().toList();
     }
 
     private List<String> auditOutcomes(String action) {
@@ -133,8 +138,9 @@ class IamRoleControllerIntegrationTest {
                 .andExpect(header().string("Location", "/admin/iam/roles/" + name))
                 .andExpect(jsonPath("$.portal").value("director"))
                 .andExpect(jsonPath("$.system").value(false));
+        assertThat(portalPermissionsOf(name)).as("the application is the portal:* composite").containsExactly("portal:director");
         assertThat(identityRoles.findRealmRole(name)).get()
-                .satisfies(role -> assertThat(role.attributes()).containsEntry("portal", List.of("director")));
+                .satisfies(role -> assertThat(role.attributes()).doesNotContainKey("portal"));
 
         mockMvc.perform(get(ROLES).with(admin()))
                 .andExpect(status().isOk())
@@ -143,16 +149,21 @@ class IamRoleControllerIntegrationTest {
                 .andExpect(jsonPath("$[?(@.name == 'SUPERADMIN')].system").value(contains(true)));
 
         mockMvc.perform(patch(ROLES + "/{name}", name).with(admin()).contentType(MediaType.APPLICATION_JSON)
-                        .content(body(Map.of("description", "Nueva descripción", "portal", ""))))
+                        .content(body(Map.of("description", "Nueva descripción", "portal", "decano"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.description").value("Nueva descripción"))
-                .andExpect(jsonPath("$.portal").doesNotExist());
+                .andExpect(jsonPath("$.portal").value("decano"));
+        assertThat(portalPermissionsOf(name)).as("exactly one application").containsExactly("portal:decano");
+        mockMvc.perform(patch(ROLES + "/{name}", name).with(admin()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("portal", ""))))
+                .andExpect(status().isBadRequest());
+        assertThat(portalPermissionsOf(name)).containsExactly("portal:decano");
 
         mockMvc.perform(delete(ROLES + "/{name}", name).with(admin())).andExpect(status().isNoContent());
         mockMvc.perform(get(ROLES + "/{name}", name).with(admin())).andExpect(status().isNotFound());
 
         assertThat(auditOutcomes("ROLE_CREATED")).containsExactly("SUCCESS");
-        assertThat(auditOutcomes("ROLE_UPDATED")).containsExactly("SUCCESS");
+        assertThat(auditOutcomes("ROLE_UPDATED")).containsExactly("SUCCESS", "FAILURE");
         assertThat(auditOutcomes("ROLE_DELETED")).containsExactly("SUCCESS");
     }
 
@@ -163,12 +174,33 @@ class IamRoleControllerIntegrationTest {
         createRole(name);
 
         mockMvc.perform(post(ROLES).with(admin()).contentType(MediaType.APPLICATION_JSON)
-                .content(body(Map.of("name", name)))).andExpect(status().isConflict());
+                .content(body(Map.of("name", name, "portal", "director")))).andExpect(status().isConflict());
         mockMvc.perform(post(ROLES).with(admin()).contentType(MediaType.APPLICATION_JSON)
-                .content(body(Map.of("name", "minusculas")))).andExpect(status().isBadRequest());
+                .content(body(Map.of("name", "minusculas", "portal", "director")))).andExpect(status().isBadRequest());
         mockMvc.perform(post(ROLES).with(admin()).contentType(MediaType.APPLICATION_JSON)
-                .content(body(Map.of("name", roleName(), "portal", "Con Espacios")))).andExpect(status().isBadRequest());
-        assertThat(auditOutcomes("ROLE_CREATED")).containsExactly("SUCCESS", "FAILURE", "FAILURE", "FAILURE");
+                .content(body(Map.of("name", roleName(), "portal", "becas")))).andExpect(status().isBadRequest());
+        String withoutApplication = roleName();
+        mockMvc.perform(post(ROLES).with(admin()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("name", withoutApplication))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString("admin, rector, decano, director")));
+        assertThat(identityRoles.findRealmRole(withoutApplication)).isEmpty();
+        assertThat(auditOutcomes("ROLE_CREATED")).containsExactly("SUCCESS", "FAILURE", "FAILURE", "FAILURE", "FAILURE");
+    }
+
+    @Test
+    @DisplayName("System roles open exactly their application and keep it")
+    void systemRolesKeepTheirApplication() throws Exception {
+        mockMvc.perform(get(ROLES).with(admin()))
+                .andExpect(jsonPath("$[?(@.name == 'SUPERADMIN')].portal").value(contains("admin")))
+                .andExpect(jsonPath("$[?(@.name == 'RECTOR')].portal").value(contains("rector")))
+                .andExpect(jsonPath("$[?(@.name == 'DECANO')].portal").value(contains("decano")))
+                .andExpect(jsonPath("$[?(@.name == 'DIRECTOR')].portal").value(contains("director")));
+
+        mockMvc.perform(patch(ROLES + "/RECTOR").with(admin()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("portal", "admin"))))
+                .andExpect(status().isConflict());
+        assertThat(portalPermissionsOf("RECTOR")).containsExactly("portal:rector");
     }
 
     @Test
@@ -201,17 +233,21 @@ class IamRoleControllerIntegrationTest {
         mockMvc.perform(put(ROLES + "/{name}/permissions", role).with(admin()).contentType(MediaType.APPLICATION_JSON)
                         .content(body(Map.of("permissions", List.of("analytics:read", "olap:user")))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$[*].name").value(contains("analytics:read", "olap:user")))
+                .andExpect(jsonPath("$[*].name").value(contains("analytics:read", "olap:user", "portal:director")))
                 .andExpect(jsonPath("$[0].resource").value("analytics"))
                 .andExpect(jsonPath("$[0].action").value("read"));
         mockMvc.perform(put(ROLES + "/{name}/permissions", role).with(admin()).contentType(MediaType.APPLICATION_JSON)
                         .content(body(Map.of("permissions", List.of("olap:user")))))
                 .andExpect(status().isOk());
         mockMvc.perform(get(ROLES + "/{name}/permissions", role).with(admin()))
-                .andExpect(jsonPath("$[*].name").value(contains("olap:user")));
+                .andExpect(jsonPath("$[*].name").value(contains("olap:user", "portal:director")));
         mockMvc.perform(put(ROLES + "/{name}/permissions", role).with(admin()).contentType(MediaType.APPLICATION_JSON)
                         .content(body(Map.of("permissions", List.of("no:existe")))))
                 .andExpect(status().isNotFound());
+        mockMvc.perform(put(ROLES + "/{name}/permissions", role).with(admin()).contentType(MediaType.APPLICATION_JSON)
+                        .content(body(Map.of("permissions", List.of("olap:user", "portal:admin")))))
+                .andExpect(status().isBadRequest());
+        assertThat(portalPermissionsOf(role)).containsExactly("portal:director");
 
         mockMvc.perform(put(ROLES + "/SUPERADMIN/permissions").with(admin()).contentType(MediaType.APPLICATION_JSON)
                         .content(body(Map.of("permissions", List.of("connectors:read")))))
@@ -220,7 +256,7 @@ class IamRoleControllerIntegrationTest {
                 .contains("iam:roles:write", "iam:users:write");
 
         assertThat(auditOutcomes("ROLE_PERMISSIONS_REPLACED"))
-                .containsExactly("SUCCESS", "SUCCESS", "FAILURE", "FAILURE");
+                .containsExactly("SUCCESS", "SUCCESS", "FAILURE", "FAILURE", "FAILURE");
     }
 
     // ---- permissions ---------------------------------------------------------------------------------------
@@ -240,6 +276,8 @@ class IamRoleControllerIntegrationTest {
                 .content(body(Map.of("name", name, "description", "otra")))).andExpect(status().isConflict());
         mockMvc.perform(post(PERMISSIONS).with(admin()).contentType(MediaType.APPLICATION_JSON)
                 .content(body(Map.of("name", "SinFormato", "description", "x")))).andExpect(status().isBadRequest());
+        mockMvc.perform(post(PERMISSIONS).with(admin()).contentType(MediaType.APPLICATION_JSON)
+                .content(body(Map.of("name", "portal:becas", "description", "Portal de becas")))).andExpect(status().isBadRequest());
 
         mockMvc.perform(get(PERMISSIONS).with(admin()))
                 .andExpect(jsonPath("$[*].name").value(hasItem(name)))
@@ -252,7 +290,7 @@ class IamRoleControllerIntegrationTest {
 
         mockMvc.perform(delete(PERMISSIONS + "/{name}", name).with(admin())).andExpect(status().isNoContent());
         assertThat(identityRoles.findClientRole(CATALOG, name)).isEmpty();
-        assertThat(auditOutcomes("PERMISSION_CREATED")).containsExactly("SUCCESS", "FAILURE", "FAILURE");
+        assertThat(auditOutcomes("PERMISSION_CREATED")).containsExactly("SUCCESS", "FAILURE", "FAILURE", "FAILURE");
         assertThat(auditOutcomes("PERMISSION_UPDATED")).containsExactly("SUCCESS");
         assertThat(auditOutcomes("PERMISSION_DELETED")).containsExactly("SUCCESS");
     }
@@ -263,6 +301,8 @@ class IamRoleControllerIntegrationTest {
         mockMvc.perform(delete(PERMISSIONS + "/iam:users:write").param("force", "true").with(admin()))
                 .andExpect(status().isConflict());
         mockMvc.perform(delete(PERMISSIONS + "/context:read").param("force", "true").with(admin()))
+                .andExpect(status().isConflict());
+        mockMvc.perform(delete(PERMISSIONS + "/portal:admin").param("force", "true").with(admin()))
                 .andExpect(status().isConflict());
 
         String role = roleName();
@@ -277,7 +317,8 @@ class IamRoleControllerIntegrationTest {
                 .andExpect(jsonPath("$.detail").value(org.hamcrest.Matchers.containsString(role)));
         mockMvc.perform(delete(PERMISSIONS + "/{name}", permission).param("force", "true").with(admin()))
                 .andExpect(status().isNoContent());
-        assertThat(identityRoles.listRealmRoleClientComposites(role, CATALOG)).isEmpty();
+        assertThat(identityRoles.listRealmRoleClientComposites(role, CATALOG)).extracting(IdentityRole::name)
+                .containsExactly("portal:director");
     }
 
     @Test
@@ -292,7 +333,8 @@ class IamRoleControllerIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.roles[*].name").value(hasItem(role)))
                 .andExpect(jsonPath("$.permissions[*].name").value(hasItem("olap:user")))
-                .andExpect(jsonPath("$.grants." + role).value(contains("olap:user")))
+                .andExpect(jsonPath("$.grants." + role).value(contains("olap:user", "portal:director")))
+                .andExpect(jsonPath("$.roles[?(@.name == '" + role + "')].portal").value(contains("director")))
                 .andExpect(jsonPath("$.grants.DECANO").value(org.hamcrest.Matchers.hasItems(
                         "analytics:read", "analytics:career", "analytics:faculty", "pipelines:read")));
     }

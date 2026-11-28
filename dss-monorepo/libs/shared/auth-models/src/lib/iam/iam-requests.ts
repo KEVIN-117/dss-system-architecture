@@ -7,6 +7,9 @@
 
 export type IamRequiredAction = 'UPDATE_PASSWORD' | 'VERIFY_EMAIL' | 'UPDATE_PROFILE' | 'CONFIGURE_TOTP';
 export type IamClientType = 'PUBLIC' | 'CONFIDENTIAL';
+/** Applications a role can open (IAM-021); the role groups the permission `portal:<application>`. */
+export const IAM_ROLE_PORTALS = ['admin', 'rector', 'decano', 'director'] as const;
+export type IamRolePortal = (typeof IAM_ROLE_PORTALS)[number];
 
 export interface IamCreateUserRequest {
   username: string;
@@ -40,13 +43,14 @@ export interface IamReplacePermissionsRequest {
 export interface IamCreateRoleRequest {
   name: string;
   description?: string;
-  portal?: string;
+  /** Required: every role belongs to exactly one application. */
+  portal: IamRolePortal;
 }
 
 export interface IamUpdateRoleRequest {
   description?: string;
-  /** An empty string removes the portal attribute. */
-  portal?: string;
+  /** Moves the role to another application; a role cannot be left without one. */
+  portal?: IamRolePortal;
 }
 
 export interface IamCreatePermissionRequest {
@@ -82,12 +86,15 @@ export interface IamUpdateClientRequest {
 /** Path identifiers, as auth-service accepts them. */
 export const IAM_USERNAME_PATTERN = /^[A-Za-z0-9._@-]{3,255}$/;
 export const IAM_ROLE_NAME_PATTERN = /^[A-Z][A-Z0-9_]{1,49}$/;
-export const IAM_PORTAL_PATTERN = /^[a-z][a-z0-9-]{0,49}$/;
 export const IAM_PERMISSION_NAME_PATTERN = /^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*)+$/;
 export const IAM_CLIENT_ID_PATTERN = /^[a-z][a-z0-9-]{2,63}$/;
 export const IAM_REQUIRED_ACTIONS: readonly IamRequiredAction[] = [
   'UPDATE_PASSWORD', 'VERIFY_EMAIL', 'UPDATE_PROFILE', 'CONFIGURE_TOTP',
 ];
+
+export function isIamRolePortal(value: unknown): value is IamRolePortal {
+  return typeof value === 'string' && (IAM_ROLE_PORTALS as readonly string[]).includes(value);
+}
 
 export function isIamPermissionName(value: unknown): value is string {
   return typeof value === 'string' && value.length <= 100 && IAM_PERMISSION_NAME_PATTERN.test(value);
@@ -132,16 +139,16 @@ export function isIamReplaceRolePermissionsRequest(value: unknown): value is Iam
 }
 
 export function isIamCreateRoleRequest(value: unknown): value is IamCreateRoleRequest {
-  return shape(value, ['name'], ['description', 'portal']) &&
+  return shape(value, ['name', 'portal'], ['description']) &&
     matches(value.name, IAM_ROLE_NAME_PATTERN) &&
     optional(value.description, isText(255)) &&
-    optional(value.portal, (portal) => matches(portal, IAM_PORTAL_PATTERN));
+    isIamRolePortal(value.portal);
 }
 
 export function isIamUpdateRoleRequest(value: unknown): value is IamUpdateRoleRequest {
   return shape(value, [], ['description', 'portal']) &&
     optional(value.description, isText(255)) &&
-    optional(value.portal, (portal) => portal === '' || matches(portal, IAM_PORTAL_PATTERN));
+    optional(value.portal, isIamRolePortal);
 }
 
 export function isIamCreatePermissionRequest(value: unknown): value is IamCreatePermissionRequest {

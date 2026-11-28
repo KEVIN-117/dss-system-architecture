@@ -72,7 +72,9 @@ public class IamRoleController {
 
     @PostMapping
     @PreAuthorize("hasAuthority('iam:roles:write')")
-    @Operation(summary = "Crear un rol del realm")
+    @Operation(summary = "Crear un rol del realm",
+            description = "portal (obligatorio) es la aplicación que abre el rol: admin, rector, decano o director. "
+                    + "El rol agrupa su permiso portal:<aplicación>.")
     public ResponseEntity<IamRoleViews.Role> create(@Valid @RequestBody CreateRoleRequest request,
                                                     JwtAuthenticationToken authentication,
                                                     HttpServletRequest httpRequest) {
@@ -83,8 +85,9 @@ public class IamRoleController {
 
     @PatchMapping("/{name}")
     @PreAuthorize("hasAuthority('iam:roles:write')")
-    @Operation(summary = "Actualizar descripción o portal de un rol",
-            description = "El nombre no cambia. Un portal vacío lo elimina.")
+    @Operation(summary = "Actualizar la descripción o la aplicación de un rol",
+            description = "El nombre no cambia. Cambiar portal reemplaza el permiso portal:* del rol; un rol no puede "
+                    + "quedar sin aplicación y los roles del sistema conservan la suya.")
     public ResponseEntity<IamRoleViews.Role> update(@PathVariable String name,
                                                     @Valid @RequestBody UpdateRoleRequest request,
                                                     JwtAuthenticationToken authentication,
@@ -115,7 +118,8 @@ public class IamRoleController {
     @PutMapping("/{name}/permissions")
     @PreAuthorize("hasAuthority('iam:roles:write')")
     @Operation(summary = "Reemplazar los permisos que agrupa el rol",
-            description = "Los usuarios con el rol reciben el cambio en su próximo token.")
+            description = "Los usuarios con el rol reciben el cambio en su próximo token. La aplicación (portal:*) no "
+                    + "cambia aquí: se conserva aunque falte en la lista y agregar otra devuelve 400.")
     public ResponseEntity<List<IamRoleViews.Permission>> replacePermissions(
             @PathVariable String name,
             @Valid @RequestBody ReplacePermissionsRequest request,
