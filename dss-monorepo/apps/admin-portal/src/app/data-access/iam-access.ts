@@ -2,6 +2,7 @@
  * Roles, permissions and the role × permission matrix through the BFF IAM routes (IAM-015/IAM-017).
  * Permissions are client roles of `dss-permissions` named `resource:action`; realm roles group them.
  */
+import type { IamRolePortal } from '@dss-monorepo/auth-models';
 import { iamRequest, type IamPermission, type IamRole } from './iam-users';
 
 export type { IamPermission, IamRole } from './iam-users';
@@ -16,12 +17,12 @@ export interface IamPermissionMatrix {
 export interface IamRoleDraft {
   name: string;
   description?: string;
-  portal?: string;
+  /** Required by auth-service (IAM-021): every role belongs to one application. */
+  portal: IamRolePortal;
 }
 
 /** Same rules as auth-service (and the BFF validators). */
 export const ROLE_NAME_PATTERN = /^[A-Z][A-Z0-9_]{1,49}$/;
-export const PORTAL_PATTERN = /^[a-z][a-z0-9-]{0,49}$/;
 export const PERMISSION_NAME_PATTERN = /^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*)+$/;
 
 const role = (name: string) => `roles/${encodeURIComponent(name)}`;
@@ -35,7 +36,7 @@ export function createRole(draft: IamRoleDraft): Promise<IamRole> {
   return iamRequest('POST', 'roles', 'No se pudo crear el rol', {
     name: draft.name.trim(),
     ...(draft.description?.trim() ? { description: draft.description.trim() } : {}),
-    ...(draft.portal?.trim() ? { portal: draft.portal.trim() } : {}),
+    portal: draft.portal,
   });
 }
 

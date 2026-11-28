@@ -1,6 +1,7 @@
 'use client';
 
 import * as React from 'react';
+import Link from 'next/link';
 import {
   Badge,
   Button,
@@ -14,6 +15,7 @@ import {
 } from '@dss-monorepo/design-system';
 import { RefreshCw, Undo2 } from 'lucide-react';
 import { useHasPermission } from '@dss-monorepo/rbac';
+import { isPortalPermission } from '@dss-monorepo/auth-models';
 import {
   getPermissionMatrix,
   groupByResource,
@@ -54,6 +56,9 @@ const copyGrants = (grants: Grants): Grants =>
 
 /** SUPERADMIN must keep the IAM permissions; auth-service refuses it too (409). */
 const isLocked = (role: string, permission: string) => role === 'SUPERADMIN' && permission.startsWith('iam:');
+
+/** The application of a role (`portal:*`) is chosen in the role editor, not here (IAM-021/022). */
+const PORTAL_LOCK_REASON = 'La aplicación de un rol se elige en su editor, en Roles.';
 
 /**
  * Role × permission matrix (IAM-017). Edits stay local until reviewed: the preview lists what each role
@@ -209,6 +214,12 @@ export function PermissionMatrixPage() {
                 <tr className="bg-muted/40">
                   <th scope="rowgroup" colSpan={roles.length + 1} className="px-4 py-2 text-left font-mono text-xs font-semibold">
                     {group.resource}
+                    {group.resource === 'portal' && (
+                      <span className="ml-2 font-sans font-normal text-muted-foreground">
+                        Solo lectura: la aplicación de cada rol se elige en{' '}
+                        <Link href="/roles" className="underline underline-offset-2">Roles</Link>.
+                      </span>
+                    )}
                   </th>
                 </tr>
                 {group.permissions.map((permission) => (
@@ -222,7 +233,8 @@ export function PermissionMatrixPage() {
                     {roles.map((role) => {
                       const checked = draft[role.name]?.has(permission.name) ?? false;
                       const changed = checked !== (original[role.name]?.has(permission.name) ?? false);
-                      const locked = checked && isLocked(role.name, permission.name);
+                      const portalRow = isPortalPermission(permission.name);
+                      const locked = portalRow || (checked && isLocked(role.name, permission.name));
                       return (
                         <td key={role.name} className={`px-3 py-2 text-center ${changed ? 'bg-amber-500/15' : ''}`}>
                           <input
@@ -231,7 +243,7 @@ export function PermissionMatrixPage() {
                             aria-label={`${role.name} · ${permission.name}`}
                             checked={checked}
                             disabled={!canWrite || saving || locked}
-                            title={locked ? 'SUPERADMIN debe conservar los permisos iam:*.' : undefined}
+                            title={portalRow ? PORTAL_LOCK_REASON : locked ? 'SUPERADMIN debe conservar los permisos iam:*.' : undefined}
                             onChange={(event) => toggle(role.name, permission.name, event.target.checked)}
                           />
                         </td>

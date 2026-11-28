@@ -27,13 +27,14 @@ beforeEach(() => {
 });
 
 describe('AdminRolesPage', () => {
-  it('lists roles sorted, with portal and system badge', async () => {
+  it('lists roles sorted, with their application and system badge', async () => {
     render(<AdminRolesPage />);
     const table = await screen.findByRole('table', { name: 'Roles del realm' });
     const rows = within(table).getAllByRole('row').slice(1);
 
     expect(rows[0].textContent).toContain('AUDITOR');
-    expect(rows[0].textContent).toContain('Sin portal');
+    expect(rows[0].textContent).toContain('Sin aplicación: nadie podrá entrar con este rol');
+    expect(rows[1].textContent).toContain('Dashboard rector');
     expect(rows[1].textContent).toContain('Sistema');
     expect(screen.getByRole('button', { name: 'Eliminar RECTOR' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('button', { name: 'Eliminar AUDITOR' })).toHaveProperty('disabled', false);
@@ -49,7 +50,7 @@ describe('AdminRolesPage', () => {
     expect(screen.queryByRole('button', { name: 'Editar AUDITOR' })).toBeNull();
   });
 
-  it('validates the name and creates a role', async () => {
+  it('validates the name, requires an application and creates a role', async () => {
     access.createRole.mockResolvedValue({ name: 'VICERRECTOR', description: 'Vice', portal: 'rector', system: false });
     render(<AdminRolesPage />);
     await screen.findByText('AUDITOR');
@@ -63,7 +64,15 @@ describe('AdminRolesPage', () => {
 
     fireEvent.change(within(dialog).getByLabelText(/Nombre/), { target: { value: 'vicerrector' } });
     fireEvent.change(within(dialog).getByLabelText('Descripción'), { target: { value: 'Vice' } });
-    fireEvent.change(within(dialog).getByLabelText('Portal'), { target: { value: 'rector' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Crear rol' }));
+    expect((await within(dialog).findByRole('alert')).textContent).toContain('Elige la aplicación');
+    expect(access.createRole).not.toHaveBeenCalled();
+
+    const app = within(dialog).getByLabelText(/^Aplicación/) as HTMLSelectElement;
+    expect([...app.options].map((option) => option.textContent)).toEqual([
+      'Elige una aplicación', 'Portal de administración', 'Dashboard rector', 'Dashboard decano', 'Dashboard director',
+    ]);
+    fireEvent.change(app, { target: { value: 'rector' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Crear rol' }));
 
     await waitFor(() => expect(access.createRole).toHaveBeenCalledWith({ name: 'VICERRECTOR', description: 'Vice', portal: 'rector' }));
@@ -71,17 +80,41 @@ describe('AdminRolesPage', () => {
     expect(access.listRoles).toHaveBeenCalledTimes(2);
   });
 
-  it('edits description and portal of an existing role', async () => {
+  it('edits the description of a role without an application and warns about it', async () => {
     access.updateRole.mockResolvedValue({ name: 'AUDITOR', description: 'Nueva', portal: '', system: false });
     render(<AdminRolesPage />);
     fireEvent.click(await screen.findByRole('button', { name: 'Editar AUDITOR' }));
     const dialog = await screen.findByRole('dialog', { name: 'Editar AUDITOR' });
 
     expect(within(dialog).queryByLabelText(/Nombre/)).toBeNull();
+    expect(within(dialog).getByText(/Sin aplicación: nadie podrá entrar con este rol/)).toBeTruthy();
     fireEvent.change(within(dialog).getByLabelText('Descripción'), { target: { value: 'Nueva' } });
     fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
 
     await waitFor(() => expect(access.updateRole).toHaveBeenCalledWith('AUDITOR', { description: 'Nueva', portal: '' }));
+  });
+
+  it('moves a role to another application but keeps a system role on its own', async () => {
+    access.listRoles.mockResolvedValue([
+      { name: 'RECTOR', description: 'Rector', portal: 'rector', system: true },
+      { name: 'VICERRECTOR', description: 'Vice', portal: 'rector', system: false },
+    ]);
+    access.updateRole.mockResolvedValue({ name: 'VICERRECTOR', description: 'Vice', portal: 'decano', system: false });
+    render(<AdminRolesPage />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar RECTOR' }));
+    let dialog = await screen.findByRole('dialog', { name: 'Editar RECTOR' });
+    expect((within(dialog).getByLabelText(/^Aplicación/) as HTMLSelectElement).disabled).toBe(true);
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Cancelar' }));
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar VICERRECTOR' }));
+    dialog = await screen.findByRole('dialog', { name: 'Editar VICERRECTOR' });
+    const app = within(dialog).getByLabelText(/^Aplicación/) as HTMLSelectElement;
+    expect(app.value).toBe('rector');
+    fireEvent.change(app, { target: { value: 'decano' } });
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }));
+
+    await waitFor(() => expect(access.updateRole).toHaveBeenCalledWith('VICERRECTOR', { description: 'Vice', portal: 'decano' }));
   });
 
   it('warns when the role is in use and deletes it only on a second confirmation', async () => {

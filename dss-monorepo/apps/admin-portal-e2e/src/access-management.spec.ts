@@ -1,7 +1,8 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 /**
- * IAM-017: an administrator creates a permission, adds it to a role in the matrix and sees it there. The
+ * IAM-017: an administrator creates a permission, adds it to a role in the matrix and sees it there.
+ * IAM-022: a role is created with its application, and the matrix shows `portal:*` without letting it change. The
  * BFF is mocked at the network boundary (another origin), so the test drives the real portal UI and checks
  * the payloads it sends.
  */
@@ -28,13 +29,15 @@ interface BffState {
   permissions: Permission[];
   grants: Record<string, string[]>;
   createdPermission?: Record<string, unknown>;
+  createdRole?: Record<string, unknown>;
+  roles: Array<{ name: string; description: string | null; portal: string | null; system: boolean }>;
   replaced?: { role: string; permissions: string[] };
 }
 
 const ROLES = [
   { name: 'DECANO', description: 'Decano de facultad', portal: 'decano', system: true },
   { name: 'DIRECTOR', description: 'Director de carrera', portal: 'director', system: true },
-  { name: 'SUPERADMIN', description: 'Administración', portal: null, system: true },
+  { name: 'SUPERADMIN', description: 'Administración', portal: 'admin', system: true },
 ];
 
 function permission(name: string, description: string): Permission {
@@ -71,8 +74,14 @@ async function mockBff(page: Page, origin: string, permissions: string[]): Promi
     permissions: [
       permission('analytics:read', 'Consultar analítica'),
       permission('iam:roles:read', 'Ver roles y permisos'),
+      permission('portal:decano', 'Entrar al dashboard decano'),
     ],
-    grants: { DECANO: ['analytics:read'], DIRECTOR: ['analytics:read'], SUPERADMIN: ['iam:roles:read'] },
+    grants: {
+      DECANO: ['analytics:read', 'portal:decano'],
+      DIRECTOR: ['analytics:read'],
+      SUPERADMIN: ['iam:roles:read'],
+    },
+    roles: ROLES.map((role) => ({ ...role })),
   };
 
   await page.route('**/api/auth/refresh', (route) =>
@@ -94,7 +103,22 @@ async function mockBff(page: Page, origin: string, permissions: string[]): Promi
     await answer(route, origin, 200, state.permissions);
   });
   await page.route('**/api/admin/iam/permissions/matrix', (route) =>
-    answer(route, origin, 200, { roles: ROLES, permissions: state.permissions, grants: state.grants }));
+    answer(route, origin, 200, { roles: state.roles, permissions: state.permissions, grants: state.grants }));
+  await page.route('**/api/admin/iam/roles', async (route) => {
+    if (route.request().method() === 'POST') {
+      state.createdRole = route.request().postDataJSON() as Record<string, unknown>;
+      const created = {
+        name: String(state.createdRole.name),
+        description: (state.createdRole.description as string | undefined) ?? null,
+        portal: String(state.createdRole.portal),
+        system: false,
+      };
+      state.roles.push(created);
+      await answer(route, origin, 201, created);
+      return;
+    }
+    await answer(route, origin, 200, state.roles);
+  });
   await page.route('**/api/admin/iam/roles/*/permissions', async (route) => {
     const role = decodeURIComponent(new URL(route.request().url()).pathname.split('/').at(-2) ?? '');
     const body = route.request().postDataJSON() as { permissions: string[] };
@@ -136,7 +160,7 @@ test('an administrator creates a permission, adds it to a role and sees it in th
   await review.getByRole('button', { name: 'Guardar cambios' }).click();
 
   await expect(page.getByText(/Se guardaron los permisos de 1 rol\./)).toBeVisible();
-  expect(bff.replaced).toEqual({ role: 'DECANO', permissions: ['analytics:read', 'reports:export'] });
+  expect(bff.replaced).toEqual({ role: 'DECANO', permissions: ['analytics:read', 'portal:decano', 'reports:export'] });
 
   // After a reload the matrix comes from the BFF again and still shows the grant.
   await page.reload();
@@ -144,6 +168,36 @@ test('an administrator creates a permission, adds it to a role and sees it in th
   await expect(page.getByRole('checkbox', { name: 'DIRECTOR · reports:export' })).not.toBeChecked();
 
   await page.screenshot({ path: 'test-output/access-matrix.png', fullPage: true });
+});
+
+test('an administrator creates a role with its application', async ({ page, baseURL }) => {
+  const bff = await mockBff(page, originOf(baseURL), ['iam:roles:read', 'iam:roles:write']);
+
+  await page.goto('/roles');
+  await expect(page.getByRole('heading', { name: 'Roles', level: 1 })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('row', { name: /DECANO/ })).toContainText('Dashboard decano');
+
+  await page.getByRole('button', { name: 'Nuevo rol' }).click();
+  const form = page.getByRole('dialog', { name: 'Nuevo rol' });
+  await form.getByLabel(/^Nombre/).fill('VICERRECTOR');
+  await form.getByLabel('Descripción').fill('Vicerrectorado');
+  await form.getByRole('button', { name: 'Crear rol' }).click();
+  await expect(form.getByRole('alert')).toContainText('Elige la aplicación');
+  expect(bff.createdRole).toBeUndefined();
+
+  await form.getByLabel(/^Aplicación/).selectOption({ label: 'Dashboard rector' });
+  await form.getByRole('button', { name: 'Crear rol' }).click();
+
+  await expect(page.getByText('Rol VICERRECTOR creado.', { exact: false })).toBeVisible();
+  expect(bff.createdRole).toEqual({ name: 'VICERRECTOR', description: 'Vicerrectorado', portal: 'rector' });
+  await expect(page.getByRole('row', { name: /VICERRECTOR/ })).toContainText('Dashboard rector');
+
+  // The application shows in the matrix as portal:*, but only the role editor changes it.
+  await page.getByRole('link', { name: 'Matriz de acceso' }).click();
+  await expect(page.getByRole('checkbox', { name: 'DECANO · portal:decano' })).toBeChecked({ timeout: 30_000 });
+  await expect(page.getByRole('checkbox', { name: 'DECANO · portal:decano' })).toBeDisabled();
+  await expect(page.getByRole('checkbox', { name: 'DIRECTOR · portal:decano' })).toBeDisabled();
+  await expect(page.getByText(/la aplicación de cada rol se elige en/)).toBeVisible();
 });
 
 test('a reader sees the matrix but cannot change it', async ({ page, baseURL }) => {
