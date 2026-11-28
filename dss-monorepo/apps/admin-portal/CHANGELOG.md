@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.14.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.13.0...admin-portal-v1.14.0) (2026-11-28)
+
+
+### Features
+
+* **auth-service:** contexto académico por permisos en lugar de rol fijo (IAM-023) ([#432](https://github.com/KEVIN-117/dss-system-architecture/issues/432)) ([0c9b3ad](https://github.com/KEVIN-117/dss-system-architecture/commit/0c9b3adb6aff54b6ae804f33fd6ad9c351fb4067))
+
 ## [1.13.0](https://github.com/KEVIN-117/dss-system-architecture/compare/admin-portal-v1.12.0...admin-portal-v1.13.0) (2026-11-28)
 
 

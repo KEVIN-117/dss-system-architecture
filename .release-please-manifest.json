@@ -8,7 +8,7 @@
   "infra/olap": "1.1.0",
   "dss-monorepo/apps/docs-portal": "1.9.0",
   "dw-control-service": "1.6.1",
-  "dss-monorepo/apps/admin-portal": "1.13.0",
+  "dss-monorepo/apps/admin-portal": "1.14.0",
   "dss-monorepo/apps/bff": "1.13.0",
   "dss-monorepo/apps/director-dashboard": "1.4.0",
   "dss-monorepo/apps/decano-dashboard": "1.4.0",
