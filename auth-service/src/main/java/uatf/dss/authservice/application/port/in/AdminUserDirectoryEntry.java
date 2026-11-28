@@ -1,5 +1,6 @@
 package uatf.dss.authservice.application.port.in;
 
+import uatf.dss.authservice.domain.model.AcademicScope;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 
 import java.util.List;
@@ -14,5 +15,6 @@ public record AdminUserDirectoryEntry(
         String lastName,
         boolean isActive,
         List<String> roles,
+        AcademicScope academicScope,
         List<UserAcademicContext> academicContexts) {
 }

@@ -1,3 +1,5 @@
+import type { AcademicScope } from './iam-users';
+
 export interface AdminUserDirectoryEntry {
   id: string;
   username: string;
@@ -6,6 +8,7 @@ export interface AdminUserDirectoryEntry {
   lastName: string | null;
   isActive: boolean;
   roles: string[];
+  academicScope: AcademicScope;
   academicContexts: AcademicContext[];
 }
 

@@ -5,8 +5,10 @@ import uatf.dss.authservice.application.port.in.ListAdminUsersQuery;
 import uatf.dss.authservice.application.port.out.AcademicContextRepository;
 import uatf.dss.authservice.application.port.out.UserDirectorySearchResult;
 import uatf.dss.authservice.application.port.out.UserRepository;
+import uatf.dss.authservice.application.service.AcademicScopeResolver;
 import uatf.dss.authservice.application.service.AdminUserDirectoryService;
 import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
+import uatf.dss.authservice.domain.model.AcademicScope;
 import uatf.dss.authservice.domain.model.Email;
 import uatf.dss.authservice.domain.model.User;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
@@ -24,7 +26,8 @@ class AdminUserDirectoryServiceTest {
 
     private final UserRepository users = org.mockito.Mockito.mock(UserRepository.class);
     private final AcademicContextRepository contexts = org.mockito.Mockito.mock(AcademicContextRepository.class);
-    private final AdminUserDirectoryService service = new AdminUserDirectoryService(users, contexts);
+    private final AcademicScopeResolver scopeResolver = org.mockito.Mockito.mock(AcademicScopeResolver.class);
+    private final AdminUserDirectoryService service = new AdminUserDirectoryService(users, contexts, scopeResolver);
 
     @Test
     void listsUsersWithRolesContextsAndPaginationMetadata() {
@@ -35,6 +38,7 @@ class AdminUserDirectoryServiceTest {
                 .thenReturn(new UserDirectorySearchResult(List.of(user), 25, 3));
         when(users.findRoleNamesByUserIds(List.of(id))).thenReturn(java.util.Map.of(id, List.of("DECANO", "ANALYST")));
         when(contexts.findAllByUserIds(List.of(id))).thenReturn(java.util.Map.of(id, List.of(academicContext)));
+        when(scopeResolver.resolve(user.keycloakId().toString())).thenReturn(AcademicScope.FACULTY);
 
         var result = service.execute(new ListAdminUsersQuery("ana", true, "DECANO", 4, "INF", 2, 10));
 
@@ -44,12 +48,15 @@ class AdminUserDirectoryServiceTest {
         assertEquals(3, result.totalPages());
         assertEquals(List.of("ANALYST", "DECANO"), result.content().getFirst().roles());
         assertEquals(List.of(academicContext), result.content().getFirst().academicContexts());
+        assertEquals(AcademicScope.FACULTY, result.content().getFirst().academicScope());
     }
 
     @Test
     void returnsUserDetailByLocalId() {
         UUID id = UUID.randomUUID();
-        when(users.findById(id)).thenReturn(Optional.of(user(id)));
+        User user = user(id);
+        when(users.findById(id)).thenReturn(Optional.of(user));
+        when(scopeResolver.resolve(user.keycloakId().toString())).thenReturn(AcademicScope.GLOBAL);
         when(users.findRoleNamesByUserId(id)).thenReturn(List.of("SUPERADMIN"));
         when(contexts.findAllByUserId(id)).thenReturn(List.of());
 
@@ -58,6 +65,7 @@ class AdminUserDirectoryServiceTest {
         assertEquals(id, result.id());
         assertEquals("ana", result.username());
         assertEquals(List.of("SUPERADMIN"), result.roles());
+        assertEquals(AcademicScope.GLOBAL, result.academicScope());
     }
 
     @Test

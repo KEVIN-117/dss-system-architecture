@@ -10,6 +10,7 @@ import uatf.dss.authservice.application.port.in.GetAdminUserByIdUseCase;
 import uatf.dss.authservice.application.port.in.ListAdminUsersQuery;
 import uatf.dss.authservice.application.port.in.ListAdminUsersUseCase;
 import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
+import uatf.dss.authservice.domain.model.AcademicScope;
 
 import java.util.List;
 import java.util.UUID;
@@ -52,7 +53,7 @@ class AdminUserDirectoryControllerTest extends BaseWebMvcTest {
     void listReturnsPagedSafeDirectoryAndPassesFilters() throws Exception {
         UUID id = UUID.randomUUID();
         AdminUserDirectoryEntry entry = new AdminUserDirectoryEntry(id, "selene", "selene@uatf.edu.bo", "Selene", "Rojas", true,
-                List.of("SUPERADMIN"), List.of());
+                List.of("SUPERADMIN"), AcademicScope.GLOBAL, List.of());
         when(listUsers.execute(any(ListAdminUsersQuery.class)))
                 .thenReturn(new AdminUserDirectoryPage(List.of(entry), 1, 10, 21, 3));
 
@@ -69,6 +70,7 @@ class AdminUserDirectoryControllerTest extends BaseWebMvcTest {
                 .andExpect(jsonPath("$.content[0].id").value(id.toString()))
                 .andExpect(jsonPath("$.content[0].username").value("selene"))
                 .andExpect(jsonPath("$.content[0].roles[0]").value("SUPERADMIN"))
+                .andExpect(jsonPath("$.content[0].academicScope").value("GLOBAL"))
                 .andExpect(jsonPath("$.page").value(1))
                 .andExpect(jsonPath("$.size").value(10))
                 .andExpect(jsonPath("$.totalElements").value(21))
@@ -92,7 +94,7 @@ class AdminUserDirectoryControllerTest extends BaseWebMvcTest {
     void detailReturnsSafeUserForSuperadmin() throws Exception {
         UUID id = UUID.randomUUID();
         when(getUser.execute(id)).thenReturn(new AdminUserDirectoryEntry(id, "selene", "selene@uatf.edu.bo", "Selene", "Rojas", true,
-                List.of("SUPERADMIN"), List.of()));
+                List.of("SUPERADMIN"), AcademicScope.GLOBAL, List.of()));
 
         mockMvc.perform(get("/admin/users/{id}", id).with(superadmin()))
                 .andExpect(status().isOk())

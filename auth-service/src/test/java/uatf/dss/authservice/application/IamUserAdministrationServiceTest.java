@@ -18,12 +18,14 @@ import uatf.dss.authservice.application.port.out.IdentityRoleAdminPort;
 import uatf.dss.authservice.application.port.out.IdentityRoleMappingPort;
 import uatf.dss.authservice.application.port.out.IdentityUserAdminPort;
 import uatf.dss.authservice.application.port.out.UserRepository;
+import uatf.dss.authservice.application.service.AcademicScopeResolver;
 import uatf.dss.authservice.application.service.AdminAuditRecorder;
 import uatf.dss.authservice.application.service.IamUserAdministrationService;
 import uatf.dss.authservice.domain.exception.conflict.IamRuleViolationException;
 import uatf.dss.authservice.domain.exception.notfound.UserNotFoundException;
 import uatf.dss.authservice.domain.exception.upstream.IdentityProviderException;
 import uatf.dss.authservice.domain.exception.validation.ValidationException;
+import uatf.dss.authservice.domain.model.AcademicScope;
 import uatf.dss.authservice.domain.model.User;
 import uatf.dss.authservice.domain.model.audit.AdminAuditEntry;
 import uatf.dss.authservice.domain.model.audit.AuditActor;
@@ -80,7 +82,7 @@ class IamUserAdministrationServiceTest {
     void setUp() {
         service = new IamUserAdministrationService(users, roles, mappings, localUsers, syncUser,
                 new AdminAuditRecorder(auditLog, Clock.fixed(Instant.parse("2026-11-20T10:00:00Z"), ZoneOffset.UTC)),
-                PERMISSIONS, LIFESPAN);
+                new AcademicScopeResolver(mappings, PERMISSIONS), PERMISSIONS, LIFESPAN);
         when(localUsers.findById(localId)).thenReturn(Optional.of(localUser(true)));
         when(users.findUserById(keycloakId)).thenReturn(Optional.of(identityUser(true)));
         when(syncUser.sync(any())).thenReturn(localUser(true));
@@ -114,6 +116,8 @@ class IamUserAdministrationServiceTest {
     @Test
     void createsTheUserSyncsTheLocalCopyAndSendsTheInvitation() {
         when(users.createUser(any())).thenReturn(keycloakId);
+        when(mappings.listUserClientRoles(keycloakId, PERMISSIONS, true))
+                .thenReturn(List.of(role("analytics:career"), role("analytics:faculty")));
 
         IamUserViews.IamUser created = service.createUser(new IamUserCommands.CreateUser(admin, " selene ",
                 "selene@uatf.edu.bo", "Selene", "Rojas", true, true));
@@ -127,6 +131,7 @@ class IamUserAdministrationServiceTest {
                 Set.of(IdentityRequiredAction.UPDATE_PASSWORD, IdentityRequiredAction.VERIFY_EMAIL), LIFESPAN);
         assertThat(created.id()).isEqualTo(localId);
         assertThat(created.invitationSent()).isTrue();
+        assertThat(created.academicScope()).isEqualTo(AcademicScope.FACULTY);
         assertThat(created.createdAt()).isEqualTo(Instant.ofEpochMilli(1_790_000_000_000L));
         assertThat(completedAudits()).extracting(AdminAuditEntry::action, AdminAuditEntry::outcome)
                 .containsExactly(org.assertj.core.groups.Tuple.tuple("USER_CREATED", AuditOutcome.SUCCESS),

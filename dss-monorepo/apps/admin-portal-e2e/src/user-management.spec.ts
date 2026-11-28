@@ -86,6 +86,7 @@ async function mockBff(page: Page, origin: string, permissions: string[]): Promi
         lastName: state.created.lastName ?? null,
         isActive: true,
         roles: [],
+        academicScope: 'NONE',
         academicContexts: [],
       });
       await answer(route, origin, 201, {
@@ -167,6 +168,7 @@ test('a reader sees users but no write actions', async ({ page, baseURL }) => {
     lastName: 'García',
     isActive: true,
     roles: ['DIRECTOR'],
+    academicScope: 'CAREER',
     academicContexts: [],
   });
 

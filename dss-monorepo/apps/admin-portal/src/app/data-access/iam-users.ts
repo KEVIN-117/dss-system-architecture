@@ -5,6 +5,9 @@
 
 export type IamRequiredAction = 'UPDATE_PASSWORD' | 'VERIFY_EMAIL' | 'UPDATE_PROFILE' | 'CONFIGURE_TOTP';
 
+/** Derived by auth-service from the user's effective analytics permissions, never from role names. */
+export type AcademicScope = 'GLOBAL' | 'FACULTY' | 'CAREER' | 'NONE';
+
 export interface IamUser {
   id: string;
   username: string;
@@ -16,6 +19,7 @@ export interface IamUser {
   createdAt: string | null;
   /** Only on creation: `false` when the invitation e-mail could not be sent. */
   invitationSent: boolean | null;
+  academicScope: AcademicScope;
 }
 
 export interface IamNamedRole {

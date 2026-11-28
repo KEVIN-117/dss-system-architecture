@@ -32,7 +32,7 @@ import {
 import type { IamUser } from '../data-access/iam-users';
 import { CreateUserDialog } from './CreateUserDialog';
 import { UserManagementSheet, type UserManagementTab } from './UserManagementSheet';
-import { ROLE_PRECEDENCE, effectiveRole, personName } from './user-roles';
+import { ROLE_PRECEDENCE, personName } from './user-roles';
 
 const PAGE_SIZE = 20;
 
@@ -72,6 +72,7 @@ function directoryEntry(user: IamUser): AdminUserDirectoryEntry {
     lastName: user.lastName,
     isActive: user.enabled,
     roles: [],
+    academicScope: user.academicScope,
     academicContexts: [],
   };
 }
@@ -316,7 +317,6 @@ export function AdminUsersPage() {
             </TableHeader>
             <TableBody>
               {users.map((user) => {
-                const role = effectiveRole(user.roles);
                 return (
                   <TableRow key={user.id}>
                     <TableCell className="min-w-48 font-sans">
@@ -346,7 +346,7 @@ export function AdminUsersPage() {
                       </div>
                     </TableCell>
                     <TableCell className="min-w-48 font-sans text-sm">
-                      {role === 'RECTOR' || role === 'SUPERADMIN'
+                      {user.academicScope === 'GLOBAL' || user.academicScope === 'NONE'
                         ? 'No requiere contexto'
                         : contextSummary(user, academicCatalog)}
                     </TableCell>

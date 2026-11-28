@@ -37,6 +37,7 @@ const director: AdminUserDirectoryEntry = {
   lastName: 'García',
   isActive: true,
   roles: ['DIRECTOR'],
+  academicScope: 'CAREER',
   academicContexts: [
     { id: 'context-1', userId: '123e4567-e89b-42d3-a456-426614174000', facultyId: 4, careerId: '101' },
     { id: 'context-2', userId: '123e4567-e89b-42d3-a456-426614174000', facultyId: 8, careerId: '202' },
@@ -51,6 +52,7 @@ const decano: AdminUserDirectoryEntry = {
   lastName: 'Mamani',
   isActive: false,
   roles: ['DECANO'],
+  academicScope: 'FACULTY',
   academicContexts: [],
 };
 
@@ -140,7 +142,7 @@ describe('AdminUsersPage', () => {
   it('creates a user and opens its roles to finish the set-up', async () => {
     iam.createIamUser.mockResolvedValue({
       id: '323e4567-e89b-42d3-a456-426614174000', username: 'nuevo.usuario', email: 'nuevo@uatf.edu.bo',
-      firstName: 'Nuevo', lastName: 'Usuario', enabled: true, emailVerified: false, createdAt: null, invitationSent: true,
+      firstName: 'Nuevo', lastName: 'Usuario', enabled: true, emailVerified: false, createdAt: null, invitationSent: true, academicScope: 'NONE',
     });
     render(<AdminUsersPage />);
     await screen.findByText('Ana García');
@@ -164,7 +166,7 @@ describe('AdminUsersPage', () => {
   it('warns when the user was created but the invitation could not be sent', async () => {
     iam.createIamUser.mockResolvedValue({
       id: '323e4567-e89b-42d3-a456-426614174000', username: 'sin.correo', email: 'x@uatf.edu.bo',
-      firstName: null, lastName: null, enabled: true, emailVerified: false, createdAt: null, invitationSent: false,
+      firstName: null, lastName: null, enabled: true, emailVerified: false, createdAt: null, invitationSent: false, academicScope: 'NONE',
     });
     render(<AdminUsersPage />);
     await screen.findByText('Ana García');

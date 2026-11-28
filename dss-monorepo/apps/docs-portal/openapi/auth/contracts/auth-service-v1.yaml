@@ -106,9 +106,13 @@ paths:
       summary: Reemplaza los contextos académicos de un usuario
       x-required-permission: iam:users:write
       description: >-
-        Sustituye la lista completa de contextos académicos. SUPERADMIN y RECTOR no
-        llevan contextos; DECANO lleva una o más facultades (sin carrera) y DIRECTOR
-        una o más carreras (con su facultad), hasta 20 y sin repetir ninguno (IAM-009).
+        Sustituye la lista completa de contextos académicos. La regla depende de los
+        permisos efectivos del usuario (roles compuestos del cliente `dss-permissions`,
+        leídos de Keycloak), no del nombre de sus roles: con `analytics:global` o sin
+        `analytics:faculty` ni `analytics:career` no lleva contextos; con
+        `analytics:faculty` lleva una o más facultades (sin carrera) y con
+        `analytics:career` una o más carreras (con su facultad), hasta 20 y sin repetir
+        ninguno (IAM-009). Ver `AcademicScope`.
         Una carrera requiere su facultad; `facultyId` no puede ser negativo y
         `careerId` tiene tres caracteres sin espacios.
       parameters:
@@ -843,9 +847,19 @@ components:
         academicContexts:
           type: array
           items: { $ref: '#/components/schemas/UserAcademicContext' }
+    AcademicScope:
+      type: string
+      enum: [GLOBAL, FACULTY, CAREER, NONE]
+      description: >-
+        Alcance académico derivado de los permisos efectivos del usuario (roles
+        compuestos del cliente `dss-permissions`), nunca del nombre de sus roles. Gana la
+        primera coincidencia: `analytics:global` es GLOBAL (sin contextos),
+        `analytics:faculty` es FACULTY (1 a 20 facultades, sin carrera),
+        `analytics:career` es CAREER (1 a 20 carreras, con su facultad) y, si no hay
+        ninguno, NONE (sin contextos).
     AdminUserDirectoryEntry:
       type: object
-      required: [id, username, isActive, roles, academicContexts]
+      required: [id, username, isActive, roles, academicScope, academicContexts]
       properties:
         id: { type: string, format: uuid }
         username: { type: string }
@@ -856,6 +870,7 @@ components:
         roles:
           type: array
           items: { type: string }
+        academicScope: { $ref: '#/components/schemas/AcademicScope' }
         academicContexts:
           type: array
           items: { $ref: '#/components/schemas/UserAcademicContext' }
@@ -901,7 +916,7 @@ components:
     IamUser:
       type: object
       description: Vista administrativa; no expone el id de Keycloak ni credenciales.
-      required: [id, username, enabled, emailVerified]
+      required: [id, username, enabled, emailVerified, academicScope]
       properties:
         id: { type: string, format: uuid, description: Id local (el de `/admin/users`). }
         username: { type: string }
@@ -914,6 +929,7 @@ components:
         invitationSent:
           type: [boolean, 'null']
           description: Solo al crear. `false` si el correo de invitación no se pudo enviar; `null` si no se pidió.
+        academicScope: { $ref: '#/components/schemas/AcademicScope' }
     IamRole:
       type: object
       required: [name]

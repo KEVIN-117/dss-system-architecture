@@ -23,11 +23,12 @@ import uatf.dss.authservice.application.port.in.SetUserAcademicContextsCommand;
 import uatf.dss.authservice.application.port.out.AcademicCatalogRepository;
 import uatf.dss.authservice.application.port.out.AcademicContextRepository;
 import uatf.dss.authservice.application.port.out.UserRepository;
+import uatf.dss.authservice.application.service.AcademicScopeResolver;
 import uatf.dss.authservice.application.service.SetUserAcademicContextsService;
-import uatf.dss.authservice.domain.exception.conflict.UserRoleSnapshotNotFoundException;
 import uatf.dss.authservice.domain.exception.notfound.CareerNotFoundException;
 import uatf.dss.authservice.domain.exception.validation.InvalidAcademicContextException;
 import uatf.dss.authservice.domain.exception.validation.InvalidDeanAcademicContextException;
+import uatf.dss.authservice.domain.model.AcademicScope;
 import uatf.dss.authservice.domain.model.User;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 
@@ -47,17 +48,21 @@ class SetUserAcademicContextsServiceTest {
     @Mock AcademicContextRepository contextRepository;
     @Mock AcademicCatalogRepository catalogRepository;
     @Mock AdminAuditLogRepository auditLogRepository;
+    @Mock AcademicScopeResolver scopeResolver;
 
     private static final Instant NOW = Instant.parse("2026-11-20T10:00:00Z");
     private SetUserAcademicContextsService service;
     private final UUID targetId = UUID.randomUUID();
+    private final UUID keycloakId = UUID.randomUUID();
     private final AuditActor actor = new AuditActor(UUID.randomUUID().toString(), "ana.admin", "10.0.0.7");
 
     @BeforeEach
     void setUp() {
         service = new SetUserAcademicContextsService(userRepository, contextRepository, catalogRepository,
-                new AdminAuditRecorder(auditLogRepository, Clock.fixed(NOW, ZoneOffset.UTC)));
-        when(userRepository.findById(targetId)).thenReturn(Optional.of(mock(User.class)));
+                new AdminAuditRecorder(auditLogRepository, Clock.fixed(NOW, ZoneOffset.UTC)), scopeResolver);
+        User target = mock(User.class);
+        when(target.keycloakId()).thenReturn(keycloakId);
+        when(userRepository.findById(targetId)).thenReturn(Optional.of(target));
     }
 
     @Test
@@ -65,7 +70,7 @@ class SetUserAcademicContextsServiceTest {
         var input = new SetUserAcademicContextsCommand.AcademicContextInput(10, "025");
         var command = new SetUserAcademicContextsCommand(actor, targetId, List.of(input));
         var saved = new UserAcademicContext(UUID.randomUUID(), targetId, 10, "025");
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("ROLE_DIRECTOR"));
+        scope(AcademicScope.CAREER);
         when(catalogRepository.existsActiveFaculty(10)).thenReturn(true);
         when(catalogRepository.existsActiveProgram("025", 10)).thenReturn(true);
         when(contextRepository.replaceAllForUser(eq(targetId), anyList())).thenReturn(List.of(saved));
@@ -78,7 +83,7 @@ class SetUserAcademicContextsServiceTest {
     void decanoCanBeAssignedFacultyOnly() {
         var command = new SetUserAcademicContextsCommand(actor, targetId,
                 List.of(new SetUserAcademicContextsCommand.AcademicContextInput(10, null)));
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DECANO"));
+        scope(AcademicScope.FACULTY);
         when(catalogRepository.existsActiveFaculty(10)).thenReturn(true);
         when(contextRepository.replaceAllForUser(eq(targetId), anyList())).thenAnswer(invocation -> invocation.getArgument(1));
 
@@ -94,7 +99,7 @@ class SetUserAcademicContextsServiceTest {
         var command = new SetUserAcademicContextsCommand(actor, targetId, List.of(
                 new SetUserAcademicContextsCommand.AcademicContextInput(10, null),
                 new SetUserAcademicContextsCommand.AcademicContextInput(12, null)));
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DECANO"));
+        scope(AcademicScope.FACULTY);
         when(catalogRepository.existsActiveFaculty(anyInt())).thenReturn(true);
         when(contextRepository.replaceAllForUser(eq(targetId), anyList())).thenAnswer(invocation -> invocation.getArgument(1));
 
@@ -114,7 +119,7 @@ class SetUserAcademicContextsServiceTest {
         var command = new SetUserAcademicContextsCommand(actor, targetId, List.of(
                 new SetUserAcademicContextsCommand.AcademicContextInput(10, "025"),
                 new SetUserAcademicContextsCommand.AcademicContextInput(8, "015")));
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DIRECTOR"));
+        scope(AcademicScope.CAREER);
         when(catalogRepository.existsActiveFaculty(anyInt())).thenReturn(true);
         when(catalogRepository.existsActiveProgram("025", 10)).thenReturn(true);
         when(catalogRepository.existsActiveProgram("015", 8)).thenReturn(false);
@@ -126,7 +131,7 @@ class SetUserAcademicContextsServiceTest {
 
     @Test
     void duplicateContextsAreRejectedAndAuditedAsFailure() {
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DECANO"));
+        scope(AcademicScope.FACULTY);
         var command = new SetUserAcademicContextsCommand(actor, targetId, List.of(
                 new SetUserAcademicContextsCommand.AcademicContextInput(10, null),
                 new SetUserAcademicContextsCommand.AcademicContextInput(10, null)));
@@ -139,29 +144,59 @@ class SetUserAcademicContextsServiceTest {
     }
 
     @Test
-    void deanWithoutAnyContextAndRectorWithOneAreRejected() {
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DECANO"));
+    void facultyScopeWithoutAnyContextIsRejected() {
+        scope(AcademicScope.FACULTY);
         assertThrows(InvalidAcademicContextException.class,
                 () -> service.execute(new SetUserAcademicContextsCommand(actor, targetId, List.of())));
-
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("RECTOR"));
-        assertThrows(InvalidAcademicContextException.class, () -> service.execute(new SetUserAcademicContextsCommand(
-                actor, targetId, List.of(new SetUserAcademicContextsCommand.AcademicContextInput(10, null)))));
         verify(contextRepository, never()).replaceAllForUser(any(), any());
     }
 
     @Test
-    void missingRoleSnapshotFailsClosedWithoutReplacing() {
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("STUDENT"));
-        var command = new SetUserAcademicContextsCommand(actor, targetId, List.of());
+    void customRoleGroupingFacultyPermissionCanReceiveFaculties() {
+        // The user only holds a custom role (for example VICEDECANO) whose composite carries analytics:faculty.
+        scope(AcademicScope.FACULTY);
+        when(catalogRepository.existsActiveFaculty(anyInt())).thenReturn(true);
+        when(contextRepository.replaceAllForUser(eq(targetId), anyList())).thenAnswer(invocation -> invocation.getArgument(1));
 
-        assertThrows(UserRoleSnapshotNotFoundException.class, () -> service.execute(command));
+        var result = service.execute(new SetUserAcademicContextsCommand(actor, targetId, List.of(
+                new SetUserAcademicContextsCommand.AcademicContextInput(10, null),
+                new SetUserAcademicContextsCommand.AcademicContextInput(12, null))));
+
+        assertEquals(2, result.size());
+        verify(userRepository, never()).findRoleNamesByUserId(any());
+    }
+
+    @Test
+    void globalScopeRejectsContextsAndAcceptsAnEmptyList() {
+        scope(AcademicScope.GLOBAL);
+        when(contextRepository.replaceAllForUser(eq(targetId), anyList())).thenReturn(List.of());
+
+        assertThrows(InvalidAcademicContextException.class, () -> service.execute(new SetUserAcademicContextsCommand(
+                actor, targetId, List.of(new SetUserAcademicContextsCommand.AcademicContextInput(10, null)))));
         verify(contextRepository, never()).replaceAllForUser(any(), any());
+
+        assertEquals(List.of(), service.execute(new SetUserAcademicContextsCommand(actor, targetId, List.of())));
+        verify(contextRepository).replaceAllForUser(targetId, List.of());
+    }
+
+    @Test
+    void noneScopeRejectsContextsAndAcceptsAnEmptyList() {
+        scope(AcademicScope.NONE);
+        when(contextRepository.replaceAllForUser(eq(targetId), anyList())).thenReturn(List.of());
+
+        InvalidAcademicContextException rejected = assertThrows(InvalidAcademicContextException.class,
+                () -> service.execute(new SetUserAcademicContextsCommand(actor, targetId,
+                        List.of(new SetUserAcademicContextsCommand.AcademicContextInput(10, null)))));
+        assertTrue(rejected.getMessage().contains("analytics"));
+        verify(contextRepository, never()).replaceAllForUser(any(), any());
+
+        assertEquals(List.of(), service.execute(new SetUserAcademicContextsCommand(actor, targetId, List.of())));
+        verify(contextRepository).replaceAllForUser(targetId, List.of());
     }
 
     @Test
     void invalidRoleContextShapeDoesNotReplaceExistingContexts() {
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DECANO"));
+        scope(AcademicScope.FACULTY);
         var command = new SetUserAcademicContextsCommand(actor, targetId,
                 List.of(new SetUserAcademicContextsCommand.AcademicContextInput(10, "025")));
 
@@ -171,7 +206,7 @@ class SetUserAcademicContextsServiceTest {
 
     @Test
     void careerFromAnotherFacultyIsRejectedBeforeReplacement() {
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DIRECTOR"));
+        scope(AcademicScope.CAREER);
         when(catalogRepository.existsActiveFaculty(10)).thenReturn(true);
         when(catalogRepository.existsActiveProgram("025", 10)).thenReturn(false);
         var command = new SetUserAcademicContextsCommand(actor, targetId,
@@ -185,7 +220,7 @@ class SetUserAcademicContextsServiceTest {
     void successfulReplacementIsAuditedInTheSameTransactionWithBeforeAndAfter() {
         var command = new SetUserAcademicContextsCommand(actor, targetId,
                 List.of(new SetUserAcademicContextsCommand.AcademicContextInput(10, null)));
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DECANO"));
+        scope(AcademicScope.FACULTY);
         when(catalogRepository.existsActiveFaculty(10)).thenReturn(true);
         when(contextRepository.findAllByUserId(targetId))
                 .thenReturn(List.of(new UserAcademicContext(UUID.randomUUID(), targetId, 4, null)));
@@ -209,7 +244,7 @@ class SetUserAcademicContextsServiceTest {
 
     @Test
     void rejectedReplacementIsAuditedIndependentlyAsFailure() {
-        when(userRepository.findRoleNamesByUserId(targetId)).thenReturn(List.of("DECANO"));
+        scope(AcademicScope.FACULTY);
         var command = new SetUserAcademicContextsCommand(actor, targetId,
                 List.of(new SetUserAcademicContextsCommand.AcademicContextInput(10, "025")));
 
@@ -221,6 +256,10 @@ class SetUserAcademicContextsServiceTest {
         assertEquals(AuditOutcome.FAILURE, entry.getValue().outcome());
         assertTrue(entry.getValue().failureReason().startsWith("InvalidDeanAcademicContextException"));
         assertNull(entry.getValue().after());
+    }
+
+    private void scope(AcademicScope scope) {
+        when(scopeResolver.resolve(keycloakId.toString())).thenReturn(scope);
     }
 
     @SuppressWarnings("unchecked")

@@ -9,6 +9,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import uatf.dss.authservice.TestcontainersConfiguration;
 import uatf.dss.authservice.application.port.in.GetAuthUserProfileCommand;
 import uatf.dss.authservice.application.port.in.GetAuthUserProfileUseCase;
@@ -18,10 +19,12 @@ import uatf.dss.authservice.application.port.in.SetUserAcademicContextsCommand;
 import uatf.dss.authservice.application.port.in.SetUserAcademicContextsCommand.AcademicContextInput;
 import uatf.dss.authservice.application.port.in.SetUserAcademicContextsUseCase;
 import uatf.dss.authservice.application.port.in.UserAcademicScope;
+import uatf.dss.authservice.application.port.out.IdentityRoleMappingPort;
 import uatf.dss.authservice.application.port.out.UserRepository;
 import uatf.dss.authservice.domain.exception.validation.InvalidAcademicContextException;
 import uatf.dss.authservice.domain.model.User;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
+import uatf.dss.authservice.domain.model.identity.IdentityRole;
 import uatf.dss.authservice.domain.model.audit.AuditActor;
 
 import java.util.List;
@@ -31,6 +34,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.Mockito.when;
 
 /**
  * IAM-009 end to end on PostgreSQL: a user holds several academic contexts, the read endpoints' use cases
@@ -50,6 +54,8 @@ class MultipleAcademicContextsIntegrationTest {
     @Autowired private GetAuthUserProfileUseCase profile;
     @Autowired private UserRepository userRepository;
     @Autowired private JdbcTemplate jdbcTemplate;
+    // The academic scope is read live from Keycloak; here the permissions of each user are stubbed.
+    @MockitoBean private IdentityRoleMappingPort identityMappings;
 
     @BeforeEach
     void setUp() {
@@ -66,6 +72,10 @@ class MultipleAcademicContextsIntegrationTest {
         User user = userRepository.save(User.create(null, UUID.randomUUID(), username, username + "@uatf.edu.bo",
                 "Test", "User", true));
         userRepository.replaceRoleSnapshot(user.id(), Set.of(role));
+        String permission = "DECANO".equals(role) ? "analytics:faculty" : "analytics:career";
+        when(identityMappings.listUserClientRoles(user.keycloakId().toString(), "dss-permissions", true))
+                .thenReturn(List.of(new IdentityRole(UUID.randomUUID().toString(), permission, null, false, false,
+                        Map.of())));
         return user;
     }
 

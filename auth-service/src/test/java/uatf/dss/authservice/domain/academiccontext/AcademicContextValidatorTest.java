@@ -7,7 +7,7 @@ import uatf.dss.authservice.domain.exception.validation.InvalidAcademicContextEx
 import uatf.dss.authservice.domain.exception.validation.InvalidDeanAcademicContextException;
 import uatf.dss.authservice.domain.exception.validation.InvalidDirectorAcademicContextException;
 import uatf.dss.authservice.domain.exception.validation.InvalidRectorAcademicContextException;
-import uatf.dss.authservice.domain.model.RoleType;
+import uatf.dss.authservice.domain.model.AcademicScope;
 import uatf.dss.authservice.domain.model.UserAcademicContext;
 import uatf.dss.authservice.domain.validator.AcademicContextValidator;
 
@@ -26,16 +26,16 @@ class AcademicContextValidatorTest {
     private final UUID dummyUserId = UUID.randomUUID();
 
     @Nested
-    @DisplayName("Role: RECTOR and SUPERADMIN (Global Scope)")
-    class RectorAndSuperadminRules {
+    @DisplayName("Scope: GLOBAL and NONE (no context)")
+    class GlobalAndNoneRules {
 
         @Test
         @DisplayName("Should pass validation when both facultyId and careerId are null")
         void shouldPassWhenContextIsEmpty() {
             UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, null, null);
 
-            assertDoesNotThrow(() -> AcademicContextValidator.validate(context, RoleType.RECTOR));
-            assertDoesNotThrow(() -> AcademicContextValidator.validate(context, RoleType.SUPERADMIN));
+            assertDoesNotThrow(() -> AcademicContextValidator.validate(context, AcademicScope.GLOBAL));
+            assertDoesNotThrow(() -> AcademicContextValidator.validate(context, AcademicScope.NONE));
         }
 
         @Test
@@ -44,9 +44,9 @@ class AcademicContextValidatorTest {
             UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, null);
 
             assertThrows(InvalidRectorAcademicContextException.class, () ->
-                    AcademicContextValidator.validate(context, RoleType.RECTOR));
+                    AcademicContextValidator.validate(context, AcademicScope.GLOBAL));
             assertThrows(InvalidRectorAcademicContextException.class, () ->
-                    AcademicContextValidator.validate(context, RoleType.SUPERADMIN));
+                    AcademicContextValidator.validate(context, AcademicScope.NONE));
         }
 
         @Test
@@ -55,22 +55,22 @@ class AcademicContextValidatorTest {
             UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, "020");
 
             assertThrows(InvalidRectorAcademicContextException.class, () ->
-                    AcademicContextValidator.validate(context, RoleType.RECTOR));
+                    AcademicContextValidator.validate(context, AcademicScope.GLOBAL));
             assertThrows(InvalidRectorAcademicContextException.class, () ->
-                    AcademicContextValidator.validate(context, RoleType.SUPERADMIN));
+                    AcademicContextValidator.validate(context, AcademicScope.NONE));
         }
     }
 
     @Nested
-    @DisplayName("Role: DECANO (Faculty Scope)")
-    class DecanoRules {
+    @DisplayName("Scope: FACULTY (analytics:faculty)")
+    class FacultyRules {
 
         @Test
         @DisplayName("Should pass validation when facultyId is present and careerId is null")
         void shouldPassWhenFacultyPresentAndNoCareer() {
             UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, null);
 
-            assertDoesNotThrow(() -> AcademicContextValidator.validate(context, RoleType.DECANO));
+            assertDoesNotThrow(() -> AcademicContextValidator.validate(context, AcademicScope.FACULTY));
         }
 
         @Test
@@ -79,7 +79,7 @@ class AcademicContextValidatorTest {
             UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, null, null);
 
             assertThrows(InvalidDeanAcademicContextException.class, () ->
-                    AcademicContextValidator.validate(context, RoleType.DECANO));
+                    AcademicContextValidator.validate(context, AcademicScope.FACULTY));
         }
 
         @Test
@@ -88,20 +88,20 @@ class AcademicContextValidatorTest {
             UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, "020");
 
             assertThrows(InvalidDeanAcademicContextException.class, () ->
-                    AcademicContextValidator.validate(context, RoleType.DECANO));
+                    AcademicContextValidator.validate(context, AcademicScope.FACULTY));
         }
     }
 
     @Nested
-    @DisplayName("Role: DIRECTOR (Career Scope)")
-    class DirectorRules {
+    @DisplayName("Scope: CAREER (analytics:career)")
+    class CareerRules {
 
         @Test
         @DisplayName("Should pass validation when both facultyId and careerId are present")
         void shouldPassWhenBothFacultyAndCareerPresent() {
             UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, "020");
 
-            assertDoesNotThrow(() -> AcademicContextValidator.validate(context, RoleType.DIRECTOR));
+            assertDoesNotThrow(() -> AcademicContextValidator.validate(context, AcademicScope.CAREER));
         }
 
         @Test
@@ -110,7 +110,7 @@ class AcademicContextValidatorTest {
             UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, 10, null);
 
             assertThrows(InvalidDirectorAcademicContextException.class, () ->
-                    AcademicContextValidator.validate(context, RoleType.DIRECTOR));
+                    AcademicContextValidator.validate(context, AcademicScope.CAREER));
         }
 
         @Test
@@ -119,7 +119,7 @@ class AcademicContextValidatorTest {
             UserAcademicContext context = new UserAcademicContext(dummyId, dummyUserId, null, null);
 
             assertThrows(InvalidDirectorAcademicContextException.class, () ->
-                    AcademicContextValidator.validate(context, RoleType.DIRECTOR));
+                    AcademicContextValidator.validate(context, AcademicScope.CAREER));
         }
     }
 
@@ -132,46 +132,49 @@ class AcademicContextValidatorTest {
         }
 
         @Test
-        @DisplayName("A dean can hold several faculties and a director several careers")
+        @DisplayName("FACULTY can hold several faculties and CAREER several careers")
         void deanAndDirectorAcceptSeveralContexts() {
             assertDoesNotThrow(() -> AcademicContextValidator.validateAll(
-                    List.of(context(5, null), context(8, null)), RoleType.DECANO));
+                    List.of(context(5, null), context(8, null)), AcademicScope.FACULTY));
             assertDoesNotThrow(() -> AcademicContextValidator.validateAll(
-                    List.of(context(10, "025"), context(10, "026"), context(8, "015")), RoleType.DIRECTOR));
+                    List.of(context(10, "025"), context(10, "026"), context(8, "015")), AcademicScope.CAREER));
         }
 
         @Test
-        @DisplayName("Global roles take no context; dean and director need at least one")
+        @DisplayName("GLOBAL and NONE take no context; FACULTY and CAREER need at least one")
         void countRules() {
-            assertDoesNotThrow(() -> AcademicContextValidator.validateAll(List.of(), RoleType.RECTOR));
-            assertDoesNotThrow(() -> AcademicContextValidator.validateAll(List.of(), RoleType.SUPERADMIN));
+            assertDoesNotThrow(() -> AcademicContextValidator.validateAll(List.of(), AcademicScope.GLOBAL));
+            assertDoesNotThrow(() -> AcademicContextValidator.validateAll(List.of(), AcademicScope.NONE));
             assertThrows(InvalidAcademicContextException.class, () ->
-                    AcademicContextValidator.validateAll(List.of(context(5, null)), RoleType.RECTOR));
+                    AcademicContextValidator.validateAll(List.of(context(5, null)), AcademicScope.GLOBAL));
+            InvalidAcademicContextException none = assertThrows(InvalidAcademicContextException.class, () ->
+                    AcademicContextValidator.validateAll(List.of(context(5, null)), AcademicScope.NONE));
+            assertTrue(none.getMessage().contains("no faculty/career analytics permission"));
             assertThrows(InvalidAcademicContextException.class, () ->
-                    AcademicContextValidator.validateAll(List.of(), RoleType.DECANO));
+                    AcademicContextValidator.validateAll(List.of(), AcademicScope.FACULTY));
             assertThrows(InvalidAcademicContextException.class, () ->
-                    AcademicContextValidator.validateAll(List.of(), RoleType.DIRECTOR));
+                    AcademicContextValidator.validateAll(List.of(), AcademicScope.CAREER));
         }
 
         @Test
         @DisplayName("Duplicates are rejected")
         void duplicatesAreRejected() {
             InvalidAcademicContextException dean = assertThrows(InvalidAcademicContextException.class, () ->
-                    AcademicContextValidator.validateAll(List.of(context(5, null), context(5, null)), RoleType.DECANO));
+                    AcademicContextValidator.validateAll(List.of(context(5, null), context(5, null)), AcademicScope.FACULTY));
             assertTrue(dean.getMessage().contains("faculty 5"));
             InvalidAcademicContextException director = assertThrows(InvalidAcademicContextException.class, () ->
                     AcademicContextValidator.validateAll(
-                            List.of(context(10, "025"), context(8, "015"), context(10, "025")), RoleType.DIRECTOR));
+                            List.of(context(10, "025"), context(8, "015"), context(10, "025")), AcademicScope.CAREER));
             assertTrue(director.getMessage().contains("career 025"));
         }
 
         @Test
-        @DisplayName("Each context keeps the shape rule of the role")
+        @DisplayName("Each context keeps the shape rule of the scope")
         void everyContextKeepsTheShapeRule() {
             assertThrows(InvalidDeanAcademicContextException.class, () -> AcademicContextValidator.validateAll(
-                    List.of(context(5, null), context(10, "025")), RoleType.DECANO));
+                    List.of(context(5, null), context(10, "025")), AcademicScope.FACULTY));
             assertThrows(InvalidDirectorAcademicContextException.class, () -> AcademicContextValidator.validateAll(
-                    List.of(context(10, "025"), context(8, null)), RoleType.DIRECTOR));
+                    List.of(context(10, "025"), context(8, null)), AcademicScope.CAREER));
         }
 
         @Test
@@ -179,11 +182,11 @@ class AcademicContextValidatorTest {
         void upperBound() {
             List<UserAcademicContext> max = IntStream.range(0, AcademicContextValidator.MAX_CONTEXTS)
                     .mapToObj(i -> context(i, null)).toList();
-            assertDoesNotThrow(() -> AcademicContextValidator.validateAll(max, RoleType.DECANO));
+            assertDoesNotThrow(() -> AcademicContextValidator.validateAll(max, AcademicScope.FACULTY));
             List<UserAcademicContext> tooMany = IntStream.rangeClosed(0, AcademicContextValidator.MAX_CONTEXTS)
                     .mapToObj(i -> context(i, null)).toList();
             assertThrows(InvalidAcademicContextException.class, () ->
-                    AcademicContextValidator.validateAll(tooMany, RoleType.DECANO));
+                    AcademicContextValidator.validateAll(tooMany, AcademicScope.FACULTY));
         }
     }
 }

@@ -32,6 +32,7 @@ const user: AdminUserDirectoryEntry = {
   lastName: 'García',
   isActive: true,
   roles: ['DIRECTOR'],
+  academicScope: 'CAREER',
   academicContexts: [],
 };
 

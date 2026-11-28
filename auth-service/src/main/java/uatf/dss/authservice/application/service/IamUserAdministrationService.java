@@ -62,19 +62,21 @@ public class IamUserAdministrationService implements IamUserAdministrationUseCas
     private final UserRepository localUsers;
     private final SyncUserUseCase syncUser;
     private final AdminAuditRecorder audit;
+    private final AcademicScopeResolver scopeResolver;
     private final String permissionsClientId;
     private final Duration invitationLifespan;
 
     public IamUserAdministrationService(IdentityUserAdminPort users, IdentityRoleAdminPort roles,
                                         IdentityRoleMappingPort mappings, UserRepository localUsers,
                                         SyncUserUseCase syncUser, AdminAuditRecorder audit,
-                                        String permissionsClientId, Duration invitationLifespan) {
+                                        AcademicScopeResolver scopeResolver, String permissionsClientId, Duration invitationLifespan) {
         this.users = users;
         this.roles = roles;
         this.mappings = mappings;
         this.localUsers = localUsers;
         this.syncUser = syncUser;
         this.audit = audit;
+        this.scopeResolver = scopeResolver;
         this.permissionsClientId = permissionsClientId;
         this.invitationLifespan = invitationLifespan;
     }
@@ -105,7 +107,7 @@ public class IamUserAdministrationService implements IamUserAdministrationUseCas
         if (command.sendInvitation()) {
             invitationSent = sendInvitationQuietly(command.actor(), local.id(), keycloakId);
         }
-        return view(local.id(), created, invitationSent);
+        return view(local.id(), created, keycloakId, invitationSent);
     }
 
     @Override
@@ -126,7 +128,7 @@ public class IamUserAdministrationService implements IamUserAdministrationUseCas
                 },
                 IamUserAdministrationService::snapshot);
         refreshLocal(updated, null);
-        return view(command.userId(), updated, null);
+        return view(command.userId(), updated, keycloakId, null);
     }
 
     @Override
@@ -326,10 +328,11 @@ public class IamUserAdministrationService implements IamUserAdministrationUseCas
         return snapshot;
     }
 
-    private static IamUserViews.IamUser view(UUID localId, IdentityUser user, Boolean invitationSent) {
+    private IamUserViews.IamUser view(UUID localId, IdentityUser user, String keycloakId, Boolean invitationSent) {
         return new IamUserViews.IamUser(localId, user.username(), user.email(), user.firstName(), user.lastName(),
                 user.enabled(), user.emailVerified(),
-                user.createdTimestamp() == null ? null : Instant.ofEpochMilli(user.createdTimestamp()), invitationSent);
+                user.createdTimestamp() == null ? null : Instant.ofEpochMilli(user.createdTimestamp()), invitationSent,
+                scopeResolver.resolve(keycloakId));
     }
 
     private static String trimToNull(String value) {
