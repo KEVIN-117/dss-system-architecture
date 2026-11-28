@@ -10,7 +10,8 @@ public final class IamRoleViews {
     }
 
     /**
-     * @param portal portal a holder of this role is routed to (attribute {@code portal}), e.g. {@code rector}
+     * @param portal application the role opens ({@code admin}, {@code rector}, {@code decano} or {@code director}),
+     *               taken from the {@code portal:*} permission it groups; {@code null} if it has none yet
      * @param system role the platform depends on: it can be edited but not deleted
      */
     public record Role(String name, String description, String portal, boolean system) {

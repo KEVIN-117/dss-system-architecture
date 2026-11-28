@@ -59,8 +59,8 @@ Un permiso nuevo se crea desde el admin-portal (**Permisos**) y llega al token s
 
 - SUPERADMIN no tiene permisos académicos ni `olap:admin` (D4): administrar la plataforma no da acceso a los datos. Desde LM-005 sí opera el Load Manager: lanza, detiene y programa cargas ETL. Esos permisos no dan acceso a los datos del DW.
 - `olap:*`, `dw:*` y `prediction:publish` se asignan por usuario o en roles creados desde el portal.
-- **Aplicación del rol (IAM-020):** cada rol abre una sola aplicación, la de su permiso `portal:*`; ese permiso no se hereda entre RECTOR, DECANO y DIRECTOR. Mientras IAM-021…IAM-024 no estén desplegados, el portal todavía se decide por los cuatro roles y `KEYCLOAK_PORTAL_ROLES` (§3).
-- Roles, permisos y la matriz rol × permiso se editan en el admin-portal (**Roles**, **Permisos**, **Matriz de acceso**). Los roles del sistema (los cuatro de arriba) y los permisos `iam:*` y `context:read` no se pueden borrar, y SUPERADMIN siempre conserva `iam:*`.
+- **Aplicación del rol (IAM-020/021):** cada rol abre una sola aplicación, la de su permiso `portal:*`; ese permiso no se hereda entre RECTOR, DECANO y DIRECTOR. auth-service lo garantiza: la aplicación es obligatoria al crear un rol, cambiarla reemplaza su `portal:*`, la matriz no la cambia (los `portal:*` se conservan aunque falten en la lista y agregar otro da 400), los roles del sistema conservan la suya y los `portal:*` no se crean ni se borran a mano. El atributo libre `portal` ya no se usa (se elimina al editar el rol). Mientras IAM-024 no esté desplegado, la entrada a cada app todavía se decide por los cuatro roles y `KEYCLOAK_PORTAL_ROLES` (§3).
+- Roles, permisos y la matriz rol × permiso se editan en el admin-portal (**Roles**, **Permisos**, **Matriz de acceso**). Los roles del sistema (los cuatro de arriba) y los permisos `iam:*`, `context:read` y `portal:*` no se pueden borrar, y SUPERADMIN siempre conserva `iam:*`.
 
 ### 1.3 Clientes
 
@@ -97,7 +97,7 @@ Publica en `keycloak.user.events` (con DLX/DLQ y confirmación del broker) altas
 | Recurso | Operaciones | Permiso |
 |---|---|---|
 | Usuarios | crear e invitar, activar/desactivar, correos de acción, roles y permisos directos y efectivos, resync | `iam:users:read` / `iam:users:write` |
-| Roles y permisos | CRUD de roles (con `portal`) y permisos, matriz, reemplazo de permisos de un rol | `iam:roles:read` / `iam:roles:write` |
+| Roles y permisos | CRUD de roles (cada uno con su aplicación, `portal`, obligatoria) y permisos, matriz, reemplazo de permisos de un rol | `iam:roles:read` / `iam:roles:write` |
 | Aplicaciones | listar, registrar, editar, rotar secreto | `iam:clients:read` / `iam:clients:write` |
 | Auditoría | consulta paginada y filtrable | `iam:audit:read` |
 

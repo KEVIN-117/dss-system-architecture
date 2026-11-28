@@ -8,6 +8,7 @@ import uatf.dss.authservice.domain.exception.conflict.IamRuleViolationException;
 import uatf.dss.authservice.domain.exception.notfound.IdentityResourceNotFoundException;
 import uatf.dss.authservice.domain.exception.validation.ValidationException;
 import uatf.dss.authservice.domain.model.KeycloakBuiltInRoles;
+import uatf.dss.authservice.domain.model.PortalApplication;
 import uatf.dss.authservice.domain.model.audit.AuditTargetType;
 import uatf.dss.authservice.domain.model.identity.IdentityRole;
 import uatf.dss.authservice.domain.model.identity.IdentityRoleDraft;
@@ -19,6 +20,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.regex.Pattern;
@@ -33,16 +35,19 @@ import java.util.stream.Collectors;
  *     <li>A role held by users, or a permission grouped by a role or held by a user, is only deleted with
  *     {@code force}.</li>
  *     <li>Names are validated ({@code ROLE_NAME}, {@code resource:action}) and immutable; every write is audited.</li>
+ *     <li>Every role belongs to exactly one application (IAM-021): it groups exactly one {@code portal:*} permission,
+ *     required on create and changed only through the role, never through its permissions. System roles keep the
+ *     application of their portal. {@code portal:*} permissions are not created or deleted by hand.</li>
  * </ul>
  */
 public class IamRoleAdministrationService implements IamRoleAdministrationUseCase {
 
     public static final Set<String> SYSTEM_ROLES = Set.of("SUPERADMIN", "RECTOR", "DECANO", "DIRECTOR");
     static final Pattern ROLE_NAME = Pattern.compile("^[A-Z][A-Z0-9_]{1,49}$");
-    static final Pattern PORTAL = Pattern.compile("^[a-z][a-z0-9-]{0,49}$");
     static final Pattern PERMISSION_NAME = Pattern.compile("^[a-z][a-z0-9-]*(:[a-z][a-z0-9-]*)+$");
     static final int MAX_PERMISSION_NAME = 100;
-    private static final String PORTAL_ATTRIBUTE = "portal";
+    /** Free-text attribute used before IAM-021; translated to portal:* by iam-020 and dropped on update. */
+    private static final String LEGACY_PORTAL_ATTRIBUTE = "portal";
     private static final String IAM_PREFIX = "iam:";
     private static final String CONTEXT_READ = "context:read";
 
@@ -63,21 +68,22 @@ public class IamRoleAdministrationService implements IamRoleAdministrationUseCas
     public List<IamRoleViews.Role> listRoles() {
         return roles.listRealmRoles().stream()
                 .filter(role -> !KeycloakBuiltInRoles.isBuiltIn(role.name()))
-                .map(IamRoleAdministrationService::roleView)
+                .map(role -> roleView(role, compositeNames(role.name())))
                 .sorted(Comparator.comparing(IamRoleViews.Role::name))
                 .toList();
     }
 
     @Override
     public IamRoleViews.Role getRole(String name) {
-        return roleView(realmRole(name));
+        IdentityRole role = realmRole(name);
+        return roleView(role, compositeNames(role.name()));
     }
 
     @Override
     public IamRoleViews.Role createRole(IamRoleCommands.CreateRole command) {
         String name = trim(command.name());
         String portal = blankToNull(command.portal());
-        IdentityRoleDraft draft = new IdentityRoleDraft(name, blankToNull(command.description()), portalAttributes(Map.of(), portal));
+        IdentityRoleDraft draft = new IdentityRoleDraft(name, blankToNull(command.description()), Map.of());
         audit.recordRemote(
                 new AdminAuditRecorder.Operation(command.actor(), "ROLE_CREATED", AuditTargetType.ROLE, name, null),
                 () -> {
@@ -88,11 +94,22 @@ public class IamRoleAdministrationService implements IamRoleAdministrationUseCas
                     if (KeycloakBuiltInRoles.isBuiltIn(name)) {
                         throw new ValidationException("El nombre " + name + " está reservado por Keycloak.");
                     }
-                    validatePortal(portal);
+                    PortalApplication application = requireApplication(portal);
                     roles.createRealmRole(draft);
+                    try {
+                        roles.addClientCompositesToRealmRole(name, permissionsClientId, Set.of(application.permission()));
+                    } catch (RuntimeException failure) {
+                        // A role without its application would open nothing: undo the creation.
+                        try {
+                            roles.deleteRealmRole(name);
+                        } catch (RuntimeException rollbackFailure) {
+                            failure.addSuppressed(rollbackFailure);
+                        }
+                        throw failure;
+                    }
                     return realmRole(name);
                 },
-                IamRoleAdministrationService::roleSnapshot);
+                this::roleSnapshot);
         return getRole(name);
     }
 
@@ -100,20 +117,32 @@ public class IamRoleAdministrationService implements IamRoleAdministrationUseCas
     public IamRoleViews.Role updateRole(IamRoleCommands.UpdateRole command) {
         String name = trim(command.name());
         IdentityRole current = realmRole(name);
+        Set<String> currentPermissions = compositeNames(name);
         IdentityRole updated = audit.recordRemote(
                 new AdminAuditRecorder.Operation(command.actor(), "ROLE_UPDATED", AuditTargetType.ROLE, name,
-                        () -> roleSnapshot(current)),
+                        () -> roleSnapshot(current, currentPermissions)),
                 () -> {
-                    String portal = command.portal() == null ? portalOf(current) : blankToNull(command.portal());
-                    validatePortal(portal);
+                    PortalApplication application = command.portal() == null
+                            ? null : requireApplication(blankToNull(command.portal()));
+                    if (application != null) {
+                        PortalApplication fixed = PortalApplication.ofSystemRole(name).orElse(null);
+                        if (fixed != null && fixed != application) {
+                            throw new IamRuleViolationException("El rol " + name + " es del sistema y siempre abre la "
+                                    + "aplicación " + fixed.id() + ".");
+                        }
+                    }
                     String description = command.description() == null
                             ? current.description() : blankToNull(command.description());
+                    // The legacy free-text attribute "portal" is dropped: the application is the portal:* composite.
                     roles.updateRealmRole(name, new IdentityRoleDraft(name, description,
-                            portalAttributes(current.attributes(), portal)));
+                            withoutLegacyPortalAttribute(current.attributes())));
+                    if (application != null) {
+                        setApplication(name, currentPermissions, application);
+                    }
                     return realmRole(name);
                 },
-                IamRoleAdministrationService::roleSnapshot);
-        return roleView(updated);
+                this::roleSnapshot);
+        return roleView(updated, compositeNames(name));
     }
 
     @Override
@@ -123,8 +152,9 @@ public class IamRoleAdministrationService implements IamRoleAdministrationUseCas
         audit.recordRemote(
                 new AdminAuditRecorder.Operation(command.actor(), "ROLE_DELETED", AuditTargetType.ROLE, name,
                         () -> {
-                            Map<String, Object> before = roleSnapshot(current);
-                            before.put("permissions", permissionNames(roles.listRealmRoleClientComposites(name, permissionsClientId)));
+                            Set<String> permissions = compositeNames(name);
+                            Map<String, Object> before = roleSnapshot(current, permissions);
+                            before.put("permissions", List.copyOf(permissions));
                             return before;
                         }),
                 () -> {
@@ -156,6 +186,8 @@ public class IamRoleAdministrationService implements IamRoleAdministrationUseCas
         Set<String> requested = command.permissions().stream().filter(Objects::nonNull).map(String::trim)
                 .filter(name -> !name.isEmpty()).collect(Collectors.toCollection(TreeSet::new));
         Set<String> current = permissionNames(roles.listRealmRoleClientComposites(roleName, permissionsClientId));
+        // The application is not part of the grid: the portal:* the role has are kept even if the list omits them.
+        current.stream().filter(PortalApplication::isPortalPermission).forEach(requested::add);
 
         audit.recordRemote(
                 new AdminAuditRecorder.Operation(command.actor(), "ROLE_PERMISSIONS_REPLACED", AuditTargetType.ROLE,
@@ -163,6 +195,11 @@ public class IamRoleAdministrationService implements IamRoleAdministrationUseCas
                 () -> {
                     Set<String> toAdd = difference(requested, current);
                     Set<String> toRemove = difference(current, requested);
+                    List<String> portals = toAdd.stream().filter(PortalApplication::isPortalPermission).toList();
+                    if (!portals.isEmpty()) {
+                        throw new ValidationException("La aplicación del rol (" + String.join(", ", portals)
+                                + ") se cambia al editar el rol, no en sus permisos.");
+                    }
                     if ("SUPERADMIN".equals(roleName)
                             && toRemove.stream().anyMatch(permission -> permission.startsWith(IAM_PREFIX))) {
                         throw new IamRuleViolationException(
@@ -193,6 +230,10 @@ public class IamRoleAdministrationService implements IamRoleAdministrationUseCas
                     if (name == null || name.length() > MAX_PERMISSION_NAME || !PERMISSION_NAME.matcher(name).matches()) {
                         throw new ValidationException("Nombre de permiso inválido: usa el formato recurso:acción en "
                                 + "minúsculas (hasta " + MAX_PERMISSION_NAME + " caracteres), por ejemplo reports:export.");
+                    }
+                    if (PortalApplication.isPortalPermission(name)) {
+                        throw new ValidationException("Los permisos portal:* representan las aplicaciones ("
+                                + PortalApplication.ids() + ") y no se crean a mano.");
                     }
                     if (command.description() == null || command.description().isBlank()) {
                         throw new ValidationException("Describe qué permite el permiso.");
@@ -258,12 +299,16 @@ public class IamRoleAdministrationService implements IamRoleAdministrationUseCas
 
     @Override
     public IamRoleViews.Matrix matrix() {
-        List<IamRoleViews.Role> roleViews = listRoles();
+        List<IamRoleViews.Role> roleViews = new ArrayList<>();
         Map<String, List<String>> grants = new LinkedHashMap<>();
-        for (IamRoleViews.Role role : roleViews) {
-            grants.put(role.name(), List.copyOf(permissionNames(
-                    roles.listRealmRoleClientComposites(role.name(), permissionsClientId))));
-        }
+        roles.listRealmRoles().stream()
+                .filter(role -> !KeycloakBuiltInRoles.isBuiltIn(role.name()))
+                .sorted(Comparator.comparing(IdentityRole::name))
+                .forEach(role -> {
+                    Set<String> permissions = compositeNames(role.name());
+                    roleViews.add(roleView(role, permissions));
+                    grants.put(role.name(), List.copyOf(permissions));
+                });
         return new IamRoleViews.Matrix(roleViews, listPermissions(), grants);
     }
 
@@ -274,7 +319,7 @@ public class IamRoleAdministrationService implements IamRoleAdministrationUseCas
     }
 
     public static boolean isSystemPermission(String name) {
-        return name.startsWith(IAM_PREFIX) || CONTEXT_READ.equals(name);
+        return name.startsWith(IAM_PREFIX) || CONTEXT_READ.equals(name) || PortalApplication.isPortalPermission(name);
     }
 
     private List<String> rolesGranting(String permission) {
@@ -302,37 +347,57 @@ public class IamRoleAdministrationService implements IamRoleAdministrationUseCas
                 new IdentityResourceNotFoundException("No existe el permiso " + trimmed + "."));
     }
 
-    private static void validatePortal(String portal) {
-        if (portal != null && !PORTAL.matcher(portal).matches()) {
-            throw new ValidationException("Portal inválido: usa minúsculas, números y guion, por ejemplo rector.");
+    private static PortalApplication requireApplication(String id) {
+        if (id == null) {
+            throw new ValidationException("Elige la aplicación del rol: " + PortalApplication.ids() + ".");
+        }
+        return PortalApplication.fromId(id).orElseThrow(() -> new ValidationException(
+                "Aplicación inválida: usa " + PortalApplication.ids() + "."));
+    }
+
+    /** Leaves the role grouping exactly the access permission of {@code application}. */
+    private void setApplication(String roleName, Set<String> currentPermissions, PortalApplication application) {
+        Set<String> stale = currentPermissions.stream()
+                .filter(PortalApplication::isPortalPermission)
+                .filter(permission -> !permission.equals(application.permission()))
+                .collect(Collectors.toCollection(TreeSet::new));
+        if (!currentPermissions.contains(application.permission())) {
+            roles.addClientCompositesToRealmRole(roleName, permissionsClientId, Set.of(application.permission()));
+        }
+        if (!stale.isEmpty()) {
+            roles.removeClientCompositesFromRealmRole(roleName, permissionsClientId, stale);
         }
     }
 
-    /** Keeps every other attribute and sets or removes {@code portal}. */
-    private static Map<String, List<String>> portalAttributes(Map<String, List<String>> current, String portal) {
+    private Set<String> compositeNames(String roleName) {
+        return permissionNames(roles.listRealmRoleClientComposites(roleName, permissionsClientId));
+    }
+
+    /** The application of a role: its first known {@code portal:*} permission, if any. */
+    private static Optional<PortalApplication> applicationOf(Set<String> permissions) {
+        return permissions.stream().map(PortalApplication::fromPermission).flatMap(Optional::stream).findFirst();
+    }
+
+    private static Map<String, List<String>> withoutLegacyPortalAttribute(Map<String, List<String>> current) {
         Map<String, List<String>> attributes = new HashMap<>(current == null ? Map.of() : current);
-        if (portal == null) {
-            attributes.remove(PORTAL_ATTRIBUTE);
-        } else {
-            attributes.put(PORTAL_ATTRIBUTE, List.of(portal));
-        }
+        attributes.remove(LEGACY_PORTAL_ATTRIBUTE);
         return attributes;
     }
 
-    private static String portalOf(IdentityRole role) {
-        List<String> values = role.attributes().get(PORTAL_ATTRIBUTE);
-        return values == null || values.isEmpty() ? null : values.getFirst();
+    private static IamRoleViews.Role roleView(IdentityRole role, Set<String> permissions) {
+        return new IamRoleViews.Role(role.name(), role.description(),
+                applicationOf(permissions).map(PortalApplication::id).orElse(null), isSystemRole(role.name()));
     }
 
-    private static IamRoleViews.Role roleView(IdentityRole role) {
-        return new IamRoleViews.Role(role.name(), role.description(), portalOf(role), isSystemRole(role.name()));
+    private Map<String, Object> roleSnapshot(IdentityRole role) {
+        return roleSnapshot(role, compositeNames(role.name()));
     }
 
-    private static Map<String, Object> roleSnapshot(IdentityRole role) {
+    private static Map<String, Object> roleSnapshot(IdentityRole role, Set<String> permissions) {
         Map<String, Object> snapshot = new LinkedHashMap<>();
         snapshot.put("name", role.name());
         snapshot.put("description", role.description());
-        snapshot.put("portal", portalOf(role));
+        snapshot.put("portal", applicationOf(permissions).map(PortalApplication::id).orElse(null));
         return snapshot;
     }
 

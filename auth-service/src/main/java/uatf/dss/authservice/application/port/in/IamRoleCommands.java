@@ -13,10 +13,11 @@ public final class IamRoleCommands {
     private IamRoleCommands() {
     }
 
+    /** {@code portal} is the application the role opens: {@code admin}, {@code rector}, {@code decano} or {@code director}. */
     public record CreateRole(AuditActor actor, String name, String description, String portal) {
     }
 
-    /** {@code null} leaves a field unchanged; an empty {@code portal} removes it. */
+    /** {@code null} leaves a field unchanged; a role cannot be left without an application, so {@code portal} is never blank. */
     public record UpdateRole(AuditActor actor, String name, String description, String portal) {
     }
 
