@@ -144,5 +144,10 @@ jobs:
         if: steps.playwright-cache.outputs.cache-hit == 'true'
         timeout-minutes: 5
         run: bun run playwright install-deps chromium
-      - name: Build and test ${{ matrix.app }}
-        run: bun nx run-many -t build e2e -p "@dss-monorepo/${{ matrix.app }},@dss-monorepo/${{ matrix.app }}-e2e"
+      # The inferred e2e target has no dependsOn, so running build and e2e in
+      # one command starts the Playwright `next dev` server before the
+      # libraries' dist/ outputs exist ("Can't resolve '@dss-monorepo/auth'").
+      - name: Build ${{ matrix.app }} and its libraries
+        run: bun nx run-many -t build -p "@dss-monorepo/${{ matrix.app }}"
+      - name: E2E ${{ matrix.app }}
+        run: bun nx run-many -t e2e -p "@dss-monorepo/${{ matrix.app }}-e2e"
