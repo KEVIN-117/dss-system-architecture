@@ -12,6 +12,7 @@ import {
   DialogTitle,
   Input,
   Loader,
+  Select,
   Table,
   TableBody,
   TableCell,
@@ -21,8 +22,8 @@ import {
 } from '@dss-monorepo/design-system';
 import { Pencil, Plus, RefreshCw, Trash2 } from 'lucide-react';
 import { useHasPermission } from '@dss-monorepo/rbac';
+import { DSS_APPS, dssAppById, type IamRolePortal } from '@dss-monorepo/auth-models';
 import {
-  PORTAL_PATTERN,
   ROLE_NAME_PATTERN,
   createRole,
   deleteRole,
@@ -32,7 +33,10 @@ import {
 } from '../data-access/iam-access';
 import { DeleteInUseDialog } from './DeleteInUseDialog';
 
-/** Roles of the realm (IAM-017): create, describe, route to a portal and delete. */
+/** Shown for roles without an application: their holders cannot open any portal (IAM-022). */
+export const NO_APP_WARNING = 'Sin aplicación: nadie podrá entrar con este rol';
+
+/** Roles of the realm (IAM-017): create, describe, choose their application (IAM-022) and delete. */
 export function AdminRolesPage() {
   const canWrite = useHasPermission('iam:roles:write');
   const [roles, setRoles] = React.useState<IamRole[]>([]);
@@ -69,7 +73,7 @@ export function AdminRolesPage() {
           <p className="text-sm font-medium text-muted-foreground">Administración · servicio de autenticación</p>
           <h1 id="admin-roles-title" className="text-2xl font-semibold tracking-tight">Roles</h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Un rol agrupa permisos y decide a qué portal entra quien lo tiene. Qué permisos tiene cada rol se
+            Un rol agrupa permisos y decide a qué aplicación entra quien lo tiene. Qué permisos tiene cada rol se
             edita en la matriz de acceso.
           </p>
         </div>
@@ -107,7 +111,7 @@ export function AdminRolesPage() {
             <TableRow>
               <TableHead>Rol</TableHead>
               <TableHead>Descripción</TableHead>
-              <TableHead>Portal</TableHead>
+              <TableHead>Aplicación</TableHead>
               <TableHead className="text-right">Acciones</TableHead>
             </TableRow>
           </TableHeader>
@@ -121,7 +125,11 @@ export function AdminRolesPage() {
                   </span>
                 </TableCell>
                 <TableCell className="font-sans text-sm text-muted-foreground">{role.description || '—'}</TableCell>
-                <TableCell className="font-sans text-sm">{role.portal || 'Sin portal'}</TableCell>
+                <TableCell className="font-sans text-sm">
+                  {dssAppById(role.portal)?.label ?? (
+                    <span className="text-amber-700 dark:text-amber-400">{NO_APP_WARNING}</span>
+                  )}
+                </TableCell>
                 <TableCell>
                   {canWrite && (
                     <div className="flex justify-end gap-1">
@@ -191,9 +199,10 @@ function RoleFormDialog({ role, onClose, onSaved }: {
   onSaved: (role: IamRole, created: boolean) => void;
 }) {
   const creating = role === 'new';
+  const systemRole = role !== null && role !== 'new' && role.system;
   const [name, setName] = React.useState('');
   const [description, setDescription] = React.useState('');
-  const [portal, setPortal] = React.useState('');
+  const [portal, setPortal] = React.useState<IamRolePortal | ''>('');
   const [saving, setSaving] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
 
@@ -201,7 +210,7 @@ function RoleFormDialog({ role, onClose, onSaved }: {
     if (role === null) return;
     setName(role === 'new' ? '' : role.name);
     setDescription(role === 'new' ? '' : role.description ?? '');
-    setPortal(role === 'new' ? '' : role.portal ?? '');
+    setPortal(role === 'new' ? '' : dssAppById(role.portal)?.id ?? '');
     setError(null);
   }, [role]);
 
@@ -211,15 +220,15 @@ function RoleFormDialog({ role, onClose, onSaved }: {
       setError('El nombre usa MAYÚSCULAS, números y guion bajo, empieza con una letra y tiene de 2 a 50 caracteres.');
       return;
     }
-    if (portal.trim() && !PORTAL_PATTERN.test(portal.trim())) {
-      setError('El portal usa minúsculas, números y guion, por ejemplo rector.');
+    if (creating && !portal) {
+      setError('Elige la aplicación a la que entrará quien tenga el rol.');
       return;
     }
     setSaving(true);
     setError(null);
     try {
       const saved = creating
-        ? await createRole({ name, description, portal })
+        ? await createRole({ name, description, portal: portal as IamRolePortal })
         : await updateRole((role as IamRole).name, { description, portal });
       onSaved(saved, creating);
       onClose();
@@ -259,17 +268,26 @@ function RoleFormDialog({ role, onClose, onSaved }: {
             <Input id="role-description" maxLength={255} value={description} onChange={(event) => setDescription(event.target.value)} />
           </div>
           <div className="space-y-1.5">
-            <label htmlFor="role-portal" className="text-sm font-medium">Portal</label>
-            <Input
+            <label htmlFor="role-portal" className="text-sm font-medium">Aplicación <span aria-hidden="true">*</span></label>
+            <Select
               id="role-portal"
+              required
               value={portal}
-              onChange={(event) => setPortal(event.target.value.toLowerCase())}
-              placeholder="rector, decano, director…"
+              disabled={systemRole}
+              onChange={(event) => setPortal(event.target.value as IamRolePortal | '')}
               aria-describedby="role-portal-hint"
-            />
+            >
+              <option value="" disabled={!creating && portal !== ''}>Elige una aplicación</option>
+              {DSS_APPS.map((app) => (
+                <option key={app.id} value={app.id}>{app.label}</option>
+              ))}
+            </Select>
             <p id="role-portal-hint" className="text-xs text-muted-foreground">
-              Portal al que entra quien tiene el rol. Déjalo vacío para que no abra ninguno.
+              {systemRole
+                ? 'Los roles del sistema conservan su aplicación.'
+                : 'Aplicación a la que entra quien tiene el rol. Cada rol abre una sola.'}
             </p>
+            {!creating && !portal && <p className="text-xs text-amber-700 dark:text-amber-400">{NO_APP_WARNING}.</p>}
           </div>
           {error && (
             <p role="alert" className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-sm text-destructive">{error}</p>

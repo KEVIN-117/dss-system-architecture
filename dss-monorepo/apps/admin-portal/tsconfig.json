@@ -72,6 +72,9 @@
     },
     {
       "path": "../../libs/charts"
+    },
+    {
+      "path": "../../libs/shared/auth-models"
     }
   ]
 }

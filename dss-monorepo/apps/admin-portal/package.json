@@ -5,6 +5,7 @@
   "dependencies": {
     "@dss-monorepo/charts": "workspace:*",
     "@dss-monorepo/rbac": "workspace:*",
+    "@dss-monorepo/auth-models": "workspace:*",
     "@dss-monorepo/auth": "workspace:*",
     "@dss-monorepo/design-system": "workspace:*",
     "lucide-react": "^1.43.0",

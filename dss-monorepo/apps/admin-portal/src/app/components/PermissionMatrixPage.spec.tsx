@@ -32,8 +32,12 @@ beforeEach(() => {
       { name: 'DECANO', description: null, portal: 'decano', system: true },
       { name: 'DIRECTOR', description: null, portal: 'director', system: true },
     ],
-    permissions: ['analytics:read', 'dw:closure:read', 'iam:users:read'].map(permission),
-    grants: { SUPERADMIN: ['iam:users:read'], DECANO: ['analytics:read'], DIRECTOR: ['analytics:read'] },
+    permissions: ['analytics:read', 'dw:closure:read', 'iam:users:read', 'portal:decano', 'portal:director'].map(permission),
+    grants: {
+      SUPERADMIN: ['iam:users:read'],
+      DECANO: ['analytics:read', 'portal:decano'],
+      DIRECTOR: ['analytics:read', 'portal:director'],
+    },
   });
   access.replaceRolePermissions.mockImplementation(async (_role: string, names: string[]) => names.map(permission));
 });
@@ -57,6 +61,18 @@ describe('PermissionMatrixPage', () => {
     expect(cell('DECANO', 'dw:closure:read').checked).toBe(false);
     expect(cell('SUPERADMIN', 'iam:users:read').disabled).toBe(true);
     expect(screen.getByRole('button', { name: 'Revisar cambios (0)' })).toHaveProperty('disabled', true);
+  });
+
+  it('shows portal:* rows locked, pointing to the role editor', async () => {
+    render(<PermissionMatrixPage />);
+    await screen.findByRole('table', { name: 'Matriz de roles y permisos' });
+
+    expect(cell('DECANO', 'portal:decano').checked).toBe(true);
+    expect(cell('DECANO', 'portal:decano').disabled).toBe(true);
+    expect(cell('DECANO', 'portal:director').checked).toBe(false);
+    expect(cell('DECANO', 'portal:director').disabled).toBe(true);
+    expect(cell('DECANO', 'portal:director').title).toContain('Roles');
+    expect(screen.getByRole('link', { name: 'Roles' }).getAttribute('href')).toBe('/roles');
   });
 
   it('is read-only without iam:roles:write', async () => {
@@ -83,8 +99,8 @@ describe('PermissionMatrixPage', () => {
 
     fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }));
     await waitFor(() => expect(access.replaceRolePermissions).toHaveBeenCalledTimes(2));
-    expect(access.replaceRolePermissions).toHaveBeenNthCalledWith(1, 'DECANO', ['analytics:read', 'dw:closure:read']);
-    expect(access.replaceRolePermissions).toHaveBeenNthCalledWith(2, 'DIRECTOR', []);
+    expect(access.replaceRolePermissions).toHaveBeenNthCalledWith(1, 'DECANO', ['analytics:read', 'portal:decano', 'dw:closure:read']);
+    expect(access.replaceRolePermissions).toHaveBeenNthCalledWith(2, 'DIRECTOR', ['portal:director']);
     expect((await screen.findByRole('status')).textContent).toContain('2 roles');
     expect(screen.getByRole('button', { name: 'Revisar cambios (0)' })).toBeTruthy();
   });
